@@ -92,6 +92,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc -> Netlify redeploie tout seul (~1 min).
 
+-- 2026-07-20 — CAD retours Seb : origine centre, mode CAD persistant, ligne dedup -
+ - Origine G-code par DEFAUT = centre ('c' au lieu de 'bl').
+ - Le mode CAD (_cadMode) etait coupe apres creation d'une forme (setPTool select
+   dans handlePointerUp + confirmCircle/confirmStar) -> le cercle/rect reaffichait
+   les vieilles poignees orange. Corrige : on preserve _cadMode ({const _cm=...}).
+ - Bouton Ligne autonome retire de la barre CAD (present dans le menu Creer).
+ A FAIRE (retours Seb) : cercle qui reste ROND (poignee rayon, pas bbox), apercu
+ live du cercle depuis la modale, outil COTE (cotes facon Fusion : longueur/angle/
+ diametre saisissables), et LOCK/UNLOCK points/lignes/formes (contraintes).
+
 -- 2026-07-20 — CAD Phase 2b : barre a categories facon Fusion --------------------
  Barre CAD gauche reorganisee : Selection, Ligne (direct), puis 3 menus deroulants
  (openToolMenu) CREER / MODIFIER / CONTRAINTES avec TOUS les outils facon Fusion.
@@ -1997,7 +2007,6 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     <div id="cadBar">
       <div class="cadlbl">CAD</div>
       <button class="cadb" title="Sélection CAD" onclick="setPTool('select');_cadMode=true;redrawCanvas()">↖</button>
-      <button class="cadb" id="cadb-line" title="Ligne CAD (clic à clic, cotes exactes)" onclick="cadStartLine()">╱</button>
       <div class="cadsep"></div>
       <button class="cadb" title="Créer : ligne, rectangle, cercle, arc, polygone…" onclick="openToolMenu('cadCreate',this)">✏️<span style="font-size:7px;margin-left:1px">▾</span></button>
       <div class="cadlbl">Créer</div>
@@ -2275,7 +2284,7 @@ window.__PARSED_FONTS__={};
 // ════════════════════════════════════════════════════════════
 let wzStep = 0;
 let appMode = 'normal';
-let originKey = 'bl';
+let originKey = 'c'; // defaut : centre
 const ORIGIN_NAMES = {tl:'Haut-Gauche',tc:'Haut-Centre',tr:'Haut-Droite',
   cl:'Mi-Gauche',c:'Centre',cr:'Mi-Droite',bl:'Bas-Gauche',bc:'Bas-Centre',br:'Bas-Droite'};
 let generatedGcodes = {};
@@ -3316,7 +3325,7 @@ function loadAll(){
     if(brt.safeZ){ const el=document.getElementById('safeZ2');if(el) el.value=brt.safeZ; }
     if(brt.mode) { appMode=brt.mode; wzPickMode(brt.mode); }
     // Origine : restaurer après que le DOM est prêt
-    originKey = brt.origin || 'bl';
+    originKey = brt.origin || 'c';
   } catch(e){}
   // Fraises
   try {
@@ -6582,7 +6591,7 @@ function handlePointerUp(cpx,cpy){
     if(selToolId)obj.toolId=selToolId;
     obj.strokeW=currentStrokeW;
     obj.fill=currentFill;
-    paintObjects.push(obj);selObjId=obj.id;setPTool('select');
+    paintObjects.push(obj);selObjId=obj.id;{const _cm=_cadMode;setPTool('select');_cadMode=_cm;}
   }
   freePts=[];redrawCanvas();renderInspector();updateObjCount();
 }
@@ -12948,7 +12957,7 @@ function confirmCircle(){
     strokeW:currentStrokeW,fill:currentFill};
   if(selToolId)obj.toolId=selToolId;
   paintObjects.push(obj);selObjId=obj.id;
-  setPTool('select');
+  {const _cm=_cadMode;setPTool('select');_cadMode=_cm;}
   redrawCanvas();renderInspector();updateObjCount();
   document.getElementById('circleModal').classList.remove('open');
 }
@@ -12965,7 +12974,7 @@ function confirmStar(){
     branches:nb,strokeW:currentStrokeW,fill:currentFill};
   if(selToolId)obj.toolId=selToolId;
   paintObjects.push(obj);selObjId=obj.id;
-  setPTool('select');
+  {const _cm=_cadMode;setPTool('select');_cadMode=_cm;}
   redrawCanvas();renderInspector();updateObjCount();
   document.getElementById('starModal').classList.remove('open');
 }
