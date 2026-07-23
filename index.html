@@ -85,6 +85,22 @@
 #                                                                              #
 ################################################################################
 
+-- REGLE PERMANENTE (Seb) : TOUJOURS redonner le lien de l'appli a CHAQUE reponse
+   ou il y a eu une mise a jour (et/ou le fichier, peu importe la forme).
+   LIEN LIVE : https://melodic-kleicha-7a2cf3.netlify.app
+   Depot GitHub : DpixM/cnc (branche main) -> push = auto-deploy Netlify.
+   Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
+   push sur DpixM/cnc -> Netlify redeploie tout seul (~1 min).
+
+-- 2026-07-20 — CAD Phase 2b : barre a categories facon Fusion --------------------
+ Barre CAD gauche reorganisee : Selection, Ligne (direct), puis 3 menus deroulants
+ (openToolMenu) CREER / MODIFIER / CONTRAINTES avec TOUS les outils facon Fusion.
+ Outils reels branches : Ligne, Rectangle, Cercle, Ellipse, Oblong, Spline(=free),
+ Texte, Reseau rectangulaire. Les autres (Arc, Polygone, Point, Cote, Reseau circ,
+ Symetrie, Conge, Chanfrein, Decalage, Ajuster, Prolonger, Deplacer, Echelle, +
+ toutes les contraintes) = placeholders cadSoon() -> toast "bientot". A peaufiner.
+ Helper cadPick(t) = setPTool + _cadMode. TOOL_MENUS.cadCreate/cadModify/cadConstrain.
+
 -- 2026-07-20 — CAD Phase 2a : selection CAD (sans encadrement) -----------------
  En mode CAD (_cadMode, actif des qu'on utilise la barre CAD), la selection ne
  montre PLUS le carre englobant + poignees. A la place : trait surligne (bleu) +
@@ -1981,9 +1997,14 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     <div id="cadBar">
       <div class="cadlbl">CAD</div>
       <button class="cadb" title="Sélection CAD" onclick="setPTool('select');_cadMode=true;redrawCanvas()">↖</button>
-      <button class="cadb" id="cadb-line" title="Ligne CAD : clic à clic, accroche + cotes exactes (tape une longueur + Entrée)" onclick="cadStartLine()">╱</button>
-      <button class="cadb" title="Rectangle" onclick="setPTool('rect');_cadMode=true">▭</button>
-      <button class="cadb" title="Cercle" onclick="setPTool('circle');_cadMode=true">◯</button>
+      <button class="cadb" id="cadb-line" title="Ligne CAD (clic à clic, cotes exactes)" onclick="cadStartLine()">╱</button>
+      <div class="cadsep"></div>
+      <button class="cadb" title="Créer : ligne, rectangle, cercle, arc, polygone…" onclick="openToolMenu('cadCreate',this)">✏️<span style="font-size:7px;margin-left:1px">▾</span></button>
+      <div class="cadlbl">Créer</div>
+      <button class="cadb" title="Modifier : congé, ajuster, décalage, déplacer…" onclick="openToolMenu('cadModify',this)">🔧<span style="font-size:7px;margin-left:1px">▾</span></button>
+      <div class="cadlbl">Modif.</div>
+      <button class="cadb" title="Contraintes : parallèle, perpendiculaire, milieu…" onclick="openToolMenu('cadConstrain',this)">📐<span style="font-size:7px;margin-left:1px">▾</span></button>
+      <div class="cadlbl">Contr.</div>
       <div class="cadsep"></div>
       <button class="cadb" title="Ajuster la vue" onclick="fitView()" style="font-size:12px">🖥</button>
     </div>
@@ -4135,6 +4156,42 @@ const TOOL_MENUS = {
   export: [
     {i:'🟩', l:'Export SVG', fn:"exportDrawing('svg')"},
     {i:'🟦', l:'Export DXF', fn:"exportDrawing('dxf')"},
+  ],
+  cadCreate: [
+    {i:'╱', l:'Ligne',                fn:'cadStartLine()'},
+    {i:'▭', l:'Rectangle',            fn:"cadPick('rect')"},
+    {i:'◯', l:'Cercle',               fn:"cadPick('circle')"},
+    {i:'⬭', l:'Ellipse',              fn:"cadPick('ellipse')"},
+    {i:'◠', l:'Arc',                  fn:"cadSoon('Arc')"},
+    {i:'⬠', l:'Polygone',             fn:"cadSoon('Polygone')"},
+    {i:'▬', l:'Rainure (oblong)',     fn:"cadPick('oblong')"},
+    {i:'∿', l:'Spline (tracé libre)', fn:"cadPick('free')"},
+    {i:'•', l:'Point',                fn:"cadSoon('Point')"},
+    {i:'T', l:'Texte',                fn:"cadPick('text')"},
+    {i:'📏', l:'Cote',                fn:"cadSoon('Cote')"},
+    {i:'▦', l:'Réseau rectangulaire', fn:'openPatternRect()'},
+    {i:'✳️', l:'Réseau circulaire',   fn:"cadSoon('Réseau circulaire')"},
+    {i:'🪞', l:'Symétrie miroir',     fn:"cadSoon('Symétrie miroir')"},
+  ],
+  cadModify: [
+    {i:'⌒', l:'Congé (arrondi)',   fn:"cadSoon('Congé')"},
+    {i:'◣', l:'Chanfrein',         fn:"cadSoon('Chanfrein')"},
+    {i:'⧉', l:'Décalage (offset)', fn:"cadSoon('Décalage')"},
+    {i:'✂️', l:'Ajuster (trim)',   fn:"cadSoon('Ajuster')"},
+    {i:'⊢', l:'Prolonger',         fn:"cadSoon('Prolonger')"},
+    {i:'✥', l:'Déplacer / Copier', fn:"cadSoon('Déplacer / Copier')"},
+    {i:'⤢', l:'Échelle',           fn:"cadSoon('Échelle')"},
+  ],
+  cadConstrain: [
+    {i:'⊤', l:'Horizontale / Verticale', fn:"cadSoon('Contrainte H/V')"},
+    {i:'⊙', l:'Coïncident',       fn:"cadSoon('Coïncident')"},
+    {i:'◡', l:'Tangente',         fn:"cadSoon('Tangente')"},
+    {i:'=', l:'Égal',             fn:"cadSoon('Égal')"},
+    {i:'∥', l:'Parallèle',        fn:"cadSoon('Parallèle')"},
+    {i:'⟂', l:'Perpendiculaire',  fn:"cadSoon('Perpendiculaire')"},
+    {i:'△', l:'Milieu',           fn:"cadSoon('Milieu')"},
+    {i:'◎', l:'Concentrique',     fn:"cadSoon('Concentrique')"},
+    {i:'⋰', l:'Symétrie',         fn:"cadSoon('Symétrie')"},
   ]
 };
 
@@ -5878,6 +5935,8 @@ function _cadPointAtLen(from, toward, len){
 function _cadAngle(a,b){ // 0=Est, sens trigo (Y ecran vers le bas -> on inverse)
   let ang=Math.atan2(-(b[1]-a[1]), b[0]-a[0])*180/Math.PI; if(ang<0)ang+=360; return ang;
 }
+function cadPick(t){ setPTool(t); _cadMode=true; if(t!=='cadline') redrawCanvas(); } // outil CAD + mode CAD
+function cadSoon(n){ if(typeof toastHist==='function') toastHist('🔜 '+n+' — bientôt disponible (emplacement prêt)'); }
 function cadStartLine(){ _cad={pts:[],cursor:null,typed:'',_snapped:false}; setPTool('cadline'); _cadMode=true; cadUpdateBar(); redrawCanvasNow(); }
 function cadAddPoint(xm,ym){
   if(!_cad) _cad={pts:[],cursor:null,typed:'',_snapped:false};
