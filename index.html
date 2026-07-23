@@ -85,6 +85,13 @@
 #                                                                              #
 ################################################################################
 
+-- 2026-07-20 — CAD Phase 2a : selection CAD (sans encadrement) -----------------
+ En mode CAD (_cadMode, actif des qu'on utilise la barre CAD), la selection ne
+ montre PLUS le carre englobant + poignees. A la place : trait surligne (bleu) +
+ petits noeuds aux points cles (deplacables = edition geometrique, reutilise
+ getHandlesPx). Hors CAD (outils du haut), l'ancien style bbox reste. A SUIVRE :
+ outil Cote (coter les formes) - type 'dim', non usine.
+
 -- 2026-07-20 — CAD Phase 1 : barre gauche + outil Ligne (accroche + cotes + clavier)
  Nouvelle brique CAD (garde la barre du haut). Barre verticale #cadBar a gauche
  du canvas (Selection, Ligne CAD, Rectangle, Cercle, Ajuster).
@@ -1973,10 +1980,10 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
   <div id="canvasWrap" class="canvas-area" style="touch-action:none"><canvas id="paintCanvas" touch-action="none"></canvas>
     <div id="cadBar">
       <div class="cadlbl">CAD</div>
-      <button class="cadb" title="Sélection" onclick="setPTool('select')">↖</button>
+      <button class="cadb" title="Sélection CAD" onclick="setPTool('select');_cadMode=true;redrawCanvas()">↖</button>
       <button class="cadb" id="cadb-line" title="Ligne CAD : clic à clic, accroche + cotes exactes (tape une longueur + Entrée)" onclick="cadStartLine()">╱</button>
-      <button class="cadb" title="Rectangle" onclick="setPTool('rect')">▭</button>
-      <button class="cadb" title="Cercle" onclick="setPTool('circle')">◯</button>
+      <button class="cadb" title="Rectangle" onclick="setPTool('rect');_cadMode=true">▭</button>
+      <button class="cadb" title="Cercle" onclick="setPTool('circle');_cadMode=true">◯</button>
       <div class="cadsep"></div>
       <button class="cadb" title="Ajuster la vue" onclick="fitView()" style="font-size:12px">🖥</button>
     </div>
@@ -5616,6 +5623,14 @@ function redrawCanvasNow(){
           pCtx.fillStyle='#f5a623';pCtx.strokeStyle='#111';pCtx.lineWidth=1.5;
           pCtx.beginPath();pCtx.arc(h.x,h.y,HDSIZE/2+1,0,Math.PI*2);pCtx.fill();pCtx.stroke();
         }
+      } else if(_cadMode){
+        // MODE CAD : pas d'encadrement carre. On surligne le TRAIT + petits noeuds
+        // aux points cles (les noeuds restent deplacables = edition geometrique).
+        pCtx.save(); pCtx.setLineDash([]);
+        pCtx.strokeStyle='rgba(74,163,255,.95)'; pCtx.lineWidth=2.5; pCtx.lineJoin='round'; pCtx.lineCap='round';
+        try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } }catch(e){}
+        for(const h of getHandlesPx(o)){ if(h.id==='mv')continue; pCtx.fillStyle='#fff'; pCtx.strokeStyle='#3b82f6'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(h.x,h.y,4.5,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); }
+        pCtx.restore();
       } else {
         // contour de selection bien visible (liseré sombre dessous + pointillés vifs dessus)
         pCtx.setLineDash([]);pCtx.strokeStyle='rgba(0,0,0,.55)';pCtx.lineWidth=4;
@@ -5854,6 +5869,7 @@ function drawObjPx(o){
 // CAD Phase 1 — outil Ligne : clic a clic, accroche, cotes en direct, saisie clavier
 // ══════════════════════════════════════════════════════════════════════════
 let _cad = null; // {pts:[[x,y]...], cursor:[x,y]|null, typed:'', _snapped:false}
+let _cadMode = false; // vrai quand on utilise la barre CAD -> selection style CAD (pas d'encadrement)
 function _cadLen(a,b){ return Math.hypot(b[0]-a[0], b[1]-a[1]); }
 function _cadPointAtLen(from, toward, len){
   const dx=toward[0]-from[0], dy=toward[1]-from[1], L=Math.hypot(dx,dy)||1;
@@ -5862,7 +5878,7 @@ function _cadPointAtLen(from, toward, len){
 function _cadAngle(a,b){ // 0=Est, sens trigo (Y ecran vers le bas -> on inverse)
   let ang=Math.atan2(-(b[1]-a[1]), b[0]-a[0])*180/Math.PI; if(ang<0)ang+=360; return ang;
 }
-function cadStartLine(){ _cad={pts:[],cursor:null,typed:'',_snapped:false}; setPTool('cadline'); cadUpdateBar(); redrawCanvasNow(); }
+function cadStartLine(){ _cad={pts:[],cursor:null,typed:'',_snapped:false}; setPTool('cadline'); _cadMode=true; cadUpdateBar(); redrawCanvasNow(); }
 function cadAddPoint(xm,ym){
   if(!_cad) _cad={pts:[],cursor:null,typed:'',_snapped:false};
   const sp=snapPoint(xm,ym,null);
@@ -5879,9 +5895,9 @@ function cadFinish(){
     paintObjects.push({id,type:'free',pts:_cad.pts.map(q=>[q[0],q[1]]),strokeW:currentStrokeW,fill:'none',toolId:(typeof selToolId!=='undefined'?selToolId:null)});
     selObjId=id; if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount();
   }
-  _cad=null; setPTool('select'); redrawCanvas(); if(typeof renderInspector==='function')renderInspector(); cadUpdateBar();
+  _cad=null; setPTool('select'); _cadMode=true; redrawCanvas(); if(typeof renderInspector==='function')renderInspector(); cadUpdateBar();
 }
-function cadCancel(){ _cad=null; setPTool('select'); redrawCanvas(); cadUpdateBar(); }
+function cadCancel(){ _cad=null; setPTool('select'); _cadMode=true; redrawCanvas(); cadUpdateBar(); }
 function cadUpdateBar(){
   const s=document.getElementById('cadStatus'); if(s) s.style.display=(paintTool==='cadline'&&_cad)?'flex':'none';
   const t=document.getElementById('cadStatusTxt');
@@ -6675,6 +6691,7 @@ function syncToolCats(){
 
 function setPTool(t){
   if(t!=='cadline' && _cad){ _cad=null; if(typeof cadUpdateBar==='function') cadUpdateBar(); }
+  _cadMode=false;
   paintTool=t;
   document.querySelectorAll('.ptool').forEach(b=>b.classList.remove('active'));
   const el=document.getElementById('pt-'+t); if(el)el.classList.add('active');
