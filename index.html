@@ -92,6 +92,17 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc -> Netlify redeploie tout seul (~1 min).
 
+-- 2026-07-20 — CAD : cercle reste ROND + OUTIL COTE ------------------------------
+ - Cercle : marque _circle:true a la creation ; getHandlesPx renvoie SEULE la
+   poignee de deplacement -> plus aucune poignee de deformation, il reste rond.
+ - OUTIL COTE (📏, menu Creer) : element type 'dim' (2 points -> ligne cotee avec
+   la distance en mm). ANNOTATION seulement : objToStrokes(dim)=[] (jamais de
+   G-code), exclue de mmFlatObjs (pas dans le Mode d'usinage) et de l'export.
+   Rendu drawDim (ligne + ticks + libelle), apercu live _cadDimOverlay, selection
+   par le trait (hitTest/distToObjStroke). Tests test-cad.js : 11/11 (dont securite
+   "jamais usinee"). A SUIVRE : cotes pilotables (taper une valeur -> geometrie),
+   diametre de cercle cote, lock/unlock (contraintes).
+
 -- 2026-07-20 — CAD retours Seb : origine centre, mode CAD persistant, ligne dedup -
  - Origine G-code par DEFAUT = centre ('c' au lieu de 'bl').
  - Le mode CAD (_cadMode) etait coupe apres creation d'une forme (setPTool select
@@ -4177,7 +4188,7 @@ const TOOL_MENUS = {
     {i:'∿', l:'Spline (tracé libre)', fn:"cadPick('free')"},
     {i:'•', l:'Point',                fn:"cadSoon('Point')"},
     {i:'T', l:'Texte',                fn:"cadPick('text')"},
-    {i:'📏', l:'Cote',                fn:"cadSoon('Cote')"},
+    {i:'📏', l:'Cote',                fn:'cadStartDim()'},
     {i:'▦', l:'Réseau rectangulaire', fn:'openPatternRect()'},
     {i:'✳️', l:'Réseau circulaire',   fn:"cadSoon('Réseau circulaire')"},
     {i:'🪞', l:'Symétrie miroir',     fn:"cadSoon('Symétrie miroir')"},
@@ -5175,6 +5186,7 @@ function applyZoomAt(cpx,cpy,factor){
 
 function getObjBB(o){
   if(o.type==='group'||o.type==='gear')return{x:o.x,y:o.y,w:o.w,h:o.h};
+  if(o.type==='dim'){const mnx=Math.min(o.x1,o.x2),mny=Math.min(o.y1,o.y2);return{x:mnx,y:mny,w:Math.max(Math.abs(o.x2-o.x1),.5),h:Math.max(Math.abs(o.y2-o.y1),.5)};}
   if(o.type==='rect'||o.type==='tri'||o.type==='svg'||o.type==='star'||o.type==='oblong')return{x:o.x,y:o.y,w:o.w,h:o.h};
   if(o.type==='ellipse')return{x:o.x-o.rx,y:o.y-o.ry,w:o.rx*2,h:o.ry*2};
   if(o.type==='line'){const mnx=Math.min(o.x1,o.x2),mny=Math.min(o.y1,o.y2);return{x:mnx,y:mny,w:Math.max(Math.abs(o.x2-o.x1),.5),h:Math.max(Math.abs(o.y2-o.y1),.5)};}
@@ -5276,6 +5288,12 @@ function distToObjStroke(o,xm,ym){
     const t=Math.max(0,Math.min(1,((xm-o.x1)*dx+(ym-o.y1)*dy)/L2));
     return Math.hypot(xm-(o.x1+t*dx), ym-(o.y1+t*dy));
   }
+  if(o.type==='dim'){
+    const dx=o.x2-o.x1, dy=o.y2-o.y1, L2=dx*dx+dy*dy;
+    if(L2<1e-6) return Math.hypot(xm-o.x1,ym-o.y1);
+    const t=Math.max(0,Math.min(1,((xm-o.x1)*dx+(ym-o.y1)*dy)/L2));
+    return Math.hypot(xm-(o.x1+t*dx),ym-(o.y1+t*dy));
+  }
   let best=Infinity;
   let strokes=[];
   try{ strokes=objToStrokesRaw(o)||[]; }catch(e){ return Infinity; }
@@ -5308,6 +5326,13 @@ function hitTest(o,xm,ym){
     const t=Math.max(0,Math.min(1,((xm-o.x1)*dx+(ym-o.y1)*dy)/lenSq));
     const nx=o.x1+t*dx, ny=o.y1+t*dy;
     return Math.hypot(xm-nx,ym-ny)<thr;
+  }
+  if(o.type==='dim'){
+    const thr=6/(BASE_PX*vZoom);
+    const dx=o.x2-o.x1, dy=o.y2-o.y1, L2=dx*dx+dy*dy;
+    if(L2<1e-6) return Math.hypot(xm-o.x1,ym-o.y1)<thr;
+    const t=Math.max(0,Math.min(1,((xm-o.x1)*dx+(ym-o.y1)*dy)/L2));
+    return Math.hypot(xm-(o.x1+t*dx),ym-(o.y1+t*dy))<thr;
   }
   if(o.type==='svg'){
     // Sélection AU TRAIT (pas la boîte vide) : on ne prend le SVG que si le clic
@@ -5379,6 +5404,7 @@ function refitSvgBBox(o){
 
 function objToStrokes(o){
   const s=[];const org={x:0,y:0}; // strokes in sheet mm
+  if(o.type==='dim') return s; // COTE = annotation, jamais usinee
   if(o.type==='rect')s.push([[o.x,o.y],[o.x+o.w,o.y],[o.x+o.w,o.y+o.h],[o.x,o.y+o.h],[o.x,o.y]]);
   else if(o.type==='ellipse'){
     // Cercle parfait (rx≈ry) : 36pts suffisent, detectArc fera G2/G3
@@ -5771,9 +5797,11 @@ function redrawCanvasNow(){
   pCtx.fillStyle='rgba(80,90,100,.7)';pCtx.font='10px monospace';pCtx.textAlign='right';
   pCtx.fillText(Math.round(vZoom*100)+'%',cw-6,ch-6);
   if(typeof cadDrawOverlay==='function') cadDrawOverlay();
+  if(typeof _cadDimOverlay==='function') _cadDimOverlay();
 }
 
 function drawObjPx(o){
+  if(o.type==='dim'){ drawDim(o); return; }
   // ─── Stroke width: convert mm → px ───
   const swPx=Math.max(.5,(o.strokeW||0.5)*BASE_PX*vZoom);
   const savedLW=pCtx.lineWidth;
@@ -5947,6 +5975,54 @@ function _cadAngle(a,b){ // 0=Est, sens trigo (Y ecran vers le bas -> on inverse
 }
 function cadPick(t){ setPTool(t); _cadMode=true; if(t!=='cadline') redrawCanvas(); } // outil CAD + mode CAD
 function cadSoon(n){ if(typeof toastHist==='function') toastHist('🔜 '+n+' — bientôt disponible (emplacement prêt)'); }
+
+// ── OUTIL COTE (dimension) : element 'dim', annotation seulement (jamais usine) ──
+let _caddim = null; // {p1:[x,y]|null, cursor:[x,y]|null, _snapped}
+function cadStartDim(){ _caddim={p1:null,cursor:null,_snapped:false}; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique le 1er point'); redrawCanvasNow(); }
+function cadDimClick(xm,ym){
+  const sp=snapPoint(xm,ym,null);
+  if(!_caddim) _caddim={p1:null,cursor:null,_snapped:false};
+  if(!_caddim.p1){ _caddim.p1=[sp.x,sp.y]; if(typeof toastHist==='function')toastHist('📏 clique le 2e point'); redrawCanvasNow(); return; }
+  const id=objCnt++;
+  paintObjects.push({id,type:'dim',x1:_caddim.p1[0],y1:_caddim.p1[1],x2:sp.x,y2:sp.y});
+  selObjId=id; _caddim=null;
+  if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount();
+  const _cm=_cadMode; setPTool('select'); _cadMode=_cm;
+  redrawCanvas(); if(typeof renderInspector==='function')renderInspector();
+  if(typeof toastHist==='function')toastHist('📏 Cote posée');
+}
+function drawDim(o){
+  if(!pCtx) return;
+  const a=mmToPx(o.x1,o.y1), b=mmToPx(o.x2,o.y2);
+  const dmm=Math.hypot(o.x2-o.x1,o.y2-o.y1);
+  pCtx.save(); pCtx.setLineDash([]);
+  pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1.4; pCtx.lineCap='round';
+  pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke();
+  const ang=Math.atan2(b[1]-a[1],b[0]-a[0]), pa=ang+Math.PI/2, tl=5;
+  for(const q of [a,b]){ pCtx.beginPath(); pCtx.moveTo(q[0]+Math.cos(pa)*tl,q[1]+Math.sin(pa)*tl); pCtx.lineTo(q[0]-Math.cos(pa)*tl,q[1]-Math.sin(pa)*tl); pCtx.stroke(); }
+  const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2, txt=dmm.toFixed(1)+' mm';
+  pCtx.font='bold 11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle';
+  const w=pCtx.measureText(txt).width+8;
+  pCtx.fillStyle='rgba(255,255,255,.92)'; pCtx.fillRect(mx-w/2,my-9,w,18);
+  pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1; pCtx.strokeRect(mx-w/2,my-9,w,18);
+  pCtx.fillStyle='#1e40af'; pCtx.fillText(txt,mx,my);
+  pCtx.restore();
+}
+function _cadDimOverlay(){
+  if(!pCtx || !_caddim || !_caddim.p1 || !_caddim.cursor) return;
+  const a=mmToPx(_caddim.p1[0],_caddim.p1[1]), b=mmToPx(_caddim.cursor[0],_caddim.cursor[1]);
+  const d=Math.hypot(_caddim.cursor[0]-_caddim.p1[0],_caddim.cursor[1]-_caddim.p1[1]);
+  pCtx.save(); pCtx.setLineDash([4,3]); pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1.3;
+  pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke(); pCtx.setLineDash([]);
+  const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2, txt=d.toFixed(1)+' mm';
+  pCtx.font='bold 11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle';
+  const w=pCtx.measureText(txt).width+8;
+  pCtx.fillStyle='rgba(0,0,0,.8)'; pCtx.fillRect(mx-w/2,my-9,w,18);
+  pCtx.fillStyle='#93c5fd'; pCtx.fillText(txt,mx,my);
+  if(_caddim._snapped){ pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=2; pCtx.strokeRect(b[0]-5,b[1]-5,10,10); }
+  pCtx.restore();
+}
+
 function cadStartLine(){ _cad={pts:[],cursor:null,typed:'',_snapped:false}; setPTool('cadline'); _cadMode=true; cadUpdateBar(); redrawCanvasNow(); }
 function cadAddPoint(xm,ym){
   if(!_cad) _cad={pts:[],cursor:null,typed:'',_snapped:false};
@@ -6106,6 +6182,7 @@ function onME(e){handlePointerUp(e.offsetX,e.offsetY);pushHistoryIfDirty();}
 function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
   if(paintTool==='cadline'){ cadAddPoint(xm,ym); return; } // outil ligne CAD
+  if(paintTool==='caddim'){ cadDimClick(xm,ym); return; } // outil cote
   if(paintTool==='bucket'){ bucketFill(xm,ym); return; } // outil seau
 
   if(paintTool==='select'){
@@ -6288,6 +6365,7 @@ function renderSnapBtn(){
 
 function handlePointerMove(cpx,cpy){
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
+  if(paintTool==='caddim'){ if(_caddim&&_caddim.p1){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _caddim.cursor=[sp.x,sp.y]; _caddim._snapped=sp.snapped; redrawCanvasNow(); } return; }
   // ─────────────────────────────────────────────────────────────────────────
   // AIGUILLEUR DES GESTES
   // Cette fonction ne fait QUE distribuer : chaque geste est traité par sa
@@ -9575,7 +9653,7 @@ function mmFlatObjs(){
   const out=[];
   for(const o of paintObjects){
     if(o.type==='group'&&o.children) out.push(...o.children);
-    else out.push(o);
+    else if(o.type!=='dim') out.push(o); // les cotes ne sont pas des formes a usiner
   }
   return out;
 }
