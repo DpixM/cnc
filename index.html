@@ -92,6 +92,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc -> Netlify redeploie tout seul (~1 min).
 
+-- 2026-07-20 — COTE PILOTE (dimension-driven, facon Fusion) ----------------------
+ Refonte de l'outil Cote : ce n'est plus une mesure 2-points mais une COTE PILOTE
+ attachee a une forme. On clique une FORME -> sa dimension s'affiche (Ø cercle,
+ longueur ligne, largeur/hauteur rect selon le bord) dans un petit champ editable.
+ On tape une valeur -> la FORME change (applyDimValue) et la cote reste attachee
+ (recalculee via dimGeom depuis la forme). Double-clic sur une cote = re-editer.
+ Modele : {type:'dim', ref:objId, kind:'diam'|'len'|'w'|'h'}. Toujours annotation
+ (objToStrokes=[], hors mmFlatObjs/export). Tests test-cad.js 13/13.
+ A SUIVRE : cote de rayon, poignee rayon cercle, lock/unlock (contraintes).
+
 -- 2026-07-20 — CAD : cercle reste ROND + OUTIL COTE ------------------------------
  - Cercle : marque _circle:true a la creation ; getHandlesPx renvoie SEULE la
    poignee de deplacement -> plus aucune poignee de deformation, il reste rond.
@@ -5186,7 +5196,7 @@ function applyZoomAt(cpx,cpy,factor){
 
 function getObjBB(o){
   if(o.type==='group'||o.type==='gear')return{x:o.x,y:o.y,w:o.w,h:o.h};
-  if(o.type==='dim'){const mnx=Math.min(o.x1,o.x2),mny=Math.min(o.y1,o.y2);return{x:mnx,y:mny,w:Math.max(Math.abs(o.x2-o.x1),.5),h:Math.max(Math.abs(o.y2-o.y1),.5)};}
+  if(o.type==='dim'){const g=(typeof dimGeom==='function')?dimGeom(o):null; if(!g)return{x:0,y:0,w:.5,h:.5}; const mnx=Math.min(g.ax,g.bx),mny=Math.min(g.ay,g.by); return{x:mnx,y:mny,w:Math.max(Math.abs(g.bx-g.ax),.5),h:Math.max(Math.abs(g.by-g.ay),.5)};}
   if(o.type==='rect'||o.type==='tri'||o.type==='svg'||o.type==='star'||o.type==='oblong')return{x:o.x,y:o.y,w:o.w,h:o.h};
   if(o.type==='ellipse')return{x:o.x-o.rx,y:o.y-o.ry,w:o.rx*2,h:o.ry*2};
   if(o.type==='line'){const mnx=Math.min(o.x1,o.x2),mny=Math.min(o.y1,o.y2);return{x:mnx,y:mny,w:Math.max(Math.abs(o.x2-o.x1),.5),h:Math.max(Math.abs(o.y2-o.y1),.5)};}
@@ -5289,10 +5299,11 @@ function distToObjStroke(o,xm,ym){
     return Math.hypot(xm-(o.x1+t*dx), ym-(o.y1+t*dy));
   }
   if(o.type==='dim'){
-    const dx=o.x2-o.x1, dy=o.y2-o.y1, L2=dx*dx+dy*dy;
-    if(L2<1e-6) return Math.hypot(xm-o.x1,ym-o.y1);
-    const t=Math.max(0,Math.min(1,((xm-o.x1)*dx+(ym-o.y1)*dy)/L2));
-    return Math.hypot(xm-(o.x1+t*dx),ym-(o.y1+t*dy));
+    const g=(typeof dimGeom==='function')?dimGeom(o):null; if(!g) return Infinity;
+    const dx=g.bx-g.ax, dy=g.by-g.ay, L2=dx*dx+dy*dy;
+    if(L2<1e-6) return Math.hypot(xm-g.ax,ym-g.ay);
+    const t=Math.max(0,Math.min(1,((xm-g.ax)*dx+(ym-g.ay)*dy)/L2));
+    return Math.hypot(xm-(g.ax+t*dx),ym-(g.ay+t*dy));
   }
   let best=Infinity;
   let strokes=[];
@@ -5328,11 +5339,11 @@ function hitTest(o,xm,ym){
     return Math.hypot(xm-nx,ym-ny)<thr;
   }
   if(o.type==='dim'){
-    const thr=6/(BASE_PX*vZoom);
-    const dx=o.x2-o.x1, dy=o.y2-o.y1, L2=dx*dx+dy*dy;
-    if(L2<1e-6) return Math.hypot(xm-o.x1,ym-o.y1)<thr;
-    const t=Math.max(0,Math.min(1,((xm-o.x1)*dx+(ym-o.y1)*dy)/L2));
-    return Math.hypot(xm-(o.x1+t*dx),ym-(o.y1+t*dy))<thr;
+    const g=(typeof dimGeom==='function')?dimGeom(o):null; if(!g) return false;
+    const thr=7/(BASE_PX*vZoom), dx=g.bx-g.ax, dy=g.by-g.ay, L2=dx*dx+dy*dy;
+    if(L2<1e-6) return Math.hypot(xm-g.ax,ym-g.ay)<thr;
+    const t=Math.max(0,Math.min(1,((xm-g.ax)*dx+(ym-g.ay)*dy)/L2));
+    return Math.hypot(xm-(g.ax+t*dx),ym-(g.ay+t*dy))<thr;
   }
   if(o.type==='svg'){
     // Sélection AU TRAIT (pas la boîte vide) : on ne prend le SVG que si le clic
@@ -5980,32 +5991,73 @@ function cadSoon(n){ if(typeof toastHist==='function') toastHist('🔜 '+n+' —
 let _caddim = null; // {p1:[x,y]|null, cursor:[x,y]|null, _snapped}
 function cadStartDim(){ _caddim={p1:null,cursor:null,_snapped:false}; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique le 1er point'); redrawCanvasNow(); }
 function cadDimClick(xm,ym){
-  const sp=snapPoint(xm,ym,null);
-  if(!_caddim) _caddim={p1:null,cursor:null,_snapped:false};
-  if(!_caddim.p1){ _caddim.p1=[sp.x,sp.y]; if(typeof toastHist==='function')toastHist('📏 clique le 2e point'); redrawCanvasNow(); return; }
-  const id=objCnt++;
-  paintObjects.push({id,type:'dim',x1:_caddim.p1[0],y1:_caddim.p1[1],x2:sp.x,y2:sp.y});
-  selObjId=id; _caddim=null;
-  if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount();
-  const _cm=_cadMode; setPTool('select'); _cadMode=_cm;
-  redrawCanvas(); if(typeof renderInspector==='function')renderInspector();
-  if(typeof toastHist==='function')toastHist('📏 Cote posée');
+  // cote PILOTE : on clique une FORME -> sa dimension s'affiche et devient editable
+  let target=null, best=Infinity;
+  for(const o of paintObjects){ if(o.type==='dim'||o.type==='group') continue; let d; try{ d=distToObjStroke(o,xm,ym); }catch(e){ d=Infinity; } if(d<best){ best=d; target=o; } }
+  const tol=12/(BASE_PX*vZoom);
+  if(!target || best>tol){ if(typeof toastHist==='function')toastHist('📏 Clique sur une forme à coter'); return; }
+  let kind=null;
+  if(target._circle) kind='diam';
+  else if(target.type==='line') kind='len';
+  else if(target.type==='rect'||target.type==='oblong'){
+    const bb=getObjBB(target);
+    const dH=Math.min(Math.abs(ym-bb.y),Math.abs(ym-(bb.y+bb.h)));
+    const dV=Math.min(Math.abs(xm-bb.x),Math.abs(xm-(bb.x+bb.w)));
+    kind=(dH<=dV)?'w':'h';
+  } else { if(typeof toastHist==='function')toastHist('📏 Cote non dispo sur cette forme (bientôt)'); return; }
+  let dim=paintObjects.find(o=>o.type==='dim'&&o.ref===target.id&&o.kind===kind);
+  if(!dim){ dim={id:objCnt++,type:'dim',ref:target.id,kind}; paintObjects.push(dim); if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); }
+  selObjId=dim.id;
+  redrawCanvasNow();
+  openDimInput(dim);
 }
-function drawDim(o){
+// Geometrie d'une cote pilote (calculee depuis la forme referencee)
+function dimGeom(dim){
+  const o=paintObjects.find(x=>x.id===dim.ref); if(!o) return null;
+  const off=6;
+  if(dim.kind==='diam' && (o._circle||o.type==='ellipse')){ const r=o.rx||o.ry||1; return {ax:o.x-r, ay:o.y-r-off, bx:o.x+r, by:o.y-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm'}; }
+  if(dim.kind==='len' && o.type==='line'){ const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off; return {ax:o.x1+nx,ay:o.y1+ny,bx:o.x2+nx,by:o.y2+ny,val:L,label:L.toFixed(1)+' mm'}; }
+  const bb=getObjBB(o);
+  if(dim.kind==='w'){ return {ax:bb.x, ay:bb.y-off, bx:bb.x+bb.w, by:bb.y-off, val:bb.w, label:bb.w.toFixed(1)+' mm'}; }
+  if(dim.kind==='h'){ return {ax:bb.x-off, ay:bb.y, bx:bb.x-off, by:bb.y+bb.h, val:bb.h, label:bb.h.toFixed(1)+' mm'}; }
+  return null;
+}
+function getDimValue(dim){ const g=dimGeom(dim); return g?g.val:0; }
+function applyDimValue(dim,v){
+  const o=paintObjects.find(x=>x.id===dim.ref); if(!o||!(v>0)) return;
+  if(dim.kind==='diam'){ o.rx=o.ry=v/2; }
+  else if(dim.kind==='len' && o.type==='line'){ const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy)||1; o.x2=o.x1+dx/L*v; o.y2=o.y1+dy/L*v; }
+  else if(dim.kind==='w'){ o.w=v; }
+  else if(dim.kind==='h'){ o.h=v; }
+}
+function openDimInput(dim){
+  const g=dimGeom(dim); if(!g||typeof pCanvas==='undefined'||!pCanvas) return;
+  const mid=mmToPx((g.ax+g.bx)/2,(g.ay+g.by)/2), rect=pCanvas.getBoundingClientRect();
+  let inp=document.getElementById('dimInput'); if(inp) inp.remove();
+  inp=document.createElement('input'); inp.id='dimInput'; inp.type='number'; inp.step='0.1'; inp.value=getDimValue(dim).toFixed(2);
+  inp.style.cssText='position:fixed;z-index:60;width:84px;padding:5px 6px;font-size:13px;font-family:var(--mono,monospace);background:#fff;color:#111;border:2px solid #2563eb;border-radius:6px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.4)';
+  inp.style.left=(rect.left+mid[0]-42)+'px'; inp.style.top=(rect.top+mid[1]-14)+'px';
+  document.body.appendChild(inp); inp.focus(); inp.select();
+  let done=false;
+  const apply=()=>{ if(done)return; done=true; const v=parseFloat(inp.value); if(v>0){ applyDimValue(dim,v); if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); } inp.remove(); redrawCanvas(); };
+  inp.onkeydown=e=>{ if(e.key==='Enter'){ apply(); } else if(e.key==='Escape'){ done=true; inp.remove(); redrawCanvas(); } };
+  inp.onblur=apply;
+}
+function drawDim(dim){
   if(!pCtx) return;
-  const a=mmToPx(o.x1,o.y1), b=mmToPx(o.x2,o.y2);
-  const dmm=Math.hypot(o.x2-o.x1,o.y2-o.y1);
+  const g=dimGeom(dim); if(!g) return;
+  const a=mmToPx(g.ax,g.ay), b=mmToPx(g.bx,g.by);
   pCtx.save(); pCtx.setLineDash([]);
   pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1.4; pCtx.lineCap='round';
   pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke();
   const ang=Math.atan2(b[1]-a[1],b[0]-a[0]), pa=ang+Math.PI/2, tl=5;
   for(const q of [a,b]){ pCtx.beginPath(); pCtx.moveTo(q[0]+Math.cos(pa)*tl,q[1]+Math.sin(pa)*tl); pCtx.lineTo(q[0]-Math.cos(pa)*tl,q[1]-Math.sin(pa)*tl); pCtx.stroke(); }
-  const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2, txt=dmm.toFixed(1)+' mm';
+  const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
   pCtx.font='bold 11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle';
-  const w=pCtx.measureText(txt).width+8;
-  pCtx.fillStyle='rgba(255,255,255,.92)'; pCtx.fillRect(mx-w/2,my-9,w,18);
+  const w=pCtx.measureText(g.label).width+8;
+  pCtx.fillStyle='rgba(255,255,255,.94)'; pCtx.fillRect(mx-w/2,my-9,w,18);
   pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1; pCtx.strokeRect(mx-w/2,my-9,w,18);
-  pCtx.fillStyle='#1e40af'; pCtx.fillText(txt,mx,my);
+  pCtx.fillStyle='#1e40af'; pCtx.fillText(g.label,mx,my);
   pCtx.restore();
 }
 function _cadDimOverlay(){
@@ -12208,7 +12260,7 @@ function initCanvas(){
   pCanvas.addEventListener('mousemove',onMM);
   pCanvas.addEventListener('mouseup',onME);
   pCanvas.addEventListener('mouseleave',()=>{isDragging=false;isDrawing=false;pinchActive=false;dragMode=null;if(pCanvas)pCanvas.style.cursor='default';});
-  pCanvas.addEventListener('dblclick',e=>{e.preventDefault(); if(paintTool==='cadline'&&_cad){ cadFinish(); return; } const o=getObj(selObjId);if(o)centerViewOnObj(o);});
+  pCanvas.addEventListener('dblclick',e=>{e.preventDefault(); if(paintTool==='cadline'&&_cad){ cadFinish(); return; } const r=pCanvas.getBoundingClientRect(); const [dxm,dym]=pxToMm(e.clientX-r.left,e.clientY-r.top); for(let i=paintObjects.length-1;i>=0;i--){ const dd=paintObjects[i]; if(dd.type==='dim'&&hitTest(dd,dxm,dym)){ openDimInput(dd); return; } } const o=getObj(selObjId);if(o)centerViewOnObj(o);});
   document.addEventListener('keydown',e=>{
     if(paintTool!=='cadline'||!_cad) return;
     if(e.key==='Escape'){ cadCancel(); e.preventDefault(); return; }
