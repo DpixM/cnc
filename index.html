@@ -5251,6 +5251,7 @@ function applyBB(o,bb){
 }
 
 function getHandlesPx(o){
+  if(o._circle){ const[cx,cy]=mmToPx(o.x,o.y); return[{id:'mv',x:cx,y:cy}]; } // cercle = rond, aucune poignee de deformation
   if(o.type==='line'){
     // Lines: just the two endpoints + midpoint move handle
     const[ax,ay]=mmToPx(o.x1,o.y1);
@@ -12953,7 +12954,7 @@ function confirmCircle(){
   const cx = gcX + org.x;
   const cy = gcY + org.y;
   const id=objCnt++;
-  const obj={id,type:'ellipse',x:cx,y:cy,rx:r,ry:r,
+  const obj={id,type:'ellipse',x:cx,y:cy,rx:r,ry:r,_circle:true,
     strokeW:currentStrokeW,fill:currentFill};
   if(selToolId)obj.toolId=selToolId;
   paintObjects.push(obj);selObjId=obj.id;
