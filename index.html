@@ -92,6 +92,14 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc -> Netlify redeploie tout seul (~1 min).
 
+-- 2026-07-20 — COTE DISTANCE entre 2 entites (cote lineaire Fusion) ---------------
+ L'outil Cote gere maintenant la DISTANCE entre 2 lignes : clic ligne A, clic
+ ligne B -> cote 'dist' (ref+ref2). La valeur = distance perpendiculaire (gap).
+ L'editer DEPLACE la 2e ligne pour respecter la valeur (rapproche/eloigne).
+ Etat _dimA (1ere entite). Cercle=diam(1clic), rect=w/h(1clic), ligne seule=longueur
+ (re-clic), 2 lignes=distance. dimGeom/applyDimValue branche 'dist'. Tests 16/16.
+ A SUIVRE : distance point-point, angle entre 2 lignes, rayon, lock/unlock.
+
 -- 2026-07-20 — COTE PILOTE (dimension-driven, facon Fusion) ----------------------
  Refonte de l'outil Cote : ce n'est plus une mesure 2-points mais une COTE PILOTE
  attachee a une forme. On clique une FORME -> sa dimension s'affiche (Ø cercle,
@@ -5989,27 +5997,30 @@ function cadSoon(n){ if(typeof toastHist==='function') toastHist('🔜 '+n+' —
 
 // ── OUTIL COTE (dimension) : element 'dim', annotation seulement (jamais usine) ──
 let _caddim = null; // {p1:[x,y]|null, cursor:[x,y]|null, _snapped}
-function cadStartDim(){ _caddim={p1:null,cursor:null,_snapped:false}; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique le 1er point'); redrawCanvasNow(); }
+let _dimA = null; // 1ere entite cliquee pour une cote de DISTANCE entre 2 formes
+function cadStartDim(){ _caddim=null; _dimA=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
 function cadDimClick(xm,ym){
-  // cote PILOTE : on clique une FORME -> sa dimension s'affiche et devient editable
+  // trouver la forme sous le clic (la plus proche par le trait)
   let target=null, best=Infinity;
   for(const o of paintObjects){ if(o.type==='dim'||o.type==='group') continue; let d; try{ d=distToObjStroke(o,xm,ym); }catch(e){ d=Infinity; } if(d<best){ best=d; target=o; } }
   const tol=12/(BASE_PX*vZoom);
-  if(!target || best>tol){ if(typeof toastHist==='function')toastHist('📏 Clique sur une forme à coter'); return; }
-  let kind=null;
-  if(target._circle) kind='diam';
-  else if(target.type==='line') kind='len';
-  else if(target.type==='rect'||target.type==='oblong'){
-    const bb=getObjBB(target);
-    const dH=Math.min(Math.abs(ym-bb.y),Math.abs(ym-(bb.y+bb.h)));
-    const dV=Math.min(Math.abs(xm-bb.x),Math.abs(xm-(bb.x+bb.w)));
-    kind=(dH<=dV)?'w':'h';
-  } else { if(typeof toastHist==='function')toastHist('📏 Cote non dispo sur cette forme (bientôt)'); return; }
-  let dim=paintObjects.find(o=>o.type==='dim'&&o.ref===target.id&&o.kind===kind);
-  if(!dim){ dim={id:objCnt++,type:'dim',ref:target.id,kind}; paintObjects.push(dim); if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); }
-  selObjId=dim.id;
-  redrawCanvasNow();
-  openDimInput(dim);
+  if(!target || best>tol){ _dimA=null; if(typeof toastHist==='function')toastHist('📏 Clique une forme (ou 2 lignes pour la distance)'); redrawCanvasNow(); return; }
+  // Cercle -> diametre (1 clic)
+  if(target._circle){ _dimA=null; makeDim({kind:'diam',ref:target.id}); return; }
+  // Rectangle -> largeur/hauteur selon le bord (1 clic)
+  if(target.type==='rect'||target.type==='oblong'){ _dimA=null; const bb=getObjBB(target); const dH=Math.min(Math.abs(ym-bb.y),Math.abs(ym-(bb.y+bb.h))); const dV=Math.min(Math.abs(xm-bb.x),Math.abs(xm-(bb.x+bb.w))); makeDim({kind:(dH<=dV)?'w':'h',ref:target.id}); return; }
+  // Ligne -> 2 etapes : 1ere ligne memorisee, 2e ligne = DISTANCE (ou re-clic = longueur)
+  if(target.type==='line'){
+    if(!_dimA){ _dimA=target.id; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('📏 Clique la 2e ligne (distance) — ou la même (longueur)'); return; }
+    if(_dimA===target.id){ const a=_dimA; _dimA=null; makeDim({kind:'len',ref:a}); return; }
+    const a=_dimA; _dimA=null; makeDim({kind:'dist',ref:a,ref2:target.id}); return;
+  }
+  _dimA=null; if(typeof toastHist==='function')toastHist('📏 Cote non dispo sur cette forme (bientôt)');
+}
+function makeDim(spec){
+  let dim=paintObjects.find(o=>o.type==='dim'&&o.ref===spec.ref&&o.kind===spec.kind&&(o.ref2||null)===(spec.ref2||null));
+  if(!dim){ dim=Object.assign({id:objCnt++,type:'dim'},spec); paintObjects.push(dim); if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); }
+  selObjId=dim.id; redrawCanvasNow(); openDimInput(dim);
 }
 // Geometrie d'une cote pilote (calculee depuis la forme referencee)
 function dimGeom(dim){
@@ -6017,6 +6028,14 @@ function dimGeom(dim){
   const off=6;
   if(dim.kind==='diam' && (o._circle||o.type==='ellipse')){ const r=o.rx||o.ry||1; return {ax:o.x-r, ay:o.y-r-off, bx:o.x+r, by:o.y-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm'}; }
   if(dim.kind==='len' && o.type==='line'){ const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off; return {ax:o.x1+nx,ay:o.y1+ny,bx:o.x2+nx,by:o.y2+ny,val:L,label:L.toFixed(1)+' mm'}; }
+  if(dim.kind==='dist'){
+    const A=o, B=paintObjects.find(x=>x.id===dim.ref2);
+    if(!B||A.type!=='line'||B.type!=='line') return null;
+    const adx=A.x2-A.x1, ady=A.y2-A.y1, aL=Math.hypot(adx,ady)||1, nx=-ady/aL, ny=adx/aL;
+    const amx=(A.x1+A.x2)/2, amy=(A.y1+A.y2)/2, bmx=(B.x1+B.x2)/2, bmy=(B.y1+B.y2)/2;
+    const dist=(bmx-amx)*nx+(bmy-amy)*ny, val=Math.abs(dist);
+    return {ax:amx, ay:amy, bx:amx+nx*dist, by:amy+ny*dist, val, label:val.toFixed(1)+' mm', _n:[nx,ny], _dist:dist};
+  }
   const bb=getObjBB(o);
   if(dim.kind==='w'){ return {ax:bb.x, ay:bb.y-off, bx:bb.x+bb.w, by:bb.y-off, val:bb.w, label:bb.w.toFixed(1)+' mm'}; }
   if(dim.kind==='h'){ return {ax:bb.x-off, ay:bb.y, bx:bb.x-off, by:bb.y+bb.h, val:bb.h, label:bb.h.toFixed(1)+' mm'}; }
@@ -6027,6 +6046,14 @@ function applyDimValue(dim,v){
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o||!(v>0)) return;
   if(dim.kind==='diam'){ o.rx=o.ry=v/2; }
   else if(dim.kind==='len' && o.type==='line'){ const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy)||1; o.x2=o.x1+dx/L*v; o.y2=o.y1+dy/L*v; }
+  else if(dim.kind==='dist'){
+    const A=o, B=paintObjects.find(x=>x.id===dim.ref2);
+    if(!B||A.type!=='line'||B.type!=='line') return;
+    const adx=A.x2-A.x1, ady=A.y2-A.y1, aL=Math.hypot(adx,ady)||1, nx=-ady/aL, ny=adx/aL;
+    const amx=(A.x1+A.x2)/2, amy=(A.y1+A.y2)/2, bmx=(B.x1+B.x2)/2, bmy=(B.y1+B.y2)/2;
+    const cur=(bmx-amx)*nx+(bmy-amy)*ny, sign=cur>=0?1:-1, move=v*sign-cur;
+    B.x1+=nx*move; B.y1+=ny*move; B.x2+=nx*move; B.y2+=ny*move;
+  }
   else if(dim.kind==='w'){ o.w=v; }
   else if(dim.kind==='h'){ o.h=v; }
 }
