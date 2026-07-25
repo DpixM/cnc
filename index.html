@@ -92,6 +92,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc -> Netlify redeploie tout seul (~1 min).
 
+-- 2026-07-20 — Cotes sur lignes CAD (free) + noeuds gardes/verrouilles ------------
+ - Les lignes de l'outil CAD sont de type 'free' (2 points). Helper segOf/setSeg :
+   longueur/distance/angle marchent maintenant sur 'line' ET 'free 2 points'
+   (avant : "cote non dispo"). L'angle entre 2 segments CAD fonctionne.
+ - Forme cotee : elle GARDE ses noeuds (visibles, en GRIS = verrouille) au lieu de
+   les perdre ; le redimensionnement est bloque dans applyHandleDrag (change via la
+   cote seulement). Tests 25/25.
+ A SUIVRE (Seb) : snap/surbrillance du trait le plus proche du curseur pour
+ selectionner plus facilement les lignes fines. + lock deplacement, polygone, etc.
+
 -- 2026-07-20 — Cotes : style Fusion + attaches pointillees + verrou geometrie ----
  - Rendu cote FACON FUSION : traits GRIS fins + petites fleches + valeur discrete
    (fond clair). Fini le gros bleu. Selection CAD aussi plus fine (bleu leger).
@@ -5314,7 +5324,6 @@ function applyBB(o,bb){
 
 function objHasDim(id){ for(const o of paintObjects){ if(o.type==='dim' && (o.ref===id||o.ref2===id)) return true; } return false; }
 function getHandlesPx(o){
-  if(o.type!=='dim' && typeof objHasDim==='function' && objHasDim(o.id)){ const bb=getObjBB(o); const c=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2); return[{id:'mv',x:c[0],y:c[1]}]; } // cotee -> verrouillee (pas de redim libre)
   if(o.type==='point'){ const[cx,cy]=mmToPx(o.x,o.y); return[{id:'mv',x:cx,y:cy}]; }
   if(o._circle){ const[cx,cy]=mmToPx(o.x,o.y); const[rx,ry]=mmToPx(o.x+o.rx,o.y); return[{id:'mv',x:cx,y:cy},{id:'rad',x:rx,y:ry}]; } // cercle : deplacement + rayon (reste rond)
   if(o.type==='line'){
@@ -5778,7 +5787,7 @@ function redrawCanvasNow(){
         pCtx.save(); pCtx.setLineDash([]);
         pCtx.strokeStyle='rgba(59,130,246,.65)'; pCtx.lineWidth=1.6; pCtx.lineJoin='round'; pCtx.lineCap='round';
         try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } }catch(e){}
-        for(const h of getHandlesPx(o)){ if(h.id==='mv')continue; pCtx.fillStyle='#fff'; pCtx.strokeStyle='#3b82f6'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(h.x,h.y,4.5,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); }
+        const _lk=(typeof objHasDim==='function'&&objHasDim(o.id)); for(const h of getHandlesPx(o)){ if(h.id==='mv')continue; pCtx.fillStyle=_lk?'#e5e7eb':'#fff'; pCtx.strokeStyle=_lk?'#9aa0a8':'#3b82f6'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(h.x,h.y,4,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); }
         pCtx.restore();
       } else {
         // contour de selection bien visible (liseré sombre dessous + pointillés vifs dessus)
@@ -6049,12 +6058,12 @@ function cadDimClick(xm,ym){
   // Rectangle -> largeur/hauteur selon le bord (1 clic)
   if(target.type==='rect'||target.type==='oblong'){ _dimA=null; const bb=getObjBB(target); const dH=Math.min(Math.abs(ym-bb.y),Math.abs(ym-(bb.y+bb.h))); const dV=Math.min(Math.abs(xm-bb.x),Math.abs(xm-(bb.x+bb.w))); makeDim({kind:(dH<=dV)?'w':'h',ref:target.id}); return; }
   // Ligne -> 2 etapes : 1ere ligne memorisee, 2e ligne = DISTANCE (ou re-clic = longueur)
-  if(target.type==='line'){
+  if(target.type==='line' || (target.type==='free'&&target.pts&&target.pts.length===2)){
     if(!_dimA){ _dimA=target.id; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('📏 Clique la 2e ligne (distance) — ou la même (longueur)'); return; }
     if(_dimA===target.id){ const a=_dimA; _dimA=null; makeDim({kind:'len',ref:a}); return; }
     const a=_dimA; _dimA=null;
-    const A=getObj(a); let kind='dist';
-    if(A&&A.type==='line'){ const adx=A.x2-A.x1,ady=A.y2-A.y1,bdx=target.x2-target.x1,bdy=target.y2-target.y1; const cr=adx*bdy-ady*bdx, dt=adx*bdx+ady*bdy; const ab=Math.abs(Math.atan2(cr,dt)); if(Math.abs(Math.sin(ab))>0.02) kind='angle'; }
+    const As=segOf(getObj(a)), Bs=segOf(target); let kind='dist';
+    if(As&&Bs){ const adx=As[2]-As[0],ady=As[3]-As[1],bdx=Bs[2]-Bs[0],bdy=Bs[3]-Bs[1]; const cr=adx*bdy-ady*bdx, dt=adx*bdx+ady*bdy; const ab=Math.abs(Math.atan2(cr,dt)); if(Math.abs(Math.sin(ab))>0.02) kind='angle'; }
     makeDim({kind, ref:a, ref2:target.id}); return;
   }
   _dimA=null; if(typeof toastHist==='function')toastHist('📏 Cote non dispo sur cette forme (bientôt)');
@@ -6065,27 +6074,29 @@ function makeDim(spec){
   if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; redrawCanvasNow(); openDimInput(dim);
 }
 // Geometrie d'une cote pilote (calculee depuis la forme referencee)
+function segOf(o){ if(!o)return null; if(o.type==='line')return[o.x1,o.y1,o.x2,o.y2]; if(o.type==='free'&&o.pts&&o.pts.length===2)return[o.pts[0][0],o.pts[0][1],o.pts[1][0],o.pts[1][1]]; return null; }
+function setSeg(o,s){ if(!o)return; if(o.type==='line'){o.x1=s[0];o.y1=s[1];o.x2=s[2];o.y2=s[3];} else if(o.type==='free'){o.pts=[[s[0],s[1]],[s[2],s[3]]];} }
 function dimGeom(dim){
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o) return null;
   const off=6;
   if(dim.kind==='diam' && (o._circle||o.type==='ellipse')){ const r=o.rx||o.ry||1; return {ax:o.x-r, ay:o.y-r-off, bx:o.x+r, by:o.y-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm', ext:[[[o.x-r,o.y],[o.x-r,o.y-r-off]],[[o.x+r,o.y],[o.x+r,o.y-r-off]]]}; }
-  if(dim.kind==='len' && o.type==='line'){ const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off; return {ax:o.x1+nx,ay:o.y1+ny,bx:o.x2+nx,by:o.y2+ny,val:L,label:L.toFixed(1)+' mm', ext:[[[o.x1,o.y1],[o.x1+nx,o.y1+ny]],[[o.x2,o.y2],[o.x2+nx,o.y2+ny]]]}; }
+  if(dim.kind==='len'){ const s=segOf(o); if(s){ const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off; return {ax:s[0]+nx,ay:s[1]+ny,bx:s[2]+nx,by:s[3]+ny,val:L,label:L.toFixed(1)+' mm', ext:[[[s[0],s[1]],[s[0]+nx,s[1]+ny]],[[s[2],s[3]],[s[2]+nx,s[3]+ny]]]}; } }
   if(dim.kind==='angle'){
-    const A=o, B=paintObjects.find(x=>x.id===dim.ref2);
-    if(!B||A.type!=='line'||B.type!=='line') return null;
-    const adx=A.x2-A.x1,ady=A.y2-A.y1,bdx=B.x2-B.x1,bdy=B.y2-B.y1;
+    const A=segOf(o), B=segOf(paintObjects.find(x=>x.id===dim.ref2));
+    if(!A||!B) return null;
+    const adx=A[2]-A[0],ady=A[3]-A[1],bdx=B[2]-B[0],bdy=B[3]-B[1];
     const det=adx*bdy-ady*bdx; if(Math.abs(det)<1e-9) return null;
-    const t=((B.x1-A.x1)*bdy-(B.y1-A.y1)*bdx)/det, ix=A.x1+t*adx, iy=A.y1+t*ady;
+    const t=((B[0]-A[0])*bdy-(B[1]-A[1])*bdx)/det, ix=A[0]+t*adx, iy=A[1]+t*ady;
     const aA=Math.atan2(ady,adx), aB=Math.atan2(bdy,bdx);
     let diff=aB-aA; while(diff<=-Math.PI)diff+=2*Math.PI; while(diff>Math.PI)diff-=2*Math.PI;
     const val=Math.abs(diff)*180/Math.PI, rmm=12, midA=aA+diff/2;
     return {ax:ix+Math.cos(midA)*rmm, ay:iy+Math.sin(midA)*rmm, bx:ix+Math.cos(midA)*rmm, by:iy+Math.sin(midA)*rmm, val, label:val.toFixed(1)+'°', _angle:true, ix, iy, aA, diff, rmm};
   }
   if(dim.kind==='dist'){
-    const A=o, B=paintObjects.find(x=>x.id===dim.ref2);
-    if(!B||A.type!=='line'||B.type!=='line') return null;
-    const adx=A.x2-A.x1, ady=A.y2-A.y1, aL=Math.hypot(adx,ady)||1, nx=-ady/aL, ny=adx/aL;
-    const amx=(A.x1+A.x2)/2, amy=(A.y1+A.y2)/2, bmx=(B.x1+B.x2)/2, bmy=(B.y1+B.y2)/2;
+    const A=segOf(o), B=segOf(paintObjects.find(x=>x.id===dim.ref2));
+    if(!A||!B) return null;
+    const adx=A[2]-A[0], ady=A[3]-A[1], aL=Math.hypot(adx,ady)||1, nx=-ady/aL, ny=adx/aL;
+    const amx=(A[0]+A[2])/2, amy=(A[1]+A[3])/2, bmx=(B[0]+B[2])/2, bmy=(B[1]+B[3])/2;
     const dist=(bmx-amx)*nx+(bmy-amy)*ny, val=Math.abs(dist);
     return {ax:amx, ay:amy, bx:amx+nx*dist, by:amy+ny*dist, val, label:val.toFixed(1)+' mm', _n:[nx,ny], _dist:dist};
   }
@@ -6098,26 +6109,26 @@ function getDimValue(dim){ const g=dimGeom(dim); return g?g.val:0; }
 function applyDimValue(dim,v){
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o||!(v>0)) return;
   if(dim.kind==='diam'){ o.rx=o.ry=v/2; }
-  else if(dim.kind==='len' && o.type==='line'){ const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy)||1; o.x2=o.x1+dx/L*v; o.y2=o.y1+dy/L*v; }
+  else if(dim.kind==='len'){ const s=segOf(o); if(s){ const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1; setSeg(o,[s[0],s[1],s[0]+dx/L*v,s[1]+dy/L*v]); } }
   else if(dim.kind==='angle'){
-    const A=o, B=paintObjects.find(x=>x.id===dim.ref2);
-    if(!B||A.type!=='line'||B.type!=='line') return;
-    const adx=A.x2-A.x1,ady=A.y2-A.y1,bdx=B.x2-B.x1,bdy=B.y2-B.y1;
+    const Bo=paintObjects.find(x=>x.id===dim.ref2); const A=segOf(o), B=segOf(Bo);
+    if(!A||!B) return;
+    const adx=A[2]-A[0],ady=A[3]-A[1],bdx=B[2]-B[0],bdy=B[3]-B[1];
     const det=adx*bdy-ady*bdx; if(Math.abs(det)<1e-9) return;
-    const t=((B.x1-A.x1)*bdy-(B.y1-A.y1)*bdx)/det, ix=A.x1+t*adx, iy=A.y1+t*ady;
+    const t=((B[0]-A[0])*bdy-(B[1]-A[1])*bdx)/det, ix=A[0]+t*adx, iy=A[1]+t*ady;
     const aA=Math.atan2(ady,adx), aB=Math.atan2(bdy,bdx);
     let diff=aB-aA; while(diff<=-Math.PI)diff+=2*Math.PI; while(diff>Math.PI)diff-=2*Math.PI;
     const target=(diff>=0?1:-1)*(v*Math.PI/180), delta=target-diff, c=Math.cos(delta), s=Math.sin(delta);
     const rot=(px,py)=>[ix+(px-ix)*c-(py-iy)*s, iy+(px-ix)*s+(py-iy)*c];
-    [B.x1,B.y1]=rot(B.x1,B.y1); [B.x2,B.y2]=rot(B.x2,B.y2);
+    const p1=rot(B[0],B[1]), p2=rot(B[2],B[3]); setSeg(Bo,[p1[0],p1[1],p2[0],p2[1]]);
   }
   else if(dim.kind==='dist'){
-    const A=o, B=paintObjects.find(x=>x.id===dim.ref2);
-    if(!B||A.type!=='line'||B.type!=='line') return;
-    const adx=A.x2-A.x1, ady=A.y2-A.y1, aL=Math.hypot(adx,ady)||1, nx=-ady/aL, ny=adx/aL;
-    const amx=(A.x1+A.x2)/2, amy=(A.y1+A.y2)/2, bmx=(B.x1+B.x2)/2, bmy=(B.y1+B.y2)/2;
+    const Bo=paintObjects.find(x=>x.id===dim.ref2); const A=segOf(o), B=segOf(Bo);
+    if(!A||!B) return;
+    const adx=A[2]-A[0], ady=A[3]-A[1], aL=Math.hypot(adx,ady)||1, nx=-ady/aL, ny=adx/aL;
+    const amx=(A[0]+A[2])/2, amy=(A[1]+A[3])/2, bmx=(B[0]+B[2])/2, bmy=(B[1]+B[3])/2;
     const cur=(bmx-amx)*nx+(bmy-amy)*ny, sign=cur>=0?1:-1, move=v*sign-cur;
-    B.x1+=nx*move; B.y1+=ny*move; B.x2+=nx*move; B.y2+=ny*move;
+    setSeg(Bo,[B[0]+nx*move,B[1]+ny*move,B[2]+nx*move,B[3]+ny*move]);
   }
   else if(dim.kind==='w'){ o.w=v; }
   else if(dim.kind==='h'){ o.h=v; }
@@ -13216,6 +13227,7 @@ function snapPointsOf(o){
 }
 
 function applyHandleDrag(o,mode,orig,dxMm,dyMm){
+  if(o.type!=='dim' && typeof objHasDim==='function' && objHasDim(o.id) && mode!=='mv') return; // cotee : redim verrouille (change via la cote)
   if(o._circle && mode==='rad'){ const rx0=(orig&&orig.w?orig.w/2:o.rx); const r=Math.max(0.5,Math.hypot(rx0+dxMm,dyMm)); o.rx=o.ry=r; return; } // cercle reste rond
   // Line: drag endpoints directly using delta from original pos
   if(o.type==='line'){
