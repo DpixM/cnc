@@ -5762,7 +5762,7 @@ function redrawCanvasNow(){
         // MODE CAD : pas d'encadrement carre. On surligne le TRAIT + petits noeuds
         // aux points cles (les noeuds restent deplacables = edition geometrique).
         pCtx.save(); pCtx.setLineDash([]);
-        pCtx.strokeStyle='rgba(74,163,255,.95)'; pCtx.lineWidth=2.5; pCtx.lineJoin='round'; pCtx.lineCap='round';
+        pCtx.strokeStyle='rgba(59,130,246,.65)'; pCtx.lineWidth=1.6; pCtx.lineJoin='round'; pCtx.lineCap='round';
         try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } }catch(e){}
         for(const h of getHandlesPx(o)){ if(h.id==='mv')continue; pCtx.fillStyle='#fff'; pCtx.strokeStyle='#3b82f6'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(h.x,h.y,4.5,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); }
         pCtx.restore();
@@ -6048,7 +6048,7 @@ function cadDimClick(xm,ym){
 function makeDim(spec){
   let dim=paintObjects.find(o=>o.type==='dim'&&o.ref===spec.ref&&o.kind===spec.kind&&(o.ref2||null)===(spec.ref2||null));
   if(!dim){ dim=Object.assign({id:objCnt++,type:'dim'},spec); paintObjects.push(dim); if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); }
-  selObjId=dim.id; redrawCanvasNow(); openDimInput(dim);
+  if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; redrawCanvasNow(); openDimInput(dim);
 }
 // Geometrie d'une cote pilote (calculee depuis la forme referencee)
 function dimGeom(dim){
@@ -6121,32 +6121,26 @@ function openDimInput(dim){
   inp.onkeydown=e=>{ if(e.key==='Enter'){ apply(); } else if(e.key==='Escape'){ done=true; inp.remove(); redrawCanvas(); } };
   inp.onblur=apply;
 }
+function _dimArrow(x,y,ang){ const s=6; pCtx.beginPath(); pCtx.moveTo(x,y); pCtx.lineTo(x+Math.cos(ang+0.38)*s, y+Math.sin(ang+0.38)*s); pCtx.lineTo(x+Math.cos(ang-0.38)*s, y+Math.sin(ang-0.38)*s); pCtx.closePath(); pCtx.fill(); }
+function _dimLabel(px,py,txt){ pCtx.save(); pCtx.font='11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle'; const w=pCtx.measureText(txt).width+8; pCtx.fillStyle='rgba(247,244,240,.95)'; pCtx.fillRect(px-w/2,py-8,w,16); pCtx.fillStyle='#4b5563'; pCtx.fillText(txt,px,py); pCtx.restore(); }
 function drawDim(dim){
   if(!pCtx) return;
   const g=dimGeom(dim); if(!g) return;
+  const GRAY='#7c828c';
+  pCtx.save(); pCtx.setLineDash([]); pCtx.lineCap='butt'; pCtx.strokeStyle=GRAY; pCtx.fillStyle=GRAY; pCtx.lineWidth=1;
   if(g._angle){
     const c=mmToPx(g.ix,g.iy), rpx=Math.max(12,g.rmm*BASE_PX*vZoom);
-    pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1.4;
     pCtx.beginPath(); pCtx.arc(c[0],c[1],rpx,g.aA,g.aA+g.diff,g.diff<0); pCtx.stroke();
-    const lp=mmToPx(g.ax,g.ay);
-    pCtx.font='bold 11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle';
-    const w=pCtx.measureText(g.label).width+8;
-    pCtx.fillStyle='rgba(255,255,255,.94)'; pCtx.fillRect(lp[0]-w/2,lp[1]-9,w,18);
-    pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1; pCtx.strokeRect(lp[0]-w/2,lp[1]-9,w,18);
-    pCtx.fillStyle='#1e40af'; pCtx.fillText(g.label,lp[0],lp[1]); pCtx.restore(); return;
+    _dimArrow(c[0]+Math.cos(g.aA)*rpx, c[1]+Math.sin(g.aA)*rpx, g.aA+(g.diff<0?-1:1)*Math.PI/2);
+    _dimArrow(c[0]+Math.cos(g.aA+g.diff)*rpx, c[1]+Math.sin(g.aA+g.diff)*rpx, g.aA+g.diff+(g.diff<0?1:-1)*Math.PI/2);
+    const lp=mmToPx(g.ax,g.ay); _dimLabel(lp[0],lp[1],g.label); pCtx.restore(); return;
   }
   const a=mmToPx(g.ax,g.ay), b=mmToPx(g.bx,g.by);
-  pCtx.save(); pCtx.setLineDash([]);
-  pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1.4; pCtx.lineCap='round';
   pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke();
-  const ang=Math.atan2(b[1]-a[1],b[0]-a[0]), pa=ang+Math.PI/2, tl=5;
-  for(const q of [a,b]){ pCtx.beginPath(); pCtx.moveTo(q[0]+Math.cos(pa)*tl,q[1]+Math.sin(pa)*tl); pCtx.lineTo(q[0]-Math.cos(pa)*tl,q[1]-Math.sin(pa)*tl); pCtx.stroke(); }
-  const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
-  pCtx.font='bold 11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle';
-  const w=pCtx.measureText(g.label).width+8;
-  pCtx.fillStyle='rgba(255,255,255,.94)'; pCtx.fillRect(mx-w/2,my-9,w,18);
-  pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1; pCtx.strokeRect(mx-w/2,my-9,w,18);
-  pCtx.fillStyle='#1e40af'; pCtx.fillText(g.label,mx,my);
+  const ang=Math.atan2(b[1]-a[1],b[0]-a[0]);
+  _dimArrow(a[0],a[1], ang+Math.PI);
+  _dimArrow(b[0],b[1], ang);
+  _dimLabel((a[0]+b[0])/2,(a[1]+b[1])/2,g.label);
   pCtx.restore();
 }
 function _cadDimOverlay(){
