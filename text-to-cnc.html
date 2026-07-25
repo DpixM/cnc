@@ -5335,7 +5335,7 @@ function applyBB(o,bb){
 
 function objHasDim(id){ for(const o of paintObjects){ if(o.type==='dim' && (o.ref===id||o.ref2===id)) return true; } return false; }
 function getHandlesPx(o){
-  if(o.type==='dim'){ const g=(typeof dimGeom==='function')?dimGeom(o):null; if(g&&g._angle){ const c=mmToPx(g.ax,g.ay); return[{id:'aplace',x:c[0],y:c[1]}]; } const bb=getObjBB(o); const c=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2); return[{id:'mv',x:c[0],y:c[1]}]; }
+  if(o.type==='dim'){ const g=(typeof dimGeom==='function')?dimGeom(o):null; if(g&&g._angle){ const c=mmToPx(g.ax,g.ay); return[{id:'aplace',x:c[0],y:c[1]}]; } if(g&&o.kind==='ptdist'){ const c=mmToPx((g.ax+g.bx)/2,(g.ay+g.by)/2); return[{id:'aplace',x:c[0],y:c[1]}]; } const bb=getObjBB(o); const c=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2); return[{id:'mv',x:c[0],y:c[1]}]; }
   if(o.type==='point'){ const[cx,cy]=mmToPx(o.x,o.y); return[{id:'mv',x:cx,y:cy}]; }
   if(o._circle){ const[cx,cy]=mmToPx(o.x,o.y); const[rx,ry]=mmToPx(o.x+o.rx,o.y); return[{id:'mv',x:cx,y:cy},{id:'rad',x:rx,y:ry}]; } // cercle : deplacement + rayon (reste rond)
   if(o.type==='line'){
@@ -6170,7 +6170,7 @@ function beginPlace(spec){ _dimPlace={spec, px:null, py:null}; _dimEdgeA=null; _
 function placeDim(spec,px,py){
   let dim=paintObjects.find(o=>o.type==='dim'&&o.ref===spec.ref&&o.kind===spec.kind&&(o.ref2||null)===(spec.ref2||null));
   if(!dim){ dim=Object.assign({id:objCnt++,type:'dim'},spec); paintObjects.push(dim); if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); }
-  if(dim.kind==='angle'){ dim.place=[px,py]; }
+  if(dim.kind==='angle'||dim.kind==='ptdist'){ dim.place=[px,py]; }
   else { const base=_dimGeomBase(Object.assign({},dim,{mv:undefined})); if(base){ const cx=(base.ax+base.bx)/2, cy=(base.ay+base.by)/2; dim.mv=[px-cx, py-cy]; } }
   if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null;
   if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow();
@@ -6225,13 +6225,32 @@ function nearestIntersection(xm,ym,tol){
   return best;
 }
 function dimGeom(dim){ const g=_dimGeomBase(dim); if(!g||!dim.mv) return g; const mx=dim.mv[0],my=dim.mv[1]; g.ax+=mx;g.ay+=my;g.bx+=mx;g.by+=my; if(g.ix!=null){g.ix+=mx;g.iy+=my;} if(g.ext){for(const s of g.ext){s[1][0]+=mx;s[1][1]+=my;}} return g; }
+function _linDimGeom(P,Q,place){
+  const minX=Math.min(P[0],Q[0]),maxX=Math.max(P[0],Q[0]),minY=Math.min(P[1],Q[1]),maxY=Math.max(P[1],Q[1]);
+  if(!place){ const dx=Q[0]-P[0],dy=Q[1]-P[1],L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L; place=[(P[0]+Q[0])/2+nx*8,(P[1]+Q[1])/2+ny*8]; }
+  const outX = place[0]<minX?minX-place[0]:(place[0]>maxX?place[0]-maxX:0);
+  const outY = place[1]<minY?minY-place[1]:(place[1]>maxY?place[1]-maxY:0);
+  let axis;
+  if(outX<1e-9 && outY<1e-9) axis='aligned';
+  else if(outY>=outX && (maxX-minX)>0.05) axis='h';
+  else if((maxY-minY)>0.05) axis='v';
+  else axis='aligned';
+  if(axis==='h'){ const y=place[1], val=Math.abs(Q[0]-P[0]);
+    return {axis, ax:P[0],ay:y,bx:Q[0],by:y,val,label:val.toFixed(1)+' mm', ext:[[[P[0],P[1]],[P[0],y]],[[Q[0],Q[1]],[Q[0],y]]]}; }
+  if(axis==='v'){ const x=place[0], val=Math.abs(Q[1]-P[1]);
+    return {axis, ax:x,ay:P[1],bx:x,by:Q[1],val,label:val.toFixed(1)+' mm', ext:[[[P[0],P[1]],[x,P[1]]],[[Q[0],Q[1]],[x,Q[1]]]]}; }
+  const dx=Q[0]-P[0],dy=Q[1]-P[1],L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L;
+  const off=(place[0]-(P[0]+Q[0])/2)*nx+(place[1]-(P[1]+Q[1])/2)*ny, val=L;
+  return {axis:'aligned', ax:P[0]+nx*off,ay:P[1]+ny*off,bx:Q[0]+nx*off,by:Q[1]+ny*off,val,label:val.toFixed(1)+' mm',
+    ext:[[[P[0],P[1]],[P[0]+nx*off,P[1]+ny*off]],[[Q[0],Q[1]],[Q[0]+nx*off,Q[1]+ny*off]]]};
+}
 function _angleSector(rays, phi){
   const n=rays.length;
   for(let i=0;i<n;i++){ const lo=rays[i]; const hi=(i===n-1)?rays[0]+2*Math.PI:rays[i+1]; let pp=phi; if(pp<lo)pp+=2*Math.PI; if(pp>=lo&&pp<hi) return {lo, span:hi-lo, mid:(lo+hi)/2}; }
   return {lo:rays[0], span:rays[1]-rays[0], mid:(rays[0]+rays[1])/2};
 }
 function _dimGeomBase(dim){
-  if(dim.kind==='ptdist'){ const P=ptOfRef(dim.ref), Q=ptOfRef(dim.ref2); if(!P||!Q)return null; const val=Math.hypot(Q[0]-P[0],Q[1]-P[1]); return {ax:P[0],ay:P[1],bx:Q[0],by:Q[1],val,label:val.toFixed(1)+' mm'}; }
+  if(dim.kind==='ptdist'){ const P=ptOfRef(dim.ref), Q=ptOfRef(dim.ref2); if(!P||!Q)return null; return _linDimGeom(P,Q,dim.place); }
   if(dim.kind==='pdist'){ const P=ptOfRef(dim.ref), E=segOfRef(dim.ref2); if(!P||!E)return null; const ex=E[2]-E[0],ey=E[3]-E[1],L2=ex*ex+ey*ey||1; const t=((P[0]-E[0])*ex+(P[1]-E[1])*ey)/L2; const fx=E[0]+t*ex,fy=E[1]+t*ey; const val=Math.hypot(P[0]-fx,P[1]-fy); return {ax:fx,ay:fy,bx:P[0],by:P[1],val,label:val.toFixed(1)+' mm', ext:[[[fx,fy],[fx,fy]]]}; }
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o && !(typeof dim.ref==='string' && dim.ref.indexOf('#')>=0)) return null;
   const off=6;
@@ -6269,7 +6288,12 @@ function _dimGeomBase(dim){
 }
 function getDimValue(dim){ const g=dimGeom(dim); return g?g.val:0; }
 function applyDimValue(dim,v){
-  if(dim.kind==='ptdist'){ const o=objForPointRef(dim.ref2); if(!o||!(v>0))return; const P=ptOfRef(dim.ref),Q=ptOfRef(dim.ref2); if(!P||!Q)return; const dx=Q[0]-P[0],dy=Q[1]-P[1],L=Math.hypot(dx,dy)||1; _shiftObj(o, (P[0]+dx/L*v)-Q[0], (P[1]+dy/L*v)-Q[1]); if(typeof pushHistory==='function')pushHistory(); return; }
+  if(dim.kind==='ptdist'){ const o=objForPointRef(dim.ref2); if(!o||!(v>0))return; const P=ptOfRef(dim.ref),Q=ptOfRef(dim.ref2); if(!P||!Q)return;
+    const gg=_dimGeomBase(dim), axis=gg?gg.axis:'aligned';
+    if(axis==='h'){ const sgn=(Q[0]-P[0])>=0?1:-1; _shiftObj(o,(P[0]+sgn*v)-Q[0],0); }
+    else if(axis==='v'){ const sgn=(Q[1]-P[1])>=0?1:-1; _shiftObj(o,0,(P[1]+sgn*v)-Q[1]); }
+    else { const dx=Q[0]-P[0],dy=Q[1]-P[1],L=Math.hypot(dx,dy)||1; _shiftObj(o,(P[0]+dx/L*v)-Q[0],(P[1]+dy/L*v)-Q[1]); }
+    if(typeof pushHistory==='function')pushHistory(); return; }
   if(dim.kind==='pdist'){ const o=objForPointRef(dim.ref); const E=segOfRef(dim.ref2); if(!o||!E||!(v>0))return; const P=ptOfRef(dim.ref); const ex=E[2]-E[0],ey=E[3]-E[1],L=Math.hypot(ex,ey)||1,nx=-ey/L,ny=ex/L; const d=(P[0]-E[0])*nx+(P[1]-E[1])*ny; const sgn=d>=0?1:-1; const foot=[P[0]-nx*d,P[1]-ny*d]; _shiftObj(o, (foot[0]+nx*sgn*v)-P[0], (foot[1]+ny*sgn*v)-P[1]); if(typeof pushHistory==='function')pushHistory(); return; }
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o||!(v>0)) return;
   if(dim.kind==='diam'){ o.rx=o.ry=v/2; }
@@ -6638,7 +6662,7 @@ function handlePointerDown(cpx,cpy){
       // Select immediately, but delay drag start until movement
       selObjId=found.id;
       const origBB=found.type==='line'?{...found}:{...getObjBB(found)};
-      if(found.type==='dim'){ origBB._mv=[...(found.mv||[0,0])]; if(found.kind==='angle'){ if(!found.place){ const _g=dimGeom(found); if(_g)found.place=[_g.ax,_g.ay]; } origBB._place=found.place?[...found.place]:[0,0]; } }
+      if(found.type==='dim'){ origBB._mv=[...(found.mv||[0,0])]; if(found.kind==='angle'||found.kind==='ptdist'){ if(!found.place){ const _g=dimGeom(found); if(_g)found.place=found.kind==='angle'?[_g.ax,_g.ay]:[(_g.ax+_g.bx)/2,(_g.ay+_g.by)/2]; } origBB._place=found.place?[...found.place]:[0,0]; } }
       dragPending={mode:'mv',obj:found,cpx,cpy,origBB,startMm:{x:xm,y:ym}};
     }else{
       selObjId=null;
@@ -13474,7 +13498,7 @@ function snapPointsOf(o){
 }
 
 function applyHandleDrag(o,mode,orig,dxMm,dyMm){
-  if(o.type==='dim'){ if(o.kind==='angle'){ const op=(orig&&orig._place)?orig._place:(o.place||[0,0]); o.place=[op[0]+dxMm, op[1]+dyMm]; return; } if(mode==='mv') o.mv=[((orig&&orig._mv)?orig._mv[0]:0)+dxMm, ((orig&&orig._mv)?orig._mv[1]:0)+dyMm]; return; } // deplacer une cote (angle: secteur restreint via place)
+  if(o.type==='dim'){ if(o.kind==='angle'||o.kind==='ptdist'){ const op=(orig&&orig._place)?orig._place:(o.place||[0,0]); o.place=[op[0]+dxMm, op[1]+dyMm]; return; } if(mode==='mv') o.mv=[((orig&&orig._mv)?orig._mv[0]:0)+dxMm, ((orig&&orig._mv)?orig._mv[1]:0)+dyMm]; return; } // deplacer une cote (angle/ptdist: axe restreint via place)
   if(o.type!=='dim' && typeof objHasDim==='function' && objHasDim(o.id) && mode!=='mv') return; // cotee : redim verrouille (change via la cote)
   if(o._circle && mode==='rad'){ const rx0=(orig&&orig.w?orig.w/2:o.rx); const r=Math.max(0.5,Math.hypot(rx0+dxMm,dyMm)); o.rx=o.ry=r; return; } // cercle reste rond
   // Line: drag endpoints directly using delta from original pos
