@@ -4040,6 +4040,7 @@ let snapEnabled = true;  // accrochage actif par défaut
 let currentStarBranches = 5;
 const SNAP_DIST = 14; // px threshold for snap (bigger = easier to snap on mobile)
 let lastSnapResult = null;
+let hoverSnap = null;   // accroche affichee au survol (sans dessiner)
 
 // ════════════════════════════════════════════════════════════
 // STEPPER
@@ -4259,7 +4260,8 @@ const TOOL_MENUS = {
     {i:'T', l:'Texte',                fn:"cadPick('text')"},
     {i:'▦', l:'Réseau rectangulaire', fn:'openPatternRect()'},
     {i:'✳️', l:'Réseau circulaire',   fn:"cadSoon('Réseau circulaire')"},
-    {i:'🪞', l:'Symétrie miroir',     fn:"cadSoon('Symétrie miroir')"},
+    {i:'🪞', l:'Miroir ⇋ (gauche-droite)', fn:"cadMirror('lr')"},
+    {i:'🪞', l:'Miroir ⥯ (haut-bas)',      fn:"cadMirror('ud')"},
   ],
   cadModify: [
     {i:'⌒', l:'Congé (arrondi)',   fn:"cadSoon('Congé')"},
@@ -4267,7 +4269,7 @@ const TOOL_MENUS = {
     {i:'⧉', l:'Décalage (offset)', fn:"cadSoon('Décalage')"},
     {i:'✂️', l:'Ajuster (trim)',   fn:"cadSoon('Ajuster')"},
     {i:'⊢', l:'Prolonger',         fn:"cadSoon('Prolonger')"},
-    {i:'✥', l:'Déplacer / Copier', fn:"cadSoon('Déplacer / Copier')"},
+    {i:'⧉', l:'Dupliquer (+5 mm)',  fn:"cadDuplicate()"},
     {i:'⤢', l:'Échelle',           fn:"cadSoon('Échelle')"},
   ],
   cadConstrain: [
@@ -5866,6 +5868,13 @@ function redrawCanvasNow(){
         pCtx.strokeStyle='#fff';pCtx.lineWidth=1.5;pCtx.stroke();
       }
     }
+  } else if(snapEnabled && hoverSnap){
+    // Accroche au survol : losange magenta (montre que le curseur est capte)
+    const[sx,sy]=mmToPx(hoverSnap.x,hoverSnap.y);
+    pCtx.save();pCtx.setLineDash([]);
+    pCtx.strokeStyle='#e11d9b';pCtx.fillStyle='rgba(225,29,155,.20)';pCtx.lineWidth=1.6;
+    pCtx.beginPath();pCtx.moveTo(sx,sy-6);pCtx.lineTo(sx+6,sy);pCtx.lineTo(sx,sy+6);pCtx.lineTo(sx-6,sy);pCtx.closePath();
+    pCtx.fill();pCtx.stroke();pCtx.restore();
   }
 
   // Zoom %
@@ -6052,6 +6061,57 @@ function _cadAngle(a,b){ // 0=Est, sens trigo (Y ecran vers le bas -> on inverse
 }
 function cadPick(t){ setPTool(t); _cadMode=true; if(t!=='cadline') redrawCanvas(); } // outil CAD + mode CAD
 function cadSoon(n){ if(typeof toastHist==='function') toastHist('🔜 '+n+' — bientôt disponible (emplacement prêt)'); }
+function _mirrorX(o,cx){ const f=x=>2*cx-x;
+  switch(o.type){
+    case 'rect': case 'tri': case 'star': case 'oblong': case 'text': case 'svg': if(o.x!=null)o.x=f(o.x+(o.w||0)); break;
+    case 'ellipse': o.x=f(o.x); break;
+    case 'line': o.x1=f(o.x1); o.x2=f(o.x2); break;
+    case 'free': if(o.pts)o.pts=o.pts.map(pt=>[f(pt[0]),pt[1]]); break;
+    case 'point': o.x=f(o.x); break;
+    case 'gear': if(o.cx!=null)o.cx=f(o.cx); else if(o.x!=null)o.x=f(o.x+(o.w||0)); if(o.gearPts)o.gearPts=o.gearPts.map(pt=>[-pt[0],pt[1]]); break;
+    default: if(o.x!=null)o.x=f(o.x+(o.w||0));
+  }
+}
+function _mirrorY(o,cy){ const f=y=>2*cy-y;
+  switch(o.type){
+    case 'rect': case 'tri': case 'star': case 'oblong': case 'text': case 'svg': if(o.y!=null)o.y=f(o.y+(o.h||0)); break;
+    case 'ellipse': o.y=f(o.y); break;
+    case 'line': o.y1=f(o.y1); o.y2=f(o.y2); break;
+    case 'free': if(o.pts)o.pts=o.pts.map(pt=>[pt[0],f(pt[1])]); break;
+    case 'point': o.y=f(o.y); break;
+    case 'gear': if(o.cy!=null)o.cy=f(o.cy); else if(o.y!=null)o.y=f(o.y+(o.h||0)); if(o.gearPts)o.gearPts=o.gearPts.map(pt=>[pt[0],-pt[1]]); break;
+    default: if(o.y!=null)o.y=f(o.y+(o.h||0));
+  }
+}
+function cadMirror(dir){
+  const ids=[...getSelIds()];
+  if(!ids.length){ cadSoon('Miroir'); if(typeof toastHist==='function')toastHist('🪞 Sélectionne d\'abord une ou plusieurs formes'); return; }
+  const objs=ids.map(getObj).filter(Boolean);
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  for(const o of objs){ const b=getObjBB(o); if(!b)continue; minX=Math.min(minX,b.x);minY=Math.min(minY,b.y);maxX=Math.max(maxX,b.x+b.w);maxY=Math.max(maxY,b.y+b.h); }
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  for(const o of objs){ if(dir==='lr')_mirrorX(o,cx); else _mirrorY(o,cy); }
+  if(typeof pushHistory==='function')pushHistory();
+  if(typeof redrawCanvasNow==='function')redrawCanvasNow();
+  if(typeof toastHist==='function')toastHist(dir==='lr'?'🪞 Miroir gauche-droite appliqué':'🪞 Miroir haut-bas appliqué');
+}
+function _shiftObj(o,dx,dy){
+  if(o.x!=null)o.x+=dx; if(o.y!=null)o.y+=dy;
+  if(o.x1!=null){o.x1+=dx;o.x2+=dx;o.y1+=dy;o.y2+=dy;}
+  if(o.cx!=null)o.cx+=dx; if(o.cy!=null)o.cy+=dy;
+  if(o.pts)o.pts=o.pts.map(pt=>[pt[0]+dx,pt[1]+dy]);
+}
+function cadDuplicate(){
+  const ids=[...getSelIds()];
+  if(!ids.length){ if(typeof toastHist==='function')toastHist('⧉ Sélectionne d\'abord une forme'); return; }
+  const news=[];
+  for(const id of ids){ const o=getObj(id); if(!o)continue; const c=JSON.parse(JSON.stringify(o)); c.id=Date.now()+Math.random(); _shiftObj(c,5,5); paintObjects.push(c); news.push(c.id); }
+  if(typeof selObjIds!=='undefined'&&selObjIds.clear){ selObjIds.clear(); news.forEach(i=>selObjIds.add(i)); }
+  selObjId=news[news.length-1]||null;
+  if(typeof pushHistory==='function')pushHistory();
+  if(typeof redrawCanvasNow==='function')redrawCanvasNow();
+  if(typeof toastHist==='function')toastHist('⧉ '+news.length+' copie(s), décalée(s) de 5 mm');
+}
 
 // ── OUTIL COTE (dimension) : element 'dim', annotation seulement (jamais usine) ──
 let _caddim = null; // {p1:[x,y]|null, cursor:[x,y]|null, _snapped}
@@ -6535,9 +6595,11 @@ function snapPoint(xm,ym,excludeId){
     if(o.id===excludeId)continue;
     if(o.type==='dim'||o.type==='point'||o.type==='text')continue;
     let segs; try{ segs=objToStrokesRaw(o)||[]; }catch(e){ continue; }
+    const closed=['rect','ellipse','tri','star','oblong','gear','text','polygon'].includes(o.type);
     for(const s of segs){ if(!s||s.length<2)continue;
-      for(let i=0;i<s.length-1;i++){
-        const ax=s[i][0],ay=s[i][1],cx2=s[i+1][0],cy2=s[i+1][1];
+      const n=s.length, lim=closed?n:n-1;
+      for(let i=0;i<lim;i++){
+        const ax=s[i][0],ay=s[i][1],cx2=s[(i+1)%n][0],cy2=s[(i+1)%n][1];
         const dx=cx2-ax,dy=cy2-ay,L2=dx*dx+dy*dy; if(L2<1e-9)continue;
         let t=((xm-ax)*dx+(ym-ay)*dy)/L2; t=Math.max(0,Math.min(1,t));
         const fx=ax+t*dx,fy=ay+t*dy,d=Math.hypot(xm-fx,ym-fy);
@@ -6583,6 +6645,15 @@ function handlePointerMove(cpx,cpy){
   if (paintTool === 'select' && isDragging && dragMode && dragObj) {
     pmDragObject(xm,ym); return;
   }
+
+  // 3b. Repere d'accroche AU SURVOL (visible en permanence, tous outils)
+  if(snapEnabled && !isDragging && !isDrawing && paintTool!=='pan'){
+    const hs=snapPoint(xm,ym,null);
+    const nh=hs.snapped?{x:hs.x,y:hs.y}:null;
+    const changed=(!!nh!==!!hoverSnap)||(nh&&hoverSnap&&(Math.abs(nh.x-hoverSnap.x)>1e-6||Math.abs(nh.y-hoverSnap.y)>1e-6));
+    hoverSnap=nh;
+    if(changed) redrawCanvasNow();
+  } else if(hoverSnap){ hoverSnap=null; redrawCanvasNow(); }
 
   // 4. Simple survol en mode sélection : on adapte le curseur
   pmUpdateHoverCursor(cpx,cpy,xm,ym);
