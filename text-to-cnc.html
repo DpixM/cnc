@@ -6656,7 +6656,7 @@ function handlePointerDown(cpx,cpy){
 function snapPoint(xm,ym,excludeId){
   if(!snapEnabled)return{x:xm,y:ym,snapped:false};
   const SNAP_MM=SNAP_DIST/(BASE_PX*vZoom);
-  let bx=xm,by=ym,bd=SNAP_MM,snapped=false;
+  let bx=xm,by=ym,bd=SNAP_MM,snapped=false,snapKind=null;
 
   // Points fixes : origine G-code + coins de la feuille + centre feuille
   const org=getOriginMm();
@@ -6673,7 +6673,7 @@ function snapPoint(xm,ym,excludeId){
   ];
   for(const[px,py] of fixedPts){
     const d=Math.hypot(xm-px,ym-py);
-    if(d<bd){bd=d;bx=px;by=py;snapped=true;}
+    if(d<bd){bd=d;bx=px;by=py;snapped=true;snapKind='point';}
   }
 
   // Points des objets (coins, centre, milieux)
@@ -6683,12 +6683,12 @@ function snapPoint(xm,ym,excludeId){
     const pts=snapPointsOf(o);
     for(const[px,py]of pts){
       const d=Math.hypot(xm-px,ym-py);
-      if(d<bd){bd=d;bx=px;by=py;snapped=true;}
+      if(d<bd){bd=d;bx=px;by=py;snapped=true;snapKind='point';}
     }
   }
   // Accroche sur les INTERSECTIONS de segments (croisements) — point discret prioritaire.
   { const _S=_allSegs(excludeId);
-    if(_S.length<=160){ for(let i=0;i<_S.length;i++){ for(let j=i+1;j<_S.length;j++){ const ip=_segInt(_S[i],_S[j]); if(ip){ const d=Math.hypot(xm-ip[0],ym-ip[1]); if(d<bd){bd=d;bx=ip[0];by=ip[1];snapped=true;} } } } } }
+    if(_S.length<=160){ for(let i=0;i<_S.length;i++){ for(let j=i+1;j<_S.length;j++){ const ip=_segInt(_S[i],_S[j]); if(ip){ const d=Math.hypot(xm-ip[0],ym-ip[1]); if(d<bd){bd=d;bx=ip[0];by=ip[1];snapped=true;snapKind='point';} } } } } }
   // Accroche sur les SEGMENTS : UNIQUEMENT si aucun point discret (coin / milieu / centre /
   // intersection) n'est deja accroche. Ainsi coins ET milieux gardent la priorite, et le
   // trait ne sert que de repli quand on est loin de tout point remarquable.
@@ -6705,12 +6705,12 @@ function snapPoint(xm,ym,excludeId){
           const dx=cx2-ax,dy=cy2-ay,L2=dx*dx+dy*dy; if(L2<1e-9)continue;
           let t=((xm-ax)*dx+(ym-ay)*dy)/L2; t=Math.max(0,Math.min(1,t));
           const fx=ax+t*dx,fy=ay+t*dy,d=Math.hypot(xm-fx,ym-fy);
-          if(d<bd){bd=d;bx=fx;by=fy;snapped=true;}
+          if(d<bd){bd=d;bx=fx;by=fy;snapped=true;snapKind='seg';}
         }
       }
     }
   }
-  return{x:bx,y:by,snapped};
+  return{x:bx,y:by,snapped,kind:snapKind};
 }
 
 function renderSnapBtn(){
@@ -6809,11 +6809,14 @@ function pmDragObject(xm,ym){
           let cands;
           if(bb.x1!=null){ cands=[[bb.x1,bb.y1],[bb.x2,bb.y2],[(bb.x1+bb.x2)/2,(bb.y1+bb.y2)/2]]; }
           else { cands=[[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h],[bb.x+bb.w/2,bb.y+bb.h/2],[bb.x+bb.w/2,bb.y],[bb.x+bb.w/2,bb.y+bb.h],[bb.x,bb.y+bb.h/2],[bb.x+bb.w,bb.y+bb.h/2]]; }
-          let bestS=null;
+          let bestPt=null, bestSeg=null;
           for(const c of cands){
             const snp=snapPoint(c[0]+dxMm, c[1]+dyMm, dragObj.id);
-            if(snp.snapped){ const d=Math.hypot((c[0]+dxMm)-snp.x,(c[1]+dyMm)-snp.y); if(!bestS||d<bestS.d) bestS={d,dx:snp.x-c[0],dy:snp.y-c[1],sx:snp.x,sy:snp.y}; }
+            if(snp.snapped){ const d=Math.hypot((c[0]+dxMm)-snp.x,(c[1]+dyMm)-snp.y); const rec={d,dx:snp.x-c[0],dy:snp.y-c[1],sx:snp.x,sy:snp.y};
+              if(snp.kind==='seg'){ if(!bestSeg||d<bestSeg.d) bestSeg=rec; }
+              else { if(!bestPt||d<bestPt.d) bestPt=rec; } }
           }
+          const bestS = bestPt || bestSeg;   // coin/milieu/intersection prioritaire sur un bord
           if(bestS){ dxMm=bestS.dx; dyMm=bestS.dy; lastSnapResult={x:bestS.sx,y:bestS.sy,snapped:true}; }
           else lastSnapResult={snapped:false};
         }
