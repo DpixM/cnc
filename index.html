@@ -5335,7 +5335,7 @@ function applyBB(o,bb){
 
 function objHasDim(id){ for(const o of paintObjects){ if(o.type==='dim' && (o.ref===id||o.ref2===id)) return true; } return false; }
 function getHandlesPx(o){
-  if(o.type==='dim'){ const bb=getObjBB(o); const c=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2); return[{id:'mv',x:c[0],y:c[1]}]; }
+  if(o.type==='dim'){ const g=(typeof dimGeom==='function')?dimGeom(o):null; if(g&&g._angle){ const c=mmToPx(g.ax,g.ay); return[{id:'aplace',x:c[0],y:c[1]}]; } const bb=getObjBB(o); const c=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2); return[{id:'mv',x:c[0],y:c[1]}]; }
   if(o.type==='point'){ const[cx,cy]=mmToPx(o.x,o.y); return[{id:'mv',x:cx,y:cy}]; }
   if(o._circle){ const[cx,cy]=mmToPx(o.x,o.y); const[rx,ry]=mmToPx(o.x+o.rx,o.y); return[{id:'mv',x:cx,y:cy},{id:'rad',x:rx,y:ry}]; } // cercle : deplacement + rayon (reste rond)
   if(o.type==='line'){
@@ -6117,27 +6117,29 @@ function cadDuplicate(){
 let _caddim = null; // {p1:[x,y]|null, cursor:[x,y]|null, _snapped}
 let _dimA = null; // 1ere entite cliquee pour une cote de DISTANCE entre 2 formes
 let _dimHover = null;    // arete surlignee au survol (cotation)
+let _dimPlace = null;    // cote en cours de depose (suit le curseur)
 let _dimEdgeMode = null; // 'angle' | 'dist' : picking d'aretes
 let _dimEdgeA = null;    // 1ere arete choisie (ref 'id#idx')
 function cadStartDim(){ _caddim=null; _dimA=null; _dimEdgeMode=null; _dimEdgeA=null; _dimHover=null; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
 function cadStartAngle(){ _caddim=null; _dimA=null; _dimHover=null; _dimEdgeA=null; _dimEdgeMode='angle'; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('∠ Angle : clique 2 arêtes (côtés de rectangle OK)'); redrawCanvasNow(); }
 function cadStartDist(){ _caddim=null; _dimA=null; _dimHover=null; _dimEdgeA=null; _dimEdgeMode='dist'; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('⇥ Distance : clique 2 arêtes'); redrawCanvasNow(); }
 function cadDimClick(xm,ym){
+  if(_dimPlace){ const sp=_dimPlace.spec; _dimPlace=null; placeDim(sp,xm,ym); return; }
   const tol=14/(BASE_PX*vZoom);
   // 1) Cercle sous le curseur -> diametre (1 clic)
   let circ=null, cb=Infinity;
   for(const o of paintObjects){ if(o._circle||o.type==='ellipse'){ const r=((o.rx||0)+(o.ry||0))/2||o.rx||o.ry; const dr=Math.abs(Math.hypot(xm-o.x,ym-o.y)-r); if(dr<tol&&dr<cb){cb=dr;circ=o;} } }
   const ne=nearestEdge(xm,ym);
-  if(circ && (!ne || cb<=ne.d)){ _dimEdgeA=null; makeDim({kind:'diam',ref:circ.id}); return; }
+  if(circ && (!ne || cb<=ne.d)){ _dimEdgeA=null; beginPlace({kind:'diam',ref:circ.id}); return; }
   if(!ne || ne.d>tol){ _dimEdgeA=null; if(typeof toastHist==='function')toastHist('📏 Clique un trait ou un cercle'); redrawCanvasNow(); return; }
   // 2) 1ere arete choisie
   if(!_dimEdgeA){ _dimEdgeA=ne.ref; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('📏 Re-clique la MÊME arête = longueur • clique une AUTRE = distance/angle'); return; }
   // 3) 2e clic : meme arete = longueur ; autre arete = distance (parallele) ou angle
-  if(_dimEdgeA===ne.ref){ const a=_dimEdgeA; _dimEdgeA=null; makeDimLen(a); return; }
+  if(_dimEdgeA===ne.ref){ const a=_dimEdgeA; _dimEdgeA=null; beginPlace({kind:'len', ref:_dimRef(a)}); return; }
   const A=segOfRef(_dimEdgeA), B=segOfRef(ne.ref), a=_dimEdgeA; _dimEdgeA=null;
   let kind='dist';
   if(A&&B){ const adx=A[2]-A[0],ady=A[3]-A[1],bdx=B[2]-B[0],bdy=B[3]-B[1]; const cr=adx*bdy-ady*bdx, dt=adx*bdx+ady*bdy; const ab=Math.abs(Math.atan2(cr,dt)); if(Math.abs(Math.sin(ab))>0.03) kind='angle'; }
-  makeDim({kind, ref:_dimRef(a), ref2:_dimRef(ne.ref)});
+  beginPlace({kind, ref:_dimRef(a), ref2:_dimRef(ne.ref)});
 }
 // Une arete appartenant a une ligne/free-2pt entiere -> ref objet (cote EDITABLE).
 // Une arete de rectangle / segment de polyligne -> ref d'arete 'id#idx' (mesure).
@@ -6146,6 +6148,17 @@ function _dimRef(ref){
   return ref;
 }
 function makeDimLen(ref){ makeDim({kind:'len', ref:_dimRef(ref)}); }
+function beginPlace(spec){ _dimPlace={spec, px:null, py:null}; _dimEdgeA=null; _dimHover=null; if(typeof toastHist==='function')toastHist('↔ Bouge la souris puis clique pour déposer la cote'); redrawCanvasNow(); }
+function placeDim(spec,px,py){
+  let dim=paintObjects.find(o=>o.type==='dim'&&o.ref===spec.ref&&o.kind===spec.kind&&(o.ref2||null)===(spec.ref2||null));
+  if(!dim){ dim=Object.assign({id:objCnt++,type:'dim'},spec); paintObjects.push(dim); if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); }
+  if(dim.kind==='angle'){ dim.place=[px,py]; }
+  else { const base=_dimGeomBase(Object.assign({},dim,{mv:undefined})); if(base){ const cx=(base.ax+base.bx)/2, cy=(base.ay+base.by)/2; dim.mv=[px-cx, py-cy]; } }
+  if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null;
+  if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow();
+  const meas=(typeof dim.ref==='string'&&dim.ref.indexOf('#')>=0)||(typeof dim.ref2==='string'&&dim.ref2.indexOf('#')>=0);
+  if(!meas) openDimInput(dim);
+}
 function makeDim(spec){
   let dim=paintObjects.find(o=>o.type==='dim'&&o.ref===spec.ref&&o.kind===spec.kind&&(o.ref2||null)===(spec.ref2||null));
   if(!dim){ dim=Object.assign({id:objCnt++,type:'dim'},spec); paintObjects.push(dim); if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); }
@@ -6194,6 +6207,11 @@ function nearestIntersection(xm,ym,tol){
   return best;
 }
 function dimGeom(dim){ const g=_dimGeomBase(dim); if(!g||!dim.mv) return g; const mx=dim.mv[0],my=dim.mv[1]; g.ax+=mx;g.ay+=my;g.bx+=mx;g.by+=my; if(g.ix!=null){g.ix+=mx;g.iy+=my;} if(g.ext){for(const s of g.ext){s[1][0]+=mx;s[1][1]+=my;}} return g; }
+function _angleSector(rays, phi){
+  const n=rays.length;
+  for(let i=0;i<n;i++){ const lo=rays[i]; const hi=(i===n-1)?rays[0]+2*Math.PI:rays[i+1]; let pp=phi; if(pp<lo)pp+=2*Math.PI; if(pp>=lo&&pp<hi) return {lo, span:hi-lo, mid:(lo+hi)/2}; }
+  return {lo:rays[0], span:rays[1]-rays[0], mid:(rays[0]+rays[1])/2};
+}
 function _dimGeomBase(dim){
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o && !(typeof dim.ref==='string' && dim.ref.indexOf('#')>=0)) return null;
   const off=6;
@@ -6205,10 +6223,16 @@ function _dimGeomBase(dim){
     const adx=A[2]-A[0],ady=A[3]-A[1],bdx=B[2]-B[0],bdy=B[3]-B[1];
     const det=adx*bdy-ady*bdx; if(Math.abs(det)<1e-9) return null;
     const t=((B[0]-A[0])*bdy-(B[1]-A[1])*bdx)/det, ix=A[0]+t*adx, iy=A[1]+t*ady;
-    const aA=Math.atan2(ady,adx), aB=Math.atan2(bdy,bdx);
-    let diff=aB-aA; while(diff<=-Math.PI)diff+=2*Math.PI; while(diff>Math.PI)diff-=2*Math.PI;
-    const val=Math.abs(diff)*180/Math.PI, rmm=12, midA=aA+diff/2;
-    return {ax:ix+Math.cos(midA)*rmm, ay:iy+Math.sin(midA)*rmm, bx:ix+Math.cos(midA)*rmm, by:iy+Math.sin(midA)*rmm, val, label:val.toFixed(1)+'°', _angle:true, ix, iy, aA, diff, rmm};
+    const dA=Math.atan2(ady,adx), dB=Math.atan2(bdy,bdx);
+    const nrm=a=>{a=a%(2*Math.PI); if(a<0)a+=2*Math.PI; return a;};
+    const rays=[nrm(dA),nrm(dB),nrm(dA+Math.PI),nrm(dB+Math.PI)].sort((x,y)=>x-y);
+    let place=dim.place;
+    if(!place){ let d=dB-dA; while(d<=-Math.PI)d+=2*Math.PI; while(d>Math.PI)d-=2*Math.PI; const mid=dA+d/2; place=[ix+Math.cos(mid)*12, iy+Math.sin(mid)*12]; }
+    const phi=nrm(Math.atan2(place[1]-iy, place[0]-ix));
+    const sec=_angleSector(rays,phi);
+    const rmm=Math.max(6, Math.hypot(place[0]-ix, place[1]-iy));
+    const val=sec.span*180/Math.PI;
+    return {ax:ix+Math.cos(sec.mid)*rmm, ay:iy+Math.sin(sec.mid)*rmm, bx:ix+Math.cos(sec.mid)*rmm, by:iy+Math.sin(sec.mid)*rmm, val, label:val.toFixed(1)+'°', _angle:true, ix, iy, aA:sec.lo, diff:sec.span, rmm};
   }
   if(dim.kind==='dist'){
     const A=segOfRef(dim.ref), B=segOfRef(dim.ref2);
@@ -6290,6 +6314,11 @@ function drawDim(dim){
   pCtx.restore();
 }
 function _cadDimOverlay(){
+  // Apercu de la cote pendant la depose (suit le curseur)
+  if(pCtx && _dimPlace && _dimPlace.px!=null){ const sp=_dimPlace.spec; const tmp=Object.assign({type:'dim',id:-999},sp);
+    if(sp.kind==='angle') tmp.place=[_dimPlace.px,_dimPlace.py];
+    else { const base=_dimGeomBase(Object.assign({},tmp,{mv:undefined})); if(base){ const cx=(base.ax+base.bx)/2,cy=(base.ay+base.by)/2; tmp.mv=[_dimPlace.px-cx,_dimPlace.py-cy]; } }
+    try{ drawDim(tmp); }catch(e){} }
   // Arete deja choisie (1ere) : surlignee en vert
   if(pCtx && _dimEdgeA){ const s=segOfRef(_dimEdgeA); if(s){ const a=mmToPx(s[0],s[1]),b=mmToPx(s[2],s[3]); pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3; pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke(); pCtx.restore(); } }
   // Arete sous le curseur : surlignee en magenta + losange = accroche
@@ -6579,7 +6608,7 @@ function handlePointerDown(cpx,cpy){
       // Select immediately, but delay drag start until movement
       selObjId=found.id;
       const origBB=found.type==='line'?{...found}:{...getObjBB(found)};
-      if(found.type==='dim') origBB._mv=[...(found.mv||[0,0])];
+      if(found.type==='dim'){ origBB._mv=[...(found.mv||[0,0])]; if(found.kind==='angle'){ if(!found.place){ const _g=dimGeom(found); if(_g)found.place=[_g.ax,_g.ay]; } origBB._place=found.place?[...found.place]:[0,0]; } }
       dragPending={mode:'mv',obj:found,cpx,cpy,origBB,startMm:{x:xm,y:ym}};
     }else{
       selObjId=null;
@@ -6687,7 +6716,7 @@ function renderSnapBtn(){
 
 function handlePointerMove(cpx,cpy){
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
-  if(paintTool==='caddim'){ const[xm,ym]=pxToMm(cpx,cpy); const tolE=14/(BASE_PX*vZoom); const ne=nearestEdge(xm,ym);
+  if(paintTool==='caddim'){ const[xm,ym]=pxToMm(cpx,cpy); if(_dimPlace){ _dimPlace.px=xm; _dimPlace.py=ym; redrawCanvasNow(); return; } const tolE=14/(BASE_PX*vZoom); const ne=nearestEdge(xm,ym);
     let hv=(ne&&ne.d<=tolE)?{seg:ne.seg,foot:ne.foot,d:ne.d}:null;
     const ip=nearestIntersection(xm,ym,tolE); if(ip && (!hv||ip.d<hv.d)) hv={seg:hv?hv.seg:null, foot:ip.pt, d:ip.d, _inter:true};
     _dimHover=hv; redrawCanvasNow(); return; }
@@ -13405,7 +13434,7 @@ function snapPointsOf(o){
 }
 
 function applyHandleDrag(o,mode,orig,dxMm,dyMm){
-  if(o.type==='dim'){ if(mode==='mv') o.mv=[((orig&&orig._mv)?orig._mv[0]:0)+dxMm, ((orig&&orig._mv)?orig._mv[1]:0)+dyMm]; return; } // deplacer une cote
+  if(o.type==='dim'){ if(o.kind==='angle'){ const op=(orig&&orig._place)?orig._place:(o.place||[0,0]); o.place=[op[0]+dxMm, op[1]+dyMm]; return; } if(mode==='mv') o.mv=[((orig&&orig._mv)?orig._mv[0]:0)+dxMm, ((orig&&orig._mv)?orig._mv[1]:0)+dyMm]; return; } // deplacer une cote (angle: secteur restreint via place)
   if(o.type!=='dim' && typeof objHasDim==='function' && objHasDim(o.id) && mode!=='mv') return; // cotee : redim verrouille (change via la cote)
   if(o._circle && mode==='rad'){ const rx0=(orig&&orig.w?orig.w/2:o.rx); const r=Math.max(0.5,Math.hypot(rx0+dxMm,dyMm)); o.rx=o.ry=r; return; } // cercle reste rond
   // Line: drag endpoints directly using delta from original pos
