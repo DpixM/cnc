@@ -6199,7 +6199,7 @@ function segOfRef(ref){
 }
 function nearestEdge(xm,ym){
   let best=null;
-  for(const o of paintObjects){ if(o.type==='dim'||o.type==='group'||o.type==='point')continue;
+  for(const o of paintObjects){ if(o.type==='dim'||o.type==='group'||o.type==='point'||o._circle||o.type==='ellipse')continue; // cercles : pickables par centre/anneau, pas comme aretes
     const es=edgesOf(o);
     for(let i=0;i<es.length;i++){ const ax=es[i][0],ay=es[i][1],bx=es[i][2],by=es[i][3];
       const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy; if(L2<1e-9)continue;
