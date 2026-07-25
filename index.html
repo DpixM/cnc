@@ -6299,6 +6299,11 @@ function drawDim(dim){
   pCtx.save(); pCtx.setLineDash([]); pCtx.lineCap='butt'; pCtx.strokeStyle=GRAY; pCtx.fillStyle=GRAY; pCtx.lineWidth=1;
   if(g._angle){
     const c=mmToPx(g.ix,g.iy), rpx=Math.max(12,g.rmm*BASE_PX*vZoom);
+    // Traits d'attache gris pointilles : du sommet vers les 2 extremites de l'arc (montre les 2 cotes)
+    pCtx.save(); pCtx.setLineDash([3,3]); pCtx.strokeStyle='#a3a8b0'; pCtx.lineWidth=0.8;
+    pCtx.beginPath(); pCtx.moveTo(c[0],c[1]); pCtx.lineTo(c[0]+Math.cos(g.aA)*rpx, c[1]+Math.sin(g.aA)*rpx); pCtx.stroke();
+    pCtx.beginPath(); pCtx.moveTo(c[0],c[1]); pCtx.lineTo(c[0]+Math.cos(g.aA+g.diff)*rpx, c[1]+Math.sin(g.aA+g.diff)*rpx); pCtx.stroke();
+    pCtx.restore();
     pCtx.beginPath(); pCtx.arc(c[0],c[1],rpx,g.aA,g.aA+g.diff,g.diff<0); pCtx.stroke();
     _dimArrow(c[0]+Math.cos(g.aA)*rpx, c[1]+Math.sin(g.aA)*rpx, g.aA+(g.diff<0?-1:1)*Math.PI/2);
     _dimArrow(c[0]+Math.cos(g.aA+g.diff)*rpx, c[1]+Math.sin(g.aA+g.diff)*rpx, g.aA+g.diff+(g.diff<0?1:-1)*Math.PI/2);
@@ -6681,29 +6686,30 @@ function snapPoint(xm,ym,excludeId){
       if(d<bd){bd=d;bx=px;by=py;snapped=true;}
     }
   }
-  // Accroche sur les SEGMENTS : point le plus proche sur un trait (les coins gardent
-  // la priorite car verifies avant, avec des distances plus petites).
-  for(const o of paintObjects){
-    if(o.id===excludeId)continue;
-    if(o.type==='dim'||o.type==='point'||o.type==='text')continue;
-    let segs; try{ segs=objToStrokesRaw(o)||[]; }catch(e){ continue; }
-    const closed=['rect','ellipse','tri','star','oblong','gear','text','polygon'].includes(o.type);
-    for(const s of segs){ if(!s||s.length<2)continue;
-      const n=s.length, lim=closed?n:n-1;
-      for(let i=0;i<lim;i++){
-        const ax=s[i][0],ay=s[i][1],cx2=s[(i+1)%n][0],cy2=s[(i+1)%n][1];
-        const dx=cx2-ax,dy=cy2-ay,L2=dx*dx+dy*dy; if(L2<1e-9)continue;
-        let t=((xm-ax)*dx+(ym-ay)*dy)/L2; t=Math.max(0,Math.min(1,t));
-        const fx=ax+t*dx,fy=ay+t*dy,d=Math.hypot(xm-fx,ym-fy);
-        if(d<bd){bd=d;bx=fx;by=fy;snapped=true;}
+  // Accroche sur les INTERSECTIONS de segments (croisements) — point discret prioritaire.
+  { const _S=_allSegs(excludeId);
+    if(_S.length<=160){ for(let i=0;i<_S.length;i++){ for(let j=i+1;j<_S.length;j++){ const ip=_segInt(_S[i],_S[j]); if(ip){ const d=Math.hypot(xm-ip[0],ym-ip[1]); if(d<bd){bd=d;bx=ip[0];by=ip[1];snapped=true;} } } } } }
+  // Accroche sur les SEGMENTS : UNIQUEMENT si aucun point discret (coin / milieu / centre /
+  // intersection) n'est deja accroche. Ainsi coins ET milieux gardent la priorite, et le
+  // trait ne sert que de repli quand on est loin de tout point remarquable.
+  if(!snapped){
+    for(const o of paintObjects){
+      if(o.id===excludeId)continue;
+      if(o.type==='dim'||o.type==='point'||o.type==='text')continue;
+      let segs; try{ segs=objToStrokesRaw(o)||[]; }catch(e){ continue; }
+      const closed=['rect','ellipse','tri','star','oblong','gear','text','polygon'].includes(o.type);
+      for(const s of segs){ if(!s||s.length<2)continue;
+        const n=s.length, lim=closed?n:n-1;
+        for(let i=0;i<lim;i++){
+          const ax=s[i][0],ay=s[i][1],cx2=s[(i+1)%n][0],cy2=s[(i+1)%n][1];
+          const dx=cx2-ax,dy=cy2-ay,L2=dx*dx+dy*dy; if(L2<1e-9)continue;
+          let t=((xm-ax)*dx+(ym-ay)*dy)/L2; t=Math.max(0,Math.min(1,t));
+          const fx=ax+t*dx,fy=ay+t*dy,d=Math.hypot(xm-fx,ym-fy);
+          if(d<bd){bd=d;bx=fx;by=fy;snapped=true;}
+        }
       }
     }
   }
-  // Accroche PRIORITAIRE sur les intersections de segments (croisements).
-  { const _S=_allSegs(excludeId);
-    if(_S.length<=160){ let bi=SNAP_MM, ix=null, iy=null;
-      for(let i=0;i<_S.length;i++){ for(let j=i+1;j<_S.length;j++){ const ip=_segInt(_S[i],_S[j]); if(ip){ const d=Math.hypot(xm-ip[0],ym-ip[1]); if(d<bi){bi=d;ix=ip[0];iy=ip[1];} } } }
-      if(ix!=null){ bx=ix; by=iy; snapped=true; } } }
   return{x:bx,y:by,snapped};
 }
 
@@ -13428,6 +13434,10 @@ function confirmStar(){
 }
 
 function snapPointsOf(o){
+  // Lignes / traces libres : vraie geometrie (extremites + milieux exacts), pas la
+  // boite englobante epaissie par le trait (sinon les points sont decales de ~0.25mm).
+  if(o.type==='line'){ const mx=(o.x1+o.x2)/2,my=(o.y1+o.y2)/2; return [[o.x1,o.y1],[o.x2,o.y2],[mx,my]]; }
+  if(o.type==='free'&&o.pts&&o.pts.length>=2){ const pts=o.pts.map(p=>[p[0],p[1]]); for(let i=0;i<o.pts.length-1;i++){ pts.push([(o.pts[i][0]+o.pts[i+1][0])/2,(o.pts[i][1]+o.pts[i+1][1])/2]); } return pts; }
   const bb=getObjBB(o);
   const c=getObjCenter(o);
   return[[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h],[c.x,c.y],[bb.x+bb.w/2,bb.y],[bb.x+bb.w/2,bb.y+bb.h],[bb.x,bb.y+bb.h/2],[bb.x+bb.w,bb.y+bb.h/2]];
