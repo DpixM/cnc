@@ -92,6 +92,13 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc -> Netlify redeploie tout seul (~1 min).
 
+-- 2026-07-20 — CAD : outil POINT + poignee de RAYON du cercle ---------------------
+ - Outil POINT (menu Creer) : type 'point' {x,y}, place au clic (accroche). Repere
+   uniquement -> objToStrokes=[], hors mmFlatObjs/export. Rendu croix+point.
+   getHandlesPx=mv, hitTest/distToObjStroke par proximite. Snappable.
+ - Cercle : poignee de RAYON ('rad', a droite) -> applyHandleDrag met rx=ry=dist
+   centre->curseur : on l'agrandit a la souris en restant ROND. Tests 19/19.
+
 -- 2026-07-20 — COTE DISTANCE entre 2 entites (cote lineaire Fusion) ---------------
  L'outil Cote gere maintenant la DISTANCE entre 2 lignes : clic ligne A, clic
  ligne B -> cote 'dist' (ref+ref2). La valeur = distance perpendiculaire (gap).
@@ -4204,7 +4211,7 @@ const TOOL_MENUS = {
     {i:'⬠', l:'Polygone',             fn:"cadSoon('Polygone')"},
     {i:'▬', l:'Rainure (oblong)',     fn:"cadPick('oblong')"},
     {i:'∿', l:'Spline (tracé libre)', fn:"cadPick('free')"},
-    {i:'•', l:'Point',                fn:"cadSoon('Point')"},
+    {i:'•', l:'Point',                fn:"cadPick('point')"},
     {i:'T', l:'Texte',                fn:"cadPick('text')"},
     {i:'📏', l:'Cote',                fn:'cadStartDim()'},
     {i:'▦', l:'Réseau rectangulaire', fn:'openPatternRect()'},
@@ -5204,6 +5211,7 @@ function applyZoomAt(cpx,cpy,factor){
 
 function getObjBB(o){
   if(o.type==='group'||o.type==='gear')return{x:o.x,y:o.y,w:o.w,h:o.h};
+  if(o.type==='point')return{x:o.x-1,y:o.y-1,w:2,h:2};
   if(o.type==='dim'){const g=(typeof dimGeom==='function')?dimGeom(o):null; if(!g)return{x:0,y:0,w:.5,h:.5}; const mnx=Math.min(g.ax,g.bx),mny=Math.min(g.ay,g.by); return{x:mnx,y:mny,w:Math.max(Math.abs(g.bx-g.ax),.5),h:Math.max(Math.abs(g.by-g.ay),.5)};}
   if(o.type==='rect'||o.type==='tri'||o.type==='svg'||o.type==='star'||o.type==='oblong')return{x:o.x,y:o.y,w:o.w,h:o.h};
   if(o.type==='ellipse')return{x:o.x-o.rx,y:o.y-o.ry,w:o.rx*2,h:o.ry*2};
@@ -5281,7 +5289,8 @@ function applyBB(o,bb){
 }
 
 function getHandlesPx(o){
-  if(o._circle){ const[cx,cy]=mmToPx(o.x,o.y); return[{id:'mv',x:cx,y:cy}]; } // cercle = rond, aucune poignee de deformation
+  if(o.type==='point'){ const[cx,cy]=mmToPx(o.x,o.y); return[{id:'mv',x:cx,y:cy}]; }
+  if(o._circle){ const[cx,cy]=mmToPx(o.x,o.y); const[rx,ry]=mmToPx(o.x+o.rx,o.y); return[{id:'mv',x:cx,y:cy},{id:'rad',x:rx,y:ry}]; } // cercle : deplacement + rayon (reste rond)
   if(o.type==='line'){
     // Lines: just the two endpoints + midpoint move handle
     const[ax,ay]=mmToPx(o.x1,o.y1);
@@ -5306,6 +5315,7 @@ function distToObjStroke(o,xm,ym){
     const t=Math.max(0,Math.min(1,((xm-o.x1)*dx+(ym-o.y1)*dy)/L2));
     return Math.hypot(xm-(o.x1+t*dx), ym-(o.y1+t*dy));
   }
+  if(o.type==='point'){ return Math.hypot(xm-o.x,ym-o.y); }
   if(o.type==='dim'){
     const g=(typeof dimGeom==='function')?dimGeom(o):null; if(!g) return Infinity;
     const dx=g.bx-g.ax, dy=g.by-g.ay, L2=dx*dx+dy*dy;
@@ -5346,6 +5356,7 @@ function hitTest(o,xm,ym){
     const nx=o.x1+t*dx, ny=o.y1+t*dy;
     return Math.hypot(xm-nx,ym-ny)<thr;
   }
+  if(o.type==='point'){ return Math.hypot(xm-o.x,ym-o.y) < 5/(BASE_PX*vZoom); }
   if(o.type==='dim'){
     const g=(typeof dimGeom==='function')?dimGeom(o):null; if(!g) return false;
     const thr=7/(BASE_PX*vZoom), dx=g.bx-g.ax, dy=g.by-g.ay, L2=dx*dx+dy*dy;
@@ -5423,7 +5434,7 @@ function refitSvgBBox(o){
 
 function objToStrokes(o){
   const s=[];const org={x:0,y:0}; // strokes in sheet mm
-  if(o.type==='dim') return s; // COTE = annotation, jamais usinee
+  if(o.type==='dim'||o.type==='point') return s; // COTE / POINT = reperes, jamais usines
   if(o.type==='rect')s.push([[o.x,o.y],[o.x+o.w,o.y],[o.x+o.w,o.y+o.h],[o.x,o.y+o.h],[o.x,o.y]]);
   else if(o.type==='ellipse'){
     // Cercle parfait (rx≈ry) : 36pts suffisent, detectArc fera G2/G3
@@ -5819,7 +5830,9 @@ function redrawCanvasNow(){
   if(typeof _cadDimOverlay==='function') _cadDimOverlay();
 }
 
+function drawPointMark(o){ if(!pCtx)return; const[x,y]=mmToPx(o.x,o.y); pCtx.save(); pCtx.strokeStyle='#e8501a'; pCtx.fillStyle='#e8501a'; pCtx.lineWidth=1.4; pCtx.setLineDash([]); pCtx.beginPath(); pCtx.moveTo(x-5,y); pCtx.lineTo(x+5,y); pCtx.moveTo(x,y-5); pCtx.lineTo(x,y+5); pCtx.stroke(); pCtx.beginPath(); pCtx.arc(x,y,2,0,Math.PI*2); pCtx.fill(); pCtx.restore(); }
 function drawObjPx(o){
+  if(o.type==='point'){ drawPointMark(o); return; }
   if(o.type==='dim'){ drawDim(o); return; }
   // ─── Stroke width: convert mm → px ───
   const swPx=Math.max(.5,(o.strokeW||0.5)*BASE_PX*vZoom);
@@ -6262,6 +6275,7 @@ function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
   if(paintTool==='cadline'){ cadAddPoint(xm,ym); return; } // outil ligne CAD
   if(paintTool==='caddim'){ cadDimClick(xm,ym); return; } // outil cote
+  if(paintTool==='point'){ const sp=snapPoint(xm,ym,null); paintObjects.push({id:objCnt++,type:'point',x:sp.x,y:sp.y}); if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); redrawCanvas(); return; } // outil point
   if(paintTool==='bucket'){ bucketFill(xm,ym); return; } // outil seau
 
   if(paintTool==='select'){
@@ -9732,7 +9746,7 @@ function mmFlatObjs(){
   const out=[];
   for(const o of paintObjects){
     if(o.type==='group'&&o.children) out.push(...o.children);
-    else if(o.type!=='dim') out.push(o); // les cotes ne sont pas des formes a usiner
+    else if(o.type!=='dim'&&o.type!=='point') out.push(o); // cotes/points ne sont pas des formes a usiner
   }
   return out;
 }
@@ -13144,6 +13158,7 @@ function snapPointsOf(o){
 }
 
 function applyHandleDrag(o,mode,orig,dxMm,dyMm){
+  if(o._circle && mode==='rad'){ const rx0=(orig&&orig.w?orig.w/2:o.rx); const r=Math.max(0.5,Math.hypot(rx0+dxMm,dyMm)); o.rx=o.ry=r; return; } // cercle reste rond
   // Line: drag endpoints directly using delta from original pos
   if(o.type==='line'){
     if(mode==='mv'){o.x1=orig.x1+dxMm;o.y1=orig.y1+dyMm;o.x2=orig.x2+dxMm;o.y2=orig.y2+dyMm;}
