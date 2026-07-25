@@ -92,6 +92,15 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc -> Netlify redeploie tout seul (~1 min).
 
+-- 2026-07-20 — Cotes DEPLACABLES + plus de bleu a l'edition ----------------------
+ - EDITION cote : openDimInput vide la selection (plus de trait bleu de la forme
+   sous la cote pendant qu'on edite).
+ - COTES DEPLACABLES : chaque cote a un decalage dim.mv ; on la tire ou on veut
+   (poignee mv au centre). dimGeom = wrapper qui applique mv (deplace ligne+label
+   + bouge l'extremite dim-line des traits d'attache, l'ancre geometrie reste).
+   applyHandleDrag gere le drag d'une cote. La VALEUR ne change pas au deplacement.
+   Tests 26/26. A SUIVRE : snap/surbrillance du trait le plus proche du curseur.
+
 -- 2026-07-20 — Cotes sur lignes CAD (free) + noeuds gardes/verrouilles ------------
  - Les lignes de l'outil CAD sont de type 'free' (2 points). Helper segOf/setSeg :
    longueur/distance/angle marchent maintenant sur 'line' ET 'free 2 points'
@@ -5324,6 +5333,7 @@ function applyBB(o,bb){
 
 function objHasDim(id){ for(const o of paintObjects){ if(o.type==='dim' && (o.ref===id||o.ref2===id)) return true; } return false; }
 function getHandlesPx(o){
+  if(o.type==='dim'){ const bb=getObjBB(o); const c=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2); return[{id:'mv',x:c[0],y:c[1]}]; }
   if(o.type==='point'){ const[cx,cy]=mmToPx(o.x,o.y); return[{id:'mv',x:cx,y:cy}]; }
   if(o._circle){ const[cx,cy]=mmToPx(o.x,o.y); const[rx,ry]=mmToPx(o.x+o.rx,o.y); return[{id:'mv',x:cx,y:cy},{id:'rad',x:rx,y:ry}]; } // cercle : deplacement + rayon (reste rond)
   if(o.type==='line'){
@@ -6076,7 +6086,8 @@ function makeDim(spec){
 // Geometrie d'une cote pilote (calculee depuis la forme referencee)
 function segOf(o){ if(!o)return null; if(o.type==='line')return[o.x1,o.y1,o.x2,o.y2]; if(o.type==='free'&&o.pts&&o.pts.length===2)return[o.pts[0][0],o.pts[0][1],o.pts[1][0],o.pts[1][1]]; return null; }
 function setSeg(o,s){ if(!o)return; if(o.type==='line'){o.x1=s[0];o.y1=s[1];o.x2=s[2];o.y2=s[3];} else if(o.type==='free'){o.pts=[[s[0],s[1]],[s[2],s[3]]];} }
-function dimGeom(dim){
+function dimGeom(dim){ const g=_dimGeomBase(dim); if(!g||!dim.mv) return g; const mx=dim.mv[0],my=dim.mv[1]; g.ax+=mx;g.ay+=my;g.bx+=mx;g.by+=my; if(g.ix!=null){g.ix+=mx;g.iy+=my;} if(g.ext){for(const s of g.ext){s[1][0]+=mx;s[1][1]+=my;}} return g; }
+function _dimGeomBase(dim){
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o) return null;
   const off=6;
   if(dim.kind==='diam' && (o._circle||o.type==='ellipse')){ const r=o.rx||o.ry||1; return {ax:o.x-r, ay:o.y-r-off, bx:o.x+r, by:o.y-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm', ext:[[[o.x-r,o.y],[o.x-r,o.y-r-off]],[[o.x+r,o.y],[o.x+r,o.y-r-off]]]}; }
@@ -6134,6 +6145,7 @@ function applyDimValue(dim,v){
   else if(dim.kind==='h'){ o.h=v; }
 }
 function openDimInput(dim){
+  if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; if(typeof redrawCanvas==='function')redrawCanvas();
   const g=dimGeom(dim); if(!g||typeof pCanvas==='undefined'||!pCanvas) return;
   const mid=mmToPx((g.ax+g.bx)/2,(g.ay+g.by)/2), rect=pCanvas.getBoundingClientRect();
   let inp=document.getElementById('dimInput'); if(inp) inp.remove();
@@ -6444,6 +6456,7 @@ function handlePointerDown(cpx,cpy){
       // Select immediately, but delay drag start until movement
       selObjId=found.id;
       const origBB=found.type==='line'?{...found}:{...getObjBB(found)};
+      if(found.type==='dim') origBB._mv=[...(found.mv||[0,0])];
       dragPending={mode:'mv',obj:found,cpx,cpy,origBB,startMm:{x:xm,y:ym}};
     }else{
       selObjId=null;
@@ -13227,6 +13240,7 @@ function snapPointsOf(o){
 }
 
 function applyHandleDrag(o,mode,orig,dxMm,dyMm){
+  if(o.type==='dim'){ if(mode==='mv') o.mv=[((orig&&orig._mv)?orig._mv[0]:0)+dxMm, ((orig&&orig._mv)?orig._mv[1]:0)+dyMm]; return; } // deplacer une cote
   if(o.type!=='dim' && typeof objHasDim==='function' && objHasDim(o.id) && mode!=='mv') return; // cotee : redim verrouille (change via la cote)
   if(o._circle && mode==='rad'){ const rx0=(orig&&orig.w?orig.w/2:o.rx); const r=Math.max(0.5,Math.hypot(rx0+dxMm,dyMm)); o.rx=o.ry=r; return; } // cercle reste rond
   // Line: drag endpoints directly using delta from original pos
