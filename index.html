@@ -92,6 +92,17 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc -> Netlify redeploie tout seul (~1 min).
 
+-- 2026-07-20 — Cote ANGLE + cote en bouton direct + mode normal par defaut -------
+ - Page 1 (Mode d'usinage) : "Usinage normal" coche par DEFAUT (wzPickMode a l'init).
+   NOTE Seb : bientot un emplacement special DECOUPE TRUMPF (boulot) sur cette page.
+ - Outil Cote sorti du menu Creer -> BOUTON DIRECT (📏) dans la barre CAD (usage
+   frequent). Rappel : 1 cote NON usinee (test).
+ - Cote ANGLE entre 2 lignes secantes : clic ligne A, clic ligne B -> si paralleles
+   = distance, si secantes = ANGLE (arc + valeur). Editer l'angle fait PIVOTER la
+   2e ligne autour de l'intersection. dimGeom/applyDimValue branche 'angle'. 22/22.
+ A SUIVRE : cotes sur cotes de rectangle (2 cotes du meme rect -> angle/distance),
+ polygone/arc, offset, lock/unlock.
+
 -- 2026-07-20 — CAD : outil POINT + poignee de RAYON du cercle ---------------------
  - Outil POINT (menu Creer) : type 'point' {x,y}, place au clic (accroche). Repere
    uniquement -> objToStrokes=[], hors mmFlatObjs/export. Rendu croix+point.
@@ -2043,6 +2054,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     <div id="cadBar">
       <div class="cadlbl">CAD</div>
       <button class="cadb" title="Sélection CAD" onclick="setPTool('select');_cadMode=true;redrawCanvas()">↖</button>
+      <button class="cadb" title="Cote : clique une forme, ou 2 lignes (distance/angle)" onclick="cadStartDim()">📏</button>
       <div class="cadsep"></div>
       <button class="cadb" title="Créer : ligne, rectangle, cercle, arc, polygone…" onclick="openToolMenu('cadCreate',this)">✏️<span style="font-size:7px;margin-left:1px">▾</span></button>
       <div class="cadlbl">Créer</div>
@@ -3732,6 +3744,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   loadAll();
   wzInitOrigin();
   wzGo(0);
+  if(typeof wzPickMode==='function') wzPickMode(appMode||'normal'); // Usinage normal coche par defaut
   setTimeout(()=>{ if(typeof pushHistory==='function') pushHistory(); },200); // état initial
   setTimeout(()=>{ if(typeof renderSnapBtn==='function') renderSnapBtn(); },100); // Snap ON par défaut
   setTimeout(()=>{if(typeof updateStyleBarVisibility==='function')updateStyleBarVisibility();},100);
@@ -4213,7 +4226,6 @@ const TOOL_MENUS = {
     {i:'∿', l:'Spline (tracé libre)', fn:"cadPick('free')"},
     {i:'•', l:'Point',                fn:"cadPick('point')"},
     {i:'T', l:'Texte',                fn:"cadPick('text')"},
-    {i:'📏', l:'Cote',                fn:'cadStartDim()'},
     {i:'▦', l:'Réseau rectangulaire', fn:'openPatternRect()'},
     {i:'✳️', l:'Réseau circulaire',   fn:"cadSoon('Réseau circulaire')"},
     {i:'🪞', l:'Symétrie miroir',     fn:"cadSoon('Symétrie miroir')"},
@@ -6026,7 +6038,10 @@ function cadDimClick(xm,ym){
   if(target.type==='line'){
     if(!_dimA){ _dimA=target.id; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('📏 Clique la 2e ligne (distance) — ou la même (longueur)'); return; }
     if(_dimA===target.id){ const a=_dimA; _dimA=null; makeDim({kind:'len',ref:a}); return; }
-    const a=_dimA; _dimA=null; makeDim({kind:'dist',ref:a,ref2:target.id}); return;
+    const a=_dimA; _dimA=null;
+    const A=getObj(a); let kind='dist';
+    if(A&&A.type==='line'){ const adx=A.x2-A.x1,ady=A.y2-A.y1,bdx=target.x2-target.x1,bdy=target.y2-target.y1; const cr=adx*bdy-ady*bdx, dt=adx*bdx+ady*bdy; const ab=Math.abs(Math.atan2(cr,dt)); if(Math.abs(Math.sin(ab))>0.02) kind='angle'; }
+    makeDim({kind, ref:a, ref2:target.id}); return;
   }
   _dimA=null; if(typeof toastHist==='function')toastHist('📏 Cote non dispo sur cette forme (bientôt)');
 }
@@ -6041,6 +6056,17 @@ function dimGeom(dim){
   const off=6;
   if(dim.kind==='diam' && (o._circle||o.type==='ellipse')){ const r=o.rx||o.ry||1; return {ax:o.x-r, ay:o.y-r-off, bx:o.x+r, by:o.y-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm'}; }
   if(dim.kind==='len' && o.type==='line'){ const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off; return {ax:o.x1+nx,ay:o.y1+ny,bx:o.x2+nx,by:o.y2+ny,val:L,label:L.toFixed(1)+' mm'}; }
+  if(dim.kind==='angle'){
+    const A=o, B=paintObjects.find(x=>x.id===dim.ref2);
+    if(!B||A.type!=='line'||B.type!=='line') return null;
+    const adx=A.x2-A.x1,ady=A.y2-A.y1,bdx=B.x2-B.x1,bdy=B.y2-B.y1;
+    const det=adx*bdy-ady*bdx; if(Math.abs(det)<1e-9) return null;
+    const t=((B.x1-A.x1)*bdy-(B.y1-A.y1)*bdx)/det, ix=A.x1+t*adx, iy=A.y1+t*ady;
+    const aA=Math.atan2(ady,adx), aB=Math.atan2(bdy,bdx);
+    let diff=aB-aA; while(diff<=-Math.PI)diff+=2*Math.PI; while(diff>Math.PI)diff-=2*Math.PI;
+    const val=Math.abs(diff)*180/Math.PI, rmm=12, midA=aA+diff/2;
+    return {ax:ix+Math.cos(midA)*rmm, ay:iy+Math.sin(midA)*rmm, bx:ix+Math.cos(midA)*rmm, by:iy+Math.sin(midA)*rmm, val, label:val.toFixed(1)+'°', _angle:true, ix, iy, aA, diff, rmm};
+  }
   if(dim.kind==='dist'){
     const A=o, B=paintObjects.find(x=>x.id===dim.ref2);
     if(!B||A.type!=='line'||B.type!=='line') return null;
@@ -6059,6 +6085,18 @@ function applyDimValue(dim,v){
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o||!(v>0)) return;
   if(dim.kind==='diam'){ o.rx=o.ry=v/2; }
   else if(dim.kind==='len' && o.type==='line'){ const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy)||1; o.x2=o.x1+dx/L*v; o.y2=o.y1+dy/L*v; }
+  else if(dim.kind==='angle'){
+    const A=o, B=paintObjects.find(x=>x.id===dim.ref2);
+    if(!B||A.type!=='line'||B.type!=='line') return;
+    const adx=A.x2-A.x1,ady=A.y2-A.y1,bdx=B.x2-B.x1,bdy=B.y2-B.y1;
+    const det=adx*bdy-ady*bdx; if(Math.abs(det)<1e-9) return;
+    const t=((B.x1-A.x1)*bdy-(B.y1-A.y1)*bdx)/det, ix=A.x1+t*adx, iy=A.y1+t*ady;
+    const aA=Math.atan2(ady,adx), aB=Math.atan2(bdy,bdx);
+    let diff=aB-aA; while(diff<=-Math.PI)diff+=2*Math.PI; while(diff>Math.PI)diff-=2*Math.PI;
+    const target=(diff>=0?1:-1)*(v*Math.PI/180), delta=target-diff, c=Math.cos(delta), s=Math.sin(delta);
+    const rot=(px,py)=>[ix+(px-ix)*c-(py-iy)*s, iy+(px-ix)*s+(py-iy)*c];
+    [B.x1,B.y1]=rot(B.x1,B.y1); [B.x2,B.y2]=rot(B.x2,B.y2);
+  }
   else if(dim.kind==='dist'){
     const A=o, B=paintObjects.find(x=>x.id===dim.ref2);
     if(!B||A.type!=='line'||B.type!=='line') return;
@@ -6086,6 +6124,17 @@ function openDimInput(dim){
 function drawDim(dim){
   if(!pCtx) return;
   const g=dimGeom(dim); if(!g) return;
+  if(g._angle){
+    const c=mmToPx(g.ix,g.iy), rpx=Math.max(12,g.rmm*BASE_PX*vZoom);
+    pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1.4;
+    pCtx.beginPath(); pCtx.arc(c[0],c[1],rpx,g.aA,g.aA+g.diff,g.diff<0); pCtx.stroke();
+    const lp=mmToPx(g.ax,g.ay);
+    pCtx.font='bold 11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle';
+    const w=pCtx.measureText(g.label).width+8;
+    pCtx.fillStyle='rgba(255,255,255,.94)'; pCtx.fillRect(lp[0]-w/2,lp[1]-9,w,18);
+    pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1; pCtx.strokeRect(lp[0]-w/2,lp[1]-9,w,18);
+    pCtx.fillStyle='#1e40af'; pCtx.fillText(g.label,lp[0],lp[1]); pCtx.restore(); return;
+  }
   const a=mmToPx(g.ax,g.ay), b=mmToPx(g.bx,g.by);
   pCtx.save(); pCtx.setLineDash([]);
   pCtx.strokeStyle='#2563eb'; pCtx.lineWidth=1.4; pCtx.lineCap='round';
