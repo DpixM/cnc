@@ -92,6 +92,18 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc -> Netlify redeploie tout seul (~1 min).
 
+-- 2026-07-20 — Cotes : style Fusion + attaches pointillees + verrou geometrie ----
+ - Rendu cote FACON FUSION : traits GRIS fins + petites fleches + valeur discrete
+   (fond clair). Fini le gros bleu. Selection CAD aussi plus fine (bleu leger).
+ - TRAITS D'ATTACHE (extension lines) pointilles gris : montrent d'ou vient chaque
+   cote (dimGeom.ext, dessines dans drawDim) -> on sait a quoi appartient la cote.
+ - DESELECTION : entrer l'outil cote + poser une cote vident la selection (plus de
+   traits bleus qui trainent).
+ - VERROU : une forme COTEE n'a plus de poignees de redim (getHandlesPx -> mv seul,
+   via objHasDim). On ne change sa taille QUE par la cote. Tests 24/24.
+ A SUIVRE : verrou aussi sur le deplacement (contrainte complete), lock/unlock
+ manuel, extension lines sur dist/angle, polygone/arc/offset.
+
 -- 2026-07-20 — Cote ANGLE + cote en bouton direct + mode normal par defaut -------
  - Page 1 (Mode d'usinage) : "Usinage normal" coche par DEFAUT (wzPickMode a l'init).
    NOTE Seb : bientot un emplacement special DECOUPE TRUMPF (boulot) sur cette page.
@@ -5300,7 +5312,9 @@ function applyBB(o,bb){
   }
 }
 
+function objHasDim(id){ for(const o of paintObjects){ if(o.type==='dim' && (o.ref===id||o.ref2===id)) return true; } return false; }
 function getHandlesPx(o){
+  if(o.type!=='dim' && typeof objHasDim==='function' && objHasDim(o.id)){ const bb=getObjBB(o); const c=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2); return[{id:'mv',x:c[0],y:c[1]}]; } // cotee -> verrouillee (pas de redim libre)
   if(o.type==='point'){ const[cx,cy]=mmToPx(o.x,o.y); return[{id:'mv',x:cx,y:cy}]; }
   if(o._circle){ const[cx,cy]=mmToPx(o.x,o.y); const[rx,ry]=mmToPx(o.x+o.rx,o.y); return[{id:'mv',x:cx,y:cy},{id:'rad',x:rx,y:ry}]; } // cercle : deplacement + rayon (reste rond)
   if(o.type==='line'){
@@ -6023,7 +6037,7 @@ function cadSoon(n){ if(typeof toastHist==='function') toastHist('🔜 '+n+' —
 // ── OUTIL COTE (dimension) : element 'dim', annotation seulement (jamais usine) ──
 let _caddim = null; // {p1:[x,y]|null, cursor:[x,y]|null, _snapped}
 let _dimA = null; // 1ere entite cliquee pour une cote de DISTANCE entre 2 formes
-function cadStartDim(){ _caddim=null; _dimA=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
+function cadStartDim(){ _caddim=null; _dimA=null; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
 function cadDimClick(xm,ym){
   // trouver la forme sous le clic (la plus proche par le trait)
   let target=null, best=Infinity;
@@ -6054,8 +6068,8 @@ function makeDim(spec){
 function dimGeom(dim){
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o) return null;
   const off=6;
-  if(dim.kind==='diam' && (o._circle||o.type==='ellipse')){ const r=o.rx||o.ry||1; return {ax:o.x-r, ay:o.y-r-off, bx:o.x+r, by:o.y-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm'}; }
-  if(dim.kind==='len' && o.type==='line'){ const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off; return {ax:o.x1+nx,ay:o.y1+ny,bx:o.x2+nx,by:o.y2+ny,val:L,label:L.toFixed(1)+' mm'}; }
+  if(dim.kind==='diam' && (o._circle||o.type==='ellipse')){ const r=o.rx||o.ry||1; return {ax:o.x-r, ay:o.y-r-off, bx:o.x+r, by:o.y-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm', ext:[[[o.x-r,o.y],[o.x-r,o.y-r-off]],[[o.x+r,o.y],[o.x+r,o.y-r-off]]]}; }
+  if(dim.kind==='len' && o.type==='line'){ const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off; return {ax:o.x1+nx,ay:o.y1+ny,bx:o.x2+nx,by:o.y2+ny,val:L,label:L.toFixed(1)+' mm', ext:[[[o.x1,o.y1],[o.x1+nx,o.y1+ny]],[[o.x2,o.y2],[o.x2+nx,o.y2+ny]]]}; }
   if(dim.kind==='angle'){
     const A=o, B=paintObjects.find(x=>x.id===dim.ref2);
     if(!B||A.type!=='line'||B.type!=='line') return null;
@@ -6076,8 +6090,8 @@ function dimGeom(dim){
     return {ax:amx, ay:amy, bx:amx+nx*dist, by:amy+ny*dist, val, label:val.toFixed(1)+' mm', _n:[nx,ny], _dist:dist};
   }
   const bb=getObjBB(o);
-  if(dim.kind==='w'){ return {ax:bb.x, ay:bb.y-off, bx:bb.x+bb.w, by:bb.y-off, val:bb.w, label:bb.w.toFixed(1)+' mm'}; }
-  if(dim.kind==='h'){ return {ax:bb.x-off, ay:bb.y, bx:bb.x-off, by:bb.y+bb.h, val:bb.h, label:bb.h.toFixed(1)+' mm'}; }
+  if(dim.kind==='w'){ return {ax:bb.x, ay:bb.y-off, bx:bb.x+bb.w, by:bb.y-off, val:bb.w, label:bb.w.toFixed(1)+' mm', ext:[[[bb.x,bb.y],[bb.x,bb.y-off]],[[bb.x+bb.w,bb.y],[bb.x+bb.w,bb.y-off]]]}; }
+  if(dim.kind==='h'){ return {ax:bb.x-off, ay:bb.y, bx:bb.x-off, by:bb.y+bb.h, val:bb.h, label:bb.h.toFixed(1)+' mm', ext:[[[bb.x,bb.y],[bb.x-off,bb.y]],[[bb.x,bb.y+bb.h],[bb.x-off,bb.y+bb.h]]]}; }
   return null;
 }
 function getDimValue(dim){ const g=dimGeom(dim); return g?g.val:0; }
@@ -6135,6 +6149,7 @@ function drawDim(dim){
     _dimArrow(c[0]+Math.cos(g.aA+g.diff)*rpx, c[1]+Math.sin(g.aA+g.diff)*rpx, g.aA+g.diff+(g.diff<0?1:-1)*Math.PI/2);
     const lp=mmToPx(g.ax,g.ay); _dimLabel(lp[0],lp[1],g.label); pCtx.restore(); return;
   }
+  if(g.ext){ pCtx.save(); pCtx.setLineDash([3,3]); pCtx.strokeStyle='#a3a8b0'; pCtx.lineWidth=0.8; for(const seg of g.ext){ const s0=mmToPx(seg[0][0],seg[0][1]), s1=mmToPx(seg[1][0],seg[1][1]); pCtx.beginPath(); pCtx.moveTo(s0[0],s0[1]); pCtx.lineTo(s1[0],s1[1]); pCtx.stroke(); } pCtx.restore(); }
   const a=mmToPx(g.ax,g.ay), b=mmToPx(g.bx,g.by);
   pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke();
   const ang=Math.atan2(b[1]-a[1],b[0]-a[0]);
