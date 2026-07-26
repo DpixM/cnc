@@ -5774,7 +5774,8 @@ function redrawCanvasNow(){
     pCtx.strokeStyle=tc;pCtx.lineWidth=sel?2.5:1.5;pCtx.setLineDash([]);
     pCtx.lineCap='round';pCtx.lineJoin='round';pCtx.fillStyle=tc;
     drawObjPx(o);
-    if(sel){
+    if(sel && o.type==='dim'){ /* cote selectionnee : aucune deco bleue */ }
+    else if(sel){
       const bb=getObjBB(o);
       const[bx,by]=mmToPx(bb.x,bb.y);const[ex,ey]=mmToPx(bb.x+bb.w,bb.y+bb.h);
       if(o.type==='line'){
@@ -6149,7 +6150,14 @@ function cadDimClick(xm,ym){
   const An = A.kind==='ring'?{kind:'point',ref:'@'+A.ref}:A;
   const Bn = B.kind==='ring'?{kind:'point',ref:'@'+B.ref}:B;
   if(An.kind==='edge' && Bn.kind==='edge'){
-    if(An.ref===Bn.ref){ beginPlace({kind:'len', ref:_dimRef(An.ref)}); return; }
+    const _pid=r=>String(r).split('#')[0], _pix=r=>+String(r).split('#')[1];
+    if(An.ref===Bn.ref){
+      const o=paintObjects.find(x=>String(x.id)===_pid(An.ref)); const ix=_pix(An.ref);
+      if(o&&(o.type==='rect'||o.type==='oblong')){ if(ix===0||ix===2){ beginPlace({kind:'w',ref:o.id}); return; } if(ix===1||ix===3){ beginPlace({kind:'h',ref:o.id}); return; } }
+      beginPlace({kind:'len', ref:_dimRef(An.ref)}); return;
+    }
+    if(_pid(An.ref)===_pid(Bn.ref)){ const o=paintObjects.find(x=>String(x.id)===_pid(An.ref)); if(o&&(o.type==='rect'||o.type==='oblong')){ const s=new Set([_pix(An.ref),_pix(Bn.ref)]);
+      if(s.has(1)&&s.has(3)){ beginPlace({kind:'w',ref:o.id}); return; } if(s.has(0)&&s.has(2)){ beginPlace({kind:'h',ref:o.id}); return; } } }
     const S1=segOfRef(An.ref), S2=segOfRef(Bn.ref); let kind='dist';
     if(S1&&S2){ const adx=S1[2]-S1[0],ady=S1[3]-S1[1],bdx=S2[2]-S2[0],bdy=S2[3]-S2[1]; const cr=adx*bdy-ady*bdx, dt=adx*bdx+ady*bdy; if(Math.abs(Math.sin(Math.atan2(cr,dt)))>0.03) kind='angle'; }
     beginPlace({kind, ref:_dimRef(An.ref), ref2:_dimRef(Bn.ref)}); return;
