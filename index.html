@@ -6137,35 +6137,19 @@ function cadStartDim(){ _caddim=null; _dimA=null; _dimEdgeMode=null; _dimEdgeA=n
 function cadStartAngle(){ _caddim=null; _dimA=null; _dimHover=null; _dimEdgeA=null; _dimEdgeMode='angle'; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('∠ Angle : clique 2 arêtes (côtés de rectangle OK)'); redrawCanvasNow(); }
 function cadStartDist(){ _caddim=null; _dimA=null; _dimHover=null; _dimEdgeA=null; _dimEdgeMode='dist'; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('⇥ Distance : clique 2 arêtes'); redrawCanvasNow(); }
 function cadDimClick(xm,ym){
-  if(_dimPlace){ const sp=_dimPlace.spec; _dimPlace=null; placeDim(sp,xm,ym); return; }
   const tol=14/(BASE_PX*vZoom);
+  if(_dimPlace){
+    // Un seul upgrade autorise : 1 entite -> 2 entites (distance/angle). Ensuite, clic = depose.
+    if(!_dimPlace.upgraded && _dimPlace.src){ const hit=pickEntity(xm,ym,tol); if(hit){ const B=hit.kind==='ring'?{kind:'point',ref:'@'+hit.ref}:hit; const up=_combine(_dimPlace.src, B); if(up){ _dimPlace.spec=up; _dimPlace.upgraded=true; if(typeof toastHist==='function')toastHist('↔ Bouge puis clique pour déposer'); redrawCanvasNow(); return; } } }
+    const sp=_dimPlace.spec; _dimPlace=null; placeDim(sp,xm,ym); return;
+  }
+  const ex=_dimUnderCursor(xm,ym,tol); if(ex){ openDimInput(ex); return; }
   const hit=pickEntity(xm,ym,tol);
   if(!hit){ _dimEdgeA=null; if(typeof toastHist==='function')toastHist('📏 Clique un trait, un cercle ou un centre'); redrawCanvasNow(); return; }
-  if(!_dimEdgeA){
-    if(hit.kind==='ring'){ beginPlace({kind:'diam', ref:hit.ref}); return; }
-    _dimEdgeA=hit; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('📏 Clique une 2e entité : arête, centre… (ou la même arête = longueur)');
-    return;
-  }
-  const A=_dimEdgeA, B=hit; _dimEdgeA=null;
-  const An = A.kind==='ring'?{kind:'point',ref:'@'+A.ref}:A;
-  const Bn = B.kind==='ring'?{kind:'point',ref:'@'+B.ref}:B;
-  if(An.kind==='edge' && Bn.kind==='edge'){
-    const _pid=r=>String(r).split('#')[0], _pix=r=>+String(r).split('#')[1];
-    if(An.ref===Bn.ref){
-      const o=paintObjects.find(x=>String(x.id)===_pid(An.ref)); const ix=_pix(An.ref);
-      if(o&&(o.type==='rect'||o.type==='oblong')){ if(ix===0||ix===2){ beginPlace({kind:'w',ref:o.id}); return; } if(ix===1||ix===3){ beginPlace({kind:'h',ref:o.id}); return; } }
-      beginPlace({kind:'len', ref:_dimRef(An.ref)}); return;
-    }
-    if(_pid(An.ref)===_pid(Bn.ref)){ const o=paintObjects.find(x=>String(x.id)===_pid(An.ref)); if(o&&(o.type==='rect'||o.type==='oblong')){ const s=new Set([_pix(An.ref),_pix(Bn.ref)]);
-      if(s.has(1)&&s.has(3)){ beginPlace({kind:'w',ref:o.id}); return; } if(s.has(0)&&s.has(2)){ beginPlace({kind:'h',ref:o.id}); return; } } }
-    const S1=segOfRef(An.ref), S2=segOfRef(Bn.ref); let kind='dist';
-    if(S1&&S2){ const adx=S1[2]-S1[0],ady=S1[3]-S1[1],bdx=S2[2]-S2[0],bdy=S2[3]-S2[1]; const cr=adx*bdy-ady*bdx, dt=adx*bdx+ady*bdy; if(Math.abs(Math.sin(Math.atan2(cr,dt)))>0.03) kind='angle'; }
-    beginPlace({kind, ref:_dimRef(An.ref), ref2:_dimRef(Bn.ref)}); return;
-  }
-  if(An.kind==='point' && Bn.kind==='point'){ beginPlace({kind:'ptdist', ref:An.ref, ref2:Bn.ref}); return; }
-  const pt = An.kind==='point'?An:Bn, ed = An.kind==='edge'?An:Bn;
-  if(pt.kind==='point' && ed.kind==='edge'){ beginPlace({kind:'pdist', ref:pt.ref, ref2:ed.ref}); return; }
-  if(typeof toastHist==='function')toastHist('📏 Combinaison non gérée');
+  if(_dimEdgeA){ const A=_dimEdgeA; _dimEdgeA=null; const B=hit.kind==='ring'?{kind:'point',ref:'@'+hit.ref}:hit; const sp=_combine(A,B); if(sp){ beginPlace(sp, A); return; } if(typeof toastHist==='function')toastHist('📏 Combinaison non gérée'); return; }
+  if(hit.kind==='point'){ _dimEdgeA={kind:'point',ref:hit.ref}; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('📏 Point choisi — clique une 2e entité'); return; }
+  if(hit.kind==='ring'){ beginPlace({kind:'diam', ref:hit.ref}, {kind:'point',ref:'@'+hit.ref}); return; }
+  if(hit.kind==='edge'){ beginPlace(_edgeLenSpec(hit.ref), {kind:'edge',ref:hit.ref}); return; }
 }
 // Une arete appartenant a une ligne/free-2pt entiere -> ref objet (cote EDITABLE).
 // Une arete de rectangle / segment de polyligne -> ref d'arete 'id#idx' (mesure).
@@ -6174,7 +6158,35 @@ function _dimRef(ref){
   return ref;
 }
 function makeDimLen(ref){ makeDim({kind:'len', ref:_dimRef(ref)}); }
-function beginPlace(spec){ _dimPlace={spec, px:null, py:null}; _dimEdgeA=null; _dimHover=null; if(typeof toastHist==='function')toastHist('↔ Bouge la souris puis clique pour déposer la cote'); redrawCanvasNow(); }
+function beginPlace(spec, src){ _dimPlace={spec, src:src||null, px:null, py:null}; _dimEdgeA=null; _dimHover=null; if(typeof toastHist==='function')toastHist('↔ Bouge puis clique pour déposer • clique une AUTRE entité = distance/angle'); redrawCanvasNow(); }
+function _edgeLenSpec(ref){
+  const id=String(ref).split('#')[0], ix=+String(ref).split('#')[1];
+  const o=paintObjects.find(x=>String(x.id)===id);
+  if(o&&(o.type==='rect'||o.type==='oblong')){ if(ix===0||ix===2) return {kind:'w',ref:o.id}; if(ix===1||ix===3) return {kind:'h',ref:o.id}; }
+  return {kind:'len', ref:_dimRef(ref)};
+}
+function _combine(A,B){
+  const _pid=r=>String(r).split('#')[0], _pix=r=>+String(r).split('#')[1];
+  if(A.kind==='edge' && B.kind==='edge'){
+    if(String(A.ref)===String(B.ref)) return null;
+    if(_pid(A.ref)===_pid(B.ref)){ const o=paintObjects.find(x=>String(x.id)===_pid(A.ref)); if(o&&(o.type==='rect'||o.type==='oblong')){ const s=new Set([_pix(A.ref),_pix(B.ref)]); if(s.has(1)&&s.has(3))return {kind:'w',ref:o.id}; if(s.has(0)&&s.has(2))return {kind:'h',ref:o.id}; } }
+    const S1=segOfRef(A.ref),S2=segOfRef(B.ref); if(!S1||!S2)return null; let kind='dist';
+    const adx=S1[2]-S1[0],ady=S1[3]-S1[1],bdx=S2[2]-S2[0],bdy=S2[3]-S2[1]; const cr=adx*bdy-ady*bdx,dt=adx*bdx+ady*bdy; if(Math.abs(Math.sin(Math.atan2(cr,dt)))>0.03)kind='angle';
+    return {kind, ref:_dimRef(A.ref), ref2:_dimRef(B.ref)};
+  }
+  if(A.kind==='point' && B.kind==='point'){ if(String(A.ref)===String(B.ref))return null; return {kind:'ptdist', ref:A.ref, ref2:B.ref}; }
+  const pt=A.kind==='point'?A:B, ed=A.kind==='edge'?A:B;
+  if(pt.kind==='point' && ed.kind==='edge'){ return {kind:'pdist', ref:pt.ref, ref2:ed.ref}; }
+  return null;
+}
+function _dimUnderCursor(xm,ym,tol){
+  for(const d of paintObjects){ if(d.type!=='dim')continue; const g=dimGeom(d); if(!g)continue;
+    const lp = g._angle?[g.ax,g.ay]:[(g.ax+g.bx)/2,(g.ay+g.by)/2];
+    if(Math.hypot(xm-lp[0],ym-lp[1])<tol*1.6) return d;
+    if(!g._angle){ const dx=g.bx-g.ax,dy=g.by-g.ay,L2=dx*dx+dy*dy; if(L2>1e-9){ let t=((xm-g.ax)*dx+(ym-g.ay)*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=g.ax+t*dx,fy=g.ay+t*dy; if(Math.hypot(xm-fx,ym-fy)<tol) return d; } }
+  }
+  return null;
+}
 function placeDim(spec,px,py){
   let dim=paintObjects.find(o=>o.type==='dim'&&o.ref===spec.ref&&o.kind===spec.kind&&(o.ref2||null)===(spec.ref2||null));
   if(!dim){ dim=Object.assign({id:objCnt++,type:'dim'},spec); paintObjects.push(dim); if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); }
@@ -6355,7 +6367,7 @@ function drawDim(dim){
   if(g._angle){
     const c=mmToPx(g.ix,g.iy), rpx=Math.max(12,g.rmm*BASE_PX*vZoom);
     // Traits d'attache gris pointilles : du sommet vers les 2 extremites de l'arc (montre les 2 cotes)
-    pCtx.save(); pCtx.setLineDash([3,3]); pCtx.strokeStyle='#a3a8b0'; pCtx.lineWidth=0.8;
+    pCtx.save(); pCtx.setLineDash([3,3]); pCtx.strokeStyle='#8b9098'; pCtx.lineWidth=1;
     pCtx.beginPath(); pCtx.moveTo(c[0],c[1]); pCtx.lineTo(c[0]+Math.cos(g.aA)*rpx, c[1]+Math.sin(g.aA)*rpx); pCtx.stroke();
     pCtx.beginPath(); pCtx.moveTo(c[0],c[1]); pCtx.lineTo(c[0]+Math.cos(g.aA+g.diff)*rpx, c[1]+Math.sin(g.aA+g.diff)*rpx); pCtx.stroke();
     pCtx.restore();
@@ -6364,7 +6376,7 @@ function drawDim(dim){
     _dimArrow(c[0]+Math.cos(g.aA+g.diff)*rpx, c[1]+Math.sin(g.aA+g.diff)*rpx, g.aA+g.diff+(g.diff<0?1:-1)*Math.PI/2);
     const lp=mmToPx(g.ax,g.ay); _dimLabel(lp[0],lp[1],g.label); pCtx.restore(); return;
   }
-  if(g.ext){ pCtx.save(); pCtx.setLineDash([3,3]); pCtx.strokeStyle='#a3a8b0'; pCtx.lineWidth=0.8; for(const seg of g.ext){ const s0=mmToPx(seg[0][0],seg[0][1]), s1=mmToPx(seg[1][0],seg[1][1]); pCtx.beginPath(); pCtx.moveTo(s0[0],s0[1]); pCtx.lineTo(s1[0],s1[1]); pCtx.stroke(); } pCtx.restore(); }
+  if(g.ext){ pCtx.save(); pCtx.setLineDash([3,3]); pCtx.strokeStyle='#8b9098'; pCtx.lineWidth=1; for(const seg of g.ext){ const s0=mmToPx(seg[0][0],seg[0][1]), s1=mmToPx(seg[1][0],seg[1][1]); pCtx.beginPath(); pCtx.moveTo(s0[0],s0[1]); pCtx.lineTo(s1[0],s1[1]); pCtx.stroke(); } pCtx.restore(); }
   const a=mmToPx(g.ax,g.ay), b=mmToPx(g.bx,g.by);
   pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke();
   const ang=Math.atan2(b[1]-a[1],b[0]-a[0]);
