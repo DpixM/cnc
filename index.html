@@ -6279,7 +6279,8 @@ function _dimGeomBase(dim){
     const adx=A[2]-A[0], ady=A[3]-A[1], aL=Math.hypot(adx,ady)||1, nx=-ady/aL, ny=adx/aL;
     const amx=(A[0]+A[2])/2, amy=(A[1]+A[3])/2, bmx=(B[0]+B[2])/2, bmy=(B[1]+B[3])/2;
     const dist=(bmx-amx)*nx+(bmy-amy)*ny, val=Math.abs(dist);
-    return {ax:amx, ay:amy, bx:amx+nx*dist, by:amy+ny*dist, val, label:val.toFixed(1)+' mm', _n:[nx,ny], _dist:dist};
+    const bx=amx+nx*dist, by=amy+ny*dist;
+    return {ax:amx, ay:amy, bx, by, val, label:val.toFixed(1)+' mm', _n:[nx,ny], _dist:dist, ext:[[[amx,amy],[amx,amy]],[[bx,by],[bx,by]]]};
   }
   const bb=getObjBB(o);
   if(dim.kind==='w'){ return {ax:bb.x, ay:bb.y-off, bx:bb.x+bb.w, by:bb.y-off, val:bb.w, label:bb.w.toFixed(1)+' mm', ext:[[[bb.x,bb.y],[bb.x,bb.y-off]],[[bb.x+bb.w,bb.y],[bb.x+bb.w,bb.y-off]]]}; }
@@ -6853,7 +6854,7 @@ function pmDragObject(xm,ym){
     // dxMm/dyMm = displacement in mm from the original click position
         let dxMm=xm-dragStartMm.x, dyMm=ym-dragStartMm.y;
         // Snap: snap the cursor during move
-        if(snapEnabled&&dragMode==='mv'){
+        if(snapEnabled&&dragMode==='mv'&&dragObj&&dragObj.type!=='dim'){
           const bb=dragOrigBB;
           // On accroche N'IMPORTE lequel des points d'ancrage de l'objet (coins,
           // centre, milieux) sur une cible -> permet de coller coin a coin.
