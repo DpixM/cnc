@@ -4274,15 +4274,18 @@ const TOOL_MENUS = {
     {i:'⤢', l:'Échelle',           fn:"cadSoon('Échelle')"},
   ],
   cadConstrain: [
-    {i:'⊤', l:'Horizontale / Verticale', fn:"cadSoon('Contrainte H/V')"},
-    {i:'⊙', l:'Coïncident',       fn:"cadSoon('Coïncident')"},
-    {i:'◡', l:'Tangente',         fn:"cadSoon('Tangente')"},
-    {i:'=', l:'Égal',             fn:"cadSoon('Égal')"},
-    {i:'∥', l:'Parallèle',        fn:"cadSoon('Parallèle')"},
-    {i:'⟂', l:'Perpendiculaire',  fn:"cadSoon('Perpendiculaire')"},
-    {i:'△', l:'Milieu',           fn:"cadSoon('Milieu')"},
-    {i:'◎', l:'Concentrique',     fn:"cadSoon('Concentrique')"},
-    {i:'⋰', l:'Symétrie',         fn:"cadSoon('Symétrie')"},
+    {i:'—', l:'Horizontale',      fn:"cadConstraint('horiz')"},
+    {i:'|', l:'Verticale',        fn:"cadConstraint('vert')"},
+    {i:'∥', l:'Parallèle',        fn:"cadConstraint('parallel')"},
+    {i:'⟂', l:'Perpendiculaire',  fn:"cadConstraint('perp')"},
+    {i:'=', l:'Égal',             fn:"cadConstraint('equal')"},
+    {i:'◎', l:'Concentrique',     fn:"cadConstraint('concentric')"},
+    {i:'╱', l:'Colinéaire',       fn:"cadConstraint('collinear')"},
+    {i:'⊙', l:'Coïncident',       fn:"cadConstraint('coincident')"},
+    {i:'△', l:'Milieu',           fn:"cadConstraint('midpoint')"},
+    {i:'◡', l:'Tangente',         fn:"cadConstraint('tangent')"},
+    {i:'⋰', l:'Symétrie',         fn:"cadConstraint('symmetry')"},
+    {i:'🔒', l:'Fixe / Verrouiller', fn:"cadConstraint('fix')"},
   ]
 };
 
@@ -6063,6 +6066,46 @@ function _cadAngle(a,b){ // 0=Est, sens trigo (Y ecran vers le bas -> on inverse
 }
 function cadPick(t){ setPTool(t); _cadMode=true; if(t!=='cadline') redrawCanvas(); } // outil CAD + mode CAD
 function cadSoon(n){ if(typeof toastHist==='function') toastHist('🔜 '+n+' — bientôt disponible (emplacement prêt)'); }
+// ── CONTRAINTES (version ponctuelle : applique une fois. Persistant = etape suivante) ──
+function cadConstraint(type){
+  const ids=[...getSelIds()]; const objs=ids.map(getObj).filter(Boolean);
+  const lines=objs.filter(o=>segOf(o)); const circs=objs.filter(o=>o._circle||o.type==='ellipse'); const pts=objs.filter(o=>o.type==='point');
+  const T=(m)=>{ if(typeof toastHist==='function')toastHist(m); };
+  const setL=(o,s)=>setSeg(o,s), L=(o)=>segOf(o), half=(s)=>Math.hypot(s[2]-s[0],s[3]-s[1])/2, mid=(s)=>[(s[0]+s[2])/2,(s[1]+s[3])/2];
+  let ok=true;
+  switch(type){
+    case 'horiz': case 'vert': {
+      if(!lines.length){ T('⚠️ Sélectionne une ligne'); return; }
+      for(const o of lines){ const s=L(o),m=mid(s),hh=half(s); setL(o, type==='horiz'?[m[0]-hh,m[1],m[0]+hh,m[1]]:[m[0],m[1]-hh,m[0],m[1]+hh]); }
+      break; }
+    case 'parallel': case 'perp': {
+      if(lines.length<2){ T('⚠️ Sélectionne 2 lignes'); return; }
+      const a=L(lines[0]); let ang=Math.atan2(a[3]-a[1],a[2]-a[0]); if(type==='perp')ang+=Math.PI/2;
+      const s=L(lines[1]),m=mid(s),hh=half(s); setL(lines[1],[m[0]-Math.cos(ang)*hh,m[1]-Math.sin(ang)*hh,m[0]+Math.cos(ang)*hh,m[1]+Math.sin(ang)*hh]); break; }
+    case 'equal': {
+      if(lines.length>=2){ const la=half(L(lines[0]))*2; const s=L(lines[1]); const dx=s[2]-s[0],dy=s[3]-s[1],cur=Math.hypot(dx,dy)||1,k=la/cur; setL(lines[1],[s[0],s[1],s[0]+dx*k,s[1]+dy*k]); }
+      else if(circs.length>=2){ const r=(circs[0].rx||circs[0].ry); circs[1].rx=circs[1].ry=r; }
+      else { T('⚠️ 2 lignes ou 2 cercles'); return; } break; }
+    case 'concentric': { if(circs.length<2){ T('⚠️ Sélectionne 2 cercles'); return; } circs[1].x=circs[0].x; circs[1].y=circs[0].y; break; }
+    case 'collinear': { if(lines.length<2){ T('⚠️ Sélectionne 2 lignes'); return; }
+      const a=L(lines[0]); const ang=Math.atan2(a[3]-a[1],a[2]-a[0]),dx=Math.cos(ang),dy=Math.sin(ang);
+      const s=L(lines[1]),m=mid(s),hh=half(s); const tp=((m[0]-a[0])*dx+(m[1]-a[1])*dy),px=a[0]+dx*tp,py=a[1]+dy*tp;
+      setL(lines[1],[px-dx*hh,py-dy*hh,px+dx*hh,py+dy*hh]); break; }
+    case 'coincident': {
+      if(pts.length>=2){ pts[1].x=pts[0].x; pts[1].y=pts[0].y; }
+      else if(lines.length>=2){ const a=L(lines[0]),b=L(lines[1]); let best=null;
+        for(const ea of [[a[0],a[1]],[a[2],a[3]]]) for(const eb of [[b[0],b[1],0],[b[2],b[3],1]]){ const d=Math.hypot(ea[0]-eb[0],ea[1]-eb[1]); if(!best||d<best.d)best={d,ea,w:eb[2]}; }
+        const s=L(lines[1]); if(best.w===0){s[0]=best.ea[0];s[1]=best.ea[1];}else{s[2]=best.ea[0];s[3]=best.ea[1];} setL(lines[1],s);
+      } else { T('⚠️ 2 points ou 2 lignes'); return; } break; }
+    case 'midpoint': { if(pts.length&&lines.length){ const m=mid(L(lines[0])); pts[0].x=m[0]; pts[0].y=m[1]; } else { T('⚠️ 1 point + 1 ligne'); return; } break; }
+    case 'tangent': { if(circs.length&&lines.length){ const c=circs[0],s=L(lines[0]); const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1,nx=-ey/Ln,ny=ex/Ln; const d=(c.x-s[0])*nx+(c.y-s[1])*ny,sg=d>=0?1:-1,r=(c.rx||c.ry),fx=c.x-nx*d,fy=c.y-ny*d; c.x=fx+nx*sg*r; c.y=fy+ny*sg*r; } else { T('⚠️ 1 cercle + 1 ligne'); return; } break; }
+    case 'fix': { if(!objs.length){ T('⚠️ Sélectionne une forme'); return; } for(const o of objs)o.fixed=!o.fixed; T('🔒 Fixé / défixé'); break; }
+    case 'symmetry': { T('🔜 Symétrie : sélectionne 2 formes + un axe (bientôt)'); return; }
+    default: return;
+  }
+  if(typeof pushHistory==='function')pushHistory(); if(typeof redrawCanvasNow==='function')redrawCanvasNow();
+  T('✅ Contrainte appliquée');
+}
 function _mirrorX(o,cx){ const f=x=>2*cx-x;
   switch(o.type){
     case 'rect': case 'tri': case 'star': case 'oblong': case 'text': case 'svg': if(o.x!=null)o.x=f(o.x+(o.w||0)); break;
