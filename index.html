@@ -6103,7 +6103,7 @@ function _shpMake(tool, cx, cy, r, sides){
   if(r<=0) r=1;
   if(tool==='pcircle') return {id:Date.now()+Math.random(), type:'ellipse', _circle:true, x:cx, y:cy, rx:r, ry:r, strokeW:0.5};
   const n=Math.max(3,Math.min(64,sides||6)); const pts=[]; for(let i=0;i<=n;i++){ const a=-Math.PI/2 + i*2*Math.PI/n; pts.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); }
-  return {id:Date.now()+Math.random(), type:'free', pts, strokeW:0.5};
+  return {id:Date.now()+Math.random(), type:'free', pts, strokeW:0.5, _poly:true, _polyN:n};
 }
 function _shpDown(xm,ym){
   if(!_shp)return; const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym};
@@ -6304,14 +6304,18 @@ let _dimChain = null;    // {id,src,t} : enchainer une 2e entite juste apres (di
 let _dimEdgeMode = null; // 'angle' | 'dist' : picking d'aretes
 let _dimEdgeA = null;    // 1ere arete choisie (ref 'id#idx')
 function objForPointRef(ref){ if(typeof ref==='string'&&ref[0]==='@') return paintObjects.find(x=>String(x.id)===ref.slice(1)); return null; }
-function ptOfRef(ref){ const o=objForPointRef(ref); if(!o)return null; if(o._circle||o.type==='ellipse'||o.type==='point')return[o.x,o.y]; const c=getObjCenter(o); return[c.x,c.y]; }
+function _polyCenter(o){ if(!o||!o.pts||!o.pts.length)return null; const P=o.pts; let m=P.length; if(m>1 && Math.abs(P[0][0]-P[m-1][0])<1e-6 && Math.abs(P[0][1]-P[m-1][1])<1e-6)m--; let sx=0,sy=0; for(let i=0;i<m;i++){sx+=P[i][0];sy+=P[i][1];} return [sx/m,sy/m]; }
+function _polyR(o){ const c=_polyCenter(o); if(!c)return 0; let r=0; for(const pt of o.pts)r=Math.max(r,Math.hypot(pt[0]-c[0],pt[1]-c[1])); return r; }
+function ptOfRef(ref){ const o=objForPointRef(ref); if(!o)return null; if(o._circle||o.type==='ellipse'||o.type==='point')return[o.x,o.y]; if(o._poly)return _polyCenter(o); const c=getObjCenter(o); return[c.x,c.y]; }
 // Choisit l'entite la plus proche du curseur : centre de cercle/point, anneau de cercle (Ø), ou arete.
 function pickEntity(xm,ym,tol){
   let best=null;
   for(const o of paintObjects){ let cx,cy,isC=false;
-    if(o._circle||o.type==='ellipse'){cx=o.x;cy=o.y;isC=true;} else if(o.type==='point'){cx=o.x;cy=o.y;isC=true;}
+    if(o._circle||o.type==='ellipse'){cx=o.x;cy=o.y;isC=true;} else if(o.type==='point'){cx=o.x;cy=o.y;isC=true;} else if(o._poly){ const c=_polyCenter(o); if(c){cx=c[0];cy=c[1];isC=true;} }
     if(isC){ const d=Math.hypot(xm-cx,ym-cy); if(d<=tol&&(!best||d<best.d)) best={kind:'point', ref:'@'+o.id, d, pt:[cx,cy]}; } }
-  for(const o of paintObjects){ if(o._circle||o.type==='ellipse'){ const r=((o.rx||0)+(o.ry||0))/2; const dr=Math.abs(Math.hypot(xm-o.x,ym-o.y)-r); if(dr<=tol&&(!best||dr<best.d)) best={kind:'ring', ref:o.id, d:dr, pt:[o.x,o.y]}; } }
+  for(const o of paintObjects){ let cc=null,rr=0;
+    if(o._circle||o.type==='ellipse'){ cc=[o.x,o.y]; rr=((o.rx||0)+(o.ry||0))/2; } else if(o._poly){ cc=_polyCenter(o); rr=_polyR(o); }
+    if(cc){ const dr=Math.abs(Math.hypot(xm-cc[0],ym-cc[1])-rr); if(dr<=tol&&(!best||dr<best.d)) best={kind:'ring', ref:o.id, d:dr, pt:cc}; } }
   const ne=nearestEdge(xm,ym); if(ne&&ne.d<=tol&&(!best||ne.d<best.d)) best={kind:'edge', ref:ne.ref, d:ne.d, seg:ne.seg, foot:ne.foot};
   return best;
 }
@@ -6414,7 +6418,7 @@ function segOfRef(ref){
 }
 function nearestEdge(xm,ym){
   let best=null;
-  for(const o of paintObjects){ if(o.type==='dim'||o.type==='group'||o.type==='point'||o._circle||o.type==='ellipse')continue; // cercles : pickables par centre/anneau, pas comme aretes
+  for(const o of paintObjects){ if(o.type==='dim'||o.type==='group'||o.type==='point'||o._circle||o.type==='ellipse'||o._poly)continue; // cercles & polygones : pickables par centre/anneau
     const es=edgesOf(o);
     for(let i=0;i<es.length;i++){ const ax=es[i][0],ay=es[i][1],bx=es[i][2],by=es[i][3];
       const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy; if(L2<1e-9)continue;
@@ -6469,6 +6473,7 @@ function _dimGeomBase(dim){
   if(dim.kind==='pdist'){ const P=ptOfRef(dim.ref), E=segOfRef(dim.ref2); if(!P||!E)return null; const ex=E[2]-E[0],ey=E[3]-E[1],L2=ex*ex+ey*ey||1; const t=((P[0]-E[0])*ex+(P[1]-E[1])*ey)/L2; const fx=E[0]+t*ex,fy=E[1]+t*ey; const val=Math.hypot(P[0]-fx,P[1]-fy); return {ax:fx,ay:fy,bx:P[0],by:P[1],val,label:val.toFixed(1)+' mm', ext:[[[fx,fy],[fx,fy]]]}; }
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o && !(typeof dim.ref==='string' && dim.ref.indexOf('#')>=0)) return null;
   const off=6;
+  if(dim.kind==='diam' && o._poly){ const c=_polyCenter(o), r=_polyR(o)||1; return {ax:c[0]-r, ay:c[1]-r-off, bx:c[0]+r, by:c[1]-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm', ext:[[[c[0]-r,c[1]],[c[0]-r,c[1]-r-off]],[[c[0]+r,c[1]],[c[0]+r,c[1]-r-off]]]}; }
   if(dim.kind==='diam' && (o._circle||o.type==='ellipse')){ const r=o.rx||o.ry||1; return {ax:o.x-r, ay:o.y-r-off, bx:o.x+r, by:o.y-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm', ext:[[[o.x-r,o.y],[o.x-r,o.y-r-off]],[[o.x+r,o.y],[o.x+r,o.y-r-off]]]}; }
   if(dim.kind==='len'){ const s=segOfRef(dim.ref); if(s){ const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off; return {ax:s[0]+nx,ay:s[1]+ny,bx:s[2]+nx,by:s[3]+ny,val:L,label:L.toFixed(1)+' mm', ext:[[[s[0],s[1]],[s[0]+nx,s[1]+ny]],[[s[2],s[3]],[s[2]+nx,s[3]+ny]]]}; } }
   if(dim.kind==='angle'){
@@ -6512,7 +6517,7 @@ function applyDimValue(dim,v){
     if(typeof pushHistory==='function')pushHistory(); return; }
   if(dim.kind==='pdist'){ const o=objForPointRef(dim.ref); const E=segOfRef(dim.ref2); if(!o||!E||!(v>0))return; const P=ptOfRef(dim.ref); const ex=E[2]-E[0],ey=E[3]-E[1],L=Math.hypot(ex,ey)||1,nx=-ey/L,ny=ex/L; const d=(P[0]-E[0])*nx+(P[1]-E[1])*ny; const sgn=d>=0?1:-1; const foot=[P[0]-nx*d,P[1]-ny*d]; _shiftObj(o, (foot[0]+nx*sgn*v)-P[0], (foot[1]+ny*sgn*v)-P[1]); if(typeof pushHistory==='function')pushHistory(); return; }
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o||!(v>0)) return;
-  if(dim.kind==='diam'){ o.rx=o.ry=v/2; }
+  if(dim.kind==='diam'){ if(o._poly){ const c=_polyCenter(o), r=_polyR(o)||1, k=(v/2)/r; o.pts=o.pts.map(pt=>[c[0]+(pt[0]-c[0])*k, c[1]+(pt[1]-c[1])*k]); } else { o.rx=o.ry=v/2; } }
   else if(dim.kind==='len'){ const s=segOf(o); if(s){ const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1; setSeg(o,[s[0],s[1],s[0]+dx/L*v,s[1]+dy/L*v]); } }
   else if(dim.kind==='angle'){
     const Bo=paintObjects.find(x=>x.id===dim.ref2); const A=segOf(o), B=segOf(Bo);
@@ -15666,6 +15671,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-E (dessin interactif: cercle centre + polygone facon Fusion)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-F (polygone cotable/editable comme un cercle)</div>
 </body>
 </html>
