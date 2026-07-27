@@ -2086,7 +2086,6 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <div class="cadlbl">CAD</div>
       <button class="cadb" title="Sélection CAD" onclick="setPTool('select');_cadMode=true;redrawCanvas()">↖</button>
       <button class="cadb" title="Cote : 1 clic = longueur/Ø (édition directe)" onclick="cadStartDim()">📏</button>
-      <button class="cadb" title="Cote entre 2 éléments : distance ou angle (2 traits/centres)" onclick="cadPairMode()">↔</button>
       <div class="cadsep"></div>
       <button class="cadb" title="Créer : ligne, rectangle, cercle, arc, polygone…" onclick="openToolMenu('cadCreate',this)">✏️<span style="font-size:7px;margin-left:1px">▾</span></button>
       <div class="cadlbl">Créer</div>
@@ -6163,7 +6162,7 @@ let _caddim = null; // {p1:[x,y]|null, cursor:[x,y]|null, _snapped}
 let _dimA = null; // 1ere entite cliquee pour une cote de DISTANCE entre 2 formes
 let _dimHover = null;    // arete surlignee au survol (cotation)
 let _dimPlace = null;    // (obsolete) ancienne depose au curseur
-let _dimPairArmed = false; // mode 'cote entre 2 elements' (bouton dedie)
+let _dimChain = null;    // {id,src,t} : enchainer une 2e entite juste apres (distance/angle)
 let _dimEdgeMode = null; // 'angle' | 'dist' : picking d'aretes
 let _dimEdgeA = null;    // 1ere arete choisie (ref 'id#idx')
 function objForPointRef(ref){ if(typeof ref==='string'&&ref[0]==='@') return paintObjects.find(x=>String(x.id)===ref.slice(1)); return null; }
@@ -6178,7 +6177,7 @@ function pickEntity(xm,ym,tol){
   const ne=nearestEdge(xm,ym); if(ne&&ne.d<=tol&&(!best||ne.d<best.d)) best={kind:'edge', ref:ne.ref, d:ne.d, seg:ne.seg, foot:ne.foot};
   return best;
 }
-function cadStartDim(){ _caddim=null; _dimA=null; _dimEdgeMode=null; _dimEdgeA=null; _dimHover=null; _dimPairArmed=false; _dimPlace=null; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
+function cadStartDim(){ _caddim=null; _dimA=null; _dimEdgeMode=null; _dimEdgeA=null; _dimHover=null; _dimChain=null; _dimPlace=null; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
 function cadStartAngle(){ _caddim=null; _dimA=null; _dimHover=null; _dimEdgeA=null; _dimEdgeMode='angle'; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('∠ Angle : clique 2 arêtes (côtés de rectangle OK)'); redrawCanvasNow(); }
 function cadStartDist(){ _caddim=null; _dimA=null; _dimHover=null; _dimEdgeA=null; _dimEdgeMode='dist'; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('⇥ Distance : clique 2 arêtes'); redrawCanvasNow(); }
 function makeDimNow(spec){
@@ -6190,21 +6189,21 @@ function makeDimNow(spec){
   return dim.id;
 }
 function _replaceDim(id, spec){ const d=paintObjects.find(o=>o.id===id); if(!d)return; for(const k of ['ref','ref2','kind','place','mv']) delete d[k]; Object.assign(d,{type:'dim'},spec); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); }
-function cadPairMode(){ _dimPairArmed=true; _dimEdgeA=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('↔ Cote entre 2 éléments : clique le 1er (trait / centre)'); redrawCanvasNow(); }
 function cadDimClick(xm,ym){
-  const tol=14/(BASE_PX*vZoom);
+  const tol=14/(BASE_PX*vZoom), now=Date.now();
   const hit=pickEntity(xm,ym,tol);
-  // A) une 1ere entite est en attente (point auto, ou mode "entre 2") -> combiner
-  if(_dimEdgeA){ const A=_dimEdgeA; _dimEdgeA=null; _dimPairArmed=false; if(hit){ const B=hit.kind==='ring'?{kind:'point',ref:'@'+hit.ref}:hit; const sp=_combine(A,B); if(sp){ const id=makeDimNow(sp); const d=paintObjects.find(o=>o.id===id); if(d)openDimInput(d); return; } } if(typeof toastHist==='function')toastHist('📏 Combinaison non gérée'); redrawCanvasNow(); return; }
-  // B) clic sur une cote existante -> edition directe (meme avec l'outil cote actif)
-  const ex=_dimUnderCursor(xm,ym,tol); if(ex){ openDimInput(ex); return; }
-  if(!hit){ if(typeof toastHist==='function')toastHist('📏 Clique un trait, un cercle ou un centre'); redrawCanvasNow(); return; }
-  // C) mode "entre 2 elements" arme -> stocker la 1ere entite
-  if(_dimPairArmed){ _dimEdgeA = hit.kind==='ring'?{kind:'point',ref:'@'+hit.ref}:hit; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('↔ Clique la 2e entité'); return; }
-  // D) 1 CLIC = cote de cette entite (ouvre direct la saisie de valeur)
-  if(hit.kind==='point'){ _dimEdgeA={kind:'point',ref:hit.ref}; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('📏 Point choisi — clique une 2e entité'); return; }
-  if(hit.kind==='ring'){ const id=makeDimNow({kind:'diam',ref:hit.ref}); const d=paintObjects.find(o=>o.id===id); if(d)openDimInput(d); return; }
-  if(hit.kind==='edge'){ const id=makeDimNow(_edgeLenSpec(hit.ref)); const d=paintObjects.find(o=>o.id===id); if(d)openDimInput(d); return; }
+  // A) un point etait en attente (un point seul n'a pas de cote) -> le combiner
+  if(_dimEdgeA){ const A=_dimEdgeA; _dimEdgeA=null; if(hit){ const B=hit.kind==='ring'?{kind:'point',ref:'@'+hit.ref}:hit; const sp=_combine(A,B); if(sp){ const id=makeDimNow(sp); const d=paintObjects.find(o=>o.id===id); if(d)openDimInput(d); return; } } if(typeof toastHist==='function')toastHist('📏 Combinaison non gérée'); redrawCanvasNow(); return; }
+  // B) ENCHAINEMENT : si on vient de poser une cote 1-entite et qu'on clique une AUTRE
+  //    entite juste apres (< 1.6s) -> la transforme en distance / angle.
+  if(_dimChain && hit && (now-_dimChain.t<1600)){ const B=hit.kind==='ring'?{kind:'point',ref:'@'+hit.ref}:hit; const up=_combine(_dimChain.src, B); if(up){ _replaceDim(_dimChain.id, up); const d=paintObjects.find(o=>o.id===_dimChain.id); _dimChain=null; if(d)openDimInput(d); return; } }
+  // C) clic sur une cote existante -> edition directe
+  const ex=_dimUnderCursor(xm,ym,tol); if(ex){ _dimChain=null; openDimInput(ex); return; }
+  if(!hit){ _dimChain=null; if(typeof toastHist==='function')toastHist('📏 Clique un trait, un cercle ou un centre'); redrawCanvasNow(); return; }
+  // D) 1 CLIC = cote de cette entite (saisie directe) ; enchainable en distance/angle
+  if(hit.kind==='point'){ _dimEdgeA={kind:'point',ref:hit.ref}; _dimChain=null; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('📏 Point choisi — clique une 2e entité'); return; }
+  if(hit.kind==='ring'){ const id=makeDimNow({kind:'diam',ref:hit.ref}); _dimChain={id, src:{kind:'point',ref:'@'+hit.ref}, t:now}; const d=paintObjects.find(o=>o.id===id); if(d)openDimInput(d); return; }
+  if(hit.kind==='edge'){ const id=makeDimNow(_edgeLenSpec(hit.ref)); _dimChain={id, src:{kind:'edge',ref:hit.ref}, t:now}; const d=paintObjects.find(o=>o.id===id); if(d)openDimInput(d); return; }
 }
 // Une arete appartenant a une ligne/free-2pt entiere -> ref objet (cote EDITABLE).
 // Une arete de rectangle / segment de polyligne -> ref d'arete 'id#idx' (mesure).
