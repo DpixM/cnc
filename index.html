@@ -4251,10 +4251,10 @@ const TOOL_MENUS = {
   cadCreate: [
     {i:'╱', l:'Ligne',                fn:'cadStartLine()'},
     {i:'▭', l:'Rectangle',            fn:"cadPick('rect')"},
-    {i:'◯', l:'Cercle',               fn:"cadPick('circle')"},
+    {i:'◯', l:'Cercle (depuis le centre)', fn:"cadCircleCenter()"},
     {i:'⬭', l:'Ellipse',              fn:"cadPick('ellipse')"},
     {i:'◠', l:'Arc',                  fn:"cadSoon('Arc')"},
-    {i:'⬠', l:'Polygone',             fn:"cadPolygon()"},
+    {i:'⬠', l:'Polygone',             fn:"cadPolyFusion()"},
     {i:'▬', l:'Rainure (oblong)',     fn:"cadPick('oblong')"},
     {i:'∿', l:'Spline (tracé libre)', fn:"cadPick('free')"},
     {i:'•', l:'Point',                fn:"cadPick('point')"},
@@ -5886,6 +5886,7 @@ function redrawCanvasNow(){
   pCtx.fillStyle='rgba(80,90,100,.7)';pCtx.font='10px monospace';pCtx.textAlign='right';
   pCtx.fillText(Math.round(vZoom*100)+'%',cw-6,ch-6);
   if(typeof cadDrawOverlay==='function') cadDrawOverlay();
+  if(typeof _shpOverlay==='function') _shpOverlay();
   if(typeof _cadDimOverlay==='function') _cadDimOverlay();
 }
 
@@ -6092,6 +6093,55 @@ function cadScale(){
   for(const o of objs)_scaleObj(o,cx,cy,k);
   if(typeof pushHistory==='function')pushHistory(); if(typeof redrawCanvasNow==='function')redrawCanvasNow();
   if(typeof toastHist==='function')toastHist('⤢ Échelle ×'+k+' appliquée');
+}
+// ── DESSIN INTERACTIF façon Fusion (clic centre -> taille au curseur -> valeur tapable) ──
+let _shp = null; // {tool:'pcircle'|'ppoly', cx, cy, sides, cursor, typed, _snapped}
+function cadCircleCenter(){ _shp={tool:'pcircle', cx:null, cy:null, cursor:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('◯ Cercle : clique le centre'); redrawCanvasNow(); }
+function cadPolyFusion(){ _shp={tool:'ppoly', sides:6, cx:null, cy:null, cursor:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('⬠ Polygone '+6+' côtés : clique le centre ( [ ] pour changer le nb de côtés )'); redrawCanvasNow(); }
+function _shpRadius(){ if(!_shp||_shp.cx==null)return 0; const tv=parseFloat(_shp.typed); if(tv>0) return _shp.tool==='pcircle'? tv/2 : tv; if(!_shp.cursor)return 0; return Math.hypot(_shp.cursor[0]-_shp.cx, _shp.cursor[1]-_shp.cy); }
+function _shpMake(tool, cx, cy, r, sides){
+  if(r<=0) r=1;
+  if(tool==='pcircle') return {id:Date.now()+Math.random(), type:'ellipse', _circle:true, x:cx, y:cy, rx:r, ry:r, strokeW:0.5};
+  const n=Math.max(3,Math.min(64,sides||6)); const pts=[]; for(let i=0;i<=n;i++){ const a=-Math.PI/2 + i*2*Math.PI/n; pts.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); }
+  return {id:Date.now()+Math.random(), type:'free', pts, strokeW:0.5};
+}
+function _shpDown(xm,ym){
+  if(!_shp)return; const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym};
+  if(_shp.cx==null){ _shp.cx=sp.x; _shp.cy=sp.y; _shp.cursor=[sp.x,sp.y]; _shp.typed=''; if(typeof toastHist==='function')toastHist(_shp.tool==='pcircle'?'◯ Bouge pour le rayon, ou tape le Ø + Entrée':'⬠ Bouge pour la taille, ou tape le rayon + Entrée ( [ ] = côtés )'); redrawCanvasNow(); return; }
+  _shpFinalize();
+}
+function _shpFinalize(){
+  if(!_shp||_shp.cx==null)return; const r=_shpRadius(); const o=_shpMake(_shp.tool,_shp.cx,_shp.cy,r,_shp.sides);
+  paintObjects.push(o); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=o.id; if(typeof selObjIds!=='undefined'&&selObjIds.add)selObjIds.add(o.id);
+  if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount();
+  const tool=_shp.tool, sides=_shp.sides; _shp={tool, cx:null, cy:null, cursor:null, typed:'', _snapped:false, sides}; // enchaine (Fusion continue)
+  redrawCanvasNow();
+}
+function _shpKey(e){
+  if(!_shp)return false;
+  if(e.key==='Escape'){ _shp=null; if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); return true; }
+  if(e.key==='Enter'){ if(_shp.cx!=null)_shpFinalize(); return true; }
+  if(e.key==='Backspace'){ _shp.typed=_shp.typed.slice(0,-1); redrawCanvasNow(); return true; }
+  if(_shp.tool==='ppoly' && (e.key==='['||e.key==='ArrowDown')){ _shp.sides=Math.max(3,_shp.sides-1); redrawCanvasNow(); return true; }
+  if(_shp.tool==='ppoly' && (e.key===']'||e.key==='ArrowUp')){ _shp.sides=Math.min(64,_shp.sides+1); redrawCanvasNow(); return true; }
+  if(/^[0-9.]$/.test(e.key)){ _shp.typed+=e.key; redrawCanvasNow(); return true; }
+  return false;
+}
+function _shpOverlay(){
+  if(!pCtx||!_shp)return; pCtx.save(); pCtx.setLineDash([]);
+  const cross=(px,py,col)=>{ pCtx.strokeStyle=col;pCtx.lineWidth=1.4;pCtx.beginPath();pCtx.moveTo(px-6,py);pCtx.lineTo(px+6,py);pCtx.moveTo(px,py-6);pCtx.lineTo(px,py+6);pCtx.stroke(); };
+  if(_shp.cx==null){ if(_shp.cursor){ const c=mmToPx(_shp.cursor[0],_shp.cursor[1]); cross(c[0],c[1],'#f5a623'); } pCtx.restore(); return; }
+  const c=mmToPx(_shp.cx,_shp.cy); cross(c[0],c[1],'#f5a623'); const r=_shpRadius();
+  pCtx.strokeStyle='#f5a623'; pCtx.lineWidth=1.8; pCtx.beginPath();
+  const rr=r*BASE_PX*vZoom;
+  if(_shp.tool==='pcircle'){ pCtx.arc(c[0],c[1],rr,0,Math.PI*2); }
+  else { const n=_shp.sides; for(let i=0;i<=n;i++){ const a=-Math.PI/2+i*2*Math.PI/n; const px=c[0]+rr*Math.cos(a), py=c[1]+Math.sin(a)*rr; if(i===0)pCtx.moveTo(px,py); else pCtx.lineTo(px,py); } }
+  pCtx.stroke();
+  // etiquette valeur
+  const txt=_shp.tool==='pcircle'?('Ø '+(r*2).toFixed(1)+' mm'):(_shp.sides+' côtés · r '+r.toFixed(1)+' mm')+(_shp.typed?' ⌨':'');
+  pCtx.font='bold 11px sans-serif'; pCtx.textAlign='left'; pCtx.textBaseline='middle';
+  const w=pCtx.measureText(txt).width+8; pCtx.fillStyle='rgba(0,0,0,.8)'; pCtx.fillRect(c[0]+10,c[1]-9,w,18); pCtx.fillStyle='#ffd08a'; pCtx.fillText(txt,c[0]+14,c[1]);
+  pCtx.restore();
 }
 // ── CONTRAINTES (version ponctuelle : applique une fois. Persistant = etape suivante) ──
 let _conPick = null; // {type, need, picks:[]} : selection guidee des elements d'une contrainte
@@ -6732,6 +6782,7 @@ function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
   if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
   if(paintTool==='cadline'){ cadAddPoint(xm,ym); return; } // outil ligne CAD
+  if(paintTool==='pshape'){ _shpDown(xm,ym); return; } // dessin interactif (cercle/polygone)
   if(paintTool==='caddim'){ cadDimClick(xm,ym); return; } // outil cote
   if(paintTool==='point'){ const sp=snapPoint(xm,ym,null); paintObjects.push({id:objCnt++,type:'point',x:sp.x,y:sp.y}); if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); redrawCanvas(); return; } // outil point
   if(paintTool==='bucket'){ bucketFill(xm,ym); return; } // outil seau
@@ -6942,6 +6993,7 @@ function renderSnapBtn(){
 
 function handlePointerMove(cpx,cpy){
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
+  if(paintTool==='pshape'){ if(_shp){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _shp.cursor=[sp.x,sp.y]; _shp._snapped=sp.snapped; redrawCanvasNow(); } return; }
   if(paintTool==='caddim'){ const[xm,ym]=pxToMm(cpx,cpy); if(_dimPlace){ _dimPlace.px=xm; _dimPlace.py=ym; redrawCanvasNow(); return; } const tolE=14/(BASE_PX*vZoom);
     const e=pickEntity(xm,ym,tolE);
     let hv=null;
@@ -12811,6 +12863,7 @@ function initCanvas(){
   pCanvas.addEventListener('mouseleave',()=>{isDragging=false;isDrawing=false;pinchActive=false;dragMode=null;if(pCanvas)pCanvas.style.cursor='default';});
   pCanvas.addEventListener('dblclick',e=>{e.preventDefault(); if(paintTool==='cadline'&&_cad){ cadFinish(); return; } const r=pCanvas.getBoundingClientRect(); const [dxm,dym]=pxToMm(e.clientX-r.left,e.clientY-r.top); for(let i=paintObjects.length-1;i>=0;i--){ const dd=paintObjects[i]; if(dd.type==='dim'&&hitTest(dd,dxm,dym)){ openDimInput(dd); return; } } const o=getObj(selObjId);if(o)centerViewOnObj(o);});
   document.addEventListener('keydown',e=>{
+    if(typeof _shpKey==='function' && _shp){ const ae=document.activeElement; if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(_shpKey(e)){ e.preventDefault(); } return; }
     if(paintTool!=='cadline'||!_cad) return;
     if(e.key==='Escape'){ cadCancel(); e.preventDefault(); return; }
     if(e.key==='Enter'){ if(_cad.typed && _cad.pts.length && _cad.cursor){ cadAddPoint(_cad.cursor[0],_cad.cursor[1]); } else { cadFinish(); } e.preventDefault(); return; }
@@ -15613,6 +15666,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-D (cote au curseur + polygone + echelle)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-E (dessin interactif: cercle centre + polygone facon Fusion)</div>
 </body>
 </html>
