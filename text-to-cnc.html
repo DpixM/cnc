@@ -6067,8 +6067,31 @@ function _cadAngle(a,b){ // 0=Est, sens trigo (Y ecran vers le bas -> on inverse
 function cadPick(t){ setPTool(t); _cadMode=true; if(t!=='cadline') redrawCanvas(); } // outil CAD + mode CAD
 function cadSoon(n){ if(typeof toastHist==='function') toastHist('🔜 '+n+' — bientôt disponible (emplacement prêt)'); }
 // ── CONTRAINTES (version ponctuelle : applique une fois. Persistant = etape suivante) ──
+let _conPick = null; // {type, need, picks:[]} : selection guidee des elements d'une contrainte
 function cadConstraint(type){
-  const ids=[...getSelIds()]; const objs=ids.map(getObj).filter(Boolean);
+  const sel=[...getSelIds()].map(getObj).filter(Boolean);
+  const need=(type==='horiz'||type==='vert'||type==='fix')?1:2;
+  if(sel.length>=need){ _applyConstraintNow(type, sel); return; }
+  // Sinon : mode "clique les elements un par un" (facon Fusion)
+  _conPick={type, need, picks:[]}; setPTool('select'); _cadMode=true;
+  if(typeof toastHist==='function')toastHist('👉 Clique '+need+' élément'+(need>1?'s':'')+' pour la contrainte');
+  if(typeof redrawCanvasNow==='function')redrawCanvasNow();
+}
+function _pickObjForCon(xm,ym){
+  const tol=16/(BASE_PX*vZoom); let best=null;
+  for(const o of paintObjects){ if(o._circle||o.type==='ellipse'){ const r=((o.rx||0)+(o.ry||0))/2; const d=Math.min(Math.abs(Math.hypot(xm-o.x,ym-o.y)-r), Math.hypot(xm-o.x,ym-o.y)); if(d<=tol&&(!best||d<best.d))best={o,d}; } else if(o.type==='point'){ const d=Math.hypot(xm-o.x,ym-o.y); if(d<=tol&&(!best||d<best.d))best={o,d}; } }
+  for(const o of paintObjects){ if(o.type==='dim'||o.type==='constraint'||o.type==='group')continue; let d; try{d=distToObjStroke(o,xm,ym);}catch(e){d=Infinity;} if(d<=tol&&(!best||d<best.d))best={o,d}; }
+  return best?best.o:null;
+}
+function _conPickClick(xm,ym){
+  const o=_pickObjForCon(xm,ym);
+  if(!o){ if(typeof toastHist==='function')toastHist('👉 Clique un trait, un cercle ou un point'); return; }
+  if(_conPick.picks.some(p=>p.id===o.id)) return;
+  _conPick.picks.push(o); redrawCanvasNow();
+  if(_conPick.picks.length>=_conPick.need){ const type=_conPick.type, objs=_conPick.picks.slice(); _conPick=null; _applyConstraintNow(type, objs); }
+  else if(typeof toastHist==='function')toastHist('👉 Encore '+(_conPick.need-_conPick.picks.length)+' à cliquer');
+}
+function _applyConstraintNow(type, objs){
   const lines=objs.filter(o=>segOf(o)); const circs=objs.filter(o=>o._circle||o.type==='ellipse'); const pts=objs.filter(o=>o.type==='point');
   const T=(m)=>{ if(typeof toastHist==='function')toastHist(m); };
   const setL=(o,s)=>setSeg(o,s), L=(o)=>segOf(o), half=(s)=>Math.hypot(s[2]-s[0],s[3]-s[1])/2, mid=(s)=>[(s[0]+s[2])/2,(s[1]+s[3])/2];
@@ -6478,6 +6501,10 @@ function drawDim(dim){
   pCtx.restore();
 }
 function _cadDimOverlay(){
+  // Contrainte en cours : surligner les elements deja cliques (vert)
+  if(pCtx && _conPick && _conPick.picks.length){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3;
+    for(const o of _conPick.picks){ try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } }catch(e){} }
+    pCtx.restore(); }
   // Apercu de la cote pendant la depose (suit le curseur)
   if(pCtx && _dimPlace && _dimPlace.px!=null){ const sp=_dimPlace.spec; const tmp=Object.assign({type:'dim',id:-999},sp);
     if(sp.kind==='angle') tmp.place=[_dimPlace.px,_dimPlace.py];
@@ -6673,6 +6700,7 @@ function onME(e){handlePointerUp(e.offsetX,e.offsetY);pushHistoryIfDirty();}
 
 function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
+  if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
   if(paintTool==='cadline'){ cadAddPoint(xm,ym); return; } // outil ligne CAD
   if(paintTool==='caddim'){ cadDimClick(xm,ym); return; } // outil cote
   if(paintTool==='point'){ const sp=snapPoint(xm,ym,null); paintObjects.push({id:objCnt++,type:'point',x:sp.x,y:sp.y}); if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); redrawCanvas(); return; } // outil point
@@ -15555,6 +15583,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-B (contraintes persistantes)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-C (contraintes: clique la contrainte puis les elements)</div>
 </body>
 </html>
