@@ -2095,6 +2095,9 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <button class="cadb" title="Contraintes : parallèle, perpendiculaire, milieu…" onclick="openToolMenu('cadConstrain',this)">📐<span style="font-size:7px;margin-left:1px">▾</span></button>
       <div class="cadlbl">Contr.</div>
       <div class="cadsep"></div>
+      <button class="cadb" title="Réseaux : circulaire / rectangulaire" onclick="cadArraysMenu()">❋</button>
+      <div class="cadlbl">Réseaux</div>
+      <div class="cadsep"></div>
       <button class="cadb" title="Ajuster la vue" onclick="fitView()" style="font-size:12px">🖥</button>
     </div>
     <div id="cadStatus" style="display:none">
@@ -5369,22 +5372,17 @@ function objHasDim(id){ for(const o of paintObjects){ if(o.type==='dim' && (o.re
 function getHandlesPx(o){
   if(o.type==='dim'){ const g=(typeof dimGeom==='function')?dimGeom(o):null; if(g&&g._angle){ const c=mmToPx(g.ax,g.ay); return[{id:'aplace',x:c[0],y:c[1]}]; } if(g&&o.kind==='ptdist'){ const c=mmToPx((g.ax+g.bx)/2,(g.ay+g.by)/2); return[{id:'aplace',x:c[0],y:c[1]}]; } const bb=getObjBB(o); const c=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2); return[{id:'mv',x:c[0],y:c[1]}]; }
   if(o.type==='point'){ const[cx,cy]=mmToPx(o.x,o.y); return[{id:'mv',x:cx,y:cy}]; }
-  if(o._circle){ const[cx,cy]=mmToPx(o.x,o.y); const[rx,ry]=mmToPx(o.x+o.rx,o.y); return[{id:'mv',x:cx,y:cy},{id:'rad',x:rx,y:ry}]; } // cercle : deplacement + rayon (reste rond)
+  if(o._circle){ const[cx,cy]=mmToPx(o.x,o.y); return[{id:'mv',x:cx,y:cy}]; } // cercle : deplacement seul (taille via la fenetre / cote)
   if(o.type==='line'){
     // Lines: just the two endpoints + midpoint move handle
     const[ax,ay]=mmToPx(o.x1,o.y1);
     const[bx,by]=mmToPx(o.x2,o.y2);
     return[{id:'p1',x:ax,y:ay},{id:'p2',x:bx,y:by},{id:'mv',x:(ax+bx)/2,y:(ay+by)/2}];
   }
-  const bb=getObjBB(o);
-  const[px0,py0]=mmToPx(bb.x,bb.y);
-  const[px1,py1]=mmToPx(bb.x+bb.w,bb.y+bb.h);
-  const cx=(px0+px1)/2,cy=(py0+py1)/2;
-  return[
-    {id:'tl',x:px0,y:py0},{id:'t',x:cx,y:py0},{id:'tr',x:px1,y:py0},
-    {id:'r',x:px1,y:cy},{id:'br',x:px1,y:py1},{id:'b',x:cx,y:py1},
-    {id:'bl',x:px0,y:py1},{id:'l',x:px0,y:cy},{id:'mv',x:cx,y:cy},
-  ];
+  // Formes fermees : deplacement seul, AUCUNE poignee de redimensionnement
+  // (on redimensionne par la fenetre de parametres ou par les cotes).
+  const bb=getObjBB(o); const cc=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2);
+  return[{id:'mv',x:cc[0],y:cc[1]}];
 }
 
 function distToObjStroke(o,xm,ym){
@@ -5424,6 +5422,7 @@ function distToObjStroke(o,xm,ym){
 }
 
 function hitTest(o,xm,ym){
+  if(o&&o._link) return false; // copie de reseau : verrouillee, non selectionnable
   // Lines: test distance to segment (not BB — diagonal lines have huge BB)
   if(o.type==='line'){
     const thr = Math.max(2, (o.strokeW||0.5)/2) + 4/(BASE_PX*vZoom); // hit zone in mm
@@ -5826,26 +5825,13 @@ function redrawCanvasNow(){
           pCtx.fillStyle='#f5a623';pCtx.strokeStyle='#111';pCtx.lineWidth=1.5;
           pCtx.beginPath();pCtx.arc(h.x,h.y,HDSIZE/2+1,0,Math.PI*2);pCtx.fill();pCtx.stroke();
         }
-      } else if(_cadMode){
-        // MODE CAD : pas d'encadrement carre. On surligne le TRAIT + petits noeuds
-        // aux points cles (les noeuds restent deplacables = edition geometrique).
-        pCtx.save(); pCtx.setLineDash([]);
-        pCtx.strokeStyle='rgba(59,130,246,.65)'; pCtx.lineWidth=1.6; pCtx.lineJoin='round'; pCtx.lineCap='round';
-        try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } }catch(e){}
-        const _lk=(typeof objHasDim==='function'&&objHasDim(o.id)); for(const h of getHandlesPx(o)){ if(h.id==='mv')continue; pCtx.fillStyle=_lk?'#e5e7eb':'#fff'; pCtx.strokeStyle=_lk?'#9aa0a8':'#3b82f6'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(h.x,h.y,4,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); }
-        pCtx.restore();
       } else {
-        // contour de selection bien visible (liseré sombre dessous + pointillés vifs dessus)
-        pCtx.setLineDash([]);pCtx.strokeStyle='rgba(0,0,0,.55)';pCtx.lineWidth=4;
-        pCtx.strokeRect(bx-7,by-7,(ex-bx)+14,(ey-by)+14);
-        pCtx.strokeStyle='#ffb02e';pCtx.lineWidth=2.2;pCtx.setLineDash([7,4]);
-        pCtx.strokeRect(bx-7,by-7,(ex-bx)+14,(ey-by)+14);pCtx.setLineDash([]);
-        for(const h of getHandlesPx(o)){
-          if(h.id==='mv')continue;
-          const hs=HDSIZE;
-          pCtx.fillStyle='#f5a623';pCtx.strokeStyle='#1a1a1a';pCtx.lineWidth=1.5;
-          pCtx.beginPath();pCtx.roundRect(h.x-hs/2,h.y-hs/2,hs,hs,3);pCtx.fill();pCtx.stroke();
-        }
+        // SELECTION : on surligne le TRAIT de la forme. Pas d'encadrement carre,
+        // pas de poignee de redimensionnement (taille via la fenetre / les cotes).
+        pCtx.save(); pCtx.setLineDash([]);
+        pCtx.strokeStyle='rgba(59,130,246,.95)'; pCtx.lineWidth=2.6; pCtx.lineJoin='round'; pCtx.lineCap='round';
+        try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } }catch(e){}
+        pCtx.restore();
       }
     }
   }
@@ -6166,6 +6152,17 @@ function updateLinkedCopies(){
 }
 // ─── FENETRE D'EDITION de la forme selectionnee (dynamique, facon Fusion) ───
 let _selPanel=null;
+function _panelPos(){ try{ const s=localStorage.getItem('cncPanelPos'); if(s){ const o=JSON.parse(s); if(o&&isFinite(o.left)&&isFinite(o.top))return o; } }catch(e){} return {left:70, top:112}; }
+function _panelSavePos(l,t){ try{ localStorage.setItem('cncPanelPos', JSON.stringify({left:l, top:t})); }catch(e){} }
+function _panelGrip(){ const g=document.createElement('span'); g.textContent='⠿'; g.title='Glisser pour déplacer (position mémorisée)'; g.style.cssText='cursor:move;opacity:.55;padding:0 4px 0 0;user-select:none;font-size:14px'; return g; }
+function _makePanelDraggable(div){
+  div.addEventListener('mousedown',e=>{ const tg=e.target; if(tg&&(tg.tagName==='INPUT'||tg.tagName==='BUTTON'))return; e.preventDefault();
+    const sx=e.clientX,sy=e.clientY, ol=parseFloat(div.style.left)||0, ot=parseFloat(div.style.top)||0;
+    const mv=ev=>{ let nl=ol+(ev.clientX-sx), nt=ot+(ev.clientY-sy); nl=Math.max(2,Math.min(nl,(window.innerWidth||1200)-60)); nt=Math.max(2,Math.min(nt,(window.innerHeight||800)-30)); div.style.left=nl+'px'; div.style.top=nt+'px'; };
+    const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); _panelSavePos(parseFloat(div.style.left)||0, parseFloat(div.style.top)||0); };
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+  });
+}
 function _selPanelRemove(){ const e=document.getElementById('selPanel'); if(e)e.remove(); _selPanel=null; }
 function _selPanelShow(){
   if(typeof pCanvas==='undefined'||!pCanvas){ return; }
@@ -6178,7 +6175,8 @@ function _selPanelShow(){
   if(existing && _selPanel===o.id){ if(document.activeElement && existing.contains(document.activeElement)) return; /* sinon on rafraichit */ }
   _selPanelRemove(); _selPanel=o.id;
   const div=document.createElement('div'); div.id='selPanel';
-  div.style.cssText='position:fixed;left:70px;top:112px;z-index:99996;display:flex;gap:8px;align-items:center;background:#1f2430;border:1px solid #4a5568;border-radius:8px;padding:7px 10px;box-shadow:0 6px 18px rgba(0,0,0,.5);font:13px sans-serif;color:#e5e9f0';
+  div.style.cssText='position:fixed;z-index:99996;display:flex;gap:8px;align-items:center;background:#1f2430;border:1px solid #4a5568;border-radius:8px;padding:7px 10px;box-shadow:0 6px 18px rgba(0,0,0,.5);font:13px sans-serif;color:#e5e9f0';
+  const _pp=_panelPos(); div.style.left=_pp.left+'px'; div.style.top=_pp.top+'px'; div.appendChild(_panelGrip());
   const lab=t=>{const s=document.createElement('span');s.textContent=t;s.style.opacity=.75;return s;};
   const inp=(w,v,num)=>{const i=document.createElement('input');i.type='number';if(num){i.min='3';i.max='64';i.step='1';}else{i.step='0.1';}i.style.cssText='width:'+w+'px;background:#0e1116;border:1px solid #4a5568;border-radius:5px;color:#fff;padding:3px 5px;font:13px monospace;text-align:center';i.value=v;return i;};
   const sync=()=>{ if(typeof updateLinkedCopies==='function')updateLinkedCopies(); redrawCanvasNow(); };
@@ -6192,7 +6190,7 @@ function _selPanelShow(){
   } else { const wI=inp(58,(o.w||0).toFixed(1)), hI=inp(58,(o.h||0).toFixed(1)); div.appendChild(lab('L'));div.appendChild(wI);div.appendChild(lab('×'));div.appendChild(hI);
     const up=()=>{ const w=parseFloat(wI.value),hh=parseFloat(hI.value); if(w>0)o.w=w; if(hh>0)o.h=hh; sync(); }; wI.oninput=up;hI.oninput=up;wI.onchange=commit;hI.onchange=commit;
   }
-  document.body.appendChild(div);
+  document.body.appendChild(div); if(typeof _makePanelDraggable==='function')_makePanelDraggable(div);
 }
 function cadOffset(){
   const ids=[...getSelIds()]; if(!ids.length){ if(typeof toastHist==='function')toastHist('⚠️ Sélectionne une forme d\'abord'); return; }
@@ -6262,20 +6260,16 @@ function _shpShowInputs(){
   if(!_shp || typeof pCanvas==='undefined' || !pCanvas || !pCanvas.getBoundingClientRect) return;
   _shpInputsRemove();
   const rect=pCanvas.getBoundingClientRect();
-  const anchor = _shp.cx!=null ? mmToPx(_shp.cx,_shp.cy) : (_shp.cursor?mmToPx(_shp.cursor[0],_shp.cursor[1]):[pCanvas.width/2,70]);
   const div=document.createElement('div'); div.id='shpInputs';
   div.style.cssText='position:fixed;z-index:100000;display:flex;gap:8px;align-items:center;background:#1f2430;border:1px solid #4a5568;border-radius:8px;padding:7px 10px;box-shadow:0 6px 18px rgba(0,0,0,.5);font:13px sans-serif;color:#e5e9f0';
-  // position pres du centre/curseur mais TOUJOURS clampee dans l'ecran
-  let lx=rect.left+anchor[0]+18, ly=rect.top+anchor[1]-14;
-  lx=Math.max(8, Math.min(lx, (window.innerWidth||1200)-220)); ly=Math.max(60, Math.min(ly, (window.innerHeight||800)-60));
-  div.style.left=lx+'px'; div.style.top=ly+'px';
+  const _pp=_panelPos(); div.style.left=_pp.left+'px'; div.style.top=_pp.top+'px'; div.appendChild(_panelGrip());
   const inp=(w,v,num)=>{const i=document.createElement('input'); if(num){i.type='number'; i.min='3'; i.max='64'; i.step='1';} i.style.cssText='width:'+w+'px;background:#0e1116;border:1px solid #4a5568;border-radius:5px;color:#fff;padding:3px 5px;font:13px monospace;text-align:center'; i.value=v; return i;};
   const lab=(t)=>{const s=document.createElement('span'); s.textContent=t; s.style.opacity=.8; return s;};
   const curD = _shp.cx!=null ? (_shpRadius()*2).toFixed(1) : '';
   let sidesI=null, dI=null;
   if(_shp.tool==='ppoly'){ div.appendChild(lab('Côtés')); sidesI=inp(46,_shp.sides,true); div.appendChild(sidesI); }
   div.appendChild(lab('Ø')); dI=inp(64,_shp.typed||curD); div.appendChild(dI);
-  document.body.appendChild(div);
+  document.body.appendChild(div); if(typeof _makePanelDraggable==='function')_makePanelDraggable(div);
   const finish=(e)=>{ if(e.key==='Enter'){ if(_shp&&_shp.cx!=null)_shpFinalize(); e.preventDefault(); } else if(e.key==='Escape'){ _shp=null; _shpInputsRemove(); if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); } };
   if(sidesI){ sidesI.oninput=()=>{ const n=parseInt(sidesI.value); if(n>=3&&_shp)_shp.sides=Math.min(64,n); redrawCanvasNow(); }; sidesI.onkeydown=finish; }
   dI.oninput=()=>{ if(_shp)_shp.typed=dI.value; redrawCanvasNow(); }; dI.onkeydown=finish;
@@ -15819,6 +15813,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-L (patterns LIES + fenetre d'edition de forme)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-M (selection au trait sans poignees + fenetres deplacables memorisees + copies verrouillees + bouton Reseaux)</div>
 </body>
 </html>
