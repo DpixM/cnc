@@ -6096,9 +6096,9 @@ function cadScale(){
 }
 // ── DESSIN INTERACTIF façon Fusion (clic centre -> taille au curseur -> valeur tapable) ──
 let _shp = null; // {tool:'pcircle'|'ppoly', cx, cy, sides, cursor, typed, _snapped}
-function cadCircleCenter(){ _shp={tool:'pcircle', cx:null, cy:null, cursor:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('◯ Cercle : clique le centre'); redrawCanvasNow(); }
-function cadPolyFusion(){ _shp={tool:'ppoly', sides:6, cx:null, cy:null, cursor:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('⬠ Polygone '+6+' côtés : clique le centre ( [ ] pour changer le nb de côtés )'); redrawCanvasNow(); }
-function _shpRadius(){ if(!_shp||_shp.cx==null)return 0; const tv=parseFloat(_shp.typed); if(tv>0) return _shp.tool==='pcircle'? tv/2 : tv; if(!_shp.cursor)return 0; return Math.hypot(_shp.cursor[0]-_shp.cx, _shp.cursor[1]-_shp.cy); }
+function cadCircleCenter(){ _shp={tool:'pcircle', cx:null, cy:null, cursor:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('◯ Cercle : clique le centre (ou tape le Ø)'); if(typeof _shpShowInputs==='function')_shpShowInputs(); redrawCanvasNow(); }
+function cadPolyFusion(){ _shp={tool:'ppoly', sides:6, cx:null, cy:null, cursor:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('⬠ Polygone : tape le nb de côtés + Tab + Ø, clique le centre'); if(typeof _shpShowInputs==='function')_shpShowInputs(); redrawCanvasNow(); }
+function _shpRadius(){ if(!_shp||_shp.cx==null)return 0; const tv=parseFloat(_shp.typed); if(tv>0) return tv/2; if(!_shp.cursor)return 0; return Math.hypot(_shp.cursor[0]-_shp.cx, _shp.cursor[1]-_shp.cy); }
 function _shpMake(tool, cx, cy, r, sides){
   if(r<=0) r=1;
   if(tool==='pcircle') return {id:Date.now()+Math.random(), type:'ellipse', _circle:true, x:cx, y:cy, rx:r, ry:r, strokeW:0.5};
@@ -6107,7 +6107,7 @@ function _shpMake(tool, cx, cy, r, sides){
 }
 function _shpDown(xm,ym){
   if(!_shp)return; const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym};
-  if(_shp.cx==null){ _shp.cx=sp.x; _shp.cy=sp.y; _shp.cursor=[sp.x,sp.y]; _shp.typed=''; if(typeof toastHist==='function')toastHist(_shp.tool==='pcircle'?'◯ Bouge pour le rayon, ou tape le Ø + Entrée':'⬠ Bouge pour la taille, ou tape le rayon + Entrée ( [ ] = côtés )'); redrawCanvasNow(); return; }
+  if(_shp.cx==null){ _shp.cx=sp.x; _shp.cy=sp.y; _shp.cursor=[sp.x,sp.y]; _shp.typed=''; if(typeof toastHist==='function')toastHist('Bouge pour la taille, ou tape le Ø + Entrée'); if(typeof _shpShowInputs==='function')_shpShowInputs(); redrawCanvasNow(); return; }
   _shpFinalize();
 }
 function _shpFinalize(){
@@ -6115,7 +6115,7 @@ function _shpFinalize(){
   paintObjects.push(o); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=o.id; if(typeof selObjIds!=='undefined'&&selObjIds.add)selObjIds.add(o.id);
   if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount();
   const tool=_shp.tool, sides=_shp.sides; _shp={tool, cx:null, cy:null, cursor:null, typed:'', _snapped:false, sides}; // enchaine (Fusion continue)
-  redrawCanvasNow();
+  if(typeof _shpShowInputs==='function')_shpShowInputs(); redrawCanvasNow();
 }
 function _shpKey(e){
   if(!_shp)return false;
@@ -6126,6 +6126,28 @@ function _shpKey(e){
   if(_shp.tool==='ppoly' && (e.key===']'||e.key==='ArrowUp')){ _shp.sides=Math.min(64,_shp.sides+1); redrawCanvasNow(); return true; }
   if(/^[0-9.]$/.test(e.key)){ _shp.typed+=e.key; redrawCanvasNow(); return true; }
   return false;
+}
+function _shpInputsRemove(){ const e=document.getElementById('shpInputs'); if(e)e.remove(); }
+function _shpShowInputs(){
+  if(!_shp || typeof pCanvas==='undefined' || !pCanvas || !pCanvas.getBoundingClientRect) return;
+  _shpInputsRemove();
+  const rect=pCanvas.getBoundingClientRect();
+  const anchor = _shp.cx!=null ? mmToPx(_shp.cx,_shp.cy) : (_shp.cursor?mmToPx(_shp.cursor[0],_shp.cursor[1]):[pCanvas.width/2,70]);
+  const div=document.createElement('div'); div.id='shpInputs';
+  div.style.cssText='position:fixed;z-index:100000;display:flex;gap:6px;align-items:center;background:#1f2430;border:1px solid #3a4150;border-radius:6px;padding:5px 7px;box-shadow:0 4px 12px rgba(0,0,0,.4);font:12px sans-serif;color:#cfd4dc';
+  div.style.left=(rect.left+anchor[0]+16)+'px'; div.style.top=(rect.top+anchor[1]-16)+'px';
+  const inp=(w,v)=>{const i=document.createElement('input'); i.style.cssText='width:'+w+'px;background:#0e1116;border:1px solid #3a4150;border-radius:4px;color:#fff;padding:2px 4px;font:12px monospace;text-align:center'; i.value=v; return i;};
+  const lab=(t)=>{const s=document.createElement('span'); s.textContent=t; s.style.opacity=.8; return s;};
+  const curD = _shp.cx!=null ? (_shpRadius()*2).toFixed(1) : '';
+  let sidesI=null, dI=null;
+  if(_shp.tool==='ppoly'){ div.appendChild(lab('Côtés')); sidesI=inp(30,_shp.sides); div.appendChild(sidesI); }
+  div.appendChild(lab('Ø')); dI=inp(56,_shp.typed||curD); div.appendChild(dI);
+  document.body.appendChild(div);
+  const finish=(e)=>{ if(e.key==='Enter'){ if(_shp&&_shp.cx!=null)_shpFinalize(); e.preventDefault(); } else if(e.key==='Escape'){ _shp=null; _shpInputsRemove(); if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); } };
+  if(sidesI){ sidesI.oninput=()=>{ const n=parseInt(sidesI.value); if(n>=3&&_shp)_shp.sides=Math.min(64,n); redrawCanvasNow(); }; sidesI.onkeydown=finish; }
+  dI.oninput=()=>{ if(_shp)_shp.typed=dI.value; redrawCanvasNow(); }; dI.onkeydown=finish;
+  // focus : le champ pertinent
+  setTimeout(()=>{ try{ if(_shp&&_shp.cx==null&&sidesI)sidesI.focus(); else dI.focus(); }catch(e){} },0);
 }
 function _shpOverlay(){
   if(!pCtx||!_shp)return; pCtx.save(); pCtx.setLineDash([]);
@@ -7495,6 +7517,7 @@ function syncToolCats(){
 }
 
 function setPTool(t){
+  if(t!=='pshape'){ if(typeof _shpInputsRemove==='function')_shpInputsRemove(); if(typeof _shp!=='undefined')_shp=null; }
   if(t!=='cadline' && _cad){ _cad=null; if(typeof cadUpdateBar==='function') cadUpdateBar(); }
   _cadMode=false;
   paintTool=t;
@@ -15671,6 +15694,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-F (polygone cotable/editable comme un cercle)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-G (polygone: cases dynamiques cotes + Ø facon Fusion)</div>
 </body>
 </html>
