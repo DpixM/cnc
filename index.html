@@ -6134,14 +6134,17 @@ function _shpShowInputs(){
   const rect=pCanvas.getBoundingClientRect();
   const anchor = _shp.cx!=null ? mmToPx(_shp.cx,_shp.cy) : (_shp.cursor?mmToPx(_shp.cursor[0],_shp.cursor[1]):[pCanvas.width/2,70]);
   const div=document.createElement('div'); div.id='shpInputs';
-  div.style.cssText='position:fixed;z-index:100000;display:flex;gap:6px;align-items:center;background:#1f2430;border:1px solid #3a4150;border-radius:6px;padding:5px 7px;box-shadow:0 4px 12px rgba(0,0,0,.4);font:12px sans-serif;color:#cfd4dc';
-  div.style.left=(rect.left+anchor[0]+16)+'px'; div.style.top=(rect.top+anchor[1]-16)+'px';
-  const inp=(w,v)=>{const i=document.createElement('input'); i.style.cssText='width:'+w+'px;background:#0e1116;border:1px solid #3a4150;border-radius:4px;color:#fff;padding:2px 4px;font:12px monospace;text-align:center'; i.value=v; return i;};
+  div.style.cssText='position:fixed;z-index:100000;display:flex;gap:8px;align-items:center;background:#1f2430;border:1px solid #4a5568;border-radius:8px;padding:7px 10px;box-shadow:0 6px 18px rgba(0,0,0,.5);font:13px sans-serif;color:#e5e9f0';
+  // position pres du centre/curseur mais TOUJOURS clampee dans l'ecran
+  let lx=rect.left+anchor[0]+18, ly=rect.top+anchor[1]-14;
+  lx=Math.max(8, Math.min(lx, (window.innerWidth||1200)-220)); ly=Math.max(60, Math.min(ly, (window.innerHeight||800)-60));
+  div.style.left=lx+'px'; div.style.top=ly+'px';
+  const inp=(w,v,num)=>{const i=document.createElement('input'); if(num){i.type='number'; i.min='3'; i.max='64'; i.step='1';} i.style.cssText='width:'+w+'px;background:#0e1116;border:1px solid #4a5568;border-radius:5px;color:#fff;padding:3px 5px;font:13px monospace;text-align:center'; i.value=v; return i;};
   const lab=(t)=>{const s=document.createElement('span'); s.textContent=t; s.style.opacity=.8; return s;};
   const curD = _shp.cx!=null ? (_shpRadius()*2).toFixed(1) : '';
   let sidesI=null, dI=null;
-  if(_shp.tool==='ppoly'){ div.appendChild(lab('Côtés')); sidesI=inp(30,_shp.sides); div.appendChild(sidesI); }
-  div.appendChild(lab('Ø')); dI=inp(56,_shp.typed||curD); div.appendChild(dI);
+  if(_shp.tool==='ppoly'){ div.appendChild(lab('Côtés')); sidesI=inp(46,_shp.sides,true); div.appendChild(sidesI); }
+  div.appendChild(lab('Ø')); dI=inp(64,_shp.typed||curD); div.appendChild(dI);
   document.body.appendChild(div);
   const finish=(e)=>{ if(e.key==='Enter'){ if(_shp&&_shp.cx!=null)_shpFinalize(); e.preventDefault(); } else if(e.key==='Escape'){ _shp=null; _shpInputsRemove(); if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); } };
   if(sidesI){ sidesI.oninput=()=>{ const n=parseInt(sidesI.value); if(n>=3&&_shp)_shp.sides=Math.min(64,n); redrawCanvasNow(); }; sidesI.onkeydown=finish; }
@@ -15694,6 +15697,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-G (polygone: cases dynamiques cotes + Ø facon Fusion)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-H (cases cotes/O toujours visibles + champ numerique)</div>
 </body>
 </html>
