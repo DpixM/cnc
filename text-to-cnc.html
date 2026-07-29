@@ -6281,7 +6281,8 @@ function _shpShowInputs(){
 }
 function _shpOverlay(){
   if(!pCtx||!_shp)return; pCtx.save(); pCtx.setLineDash([]);
-  if(_shp.tool==='parc'){ const P=_shp.pts.slice(); if(_shp.cursor)P.push(_shp.cursor); pCtx.strokeStyle='#f5a623';pCtx.fillStyle='#f5a623';pCtx.lineWidth=1.8; for(const pt of _shp.pts){ const q=mmToPx(pt[0],pt[1]); pCtx.beginPath();pCtx.arc(q[0],q[1],3,0,Math.PI*2);pCtx.fill(); } if(P.length>=3){ const poly=_arcPolyline(P[0],P[1],P[2]); pCtx.beginPath(); const q0=mmToPx(poly[0][0],poly[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<poly.length;i++){const q=mmToPx(poly[i][0],poly[i][1]);pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } else if(P.length===2){ const a=mmToPx(P[0][0],P[0][1]),b=mmToPx(P[1][0],P[1][1]); pCtx.setLineDash([4,3]);pCtx.beginPath();pCtx.moveTo(a[0],a[1]);pCtx.lineTo(b[0],b[1]);pCtx.stroke();pCtx.setLineDash([]); } pCtx.restore(); return; }
+  if(_shp.tool==='parc'){ const P=_shp.pts.slice(); if(_shp.cursor)P.push(_shp.cursor); pCtx.strokeStyle='#f5a623';pCtx.fillStyle='#f5a623';pCtx.lineWidth=1.8; for(const pt of _shp.pts){ const q=mmToPx(pt[0],pt[1]); pCtx.beginPath();pCtx.arc(q[0],q[1],3,0,Math.PI*2);pCtx.fill(); } if(P.length>=3){ const poly=_arcPolyline(P[0],P[1],P[2]); pCtx.beginPath(); const q0=mmToPx(poly[0][0],poly[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<poly.length;i++){const q=mmToPx(poly[i][0],poly[i][1]);pCtx.lineTo(q[0],q[1]);} pCtx.stroke();
+      const _c=_arcThrough(P[0],P[1],P[2]); if(_c){ const _m=mmToPx(P[2][0],P[2][1]); const _t='R '+_c.r.toFixed(1)+' mm'; pCtx.font='bold 11px sans-serif'; pCtx.textAlign='left'; pCtx.textBaseline='middle'; const _w=pCtx.measureText(_t).width+8; pCtx.fillStyle='rgba(0,0,0,.8)'; pCtx.fillRect(_m[0]+10,_m[1]-9,_w,18); pCtx.fillStyle='#ffd08a'; pCtx.fillText(_t,_m[0]+14,_m[1]); } } else if(P.length===2){ const a=mmToPx(P[0][0],P[0][1]),b=mmToPx(P[1][0],P[1][1]); pCtx.setLineDash([4,3]);pCtx.beginPath();pCtx.moveTo(a[0],a[1]);pCtx.lineTo(b[0],b[1]);pCtx.stroke();pCtx.setLineDash([]); } pCtx.restore(); return; }
   const cross=(px,py,col)=>{ pCtx.strokeStyle=col;pCtx.lineWidth=1.4;pCtx.beginPath();pCtx.moveTo(px-6,py);pCtx.lineTo(px+6,py);pCtx.moveTo(px,py-6);pCtx.lineTo(px,py+6);pCtx.stroke(); };
   if(_shp.cx==null){ if(_shp.cursor){ const c=mmToPx(_shp.cursor[0],_shp.cursor[1]); cross(c[0],c[1],'#f5a623'); } pCtx.restore(); return; }
   const c=mmToPx(_shp.cx,_shp.cy); cross(c[0],c[1],'#f5a623'); const r=_shpRadius();
@@ -7152,7 +7153,10 @@ function handlePointerMove(cpx,cpy){
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
   if(paintTool==='pshape'){ if(_shp){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _shp.cursor=[sp.x,sp.y]; _shp._snapped=sp.snapped; redrawCanvasNow(); } return; }
   if(_arrayPick){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _arrayCursor=[sp.x,sp.y]; redrawCanvasNow(); return; }
-  if(paintTool==='caddim'){ const[xm,ym]=pxToMm(cpx,cpy); if(_dimPlace){ _dimPlace.px=xm; _dimPlace.py=ym; redrawCanvasNow(); return; } const tolE=14/(BASE_PX*vZoom);
+  if(paintTool==='caddim'){ const[xm,ym]=pxToMm(cpx,cpy); if(_dimPlace){ _dimPlace.px=xm; _dimPlace.py=ym;
+      // pendant la depose : surligner la 2e entite (snap) tant qu'on n'a pas encore combine
+      if(!_dimPlace.upgraded && _dimPlace.src){ const _e=pickEntity(xm,ym,14/(BASE_PX*vZoom)); _dimHover=_e?(_e.kind==='edge'?{seg:_e.seg,foot:_e.foot,d:_e.d}:{seg:null,foot:_e.pt,d:_e.d,_pt:true}):null; } else _dimHover=null;
+      redrawCanvasNow(); return; } const tolE=14/(BASE_PX*vZoom);
     const e=pickEntity(xm,ym,tolE);
     let hv=null;
     if(e){ if(e.kind==='edge') hv={seg:e.seg, foot:e.foot, d:e.d}; else hv={seg:null, foot:e.pt, d:e.d, _pt:true}; }
@@ -9181,12 +9185,12 @@ function iEditText(oid){
         <label style="font-size:10px;color:var(--txt2)">Texte</label>
         <input id="ev_txt" type="text" value="${esc(o.text||'')}"
           style="width:100%;padding:8px;background:var(--surf2);border:2px solid var(--acc);border-radius:6px;color:var(--txt);font-size:15px;margin-top:3px"
-          inputmode="text" onkeydown="if(event.key==='Enter')confirmTextEdit(${oid})">
+          inputmode="text" oninput="_liveText(${oid})" onkeydown="if(event.key==='Enter')confirmTextEdit(${oid})">
       </div>
       <div style="display:flex;gap:8px">
         <div style="flex:2">
           <label style="font-size:10px;color:var(--txt2)">Police</label>
-          <select id="ev_font" style="width:100%;padding:6px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px;margin-top:3px">
+          <select id="ev_font" onchange="_liveText(${oid})" style="width:100%;padding:6px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px;margin-top:3px">
             ${fonts.map(f=>`<option value="${f.v}" ${curFont===f.v?'selected':''}>${f.l}</option>`).join('')}
             ${customFonts.map(f=>`<option value="${f}" ${curFont===f?'selected':''}>${f}</option>`).join('')}
             <option value="__dafont__">📥 Importer .ttf/.otf…</option>
@@ -9195,25 +9199,25 @@ function iEditText(oid){
         </div>
         <div style="flex:1">
           <label style="font-size:10px;color:var(--txt2)">Taille mm</label>
-          <input id="ev_h" type="number" value="${curH}" min="1" max="200" step="0.5" inputmode="decimal"
+          <input id="ev_h" type="number" value="${curH}" min="1" max="200" step="0.5" inputmode="decimal" oninput="_liveText(${oid})"
             style="width:100%;padding:6px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--acc);font-size:13px;text-align:center;margin-top:3px">
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <button id="ev_bold" onclick="this.classList.toggle('active-btn')"
+        <button id="ev_bold" onclick="this.classList.toggle('active-btn');_liveText(${oid})"
           style="flex:1;padding:8px;border-radius:6px;font-weight:bold;font-size:14px;cursor:pointer;border:1.5px solid ${curBold?'var(--acc)':'var(--brd2)'};background:${curBold?'rgba(245,166,35,.2)':'var(--surf2)'};color:${curBold?'var(--acc)':'var(--txt2)'}"
           class="${curBold?'active-btn':''}">B Gras</button>
-        <button id="ev_italic" onclick="this.classList.toggle('active-btn')"
+        <button id="ev_italic" onclick="this.classList.toggle('active-btn');_liveText(${oid})"
           style="flex:1;padding:8px;border-radius:6px;font-style:italic;font-size:14px;cursor:pointer;border:1.5px solid ${curItalic?'var(--acc)':'var(--brd2)'};background:${curItalic?'rgba(245,166,35,.2)':'var(--surf2)'};color:${curItalic?'var(--acc)':'var(--txt2)'}"
           class="${curItalic?'active-btn':''}"><i>I Italique</i></button>
         <div style="flex:1">
           <label style="font-size:10px;color:var(--txt2)">Espac. mm</label>
-          <input id="ev_spacing" type="number" value="${curSpacing}" min="0" max="20" step="0.5" inputmode="decimal"
+          <input id="ev_spacing" type="number" value="${curSpacing}" min="0" max="20" step="0.5" inputmode="decimal" oninput="_liveText(${oid})"
             style="width:100%;padding:6px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px;text-align:center">
         </div>
         <div style="flex:1">
           <label style="font-size:10px;color:var(--txt2)">Épaisseur trait</label>
-          <input id="ev_strokew" type="number" value="${o.strokeW||0}" min="0" max="5" step="0.1" inputmode="decimal"
+          <input id="ev_strokew" type="number" value="${o.strokeW||0}" min="0" max="5" step="0.1" inputmode="decimal" oninput="_liveText(${oid})"
             style="width:100%;padding:6px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px;text-align:center">
           <div style="font-size:8px;color:var(--txt3);margin-top:2px">0=rempli, >0=contour</div>
         </div>
@@ -9264,7 +9268,7 @@ function iEditText(oid){
 
   // Override le bouton OK — il est déjà en haut du modal
   document.querySelector('#editValModal .btn-ok').onclick=()=>confirmTextEdit(oid);
-  document.getElementById('editValModal').classList.add('open');
+  const _m=document.getElementById('editValModal'); _m.classList.add('open'); _m.style.background='transparent'; _m.style.pointerEvents='none'; _m.style.justifyContent='flex-start'; const _im=_m.querySelector('.modal'); if(_im){_im.style.pointerEvents='auto'; _im.style.marginLeft='10px'; _im.style.boxShadow='0 8px 30px rgba(0,0,0,.6)';}
   setTimeout(()=>{
     document.getElementById('ev_txt')?.focus();
     // Handler police: doit être ajouté APRÈS que innerHTML est rendu
@@ -9286,6 +9290,17 @@ function iEditText(oid){
   },50);
 }
 
+function _liveText(oid){
+  const o=paintObjects.find(x=>x.id===oid); if(!o)return; const g=id=>document.getElementById(id);
+  const t=g('ev_txt'); if(t&&t.value!=null)o.text=t.value;
+  const f=g('ev_font'); if(f&&f.value&&f.value!=='__dafont__')o.fontFamily=f.value;
+  const hh=parseFloat(g('ev_h')&&g('ev_h').value); if(hh>0)o.h=hh;
+  o.fontWeight=(g('ev_bold')&&g('ev_bold').classList.contains('active-btn'))?'bold':'normal';
+  o.fontItalic=!!(g('ev_italic')&&g('ev_italic').classList.contains('active-btn'));
+  const sp=parseFloat(g('ev_spacing')&&g('ev_spacing').value); if(!isNaN(sp))o.spacing=sp;
+  const sw=parseFloat(g('ev_strokew')&&g('ev_strokew').value); if(!isNaN(sw))o.strokeW=sw;
+  if(typeof redrawCanvas==='function')redrawCanvas();
+}
 function confirmTextEdit(oid){
   const o=paintObjects.find(x=>x.id===oid);if(!o)return;
   const txt=document.getElementById('ev_txt')?.value;
@@ -10260,7 +10275,7 @@ function gcPolylineFixedZ(poly, z, safeZ, fxy, fz) {
 function closeToolDrop(){toolDropOpen=false;document.getElementById('toolDrop').style.display='none';}
 
 function closeEditVal(){
-  document.getElementById('editValModal').classList.remove('open');
+  const _m=document.getElementById('editValModal'); _m.classList.remove('open'); _m.style.background=''; _m.style.pointerEvents=''; _m.style.justifyContent=''; const _im=_m.querySelector('.modal'); if(_im){_im.style.pointerEvents='';_im.style.marginLeft='';}
   _editValCallback=null;
 }
 
@@ -15848,6 +15863,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-P (snap coins polygone + fix ellipse->cercle + tooltips au survol)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-Q (snap 2e entite cote + rayon live arc + texte en direct non-bloquant)</div>
 </body>
 </html>
