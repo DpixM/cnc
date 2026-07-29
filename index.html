@@ -4057,7 +4057,7 @@ const HDSIZE = 14; // handle size px — large enough for touch
 const OBJ_NAMES = {rect:'Rectangle',ellipse:'Ellipse',line:'Ligne',tri:'Triangle',free:'Tracé libre',text:'Texte',svg:'SVG',group:'Groupe',gear:'Engrenage',star:'Étoile',oblong:'Oblong'};
 
 // Stroke & fill defaults for new objects
-let currentStrokeW = 0.2; // mm — épaisseur du trait courant (le plus fin, demande Seb)
+let currentStrokeW = 0.1; // mm — épaisseur du trait par defaut (fin ; le curseur d'epaisseur reste dispo)
 let currentFill = 'none'; // 'none' | 'filled' | 'hatch'
 const STROKE_SIZES = [0.2, 0.5, 1.0, 2.0, 4.0]; // mm options
 const STROKE_LABELS = ['0.2','0.5','1','2','4']; // display labels
@@ -4291,7 +4291,6 @@ const TOOL_MENUS = {
     {i:'∿', l:'Spline (tracé libre)', fn:"cadPick('free')"},
     {i:'•', l:'Point',                fn:"cadPick('point')"},
     {i:'T', l:'Texte',                fn:"cadPick('text')"},
-    {i:'❋', l:'Réseaux (circ./rect.)', fn:"cadArraysMenu()"},
     {i:'🪞', l:'Miroir ⇋ (gauche-droite)', fn:"cadMirror('lr')"},
     {i:'🪞', l:'Miroir ⥯ (haut-bas)',      fn:"cadMirror('ud')"},
   ],
@@ -6109,9 +6108,9 @@ function _rotateObj(o,cx,cy,a){ const co=Math.cos(a),si=Math.sin(a); const R=(x,
 let _arrayPick = null;   // {objs:[ids]} : on attend le clic du point de pivot
 let _arrayCursor = null; // position du pivot sous le curseur (apercu)
 function cadPolarArray(){
-  const ids=[...getSelIds()]; if(!ids.length){ if(typeof toastHist==='function')toastHist('✳️ Sélectionne d\'abord les formes à répéter'); return; }
-  _arrayPick={objs:ids}; _arrayCursor=null; setPTool('select'); _cadMode=true;
-  if(typeof toastHist==='function')toastHist('✳️ Clique le POINT DE PIVOT (centre du réseau) — accroché aux points existants');
+  // TOOL-FIRST : on clique le reseau, PUIS la forme a repeter, PUIS le point de pivot
+  _arrayPick={objs:[], stage:'obj'}; _arrayCursor=null; setPTool('select'); _cadMode=true;
+  _conHintShow('✳️ Réseau — clique la forme à répéter');
   if(typeof redrawCanvasNow==='function')redrawCanvasNow();
 }
 function _arrayDoPolar(cx,cy){
@@ -6220,7 +6219,7 @@ function _arcPolyline(p1,p2,p3){ const c=_arcThrough(p1,p2,p3); if(!c)return [p1
   return out;
 }
 function cadArc3(){ _shp={tool:'parc', pts:[], cursor:null, cx:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('◠ Arc : clique le 1er point, le 2e (fin), puis le point de passage'); redrawCanvasNow(); }
-function _arcFinalize(){ if(!_shp||_shp.pts.length<3)return; const pts=_arcPolyline(_shp.pts[0],_shp.pts[1],_shp.pts[2]); const o={id:Date.now()+Math.random(),type:'free',pts,strokeW:0.5}; paintObjects.push(o); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=o.id; if(typeof selObjIds!=='undefined'&&selObjIds.add)selObjIds.add(o.id); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); _shp={tool:'parc',pts:[],cursor:null,cx:null,typed:'',_snapped:false}; redrawCanvasNow(); }
+function _arcFinalize(){ if(!_shp||_shp.pts.length<3)return; const pts=_arcPolyline(_shp.pts[0],_shp.pts[1],_shp.pts[2]); const o={id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW}; paintObjects.push(o); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=o.id; if(typeof selObjIds!=='undefined'&&selObjIds.add)selObjIds.add(o.id); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); _shp={tool:'parc',pts:[],cursor:null,cx:null,typed:'',_snapped:false}; redrawCanvasNow(); }
 // ── DESSIN INTERACTIF façon Fusion (clic centre -> taille au curseur -> valeur tapable) ──
 let _shp = null; // {tool:'pcircle'|'ppoly', cx, cy, sides, cursor, typed, _snapped}
 function cadCircleCenter(){ _shp={tool:'pcircle', cx:null, cy:null, cursor:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('◯ Cercle : clique le centre (ou tape le Ø)'); if(typeof _shpShowInputs==='function')_shpShowInputs(); redrawCanvasNow(); }
@@ -6228,9 +6227,9 @@ function cadPolyFusion(){ _shp={tool:'ppoly', sides:6, cx:null, cy:null, cursor:
 function _shpRadius(){ if(!_shp||_shp.cx==null)return 0; const tv=parseFloat(_shp.typed); if(tv>0) return tv/2; if(!_shp.cursor)return 0; return Math.hypot(_shp.cursor[0]-_shp.cx, _shp.cursor[1]-_shp.cy); }
 function _shpMake(tool, cx, cy, r, sides){
   if(r<=0) r=1;
-  if(tool==='pcircle') return {id:Date.now()+Math.random(), type:'ellipse', _circle:true, x:cx, y:cy, rx:r, ry:r, strokeW:0.5};
+  if(tool==='pcircle') return {id:Date.now()+Math.random(), type:'ellipse', _circle:true, x:cx, y:cy, rx:r, ry:r, strokeW:currentStrokeW};
   const n=Math.max(3,Math.min(64,sides||6)); const pts=[]; for(let i=0;i<=n;i++){ const a=-Math.PI/2 + i*2*Math.PI/n; pts.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); }
-  return {id:Date.now()+Math.random(), type:'free', pts, strokeW:0.5, _poly:true, _polyN:n};
+  return {id:Date.now()+Math.random(), type:'free', pts, strokeW:currentStrokeW, _poly:true, _polyN:n};
 }
 function _shpDown(xm,ym){
   if(!_shp)return; const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym};
@@ -6295,7 +6294,17 @@ function _shpOverlay(){
 }
 // ── CONTRAINTES (version ponctuelle : applique une fois. Persistant = etape suivante) ──
 let _conPick = null; // {type, need, picks:[]} : selection guidee des elements d'une contrainte
+const _CON_LABEL={horiz:'Horizontale',vert:'Verticale',parallel:'Parallèle',perp:'Perpendiculaire',equal:'Égal',concentric:'Concentrique',collinear:'Colinéaire',coincident:'Coïncident',midpoint:'Milieu',tangent:'Tangente',fix:'Fixer',symmetry:'Symétrie'};
+function _conHintShow(t){ let e=document.getElementById('cadHint'); if(!e){ e=document.createElement('div'); e.id='cadHint'; e.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:100001;background:#1f2430;border:1px solid #4a5568;border-radius:9px;padding:8px 16px;font:13px sans-serif;color:#ffd08a;box-shadow:0 4px 14px rgba(0,0,0,.5)'; document.body.appendChild(e);} e.textContent=t; }
+function _conHintHide(){ const e=document.getElementById('cadHint'); if(e)e.remove(); }
 function cadConstraint(type){
+  // TOUJOURS tool-first : on choisit la contrainte PUIS on clique les formes (facon Fusion)
+  const need=(type==='horiz'||type==='vert'||type==='fix')?1:2;
+  _conPick={type, need, picks:[]}; setPTool('select'); _cadMode=true;
+  _conHintShow('🔧 '+(_CON_LABEL[type]||type)+' — clique '+(need===1?'la forme':'la 1ʳᵉ forme'));
+  if(typeof redrawCanvasNow==='function')redrawCanvasNow();
+}
+function _cadConstraintOLD(type){
   const sel=[...getSelIds()].map(getObj).filter(Boolean);
   const need=(type==='horiz'||type==='vert'||type==='fix')?1:2;
   if(sel.length>=need){ _applyConstraintNow(type, sel); return; }
@@ -6312,11 +6321,11 @@ function _pickObjForCon(xm,ym){
 }
 function _conPickClick(xm,ym){
   const o=_pickObjForCon(xm,ym);
-  if(!o){ if(typeof toastHist==='function')toastHist('👉 Clique un trait, un cercle ou un point'); return; }
+  if(!o){ _conHintShow('👉 Clique un trait, un cercle ou un point'); return; }
   if(_conPick.picks.some(p=>p.id===o.id)) return;
   _conPick.picks.push(o); redrawCanvasNow();
-  if(_conPick.picks.length>=_conPick.need){ const type=_conPick.type, objs=_conPick.picks.slice(); _conPick=null; _applyConstraintNow(type, objs); }
-  else if(typeof toastHist==='function')toastHist('👉 Encore '+(_conPick.need-_conPick.picks.length)+' à cliquer');
+  if(_conPick.picks.length>=_conPick.need){ const type=_conPick.type, objs=_conPick.picks.slice(); _conPick=null; _conHintHide(); _applyConstraintNow(type, objs); }
+  else _conHintShow('🔧 '+(_CON_LABEL[_conPick.type]||_conPick.type)+' — clique la '+(_conPick.picks.length+1)+'ᵉ forme');
 }
 function _applyConstraintNow(type, objs){
   const lines=objs.filter(o=>segOf(o)); const circs=objs.filter(o=>o._circle||o.type==='ellipse'); const pts=objs.filter(o=>o.type==='point');
@@ -6923,7 +6932,7 @@ function onME(e){handlePointerUp(e.offsetX,e.offsetY);pushHistoryIfDirty();}
 function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
   if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
-  if(_arrayPick){ const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _arrayDoPolar(sp.x,sp.y); return; } // pivot du reseau circulaire
+  if(_arrayPick){ if(_arrayPick.stage==='obj'){ const o=_pickObjForCon(xm,ym); if(o){ _arrayPick.objs=[o.id]; _arrayPick.stage='pivot'; _conHintShow('✳️ Clique le point de PIVOT (centre)'); redrawCanvasNow(); } else _conHintShow('✳️ Clique une forme à répéter'); return; } const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _conHintHide(); _arrayDoPolar(sp.x,sp.y); return; } // reseau : etape forme puis pivot
   if(paintTool==='cadline'){ cadAddPoint(xm,ym); return; } // outil ligne CAD
   if(paintTool==='pshape'){ _shpDown(xm,ym); return; } // dessin interactif (cercle/polygone)
   if(paintTool==='caddim'){ cadDimClick(xm,ym); return; } // outil cote
@@ -15813,6 +15822,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-M (selection au trait sans poignees + fenetres deplacables memorisees + copies verrouillees + bouton Reseaux)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-N (TOUT en tool-first: contraintes + reseau, hint persistant, traits 0.1 par defaut)</div>
 </body>
 </html>
