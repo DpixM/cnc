@@ -6186,8 +6186,10 @@ function _selPanelShow(){
     div.appendChild(lab('Côtés'));div.appendChild(sI);div.appendChild(lab('Ø'));div.appendChild(dI);
     const rebuild=()=>{ const n=Math.max(3,Math.min(64,parseInt(sI.value)||6)); const dia=parseFloat(dI.value); const rr=(dia>0?dia/2:_polyR(o)); const c2=_polyCenter(o); const pts=[]; for(let i=0;i<=n;i++){const a=-Math.PI/2+i*2*Math.PI/n;pts.push([c2[0]+rr*Math.cos(a),c2[1]+rr*Math.sin(a)]);} o.pts=pts; o._polyN=n; sync(); };
     sI.oninput=rebuild; dI.oninput=rebuild; sI.onchange=commit; dI.onchange=commit;
-  } else if(o._circle||o.type==='ellipse'){ const dI=inp(64,((o.rx||0)*2).toFixed(1)); div.appendChild(lab('Ø'));div.appendChild(dI);
+  } else if(o._circle){ const dI=inp(64,((o.rx||0)*2).toFixed(1)); div.appendChild(lab('Ø'));div.appendChild(dI);
     dI.oninput=()=>{ const d=parseFloat(dI.value); if(d>0){o.rx=o.ry=d/2;} sync(); }; dI.onchange=commit;
+  } else if(o.type==='ellipse'){ const wI=inp(60,((o.rx||0)*2).toFixed(1)), hI=inp(60,((o.ry||0)*2).toFixed(1)); div.appendChild(lab('Larg'));div.appendChild(wI);div.appendChild(lab('×'));div.appendChild(hI);
+    const up=()=>{ const w=parseFloat(wI.value),hh=parseFloat(hI.value); if(w>0)o.rx=w/2; if(hh>0)o.ry=hh/2; sync(); }; wI.oninput=up;hI.oninput=up;wI.onchange=commit;hI.onchange=commit;
   } else { const wI=inp(58,(o.w||0).toFixed(1)), hI=inp(58,(o.h||0).toFixed(1)); div.appendChild(lab('L'));div.appendChild(wI);div.appendChild(lab('×'));div.appendChild(hI);
     const up=()=>{ const w=parseFloat(wI.value),hh=parseFloat(hI.value); if(w>0)o.w=w; if(hh>0)o.h=hh; sync(); }; wI.oninput=up;hI.oninput=up;wI.onchange=commit;hI.onchange=commit;
   }
@@ -6473,7 +6475,7 @@ function pickEntity(xm,ym,tol){
     if(o._circle||o.type==='ellipse'){cx=o.x;cy=o.y;isC=true;} else if(o.type==='point'){cx=o.x;cy=o.y;isC=true;} else if(o._poly){ const c=_polyCenter(o); if(c){cx=c[0];cy=c[1];isC=true;} }
     if(isC){ const d=Math.hypot(xm-cx,ym-cy); if(d<=tol&&(!best||d<best.d)) best={kind:'point', ref:'@'+o.id, d, pt:[cx,cy]}; } }
   for(const o of paintObjects){ let cc=null,rr=0;
-    if(o._circle||o.type==='ellipse'){ cc=[o.x,o.y]; rr=((o.rx||0)+(o.ry||0))/2; } else if(o._poly){ cc=_polyCenter(o); rr=_polyR(o); }
+    if(o._circle){ cc=[o.x,o.y]; rr=((o.rx||0)+(o.ry||0))/2; } else if(o._poly){ cc=_polyCenter(o); rr=_polyR(o); }
     if(cc){ const dr=Math.abs(Math.hypot(xm-cc[0],ym-cc[1])-rr); if(dr<=tol&&(!best||dr<best.d)) best={kind:'ring', ref:o.id, d:dr, pt:cc}; } }
   const ne=nearestEdge(xm,ym); if(ne&&ne.d<=tol&&(!best||ne.d<best.d)) best={kind:'edge', ref:ne.ref, d:ne.d, seg:ne.seg, foot:ne.foot};
   return best;
@@ -7038,6 +7040,7 @@ function handlePointerDown(cpx,cpy){
       // Select immediately, but delay drag start until movement
       selObjId=found.id;
       const origBB=found.type==='line'?{...found}:{...getObjBB(found)};
+      origBB._pts=(typeof snapPointsOf==='function')?snapPointsOf(found).map(pt=>[pt[0],pt[1]]):null; // vrais points d'ancrage (sommets)
       if(found.type==='dim'){ origBB._mv=[...(found.mv||[0,0])]; if(found.kind==='angle'||found.kind==='ptdist'){ if(!found.place){ const _g=dimGeom(found); if(_g)found.place=found.kind==='angle'?[_g.ax,_g.ay]:[(_g.ax+_g.bx)/2,(_g.ay+_g.by)/2]; } origBB._place=found.place?[...found.place]:[0,0]; } }
       dragPending={mode:'mv',obj:found,cpx,cpy,origBB,startMm:{x:xm,y:ym}};
     }else{
@@ -7236,7 +7239,8 @@ function pmDragObject(xm,ym){
           // On accroche N'IMPORTE lequel des points d'ancrage de l'objet (coins,
           // centre, milieux) sur une cible -> permet de coller coin a coin.
           let cands;
-          if(bb.x1!=null){ cands=[[bb.x1,bb.y1],[bb.x2,bb.y2],[(bb.x1+bb.x2)/2,(bb.y1+bb.y2)/2]]; }
+          if(bb._pts && bb._pts.length){ cands=bb._pts; } // sommets reels (coins de polygone, extremites, milieux...)
+          else if(bb.x1!=null){ cands=[[bb.x1,bb.y1],[bb.x2,bb.y2],[(bb.x1+bb.x2)/2,(bb.y1+bb.y2)/2]]; }
           else { cands=[[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h],[bb.x+bb.w/2,bb.y+bb.h/2],[bb.x+bb.w/2,bb.y],[bb.x+bb.w/2,bb.y+bb.h],[bb.x,bb.y+bb.h/2],[bb.x+bb.w,bb.y+bb.h/2]]; }
           let bestPt=null, bestSeg=null;
           for(const c of cands){
@@ -7594,6 +7598,25 @@ function closeToolMenu(){
   _tmOpen=null;
 }
 
+const _TOOL_TIP={
+ 'Horizontale':'Rend une ligne parfaitement horizontale. Clique la ligne.',
+ 'Verticale':'Rend une ligne parfaitement verticale. Clique la ligne.',
+ 'Parallèle':'Rend 2 lignes parallèles. Clique la 1re (référence) puis la 2e.',
+ 'Perpendiculaire':'Met 2 lignes à 90 degres. Clique la 1re puis la 2e.',
+ 'Égal':'Même longueur (2 lignes) ou même rayon (2 cercles). Clique-les.',
+ 'Concentrique':'2 cercles au même centre. Clique le 1er puis le 2e.',
+ 'Colinéaire':'Aligne 2 lignes sur le même axe. Clique-les.',
+ 'Coïncident':'Fait coincider 2 points (ou extremites de 2 lignes). Clique-les.',
+ 'Milieu':'Place un point au milieu d une ligne. Clique le point puis la ligne.',
+ 'Tangente':'Rend un cercle tangent a une ligne. Clique le cercle puis la ligne.',
+ 'Symétrie':'Rend 2 formes symetriques par rapport a un axe (bientot).',
+ 'Fixe / Verrouiller':'Verrouille une forme en place. Clique-la (re-clique pour deverrouiller).',
+ 'Arc (3 points)':'Arc par 3 points : depart, arrivee, puis point de passage.',
+ 'Cercle (depuis le centre)':'Clique le centre puis la taille (ou tape le diametre).',
+ 'Polygone':'Clique le centre ; regle le nombre de cotes et le diametre.',
+ 'Décalage (offset)':'Cree une copie decalee (+ agrandit, - reduit).',
+ 'Échelle':'Met a l echelle la selection par un facteur.',
+};
 function openToolMenu(cat, btn){
   if(_tmOpen===cat){ closeToolMenu(); return; }
   closeToolMenu();
@@ -7610,7 +7633,7 @@ function openToolMenu(cat, btn){
   m.innerHTML=items.map(it=>{
     const on=(it.t && paintTool===it.t) ? ' on' : '';
     const act = it.fn ? it.fn : `setPTool('${it.t}')`;
-    return `<button class="tmi${on}" onclick="closeToolMenu();${act};syncToolCats()">
+    return `<button class="tmi${on}" title="${((typeof _TOOL_TIP!=='undefined'&&_TOOL_TIP[it.l])||it.l).replace(/"/g,'')}" onclick="closeToolMenu();${act};syncToolCats()">
       ${it.i}<span>${it.l}</span></button>`;
   }).join('');
   document.body.appendChild(m);
@@ -15825,6 +15848,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-O (reseau: pieces verrouillees, base fixee, cadenas)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-P (snap coins polygone + fix ellipse->cercle + tooltips au survol)</div>
 </body>
 </html>
