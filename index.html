@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-28-Y ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-28-Z ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6334,7 +6334,7 @@ function _conHintShow(t){ let e=document.getElementById('cadHint'); if(!e){ e=do
 function _conHintHide(){ const e=document.getElementById('cadHint'); if(e)e.remove(); }
 function cadConstraint(type){
   // TOUJOURS tool-first : on choisit la contrainte PUIS on clique les formes (facon Fusion)
-  const need=(type==='horiz'||type==='vert'||type==='fix')?1:2;
+  const need=(type==='horiz'||type==='vert'||type==='fix')?1:(type==='symmetry'?3:2);
   _conPick={type, need, picks:[]}; setPTool('select'); _cadMode=true;
   _conHintShow('🔧 '+(_CON_LABEL[type]||type)+' — clique '+(need===1?'la forme':'la 1ʳᵉ forme'));
   if(typeof redrawCanvasNow==='function')redrawCanvasNow();
@@ -6394,7 +6394,17 @@ function _applyConstraintNow(type, objs){
     case 'midpoint': { if(pts.length&&lines.length){ const m=mid(L(lines[0])); pts[0].x=m[0]; pts[0].y=m[1]; } else { T('⚠️ 1 point + 1 ligne'); return; } break; }
     case 'tangent': { if(circs.length&&lines.length){ const c=circs[0],s=L(lines[0]); const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1,nx=-ey/Ln,ny=ex/Ln; const d=(c.x-s[0])*nx+(c.y-s[1])*ny,sg=d>=0?1:-1,r=(c.rx||c.ry),fx=c.x-nx*d,fy=c.y-ny*d; c.x=fx+nx*sg*r; c.y=fy+ny*sg*r; } else { T('⚠️ 1 cercle + 1 ligne'); return; } break; }
     case 'fix': { if(!objs.length){ T('⚠️ Sélectionne une forme'); return; } for(const o of objs)o.fixed=!o.fixed; T('🔒 Fixé / défixé'); break; }
-    case 'symmetry': { T('🔜 Symétrie : sélectionne 2 formes + un axe (bientôt)'); return; }
+    case 'symmetry': {
+      const axis=objs[2]; const A=objs[0], B=objs[1]; const s=axis?segOf(axis):null;
+      if(!s||!A||!B){ T('⚠️ Symétrie : clique 2 formes puis une LIGNE axe'); return; }
+      const refl=(pt)=>{ const dx=s[2]-s[0],dy=s[3]-s[1],L2=dx*dx+dy*dy||1; const t=((pt[0]-s[0])*dx+(pt[1]-s[1])*dy)/L2; const fx=s[0]+t*dx,fy=s[1]+t*dy; return [2*fx-pt[0],2*fy-pt[1]]; };
+      const src=JSON.parse(JSON.stringify(A));
+      if(segOf(src)){ const g=segOf(src); const q1=refl([g[0],g[1]]),q2=refl([g[2],g[3]]); setSeg(B,[q1[0],q1[1],q2[0],q2[1]]); }
+      else if(src.pts){ B.pts=src.pts.map(refl); B.type='free'; if(src._poly){B._poly=true;B._polyN=src._polyN;} if(src._arc){ B._arc={p1:refl(src._arc.p1),p2:refl(src._arc.p2),r:src._arc.r,sgn:-src._arc.sgn}; _arcRegen(B);} }
+      else if(src._circle||src.type==='ellipse'){ const c=refl([src.x,src.y]); B.x=c[0];B.y=c[1];B.rx=src.rx;B.ry=src.ry;B._circle=src._circle;B.type=src.type; }
+      else if(src.type==='point'){ const c=refl([src.x,src.y]); B.x=c[0];B.y=c[1]; }
+      else { T('⚠️ Symétrie non gérée pour cette forme'); return; }
+      break; }
     default: return;
   }
   // Persistance : mémoriser pour le re-solveur au déplacement
@@ -7076,7 +7086,8 @@ function handlePointerDown(cpx,cpy){
       // Select immediately, but delay drag start until movement
       selObjId=found.id;
       const origBB=found.type==='line'?{...found}:{...getObjBB(found)};
-      origBB._pts=(typeof snapPointsOf==='function')?snapPointsOf(found).map(pt=>[pt[0],pt[1]]):null; // vrais points d'ancrage (sommets)
+      origBB._pts=(typeof snapPointsOf==='function')?snapPointsOf(found).map(pt=>[pt[0],pt[1]]):null;
+      if(found._arc)origBB._arc=JSON.parse(JSON.stringify(found._arc)); // vrais points d'ancrage (sommets)
       if(found.type==='dim'){ origBB._mv=[...(found.mv||[0,0])]; if(found.kind==='angle'||found.kind==='ptdist'){ if(!found.place){ const _g=dimGeom(found); if(_g)found.place=found.kind==='angle'?[_g.ax,_g.ay]:[(_g.ax+_g.bx)/2,(_g.ay+_g.by)/2]; } origBB._place=found.place?[...found.place]:[0,0]; } }
       dragPending={mode:'mv',obj:found,cpx,cpy,origBB,startMm:{x:xm,y:ym}};
     }else{
@@ -13955,6 +13966,7 @@ function snapPointsOf(o){
 
 function applyHandleDrag(o,mode,orig,dxMm,dyMm){
   if(o&&o.fixed&&o.type!=='dim'){ return; } // forme verrouillee : pas de deplacement/redim
+  if(o&&o._arc&&mode==='mv'){ const oa=(orig&&orig._arc)?orig._arc:o._arc; o._arc.p1=[oa.p1[0]+dxMm,oa.p1[1]+dyMm]; o._arc.p2=[oa.p2[0]+dxMm,oa.p2[1]+dyMm]; o._arc.r=oa.r; o._arc.sgn=oa.sgn; _arcRegen(o); return; } // arc : bouger les points parametriques + regen (les cotes suivent)
   if(o.type==='dim'){ if(o.kind==='angle'||o.kind==='ptdist'){ const op=(orig&&orig._place)?orig._place:(o.place||[0,0]); o.place=[op[0]+dxMm, op[1]+dyMm]; return; } if(mode==='mv') o.mv=[((orig&&orig._mv)?orig._mv[0]:0)+dxMm, ((orig&&orig._mv)?orig._mv[1]:0)+dyMm]; return; } // deplacer une cote (angle/ptdist: axe restreint via place)
   if(o.type!=='dim' && typeof objHasDim==='function' && objHasDim(o.id) && mode!=='mv') return; // cotee : redim verrouille (change via la cote)
   if(o._circle && mode==='rad'){ const rx0=(orig&&orig.w?orig.w/2:o.rx); const r=Math.max(0.5,Math.hypot(rx0+dxMm,dyMm)); o.rx=o.ry=r; return; } // cercle reste rond
