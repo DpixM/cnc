@@ -6178,6 +6178,7 @@ function _selPanelShow(){
   const div=document.createElement('div'); div.id='selPanel';
   div.style.cssText='position:fixed;z-index:99996;display:flex;gap:8px;align-items:center;background:#1f2430;border:1px solid #4a5568;border-radius:8px;padding:7px 10px;box-shadow:0 6px 18px rgba(0,0,0,.5);font:13px sans-serif;color:#e5e9f0';
   const _pp=_panelPos(); div.style.left=_pp.left+'px'; div.style.top=_pp.top+'px'; div.appendChild(_panelGrip());
+  if(_shp.tool==='parc'){ if(!_shp.pts||_shp.pts.length!==2){ return; } const lab=(t)=>{const s=document.createElement('span'); s.textContent=t; s.style.opacity=.8; return s;}; const i=document.createElement('input'); i.type='number'; i.step='0.5'; i.style.cssText='width:70px;background:#0e1116;border:1px solid #4a5568;border-radius:5px;color:#fff;padding:3px 5px;font:13px monospace;text-align:center'; i.value=_shp.typed||''; div.appendChild(lab('R (mm)')); div.appendChild(i); document.body.appendChild(div); if(typeof _makePanelDraggable==='function')_makePanelDraggable(div); i.oninput=()=>{ if(_shp)_shp.typed=i.value; redrawCanvasNow(); }; i.onkeydown=(e)=>{ if(e.key==='Enter'){ _arcFinalize(); e.preventDefault(); } else if(e.key==='Escape'){ _shp=null; _shpInputsRemove(); setPTool('select'); redrawCanvasNow(); } }; setTimeout(()=>{try{i.focus();}catch(e){}},0); return; }
   const lab=t=>{const s=document.createElement('span');s.textContent=t;s.style.opacity=.75;return s;};
   const inp=(w,v,num)=>{const i=document.createElement('input');i.type='number';if(num){i.min='3';i.max='64';i.step='1';}else{i.step='0.1';}i.style.cssText='width:'+w+'px;background:#0e1116;border:1px solid #4a5568;border-radius:5px;color:#fff;padding:3px 5px;font:13px monospace;text-align:center';i.value=v;return i;};
   const sync=()=>{ if(typeof updateLinkedCopies==='function')updateLinkedCopies(); redrawCanvasNow(); };
@@ -6223,7 +6224,18 @@ function _arcPolyline(p1,p2,p3){ const c=_arcThrough(p1,p2,p3); if(!c)return [p1
   return out;
 }
 function cadArc3(){ _shp={tool:'parc', pts:[], cursor:null, cx:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('◠ Arc : clique le 1er point, le 2e (fin), puis le point de passage'); redrawCanvasNow(); }
-function _arcFinalize(){ if(!_shp||_shp.pts.length<3)return; const pts=_arcPolyline(_shp.pts[0],_shp.pts[1],_shp.pts[2]); const o={id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW}; paintObjects.push(o); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=o.id; if(typeof selObjIds!=='undefined'&&selObjIds.add)selObjIds.add(o.id); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); _shp={tool:'parc',pts:[],cursor:null,cx:null,typed:'',_snapped:false}; redrawCanvasNow(); }
+function _arcApexFromR(P1,P2,R,side){
+  const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2, dx=P2[0]-P1[0],dy=P2[1]-P1[1], L=Math.hypot(dx,dy)||1, half=L/2;
+  R=Math.max(R,half+0.01); const nx=-dy/L, ny=dx/L; const s=R-Math.sqrt(Math.max(0,R*R-half*half));
+  const sgn=(((side?side[0]:mx)-mx)*nx+((side?side[1]:my)-my)*ny)>=0?1:-1;
+  return [mx+sgn*nx*s, my+sgn*ny*s];
+}
+function _arcP3(){ // 3e point effectif (apex si un rayon est tape)
+  if(!_shp||_shp.pts.length<2)return null; const R=parseFloat(_shp.typed);
+  if(R>0) return _arcApexFromR(_shp.pts[0],_shp.pts[1],R,_shp.cursor);
+  return _shp.pts[2]||_shp.cursor;
+}
+function _arcFinalize(){ if(!_shp||_shp.pts.length<2)return; const P3=_arcP3(); if(!P3)return; const pts=_arcPolyline(_shp.pts[0],_shp.pts[1],P3); const o={id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW}; paintObjects.push(o); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=o.id; if(typeof selObjIds!=='undefined'&&selObjIds.add)selObjIds.add(o.id); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); _shpInputsRemove(); _shp={tool:'parc',pts:[],cursor:null,cx:null,typed:'',_snapped:false}; redrawCanvasNow(); }
 // ── DESSIN INTERACTIF façon Fusion (clic centre -> taille au curseur -> valeur tapable) ──
 let _shp = null; // {tool:'pcircle'|'ppoly', cx, cy, sides, cursor, typed, _snapped}
 function cadCircleCenter(){ _shp={tool:'pcircle', cx:null, cy:null, cursor:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('◯ Cercle : clique le centre (ou tape le Ø)'); if(typeof _shpShowInputs==='function')_shpShowInputs(); redrawCanvasNow(); }
@@ -6237,7 +6249,7 @@ function _shpMake(tool, cx, cy, r, sides){
 }
 function _shpDown(xm,ym){
   if(!_shp)return; const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym};
-  if(_shp.tool==='parc'){ _shp.pts.push([sp.x,sp.y]); _shp.cursor=[sp.x,sp.y]; if(_shp.pts.length>=3)_arcFinalize(); else redrawCanvasNow(); return; }
+  if(_shp.tool==='parc'){ _shp.pts.push([sp.x,sp.y]); _shp.cursor=[sp.x,sp.y]; if(_shp.pts.length>=3)_arcFinalize(); else { if(_shp.pts.length===2 && typeof _shpShowInputs==='function')_shpShowInputs(); redrawCanvasNow(); } return; }
   if(_shp.cx==null){ _shp.cx=sp.x; _shp.cy=sp.y; _shp.cursor=[sp.x,sp.y]; _shp.typed=''; if(typeof toastHist==='function')toastHist('Bouge pour la taille, ou tape le Ø + Entrée'); if(typeof _shpShowInputs==='function')_shpShowInputs(); redrawCanvasNow(); return; }
   _shpFinalize();
 }
@@ -6251,7 +6263,7 @@ function _shpFinalize(){
 function _shpKey(e){
   if(!_shp)return false;
   if(e.key==='Escape'){ _shp=null; if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); return true; }
-  if(e.key==='Enter'){ if(_shp.cx!=null)_shpFinalize(); return true; }
+  if(e.key==='Enter'){ if(_shp.tool==='parc'){ if(_shp.pts.length>=2)_arcFinalize(); } else if(_shp.cx!=null)_shpFinalize(); return true; }
   if(e.key==='Backspace'){ _shp.typed=_shp.typed.slice(0,-1); redrawCanvasNow(); return true; }
   if(_shp.tool==='ppoly' && (e.key==='['||e.key==='ArrowDown')){ _shp.sides=Math.max(3,_shp.sides-1); redrawCanvasNow(); return true; }
   if(_shp.tool==='ppoly' && (e.key===']'||e.key==='ArrowUp')){ _shp.sides=Math.min(64,_shp.sides+1); redrawCanvasNow(); return true; }
@@ -6281,7 +6293,7 @@ function _shpShowInputs(){
 }
 function _shpOverlay(){
   if(!pCtx||!_shp)return; pCtx.save(); pCtx.setLineDash([]);
-  if(_shp.tool==='parc'){ const P=_shp.pts.slice(); if(_shp.cursor)P.push(_shp.cursor); pCtx.strokeStyle='#f5a623';pCtx.fillStyle='#f5a623';pCtx.lineWidth=1.8; for(const pt of _shp.pts){ const q=mmToPx(pt[0],pt[1]); pCtx.beginPath();pCtx.arc(q[0],q[1],3,0,Math.PI*2);pCtx.fill(); } if(P.length>=3){ const poly=_arcPolyline(P[0],P[1],P[2]); pCtx.beginPath(); const q0=mmToPx(poly[0][0],poly[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<poly.length;i++){const q=mmToPx(poly[i][0],poly[i][1]);pCtx.lineTo(q[0],q[1]);} pCtx.stroke();
+  if(_shp.tool==='parc'){ const P=_shp.pts.slice(); if(_shp.cursor)P.push(_shp.cursor); pCtx.strokeStyle='#f5a623';pCtx.fillStyle='#f5a623';pCtx.lineWidth=1.8; for(const pt of _shp.pts){ const q=mmToPx(pt[0],pt[1]); pCtx.beginPath();pCtx.arc(q[0],q[1],3,0,Math.PI*2);pCtx.fill(); } if(_shp.pts.length>=2){ const P3=_arcP3()||P[2]; const poly=_arcPolyline(_shp.pts[0],_shp.pts[1],P3); pCtx.beginPath(); const q0=mmToPx(poly[0][0],poly[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<poly.length;i++){const q=mmToPx(poly[i][0],poly[i][1]);pCtx.lineTo(q[0],q[1]);} pCtx.stroke();
       const _c=_arcThrough(P[0],P[1],P[2]); if(_c){ const _m=mmToPx(P[2][0],P[2][1]); const _t='R '+_c.r.toFixed(1)+' mm'; pCtx.font='bold 11px sans-serif'; pCtx.textAlign='left'; pCtx.textBaseline='middle'; const _w=pCtx.measureText(_t).width+8; pCtx.fillStyle='rgba(0,0,0,.8)'; pCtx.fillRect(_m[0]+10,_m[1]-9,_w,18); pCtx.fillStyle='#ffd08a'; pCtx.fillText(_t,_m[0]+14,_m[1]); } } else if(P.length===2){ const a=mmToPx(P[0][0],P[0][1]),b=mmToPx(P[1][0],P[1][1]); pCtx.setLineDash([4,3]);pCtx.beginPath();pCtx.moveTo(a[0],a[1]);pCtx.lineTo(b[0],b[1]);pCtx.stroke();pCtx.setLineDash([]); } pCtx.restore(); return; }
   const cross=(px,py,col)=>{ pCtx.strokeStyle=col;pCtx.lineWidth=1.4;pCtx.beginPath();pCtx.moveTo(px-6,py);pCtx.lineTo(px+6,py);pCtx.moveTo(px,py-6);pCtx.lineTo(px,py+6);pCtx.stroke(); };
   if(_shp.cx==null){ if(_shp.cursor){ const c=mmToPx(_shp.cursor[0],_shp.cursor[1]); cross(c[0],c[1],'#f5a623'); } pCtx.restore(); return; }
@@ -9268,7 +9280,7 @@ function iEditText(oid){
 
   // Override le bouton OK — il est déjà en haut du modal
   document.querySelector('#editValModal .btn-ok').onclick=()=>confirmTextEdit(oid);
-  const _m=document.getElementById('editValModal'); _m.classList.add('open'); _m.style.background='transparent'; _m.style.pointerEvents='none'; _m.style.justifyContent='flex-start'; const _im=_m.querySelector('.modal'); if(_im){_im.style.pointerEvents='auto'; _im.style.marginLeft='10px'; _im.style.boxShadow='0 8px 30px rgba(0,0,0,.6)';}
+  const _m=document.getElementById('editValModal'); _m.classList.add('open'); _m.style.background='transparent'; _m.style.pointerEvents='none'; _m.style.justifyContent='flex-start'; _m.style.backdropFilter='none'; _m.style.webkitBackdropFilter='none'; const _im=_m.querySelector('.modal'); if(_im){_im.style.pointerEvents='auto'; _im.style.marginLeft='10px'; _im.style.boxShadow='0 8px 30px rgba(0,0,0,.6)';}
   setTimeout(()=>{
     document.getElementById('ev_txt')?.focus();
     // Handler police: doit être ajouté APRÈS que innerHTML est rendu
@@ -10275,7 +10287,7 @@ function gcPolylineFixedZ(poly, z, safeZ, fxy, fz) {
 function closeToolDrop(){toolDropOpen=false;document.getElementById('toolDrop').style.display='none';}
 
 function closeEditVal(){
-  const _m=document.getElementById('editValModal'); _m.classList.remove('open'); _m.style.background=''; _m.style.pointerEvents=''; _m.style.justifyContent=''; const _im=_m.querySelector('.modal'); if(_im){_im.style.pointerEvents='';_im.style.marginLeft='';}
+  const _m=document.getElementById('editValModal'); _m.classList.remove('open'); _m.style.background=''; _m.style.pointerEvents=''; _m.style.justifyContent=''; _m.style.backdropFilter=''; _m.style.webkitBackdropFilter=''; const _im=_m.querySelector('.modal'); if(_im){_im.style.pointerEvents='';_im.style.marginLeft='';}
   _editValCallback=null;
 }
 
@@ -15863,6 +15875,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-Q (snap 2e entite cote + rayon live arc + texte en direct non-bloquant)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-R (arc: saisie du rayon R + editeur texte CLAIR sans flou)</div>
 </body>
 </html>
