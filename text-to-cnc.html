@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-28-X ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-28-Y ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6653,7 +6653,7 @@ function _dimGeomBase(dim){
   const off=6;
   if(dim.kind==='diam' && o._poly){ const c=_polyCenter(o), r=_polyR(o)||1; return {ax:c[0]-r, ay:c[1]-r-off, bx:c[0]+r, by:c[1]-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm', ext:[[[c[0]-r,c[1]],[c[0]-r,c[1]-r-off]],[[c[0]+r,c[1]],[c[0]+r,c[1]-r-off]]]}; }
   if(dim.kind==='diam' && (o._circle||o.type==='ellipse')){ const r=o.rx||o.ry||1; return {ax:o.x-r, ay:o.y-r-off, bx:o.x+r, by:o.y-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm', ext:[[[o.x-r,o.y],[o.x-r,o.y-r-off]],[[o.x+r,o.y],[o.x+r,o.y-r-off]]]}; }
-  if(dim.kind==='arcrad' && o._arc){ const C=_arcCenter(o), ap=_arcApexPt(o); if(!C||!ap)return null; return {ax:C[0],ay:C[1],bx:ap[0],by:ap[1],val:o._arc.r,label:'R '+o._arc.r.toFixed(1)+' mm'}; }
+  if(dim.kind==='arcrad' && o._arc){ const C=_arcCenter(o), ap=_arcApexPt(o); if(!C||!ap)return null; const dx=ap[0]-C[0],dy=ap[1]-C[1],L=Math.hypot(dx,dy)||1; const lead=12; const bx=ap[0]+dx/L*lead, by=ap[1]+dy/L*lead; return {ax:ap[0],ay:ap[1],bx,by,val:o._arc.r,label:'R '+o._arc.r.toFixed(1)+' mm'}; }
   if(dim.kind==='len'){ const s=segOfRef(dim.ref); if(s){ const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1,nx=-dy/L*off,ny=dx/L*off; return {ax:s[0]+nx,ay:s[1]+ny,bx:s[2]+nx,by:s[3]+ny,val:L,label:L.toFixed(1)+' mm', ext:[[[s[0],s[1]],[s[0]+nx,s[1]+ny]],[[s[2],s[3]],[s[2]+nx,s[3]+ny]]]}; } }
   if(dim.kind==='angle'){
     const A=segOfRef(dim.ref), B=segOfRef(dim.ref2);
