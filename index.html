@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:9px;color:var(--txt3);font-family:var(--mono);margin-left:6px;letter-spacing:.3px">v2026-07-28-U ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:9px;color:var(--txt3);font-family:var(--mono);margin-left:6px;letter-spacing:.3px">v2026-07-28-V ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6241,12 +6241,14 @@ function _arcApexFromR(P1,P2,R,side){
   const sgn=(((side?side[0]:mx)-mx)*nx+((side?side[1]:my)-my)*ny)>=0?1:-1;
   return [mx+sgn*nx*s, my+sgn*ny*s];
 }
+function _arcApexSgn(P1,P2,R,sgn){ const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2, dx=P2[0]-P1[0],dy=P2[1]-P1[1], L=Math.hypot(dx,dy)||1, half=L/2; R=Math.max(R,half+0.01); const nx=-dy/L, ny=dx/L; const s=R-Math.sqrt(Math.max(0,R*R-half*half)); return [mx+sgn*nx*s, my+sgn*ny*s]; }
+function _arcRegen(o){ if(!o||!o._arc)return; const A=o._arc; const apex=_arcApexSgn(A.p1,A.p2,A.r,A.sgn); o.pts=_arcPolyline(A.p1,A.p2,apex); }
 function _arcP3(){ // 3e point effectif (apex si un rayon est tape)
   if(!_shp||_shp.pts.length<2)return null; const R=parseFloat(_shp.typed);
   if(R>0) return _arcApexFromR(_shp.pts[0],_shp.pts[1],R,_shp.cursor);
   return _shp.pts[2]||_shp.cursor;
 }
-function _arcFinalize(){ if(!_shp||_shp.pts.length<2)return; const P3=_arcP3(); if(!P3)return; const pts=_arcPolyline(_shp.pts[0],_shp.pts[1],P3); const o={id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW}; paintObjects.push(o); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=o.id; if(typeof selObjIds!=='undefined'&&selObjIds.add)selObjIds.add(o.id); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); _shpInputsRemove(); _shp={tool:'parc',pts:[],cursor:null,cx:null,typed:'',_snapped:false}; redrawCanvasNow(); }
+function _arcFinalize(){ if(!_shp||_shp.pts.length<2)return; const P1=_shp.pts[0],P2=_shp.pts[1], P3=_arcP3(); if(!P3)return; const _c=_arcThrough(P1,P2,P3); const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2, ndx=-(P2[1]-P1[1]),ndy=(P2[0]-P1[0]); const sgn=((P3[0]-mx)*ndx+(P3[1]-my)*ndy)>=0?1:-1; const r=_c?_c.r:Math.hypot(P2[0]-P1[0],P2[1]-P1[1]); const pts=_arcPolyline(P1,P2,P3); const o={id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW,_arc:{p1:[P1[0],P1[1]],p2:[P2[0],P2[1]],r,sgn}}; paintObjects.push(o); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=o.id; if(typeof selObjIds!=='undefined'&&selObjIds.add)selObjIds.add(o.id); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); _shpInputsRemove(); _shp={tool:'parc',pts:[],cursor:null,cx:null,typed:'',_snapped:false}; redrawCanvasNow(); }
 // ── DESSIN INTERACTIF façon Fusion (clic centre -> taille au curseur -> valeur tapable) ──
 let _shp = null; // {tool:'pcircle'|'ppoly', cx, cy, sides, cursor, typed, _snapped}
 function cadCircleCenter(){ _shp={tool:'pcircle', cx:null, cy:null, cursor:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('◯ Cercle : clique le centre (ou tape le Ø)'); if(typeof _shpShowInputs==='function')_shpShowInputs(); redrawCanvasNow(); }
@@ -6494,13 +6496,14 @@ let _dimEdgeA = null;    // 1ere arete choisie (ref 'id#idx')
 function objForPointRef(ref){ if(typeof ref==='string'&&ref[0]==='@') return paintObjects.find(x=>String(x.id)===ref.slice(1)); return null; }
 function _polyCenter(o){ if(!o||!o.pts||!o.pts.length)return null; const P=o.pts; let m=P.length; if(m>1 && Math.abs(P[0][0]-P[m-1][0])<1e-6 && Math.abs(P[0][1]-P[m-1][1])<1e-6)m--; let sx=0,sy=0; for(let i=0;i<m;i++){sx+=P[i][0];sy+=P[i][1];} return [sx/m,sy/m]; }
 function _polyR(o){ const c=_polyCenter(o); if(!c)return 0; let r=0; for(const pt of o.pts)r=Math.max(r,Math.hypot(pt[0]-c[0],pt[1]-c[1])); return r; }
-function ptOfRef(ref){ const o=objForPointRef(ref); if(!o)return null; if(o._circle||o.type==='ellipse'||o.type==='point')return[o.x,o.y]; if(o._poly)return _polyCenter(o); const c=getObjCenter(o); return[c.x,c.y]; }
+function ptOfRef(ref){ if(typeof ref==='string'&&ref.indexOf('~')>=0){ const pr=ref.slice(1).split('~'); const oo=paintObjects.find(x=>String(x.id)===pr[0]); if(oo&&oo._arc){ const q=pr[1]==='1'?oo._arc.p2:oo._arc.p1; return [q[0],q[1]]; } return null; } const o=objForPointRef(ref); if(!o)return null; if(o._circle||o.type==='ellipse'||o.type==='point')return[o.x,o.y]; if(o._poly)return _polyCenter(o); const c=getObjCenter(o); return[c.x,c.y]; }
 // Choisit l'entite la plus proche du curseur : centre de cercle/point, anneau de cercle (Ø), ou arete.
 function pickEntity(xm,ym,tol){
   let best=null;
   for(const o of paintObjects){ let cx,cy,isC=false;
     if(o._circle||o.type==='ellipse'){cx=o.x;cy=o.y;isC=true;} else if(o.type==='point'){cx=o.x;cy=o.y;isC=true;} else if(o._poly){ const c=_polyCenter(o); if(c){cx=c[0];cy=c[1];isC=true;} }
-    if(isC){ const d=Math.hypot(xm-cx,ym-cy); if(d<=tol&&(!best||d<best.d)) best={kind:'point', ref:'@'+o.id, d, pt:[cx,cy]}; } }
+    if(isC){ const d=Math.hypot(xm-cx,ym-cy); if(d<=tol&&(!best||d<best.d)) best={kind:'point', ref:'@'+o.id, d, pt:[cx,cy]}; }
+    if(o._arc){ for(const _k of [0,1]){ const _pp=_k?o._arc.p2:o._arc.p1; const _d=Math.hypot(xm-_pp[0],ym-_pp[1]); if(_d<=tol&&(!best||_d<best.d)) best={kind:'point', ref:'@'+o.id+'~'+_k, d:_d, pt:[_pp[0],_pp[1]]}; } } }
   for(const o of paintObjects){ let cc=null,rr=0;
     if(o._circle){ cc=[o.x,o.y]; rr=((o.rx||0)+(o.ry||0))/2; } else if(o._poly){ cc=_polyCenter(o); rr=_polyR(o); }
     if(cc){ const dr=Math.abs(Math.hypot(xm-cc[0],ym-cc[1])-rr); if(dr<=tol&&(!best||dr<best.d)) best={kind:'ring', ref:o.id, d:dr, pt:cc}; } }
@@ -6589,7 +6592,7 @@ function segOfRef(ref){
 }
 function nearestEdge(xm,ym){
   let best=null;
-  for(const o of paintObjects){ if(o.type==='dim'||o.type==='group'||o.type==='point'||o._circle||o.type==='ellipse'||o._poly)continue; // cercles & polygones : pickables par centre/anneau
+  for(const o of paintObjects){ if(o.type==='dim'||o.type==='group'||o.type==='point'||o._circle||o.type==='ellipse'||o._poly||o._arc)continue; // cercles, polygones, arcs : pickables par points
     const es=edgesOf(o);
     for(let i=0;i<es.length;i++){ const ax=es[i][0],ay=es[i][1],bx=es[i][2],by=es[i][3];
       const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy; if(L2<1e-9)continue;
@@ -6680,12 +6683,12 @@ function _dimGeomBase(dim){
 }
 function getDimValue(dim){ const g=dimGeom(dim); return g?g.val:0; }
 function applyDimValue(dim,v){
-  if(dim.kind==='ptdist'){ const o=objForPointRef(dim.ref2); if(!o||!(v>0))return; const P=ptOfRef(dim.ref),Q=ptOfRef(dim.ref2); if(!P||!Q)return;
+  if(dim.kind==='ptdist'){ const P=ptOfRef(dim.ref),Q=ptOfRef(dim.ref2); if(!P||!Q||!(v>0))return; const _mvp=(ref,dx,dy)=>{ if(typeof ref==='string'&&ref.indexOf('~')>=0){ const pr=ref.slice(1).split('~'); const oo=paintObjects.find(x=>String(x.id)===pr[0]); if(oo&&oo._arc){ const k=pr[1]==='1'?'p2':'p1'; oo._arc[k]=[oo._arc[k][0]+dx,oo._arc[k][1]+dy]; _arcRegen(oo); } return; } const oo=objForPointRef(ref); if(oo)_shiftObj(oo,dx,dy); };
     const gg=_dimGeomBase(dim), axis=gg?gg.axis:'aligned';
-    if(axis==='h'){ const sgn=(Q[0]-P[0])>=0?1:-1; _shiftObj(o,(P[0]+sgn*v)-Q[0],0); }
-    else if(axis==='v'){ const sgn=(Q[1]-P[1])>=0?1:-1; _shiftObj(o,0,(P[1]+sgn*v)-Q[1]); }
-    else { const dx=Q[0]-P[0],dy=Q[1]-P[1],L=Math.hypot(dx,dy)||1; _shiftObj(o,(P[0]+dx/L*v)-Q[0],(P[1]+dy/L*v)-Q[1]); }
-    if(typeof pushHistory==='function')pushHistory(); return; }
+    if(axis==='h'){ const sgn=(Q[0]-P[0])>=0?1:-1; _mvp(dim.ref2,(P[0]+sgn*v)-Q[0],0); }
+    else if(axis==='v'){ const sgn=(Q[1]-P[1])>=0?1:-1; _mvp(dim.ref2,0,(P[1]+sgn*v)-Q[1]); }
+    else { const dx=Q[0]-P[0],dy=Q[1]-P[1],L=Math.hypot(dx,dy)||1; _mvp(dim.ref2,(P[0]+dx/L*v)-Q[0],(P[1]+dy/L*v)-Q[1]); }
+    if(typeof updateLinkedCopies==='function')updateLinkedCopies(); if(typeof pushHistory==='function')pushHistory(); return; }
   if(dim.kind==='pdist'){ const o=objForPointRef(dim.ref); const E=segOfRef(dim.ref2); if(!o||!E||!(v>0))return; const P=ptOfRef(dim.ref); const ex=E[2]-E[0],ey=E[3]-E[1],L=Math.hypot(ex,ey)||1,nx=-ey/L,ny=ex/L; const d=(P[0]-E[0])*nx+(P[1]-E[1])*ny; const sgn=d>=0?1:-1; const foot=[P[0]-nx*d,P[1]-ny*d]; _shiftObj(o, (foot[0]+nx*sgn*v)-P[0], (foot[1]+ny*sgn*v)-P[1]); if(typeof pushHistory==='function')pushHistory(); return; }
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o||!(v>0)) return;
   if(dim.kind==='diam'){ if(o._poly){ const c=_polyCenter(o), r=_polyR(o)||1, k=(v/2)/r; o.pts=o.pts.map(pt=>[c[0]+(pt[0]-c[0])*k, c[1]+(pt[1]-c[1])*k]); } else { o.rx=o.ry=v/2; } }
@@ -15889,6 +15892,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v2026-07-28-U (badge haut = badge bas, synchro)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v2026-07-28-V (arc cotable: distance entre extremites editable)</div>
 </body>
 </html>
