@@ -5804,6 +5804,7 @@ function redrawCanvasNow(){
     pCtx.strokeStyle=tc;pCtx.lineWidth=sel?2.5:1.5;pCtx.setLineDash([]);
     pCtx.lineCap='round';pCtx.lineJoin='round';pCtx.fillStyle=tc;
     drawObjPx(o);
+    if(o.fixed && o.type!=='dim'){ try{ const _b=getObjBB(o); const _q=mmToPx(_b.x+_b.w, _b.y); pCtx.save(); pCtx.font='11px sans-serif'; pCtx.fillStyle='rgba(120,130,145,.9)'; pCtx.fillText('🔒', _q[0]+2, _q[1]+2); pCtx.restore(); }catch(e){} }
     if(sel && o.type==='dim'){ /* cote selectionnee : aucune deco bleue */ }
     else if(sel){
       const bb=getObjBB(o);
@@ -6119,8 +6120,9 @@ function _arrayDoPolar(cx,cy){
   let n=6; try{ const s=prompt('Nombre total de copies (réparties sur 360°) ?','6'); const v=parseInt(s); if(v>=2)n=Math.min(200,v); }catch(e){}
   let cnt=0;
   for(let i=1;i<n;i++){ const ang=i*2*Math.PI/n; for(const o of objs){ const c=JSON.parse(JSON.stringify(o)); c.id=Date.now()+Math.random()+i*0.001; _rotateObj(c,cx,cy,ang); c._link={src:o.id, kind:'polar', pivot:[cx,cy], ang}; paintObjects.push(c); cnt++; } }
+  for(const o of objs) o.fixed=true; // la forme de base est verrouillee (comme les copies)
   if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); if(typeof redrawCanvasNow==='function')redrawCanvasNow();
-  if(typeof toastHist==='function')toastHist('✳️ Réseau circulaire ×'+n+' ('+cnt+' copies) autour du point choisi');
+  if(typeof toastHist==='function')toastHist('✳️ Réseau circulaire ×'+n+' — pièces VERROUILLÉES (modifie la cote de la base pour tout ajuster)');
 }
 // Petit menu groupe "Réseaux"
 function cadArraysMenu(){
@@ -13879,6 +13881,7 @@ function snapPointsOf(o){
 }
 
 function applyHandleDrag(o,mode,orig,dxMm,dyMm){
+  if(o&&o.fixed&&o.type!=='dim'){ return; } // forme verrouillee : pas de deplacement/redim
   if(o.type==='dim'){ if(o.kind==='angle'||o.kind==='ptdist'){ const op=(orig&&orig._place)?orig._place:(o.place||[0,0]); o.place=[op[0]+dxMm, op[1]+dyMm]; return; } if(mode==='mv') o.mv=[((orig&&orig._mv)?orig._mv[0]:0)+dxMm, ((orig&&orig._mv)?orig._mv[1]:0)+dyMm]; return; } // deplacer une cote (angle/ptdist: axe restreint via place)
   if(o.type!=='dim' && typeof objHasDim==='function' && objHasDim(o.id) && mode!=='mv') return; // cotee : redim verrouille (change via la cote)
   if(o._circle && mode==='rad'){ const rx0=(orig&&orig.w?orig.w/2:o.rx); const r=Math.max(0.5,Math.hypot(rx0+dxMm,dyMm)); o.rx=o.ry=r; return; } // cercle reste rond
@@ -15822,6 +15825,6 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-N (TOUT en tool-first: contraintes + reseau, hint persistant, traits 0.1 par defaut)</div>
+<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v-2026-07-28-O (reseau: pieces verrouillees, base fixee, cadenas)</div>
 </body>
 </html>
