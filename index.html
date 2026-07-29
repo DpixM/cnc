@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:9px;color:var(--txt3);font-family:var(--mono);margin-left:6px;letter-spacing:.3px">v2026-07-28-V ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-28-W ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6183,7 +6183,7 @@ function _selPanelShow(){
     const mkI=(v)=>{const x=document.createElement('input'); x.type='number'; x.step='0.5'; x.style.cssText='width:66px;background:#0e1116;border:1px solid #4a5568;border-radius:5px;color:#fff;padding:3px 5px;font:13px monospace;text-align:center'; x.value=v; return x;};
     const fin=(e)=>{ if(e.key==='Enter'){ _arcFinalize(); e.preventDefault(); } else if(e.key==='Escape'){ _shp=null; _shpInputsRemove(); setPTool('select'); redrawCanvasNow(); } };
     const P1=_shp.pts[0],P2=_shp.pts[1]; const chord=Math.hypot(P2[0]-P1[0],P2[1]-P1[1]);
-    const ci=mkI(chord.toFixed(1)); div.appendChild(lab('Corde')); div.appendChild(ci);
+    div.appendChild(lab('Arc :')); const ci=mkI(chord.toFixed(1)); div.appendChild(lab('Corde')); div.appendChild(ci);
     ci.oninput=()=>{ const L=parseFloat(ci.value); if(L>0&&_shp){ const a=_shp.pts[0],b=_shp.pts[1]; const dx=b[0]-a[0],dy=b[1]-a[1],cur=Math.hypot(dx,dy)||1; _shp.pts[1]=[a[0]+dx/cur*L, a[1]+dy/cur*L]; _shp.cursor=_shp.pts[1].slice(); redrawCanvasNow(); } };
     ci.onkeydown=fin;
     const i=mkI(_shp.typed||''); div.appendChild(lab('R')); div.appendChild(i);
@@ -15892,6 +15892,5 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<div id="verTag" style="position:fixed;left:6px;bottom:4px;z-index:99999;font:10px monospace;color:#8a8f98;background:rgba(255,255,255,.5);padding:1px 5px;border-radius:4px;pointer-events:none">v2026-07-28-V (arc cotable: distance entre extremites editable)</div>
 </body>
 </html>
