@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-28-Z ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-28-AA ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -4295,11 +4295,13 @@ const TOOL_MENUS = {
     {i:'🪞', l:'Miroir ⥯ (haut-bas)',      fn:"cadMirror('ud')"},
   ],
   cadModify: [
-    {i:'⌒', l:'Congé (arrondi)',   fn:"cadSoon('Congé')"},
-    {i:'◣', l:'Chanfrein',         fn:"cadSoon('Chanfrein')"},
+    {i:'⌒', l:'Congé (arrondi)',   fn:"cadFillet()"},
+    {i:'◣', l:'Chanfrein',         fn:"cadChamfer()"},
     {i:'⧉', l:'Décalage (offset)', fn:"cadOffset()"},
-    {i:'✂️', l:'Ajuster (trim)',   fn:"cadSoon('Ajuster')"},
-    {i:'⊢', l:'Prolonger',         fn:"cadSoon('Prolonger')"},
+    {i:'✂️', l:'Ajuster (trim)',   fn:"cadTrim()"},
+    {i:'⊢', l:'Prolonger',         fn:"cadExtend()"},
+    {i:'⟳', l:'Rotation',          fn:"cadRotate()"},
+    {i:'🔓', l:'Déverrouiller',      fn:"cadUnlock()"},
     {i:'⧉', l:'Dupliquer (+5 mm)',  fn:"cadDuplicate()"},
     {i:'⤢', l:'Échelle',           fn:"cadScale()"},
   ],
@@ -6085,7 +6087,7 @@ function cadSoon(n){ if(typeof toastHist==='function') toastHist('🔜 '+n+' —
 function _scaleObj(o, cx, cy, k){
   const sx=(x)=>cx+(x-cx)*k, sy=(y)=>cy+(y-cy)*k;
   if(o.x1!=null){ o.x1=sx(o.x1);o.y1=sy(o.y1);o.x2=sx(o.x2);o.y2=sy(o.y2); }
-  else if(o.pts){ o.pts=o.pts.map(p=>[sx(p[0]),sy(p[1])]); }
+  else if(o.pts){ o.pts=o.pts.map(p=>[sx(p[0]),sy(p[1])]); if(o._arc){ o._arc.p1=[sx(o._arc.p1[0]),sy(o._arc.p1[1])]; o._arc.p2=[sx(o._arc.p2[0]),sy(o._arc.p2[1])]; o._arc.r*=k; } }
   else if(o._circle||o.type==='ellipse'){ o.x=sx(o.x);o.y=sy(o.y); o.rx=(o.rx||0)*k; o.ry=(o.ry||0)*k; }
   else { if(o.x!=null)o.x=sx(o.x); if(o.y!=null)o.y=sy(o.y); if(o.w!=null)o.w*=k; if(o.h!=null)o.h*=k; }
 }
@@ -6100,9 +6102,22 @@ function cadScale(){
   if(typeof pushHistory==='function')pushHistory(); if(typeof redrawCanvasNow==='function')redrawCanvasNow();
   if(typeof toastHist==='function')toastHist('⤢ Échelle ×'+k+' appliquée');
 }
+function _cadPickOp(need, fn, hint){ _conPick={need, picks:[], fn, hint}; if(typeof setPTool==='function')setPTool('select'); _cadMode=true; if(typeof _conHintShow==='function')_conHintShow(hint+' — clique la 1ère forme'); if(typeof redrawCanvasNow==='function')redrawCanvasNow(); }
+function _lineIntersect(A,B){ const x1=A[0],y1=A[1],x2=A[2],y2=A[3],x3=B[0],y3=B[1],x4=B[2],y4=B[3]; const d=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4); if(Math.abs(d)<1e-9)return null; const px=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/d; const py=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/d; return [px,py]; }
+function _raySegInt(P,u,S){ const x3=S[0],y3=S[1],x4=S[2],y4=S[3]; const dx=x4-x3,dy=y4-y3; const den=u[0]*dy-u[1]*dx; if(Math.abs(den)<1e-9)return null; const t=((x3-P[0])*dy-(y3-P[1])*dx)/den; const s=((x3-P[0])*u[1]-(y3-P[1])*u[0])/den; if(s<-0.001||s>1.001)return null; return {t, p:[P[0]+u[0]*t, P[1]+u[1]*t]}; }
+function cadRotate(){ _cadPickOp(1, (objs)=>{ const o=objs[0]; if(!o)return; let a=parseFloat(prompt('Angle de rotation (degrés, sens antihoraire) ?','90')); if(isNaN(a))return; const b=getObjBB(o); const cx=b.x+b.w/2, cy=b.y+b.h/2; _rotateObj(o,cx,cy,a*Math.PI/180); if(o._arc)_arcRegen(o); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('⟳ Rotation '+a+'°'); }, '⟳ Rotation'); }
+function _doChamfer(objs){ const lines=objs.filter(o=>segOf(o)); if(lines.length<2){ if(typeof toastHist==='function')toastHist('⚠️ Clique 2 lignes'); return; } let d=parseFloat(prompt('Longueur du chanfrein (mm) ?','5')); if(!(d>0))return; const L1=lines[0],L2=lines[1]; const s1=segOf(L1).slice(),s2=segOf(L2).slice(); const I=_lineIntersect(s1,s2); if(!I){ if(typeof toastHist==='function')toastHist('⚠️ Lignes parallèles'); return; } const trim=(o,s)=>{ const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-I[0],e0[1]-I[1])<Math.hypot(e1[0]-I[0],e1[1]-I[1]))?0:1; const far=near?e0:e1; const dir=[far[0]-I[0],far[1]-I[1]]; const dl=Math.hypot(dir[0],dir[1])||1; const np=[I[0]+dir[0]/dl*d, I[1]+dir[1]/dl*d]; if(near===0){s[0]=np[0];s[1]=np[1];}else{s[2]=np[0];s[3]=np[1];} setSeg(o,s); return np; }; const p1=trim(L1,s1), p2=trim(L2,s2); paintObjects.push({id:Date.now()+Math.random(),type:'line',x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],strokeW:currentStrokeW}); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('◣ Chanfrein '+d+' mm'); }
+function cadChamfer(){ _cadPickOp(2, _doChamfer, '◣ Chanfrein'); }
+function _doFillet(objs){ const lines=objs.filter(o=>segOf(o)); if(lines.length<2){ if(typeof toastHist==='function')toastHist('⚠️ Clique 2 lignes'); return; } let R=parseFloat(prompt('Rayon du congé (mm) ?','5')); if(!(R>0))return; const L1=lines[0],L2=lines[1]; const s1=segOf(L1).slice(),s2=segOf(L2).slice(); const I=_lineIntersect(s1,s2); if(!I){ if(typeof toastHist==='function')toastHist('⚠️ Lignes parallèles'); return; } const away=(s)=>{ const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-I[0],e0[1]-I[1])<Math.hypot(e1[0]-I[0],e1[1]-I[1]))?0:1; const far=near?e0:e1; const dl=Math.hypot(far[0]-I[0],far[1]-I[1])||1; return {u:[(far[0]-I[0])/dl,(far[1]-I[1])/dl], near}; }; const dA=away(s1), dB=away(s2); const dot=Math.max(-1,Math.min(1,dA.u[0]*dB.u[0]+dA.u[1]*dB.u[1])); const th=Math.acos(dot); if(th<0.05||th>Math.PI-0.05){ if(typeof toastHist==='function')toastHist('⚠️ Angle trop plat'); return; } const tanD=R/Math.tan(th/2); const TA=[I[0]+dA.u[0]*tanD,I[1]+dA.u[1]*tanD], TB=[I[0]+dB.u[0]*tanD,I[1]+dB.u[1]*tanD]; const setN=(o,s,near,np)=>{ if(near===0){s[0]=np[0];s[1]=np[1];}else{s[2]=np[0];s[3]=np[1];} setSeg(o,s); }; setN(L1,s1,dA.near,TA); setN(L2,s2,dB.near,TB); const bis=[dA.u[0]+dB.u[0],dA.u[1]+dB.u[1]]; const bl=Math.hypot(bis[0],bis[1])||1; const cen=[I[0]+bis[0]/bl*(R/Math.sin(th/2)), I[1]+bis[1]/bl*(R/Math.sin(th/2))]; const a1=Math.atan2(TA[1]-cen[1],TA[0]-cen[0]), a2=Math.atan2(TB[1]-cen[1],TB[0]-cen[0]); let span=a2-a1; while(span<=-Math.PI)span+=2*Math.PI; while(span>Math.PI)span-=2*Math.PI; const N=24,pts=[]; for(let i=0;i<=N;i++){ const a=a1+span*i/N; pts.push([cen[0]+R*Math.cos(a),cen[1]+R*Math.sin(a)]); } const through=pts[Math.floor(N/2)]; const mx=(TA[0]+TB[0])/2,my=(TA[1]+TB[1])/2, ndx=-(TB[1]-TA[1]),ndy=(TB[0]-TA[0]); const sgn=((through[0]-mx)*ndx+(through[1]-my)*ndy)>=0?1:-1; paintObjects.push({id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW,_arc:{p1:[TA[0],TA[1]],p2:[TB[0],TB[1]],r:R,sgn}}); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('⌒ Congé R'+R+' mm'); }
+function cadFillet(){ _cadPickOp(2, _doFillet, '⌒ Congé'); }
+function _doTrim(objs, click){ const L=objs.find(o=>segOf(o)); if(!L){ if(typeof toastHist==='function')toastHist('⚠️ Clique une ligne'); return; } const s=segOf(L).slice(); let best=null; for(const o of paintObjects){ if(o.id===L.id||o.type==='dim'||o.type==='constraint'||o.type==='group')continue; let segs; try{segs=objToStrokesRaw(o)||[];}catch(e){continue;} for(const poly of segs){ for(let i=0;i<poly.length-1;i++){ const ip=_segInt([s[0],s[1],s[2],s[3]],[poly[i][0],poly[i][1],poly[i+1][0],poly[i+1][1]]); if(ip){ const d=Math.hypot(ip[0]-click[0],ip[1]-click[1]); if(!best||d<best.d)best={d,ip}; } } } } if(!best){ if(typeof toastHist==='function')toastHist('✂️ Aucune intersection à couper ici'); return; } const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-click[0],e0[1]-click[1])<Math.hypot(e1[0]-click[0],e1[1]-click[1]))?0:1; if(near===0){s[0]=best.ip[0];s[1]=best.ip[1];}else{s[2]=best.ip[0];s[3]=best.ip[1];} setSeg(L,s); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('✂️ Coupé à l\'intersection'); }
+function cadTrim(){ _cadPickOp(1, _doTrim, '✂️ Ajuster : clique la partie à couper'); }
+function _doExtend(objs, click){ const L=objs.find(o=>segOf(o)); if(!L){ if(typeof toastHist==='function')toastHist('⚠️ Clique une ligne'); return; } const s=segOf(L).slice(); const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-click[0],e0[1]-click[1])<Math.hypot(e1[0]-click[0],e1[1]-click[1]))?1:0; const P=near?e1:e0, other=near?e0:e1; const dir=[P[0]-other[0],P[1]-other[1]]; const dl=Math.hypot(dir[0],dir[1])||1; const u=[dir[0]/dl,dir[1]/dl]; let best=null; for(const o of paintObjects){ if(o.id===L.id||o.type==='dim'||o.type==='constraint'||o.type==='group')continue; let segs; try{segs=objToStrokesRaw(o)||[];}catch(e){continue;} for(const poly of segs){ for(let i=0;i<poly.length-1;i++){ const ip=_raySegInt(P,u,[poly[i][0],poly[i][1],poly[i+1][0],poly[i+1][1]]); if(ip&&ip.t>0.001){ if(!best||ip.t<best.t)best={t:ip.t,p:ip.p}; } } } } if(!best){ if(typeof toastHist==='function')toastHist('⊢ Rien à atteindre dans cette direction'); return; } if(near){s[2]=best.p[0];s[3]=best.p[1];}else{s[0]=best.p[0];s[1]=best.p[1];} setSeg(L,s); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('⊢ Prolongé jusqu\'à l\'intersection'); }
+function cadExtend(){ _cadPickOp(1, _doExtend, '⊢ Prolonger : clique près du bout à étendre'); }
+function cadUnlock(){ const ids=[...getSelIds()]; if(!ids.length){ if(typeof toastHist==='function')toastHist('🔓 Sélectionne une forme (ou la base d\'un réseau) à déverrouiller'); return; } let n=0; for(const id of ids){ const o=getObj(id); if(!o)continue; if(o.fixed){o.fixed=false;n++;} for(const c of paintObjects){ if(c._link&&String(c._link.src)===String(id)){ delete c._link; c.fixed=false; n++; } } } if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('🔓 Déverrouillé ('+n+' forme(s)) — le réseau devient modifiable'); }
 function _rotateObj(o,cx,cy,a){ const co=Math.cos(a),si=Math.sin(a); const R=(x,y)=>[cx+(x-cx)*co-(y-cy)*si, cy+(x-cx)*si+(y-cy)*co];
   if(o.x1!=null){ const p1=R(o.x1,o.y1),p2=R(o.x2,o.y2); o.x1=p1[0];o.y1=p1[1];o.x2=p2[0];o.y2=p2[1]; }
-  else if(o.pts){ o.pts=o.pts.map(pt=>R(pt[0],pt[1])); }
+  else if(o.pts){ o.pts=o.pts.map(pt=>R(pt[0],pt[1])); if(o._arc){ o._arc.p1=R(o._arc.p1[0],o._arc.p1[1]); o._arc.p2=R(o._arc.p2[0],o._arc.p2[1]); } }
   else if(o._circle||o.type==='ellipse'){ const c2=R(o.x,o.y); o.x=c2[0];o.y=c2[1]; }
   else { const b=getObjBB(o); if(b){ const cc=R(b.x+b.w/2,b.y+b.h/2); if(o.x!=null){o.x=cc[0]-(o.w||0)/2; o.y=cc[1]-(o.h||0)/2;} } }
 }
@@ -6359,8 +6374,8 @@ function _conPickClick(xm,ym){
   if(!o){ _conHintShow('👉 Clique un trait, un cercle ou un point'); return; }
   if(_conPick.picks.some(p=>p.id===o.id)) return;
   _conPick.picks.push(o); redrawCanvasNow();
-  if(_conPick.picks.length>=_conPick.need){ const type=_conPick.type, objs=_conPick.picks.slice(); _conPick=null; _conHintHide(); _applyConstraintNow(type, objs); }
-  else _conHintShow('🔧 '+(_CON_LABEL[_conPick.type]||_conPick.type)+' — clique la '+(_conPick.picks.length+1)+'ᵉ forme');
+  if(_conPick.picks.length>=_conPick.need){ const type=_conPick.type, fn=_conPick.fn, objs=_conPick.picks.slice(); _conPick=null; _conHintHide(); if(fn){ fn(objs,[xm,ym]); } else { _applyConstraintNow(type, objs); } }
+  else _conHintShow((_conPick.hint||('🔧 '+(_CON_LABEL[_conPick.type]||_conPick.type||'')))+' — clique la '+(_conPick.picks.length+1)+'ᵉ forme');
 }
 function _applyConstraintNow(type, objs){
   const lines=objs.filter(o=>segOf(o)); const circs=objs.filter(o=>o._circle||o.type==='ellipse'); const pts=objs.filter(o=>o.type==='point');
@@ -6486,6 +6501,7 @@ function _shiftObj(o,dx,dy){
   if(o.x1!=null){o.x1+=dx;o.x2+=dx;o.y1+=dy;o.y2+=dy;}
   if(o.cx!=null)o.cx+=dx; if(o.cy!=null)o.cy+=dy;
   if(o.pts)o.pts=o.pts.map(pt=>[pt[0]+dx,pt[1]+dy]);
+  if(o._arc){ o._arc.p1=[o._arc.p1[0]+dx,o._arc.p1[1]+dy]; o._arc.p2=[o._arc.p2[0]+dx,o._arc.p2[1]+dy]; }
 }
 function cadDuplicate(){
   const ids=[...getSelIds()];
