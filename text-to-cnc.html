@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AQ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AR ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -7232,7 +7232,7 @@ function handlePointerDown(cpx,cpy){
         const h=hitHandle(o,cpx,cpy);
         if(h&&h!=='mv'){
           // Resize handle: startMm = the handle's OWN position so delta is relative to it
-          const origBB=o.type==='line'?{...o}:{...getObjBB(o)};
+          const origBB=o.type==='line'?{...o}:{...getObjBB(o)}; if(o._fillets)origBB._fillets=JSON.parse(JSON.stringify(o._fillets)); if(o._arc)origBB._arc=JSON.parse(JSON.stringify(o._arc)); if(typeof snapPointsOf==='function')origBB._pts=snapPointsOf(o).map(pt=>[pt[0],pt[1]]);
           // Calculate handle mm position (same logic as getHandlesPx but in mm)
           const bb=origBB;
           const handleMm={
@@ -7248,7 +7248,7 @@ function handlePointerDown(cpx,cpy){
         }
         if(h==='mv'){
           // Move: start from cursor position
-          const origBB=o.type==='line'?{...o}:{...getObjBB(o)};
+          const origBB=o.type==='line'?{...o}:{...getObjBB(o)}; if(o._fillets)origBB._fillets=JSON.parse(JSON.stringify(o._fillets)); if(o._arc)origBB._arc=JSON.parse(JSON.stringify(o._arc)); if(typeof snapPointsOf==='function')origBB._pts=snapPointsOf(o).map(pt=>[pt[0],pt[1]]);
           dragPending={mode:'mv',obj:o,cpx,cpy,origBB,startMm:{x:xm,y:ym}};
           return;
         }
@@ -7260,7 +7260,7 @@ function handlePointerDown(cpx,cpy){
           const _tol=Math.max(1.2,10/(BASE_PX*vZoom));
           const autreTrait=paintObjects.some(x=>x.id!==o.id && distToObjStroke(x,xm,ym)<=_tol);
           if(!autreTrait){
-            const origBB=o.type==='line'?{...o}:{...getObjBB(o)};
+            const origBB=o.type==='line'?{...o}:{...getObjBB(o)}; if(o._fillets)origBB._fillets=JSON.parse(JSON.stringify(o._fillets)); if(o._arc)origBB._arc=JSON.parse(JSON.stringify(o._arc)); if(typeof snapPointsOf==='function')origBB._pts=snapPointsOf(o).map(pt=>[pt[0],pt[1]]);
             dragPending={mode:'mv',obj:o,cpx,cpy,origBB,startMm:{x:xm,y:ym}};
             return;
           }
