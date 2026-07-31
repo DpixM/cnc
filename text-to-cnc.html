@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AI ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AJ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3023,11 +3023,12 @@ function buildDXF(){
     if(o._arc){ try{ const C=_arcCenter(o), ap=_arcApexPt(o); const P1=o._arc.p1,P2=o._arc.p2; const r=Math.hypot(P1[0]-C[0],P1[1]-C[1]); if(C&&ap){ ents+=_dxfArcCCW(C[0],C[1],r,P1,P2,ap); continue; } }catch(e){} }
     // Free avec congés -> LINE + ARC
     if(o.type==='free' && o._fillets && o._fillets.length){ ents+=_dxfFreeFillets(o); continue; }
-    // Sinon : polyligne — on tente l'ajustement d'arcs (image importée, spline, etc.)
+    // Sinon : polyligne FIDÈLE (image tracée, spline, forme à angles vifs).
+    // Pas d'arc-fitting auto : sur de l'art organique il inventait de faux cercles.
     const _CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon'];
     const _isClosed=_CLOSEDT.includes(o.type)||o._poly;
     let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; }
-    for(let s of st){ if(!s||s.length<2)continue; if(_isClosed){ const a=s[0],b=s[s.length-1]; if(Math.hypot(a[0]-b[0],a[1]-b[1])>1e-6)s=s.concat([[a[0],a[1]]]); } ents+=_dxfFromPrims(_fitArcs(s)); }
+    for(let s of st){ if(!s||s.length<2)continue; let closed=false; if(_isClosed){ const a=s[0],b=s[s.length-1]; if(Math.hypot(a[0]-b[0],a[1]-b[1])>1e-6)s=s.concat([[a[0],a[1]]]); closed=true; } else { closed=(s.length>2 && Math.hypot(s[0][0]-s[s.length-1][0],s[0][1]-s[s.length-1][1])<1e-6); } const pts=closed?s.slice(0,-1):s; ents+=_dxfLwpoly(pts,closed?1:0); }
   }
   return '0\nSECTION\n2\nENTITIES\n'+ents+'0\nENDSEC\n0\nEOF\n';
 }
