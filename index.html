@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AJ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AK ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6166,14 +6166,11 @@ function _scaleObj(o, cx, cy, k){
 }
 function cadScale(){
   const ids=[...getSelIds()]; if(!ids.length){ if(typeof toastHist==='function')toastHist('⚠️ Sélectionne une forme d\'abord'); return; }
-  let k=NaN; try{ k=parseFloat(prompt('Facteur d\'échelle (2 = ×2, 0.5 = moitié) ?','2')); }catch(e){}
-  if(!(k>0)) return;
-  const objs=ids.map(getObj).filter(Boolean);
-  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9; for(const o of objs){ const b=getObjBB(o); if(!b)continue; minX=Math.min(minX,b.x);minY=Math.min(minY,b.y);maxX=Math.max(maxX,b.x+b.w);maxY=Math.max(maxY,b.y+b.h); }
-  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
-  for(const o of objs)_scaleObj(o,cx,cy,k);
-  if(typeof pushHistory==='function')pushHistory(); if(typeof redrawCanvasNow==='function')redrawCanvasNow();
-  if(typeof toastHist==='function')toastHist('⤢ Échelle ×'+k+' appliquée');
+  if(!ids.map(getObj).filter(Boolean).length)return;
+  const snap=JSON.stringify(paintObjects);
+  const apply=(k)=>{ if(!(k>0))return; paintObjects.length=0; JSON.parse(snap).forEach(o=>paintObjects.push(o)); const objs=ids.map(getObj).filter(Boolean); let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9; for(const o of objs){ const b=getObjBB(o); if(!b)continue; minX=Math.min(minX,b.x);minY=Math.min(minY,b.y);maxX=Math.max(maxX,b.x+b.w);maxY=Math.max(maxY,b.y+b.h); } const cx=(minX+maxX)/2, cy=(minY+maxY)/2; for(const o of objs)_scaleObj(o,cx,cy,k); redrawCanvasNow(); };
+  apply(2);
+  _valInput('⤢ Échelle (×)', 2, apply, (v)=>{ if(v==null||!(v>0)){ paintObjects.length=0; JSON.parse(snap).forEach(o=>paintObjects.push(o)); redrawCanvasNow(); } else { apply(v); if(typeof pushHistory==='function')pushHistory(); if(typeof toastHist==='function')toastHist('⤢ Échelle ×'+v); } });
 }
 function _cadPickOp(need, fn, hint){ _setToolFromPick=true; if(typeof setPTool==='function')setPTool('select'); _setToolFromPick=false; _conPick={need, picks:[], fn, hint}; _cadMode=true; if(typeof _conHintShow==='function')_conHintShow(hint+' — clique la 1ère forme'); if(typeof redrawCanvasNow==='function')redrawCanvasNow(); }
 function _lineIntersect(A,B){ const x1=A[0],y1=A[1],x2=A[2],y2=A[3],x3=B[0],y3=B[1],x4=B[2],y4=B[3]; const d=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4); if(Math.abs(d)<1e-9)return null; const px=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/d; const py=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/d; return [px,py]; }
@@ -6262,7 +6259,7 @@ function _pickEdgeAt(xm,ym){
 }
 function _edgeSeg(pick){ // renvoie [ax,ay,bx,by] de l'arête choisie
   try{ const strokes=objToStrokesRaw(pick.obj); const CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon']; const isClosed=CLOSEDT.includes(pick.obj.type)||pick.obj._poly; for(const poly of strokes){ let pts=poly; if(isClosed){ const a=poly[0],b=poly[poly.length-1]; if(Math.hypot(a[0]-b[0],a[1]-b[1])>1e-6){ pts=poly.slice(); pts.push([a[0],a[1]]); } } if(pick.edge<pts.length-1){ const A=pts[pick.edge],B=pts[pick.edge+1]; return [A[0],A[1],B[0],B[1]]; } } }catch(e){} return null; }
-function _valInputRemove(){ const e=document.getElementById('valInput'); if(e)e.remove(); }
+function _valInputRemove(){ const e=document.getElementById('valInput'); if(e)e.remove(); window._valActiveCommit=null; window._valActiveLive=null; }
 function _valInput(label, def, onLive, onCommit){
   _valInputRemove();
   const d=document.createElement('div'); d.id='valInput';
@@ -6277,6 +6274,7 @@ function _valInput(label, def, onLive, onCommit){
   inp.addEventListener('input',()=>{ const v=parseFloat(inp.value); if(isFinite(v))onLive(v); });
   inp.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); commit(); } else if(e.key==='Escape'){ e.preventDefault(); _valInputRemove(); onCommit(null); } });
   ok.addEventListener('click',commit);
+  window._valActiveCommit=(vv)=>{ inp.value=String(vv); commit(); }; window._valActiveLive=(vv)=>{ inp.value=String(vv); const pv=parseFloat(vv); if(isFinite(pv))onLive(pv); };
   setTimeout(()=>{ try{inp.focus();inp.select();}catch(e){} },10);
 }
 function _cornerOp(kind, picks){
@@ -6317,14 +6315,12 @@ function cadPolarArray(){
   if(typeof redrawCanvasNow==='function')redrawCanvasNow();
 }
 function _arrayDoPolar(cx,cy){
-  const objs=(_arrayPick.objs||[]).map(getObj).filter(Boolean); _arrayPick=null; _arrayCursor=null;
-  if(!objs.length){ redrawCanvasNow(); return; }
-  let n=6; try{ const s=prompt('Nombre total de copies (réparties sur 360°) ?','6'); const v=parseInt(s); if(v>=2)n=Math.min(200,v); }catch(e){}
-  let cnt=0;
-  for(let i=1;i<n;i++){ const ang=i*2*Math.PI/n; for(const o of objs){ const c=JSON.parse(JSON.stringify(o)); c.id=Date.now()+Math.random()+i*0.001; _rotateObj(c,cx,cy,ang); c._link={src:o.id, kind:'polar', pivot:[cx,cy], ang}; paintObjects.push(c); cnt++; } }
-  for(const o of objs) o.fixed=true; // la forme de base est verrouillee (comme les copies)
-  if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); if(typeof redrawCanvasNow==='function')redrawCanvasNow();
-  if(typeof toastHist==='function')toastHist('✳️ Réseau circulaire ×'+n+' — pièces VERROUILLÉES (modifie la cote de la base pour tout ajuster)');
+  const objs0=(_arrayPick.objs||[]).map(getObj).filter(Boolean); _arrayPick=null; _arrayCursor=null; if(typeof _conHintHide==='function')_conHintHide();
+  if(!objs0.length){ redrawCanvasNow(); return; }
+  const ids=objs0.map(o=>o.id); const snap=JSON.stringify(paintObjects);
+  const apply=(n)=>{ n=Math.max(2,Math.min(200,Math.round(n))); paintObjects.length=0; JSON.parse(snap).forEach(o=>paintObjects.push(o)); const objs=ids.map(getObj).filter(Boolean); for(let i=1;i<n;i++){ const ang=i*2*Math.PI/n; for(const o of objs){ const c=JSON.parse(JSON.stringify(o)); c.id=Date.now()+Math.random()+i*0.001; _rotateObj(c,cx,cy,ang); c._link={src:o.id, kind:'polar', pivot:[cx,cy], ang}; paintObjects.push(c); } } for(const o of objs)o.fixed=true; redrawCanvasNow(); };
+  apply(6);
+  _valInput('✳️ Copies (réparties sur 360°)', 6, apply, (v)=>{ if(v==null||!(v>=2)){ paintObjects.length=0; JSON.parse(snap).forEach(o=>paintObjects.push(o)); redrawCanvasNow(); } else { apply(v); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); if(typeof toastHist==='function')toastHist('✳️ Réseau ×'+Math.round(v)+' — pièces verrouillées'); } });
 }
 // Petit menu groupe "Réseaux"
 function cadArraysMenu(){
@@ -6380,7 +6376,7 @@ function _selPanelShow(){
   const div=document.createElement('div'); div.id='selPanel';
   div.style.cssText='position:fixed;z-index:99996;display:flex;gap:8px;align-items:center;background:#1f2430;border:1px solid #4a5568;border-radius:8px;padding:7px 10px;box-shadow:0 6px 18px rgba(0,0,0,.5);font:13px sans-serif;color:#e5e9f0';
   const _pp=_panelPos(); div.style.left=_pp.left+'px'; div.style.top=_pp.top+'px'; div.appendChild(_panelGrip());
-  if(_shp.tool==='parc'){ if(!_shp.pts||_shp.pts.length!==2){ return; }
+  if(_shp && _shp.tool==='parc'){ if(!_shp.pts||_shp.pts.length!==2){ return; }
     const lab=(t)=>{const s=document.createElement('span'); s.textContent=t; s.style.opacity=.8; return s;};
     const mkI=(v)=>{const x=document.createElement('input'); x.type='number'; x.step='0.5'; x.style.cssText='width:66px;background:#0e1116;border:1px solid #4a5568;border-radius:5px;color:#fff;padding:3px 5px;font:13px monospace;text-align:center'; x.value=v; return x;};
     const fin=(e)=>{ if(e.key==='Enter'){ _arcFinalize(); e.preventDefault(); } else if(e.key==='Escape'){ _shp=null; _shpInputsRemove(); setPTool('select'); redrawCanvasNow(); } };
@@ -6411,8 +6407,8 @@ function _selPanelShow(){
 }
 function cadOffset(){
   const ids=[...getSelIds()]; if(!ids.length){ if(typeof toastHist==='function')toastHist('⚠️ Sélectionne une forme d\'abord'); return; }
-  let d=NaN; try{ d=parseFloat(prompt('Décalage en mm (+ = agrandir, - = réduire) ?','2')); }catch(e){}
-  if(!isFinite(d)||d===0) return; let made=0;
+  const snap=JSON.stringify(paintObjects);
+  const apply=(d)=>{ if(!isFinite(d)||d===0)return; paintObjects.length=0; JSON.parse(snap).forEach(o=>paintObjects.push(o)); let made=0;
   for(const id of ids){ const o=getObj(id); if(!o)continue; const c=JSON.parse(JSON.stringify(o)); c.id=Date.now()+Math.random()+made*0.001;
     if(c._circle||c.type==='ellipse'){ c.rx=Math.max(0.1,(c.rx||0)+d); c.ry=Math.max(0.1,(c.ry||0)+d); }
     else if(c._poly){ const ce=_polyCenter(c), r=_polyR(c)||1, k=Math.max(0.05,(r+d)/r); c.pts=c.pts.map(pt=>[ce[0]+(pt[0]-ce[0])*k, ce[1]+(pt[1]-ce[1])*k]); }
@@ -6421,7 +6417,9 @@ function cadOffset(){
     else { if(typeof toastHist==='function')toastHist('⧉ Décalage non géré pour cette forme'); continue; }
     paintObjects.push(c); made++;
   }
-  if(made){ if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); if(typeof redrawCanvasNow==='function')redrawCanvasNow(); if(typeof toastHist==='function')toastHist('⧉ Décalage '+d+' mm ('+made+' copie(s))'); }
+  redrawCanvasNow(); };
+  apply(2);
+  _valInput('⧉ Décalage (mm : + agrandit, - réduit)', 2, apply, (v)=>{ if(v==null||v===0){ paintObjects.length=0; JSON.parse(snap).forEach(o=>paintObjects.push(o)); redrawCanvasNow(); } else { apply(v); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); if(typeof toastHist==='function')toastHist('⧉ Décalage '+v+' mm'); } });
 }
 function _arcThrough(p1,p2,p3){ const ax=p1[0],ay=p1[1],bx=p2[0],by=p2[1],cx=p3[0],cy=p3[1];
   const d=2*(ax*(by-cy)+bx*(cy-ay)+cx*(ay-by)); if(Math.abs(d)<1e-9)return null;
