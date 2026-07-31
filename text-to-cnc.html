@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AK ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AL ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6263,7 +6263,8 @@ function _valInputRemove(){ const e=document.getElementById('valInput'); if(e)e.
 function _valInput(label, def, onLive, onCommit){
   _valInputRemove();
   const d=document.createElement('div'); d.id='valInput';
-  d.style.cssText='position:fixed;left:16px;top:70px;z-index:100002;background:#1f2430;border:1px solid #4a5568;border-radius:10px;padding:10px 12px;font:13px sans-serif;color:#ffd08a;box-shadow:0 6px 18px rgba(0,0,0,.55);display:flex;gap:8px;align-items:center';
+  let _vp=window._valPanelPos; if(!_vp){ try{ _vp=JSON.parse(localStorage.getItem('cncValPanelPos')); }catch(e){} } if(!_vp)_vp={left:16,top:70};
+  d.style.cssText='position:fixed;left:'+_vp.left+'px;top:'+_vp.top+'px;z-index:100002;background:#1f2430;border:1px solid #4a5568;border-radius:10px;padding:10px 12px;font:13px sans-serif;color:#ffd08a;box-shadow:0 6px 18px rgba(0,0,0,.55);display:flex;gap:8px;align-items:center;cursor:move;user-select:none';
   const lab=document.createElement('span'); lab.textContent=label; d.appendChild(lab);
   const inp=document.createElement('input'); inp.type='text'; inp.value=String(def);
   inp.style.cssText='width:74px;padding:5px 7px;border-radius:7px;border:1px solid #6b7280;background:#0d0f14;color:#7ee787;font:14px monospace;text-align:right';
@@ -6275,6 +6276,7 @@ function _valInput(label, def, onLive, onCommit){
   inp.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); commit(); } else if(e.key==='Escape'){ e.preventDefault(); _valInputRemove(); onCommit(null); } });
   ok.addEventListener('click',commit);
   window._valActiveCommit=(vv)=>{ inp.value=String(vv); commit(); }; window._valActiveLive=(vv)=>{ inp.value=String(vv); const pv=parseFloat(vv); if(isFinite(pv))onLive(pv); };
+  d.addEventListener('mousedown',ev=>{ if(ev.target&&(ev.target.tagName==='INPUT'||ev.target.tagName==='BUTTON'))return; ev.preventDefault(); const r=d.getBoundingClientRect(); const ox=ev.clientX-r.left, oy=ev.clientY-r.top; const mv=(e)=>{ d.style.left=Math.max(0,e.clientX-ox)+'px'; d.style.top=Math.max(0,e.clientY-oy)+'px'; }; const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); const r2=d.getBoundingClientRect(); window._valPanelPos={left:Math.round(r2.left),top:Math.round(r2.top)}; try{localStorage.setItem('cncValPanelPos',JSON.stringify(window._valPanelPos));}catch(e){} }; document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); });
   setTimeout(()=>{ try{inp.focus();inp.select();}catch(e){} },10);
 }
 function _cornerOp(kind, picks){
@@ -6990,7 +6992,8 @@ function _cadDimOverlay(){
     if(_arrayCursor){ const c=mmToPx(_arrayCursor[0],_arrayCursor[1]); pCtx.strokeStyle='#e11d9b'; pCtx.lineWidth=2; pCtx.beginPath(); pCtx.arc(c[0],c[1],7,0,Math.PI*2); pCtx.moveTo(c[0]-11,c[1]); pCtx.lineTo(c[0]+11,c[1]); pCtx.moveTo(c[0],c[1]-11); pCtx.lineTo(c[0],c[1]+11); pCtx.stroke(); }
     pCtx.restore(); }
   // Contrainte en cours : surligner les elements deja cliques (vert)
-  if(pCtx && _conPick && _conPick.picks.length){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3;
+  if(pCtx){ for(const o of paintObjects){ if(o._fillets){ for(const f of o._fillets){ if(!f||f.cx==null)continue; const c=mmToPx(f.cx,f.cy); pCtx.save(); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='rgba(59,130,246,.18)'; pCtx.lineWidth=1.4; pCtx.beginPath(); pCtx.arc(c[0],c[1],4.5,0,2*Math.PI); pCtx.fill(); pCtx.stroke(); pCtx.restore(); } } } }
+    if(pCtx && _conPick && _conPick.picks.length){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3;
     for(const pk of _conPick.picks){ try{ if(pk && pk.obj && typeof pk.edge==='number'){ const sg=_edgeSeg(pk); if(sg){ const a=mmToPx(sg[0],sg[1]),b=mmToPx(sg[2],sg[3]); pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke(); } } else { const _tgt=pk&&pk.obj?pk.obj:pk; for(const s of objToStrokesRaw(_tgt)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } } }catch(e){} }
     pCtx.restore(); }
   // Apercu de la cote pendant la depose (suit le curseur)
@@ -7403,6 +7406,7 @@ function renderSnapBtn(){
 }
 
 function handlePointerMove(cpx,cpy){
+  if(isDragging && dragMode==='pan'){ pmPanView(cpx,cpy); return; } // pan molette : marche dans TOUS les outils
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
   if(paintTool==='pshape'){ if(_shp){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _shp.cursor=[sp.x,sp.y]; _shp._snapped=sp.snapped; redrawCanvasNow(); } return; }
   if(_arrayPick){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _arrayCursor=[sp.x,sp.y]; redrawCanvasNow(); return; }
