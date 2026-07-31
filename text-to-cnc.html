@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AN ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AO ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6726,7 +6726,11 @@ function pickEntity(xm,ym,tol){
     if(cc){ const dr=Math.abs(Math.hypot(xm-cc[0],ym-cc[1])-rr); if(dr<=tol&&(!best||dr<best.d)) best={kind:'ring', ref:o.id, d:dr, pt:cc}; } }
   for(const o of paintObjects){ if(o._arc){ let d=Infinity; try{d=distToObjStroke(o,xm,ym);}catch(e){} if(d<=tol&&(!best||d<best.d)) best={kind:'arc', ref:o.id, d}; } }
   const ne=nearestEdge(xm,ym); if(ne&&ne.d<=tol&&(!best||ne.d<best.d)) best={kind:'edge', ref:ne.ref, d:ne.d, seg:ne.seg, foot:ne.foot};
-  for(const o of paintObjects){ if(o._fillets){ for(let fi=0;fi<o._fillets.length;fi++){ const f=o._fillets[fi]; if(!f||!f.apex)continue; const d=Math.hypot(xm-f.apex[0],ym-f.apex[1]); if(d<=tol*1.4 && (!best||best.kind==='edge'||d<best.d)) best={kind:'fillrad', ref:o.id, fi, d}; } } }
+  // Congé : détecté PARTOUT sur son arc (distance r du centre), prioritaire sur les mini-segments
+  for(const o of paintObjects){ if(o._fillets){ for(let fi=0;fi<o._fillets.length;fi++){ const f=o._fillets[fi]; if(!f||f.cx==null||!(f.r>0))continue;
+    const dc=Math.hypot(xm-f.cx,ym-f.cy); const dr=Math.abs(dc-f.r);
+    if(dr<=tol && Math.hypot(xm-f.apex[0],ym-f.apex[1])<=2*f.r+tol*2){ if(!best||best.kind==='edge'||dr<best.d) best={kind:'fillrad', ref:o.id, fi, d:dr}; }
+  } } }
   return best;
 }
 function cadStartDim(){ _caddim=null; _dimA=null; _dimEdgeA=null; _dimHover=null; _dimPlace=null; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
