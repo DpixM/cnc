@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AG ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AH ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2945,16 +2945,51 @@ function buildSVG(){
     +paths.map(d=>'  <path d="'+d+'" fill="none" stroke="#000" stroke-width="0.2"/>').join('\n')
     +'\n</svg>\n';
 }
+// ── Helpers DXF : vraies entités (pas de polylignes facettées) ────────────
+function _dxfCircle(cx,cy,r){ return '0\nCIRCLE\n8\n0\n10\n'+cx.toFixed(4)+'\n20\n'+cy.toFixed(4)+'\n40\n'+r.toFixed(4)+'\n'; }
+function _dxfLine(x1,y1,x2,y2){ return '0\nLINE\n8\n0\n10\n'+x1.toFixed(4)+'\n20\n'+y1.toFixed(4)+'\n11\n'+x2.toFixed(4)+'\n21\n'+y2.toFixed(4)+'\n'; }
+function _dxfLwpoly(pts,closed){ let e='0\nLWPOLYLINE\n8\n0\n90\n'+pts.length+'\n70\n'+(closed?1:0)+'\n'; for(const pt of pts)e+='10\n'+pt[0].toFixed(4)+'\n20\n'+pt[1].toFixed(4)+'\n'; return e; }
+function _dxfEllipse(cx,cy,rx,ry){ let mjx,mjy,ratio; if(rx>=ry){ mjx=rx; mjy=0; ratio=ry/(rx||1); } else { mjx=0; mjy=ry; ratio=rx/(ry||1); } return '0\nELLIPSE\n8\n0\n10\n'+cx.toFixed(4)+'\n20\n'+cy.toFixed(4)+'\n30\n0\n11\n'+mjx.toFixed(4)+'\n21\n'+mjy.toFixed(4)+'\n31\n0\n40\n'+ratio.toFixed(6)+'\n41\n0\n42\n6.283185307\n'; }
+function _dxfArcCCW(cx,cy,r,pa,pb,pmid){
+  const norm=(x)=>{ while(x<0)x+=2*Math.PI; while(x>=2*Math.PI)x-=2*Math.PI; return x; };
+  let a1=norm(Math.atan2(pa[1]-cy,pa[0]-cx)), a2=norm(Math.atan2(pb[1]-cy,pb[0]-cx)), am=norm(Math.atan2(pmid[1]-cy,pmid[0]-cx));
+  const span=norm(a2-a1), mm=norm(am-a1);
+  if(mm>span){ const t=a1;a1=a2;a2=t; }
+  const deg=x=>x*180/Math.PI;
+  return '0\nARC\n8\n0\n10\n'+cx.toFixed(4)+'\n20\n'+cy.toFixed(4)+'\n40\n'+r.toFixed(4)+'\n50\n'+deg(a1).toFixed(4)+'\n51\n'+deg(a2).toFixed(4)+'\n';
+}
+// Émet une forme 'free' qui a des congés : segments droits = LINE, congés = ARC
+function _dxfFreeFillets(o){
+  const pts=o.pts, fills=o._fillets, n=pts.length; if(!pts||n<2)return '';
+  const belong=new Array(n).fill(-1);
+  for(let fi=0;fi<fills.length;fi++){ const f=fills[fi]; if(!f||f.r<=0)continue; const tolr=Math.max(0.05,f.r*0.03); for(let i=0;i<n;i++){ if(Math.abs(Math.hypot(pts[i][0]-f.cx,pts[i][1]-f.cy)-f.r)<tolr)belong[i]=fi; } }
+  let e=''; const done=new Set();
+  for(let i=0;i+1<n;i++){ const a=belong[i], b=belong[i+1];
+    if(a>=0 && a===b){ if(!done.has(a)){ const f=fills[a]; e+=_dxfArcCCW(f.cx,f.cy,f.r,f.ta,f.tb,f.apex); done.add(a); } continue; }
+    e+=_dxfLine(pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1]);
+  }
+  return e;
+}
 function buildDXF(){
   const flat=_exportFlatObjs();
   let ents='';
   for(const o of flat){
+    if(o.type==='dim'||o.type==='point')continue;
+    // Cercle / ellipse -> vraie entité
+    if(o.type==='ellipse'){ if(Math.abs((o.rx||0)-(o.ry||0))<0.01){ ents+=_dxfCircle(o.x,o.y,o.rx); } else { ents+=_dxfEllipse(o.x,o.y,o.rx,o.ry); } continue; }
+    if(o._circle){ const r=o.rx||o.ry||o.r||0; ents+=_dxfCircle(o.x,o.y,r); continue; }
+    // Ligne -> LINE
+    if(o.type==='line'){ ents+=_dxfLine(o.x1,o.y1,o.x2,o.y2); continue; }
+    // Arc 3 points -> ARC
+    if(o._arc){ try{ const C=_arcCenter(o), ap=_arcApexPt(o); const P1=o._arc.p1,P2=o._arc.p2; const r=Math.hypot(P1[0]-C[0],P1[1]-C[1]); if(C&&ap){ ents+=_dxfArcCCW(C[0],C[1],r,P1,P2,ap); continue; } }catch(e){} }
+    // Free avec congés -> LINE + ARC
+    if(o.type==='free' && o._fillets && o._fillets.length){ ents+=_dxfFreeFillets(o); continue; }
+    // Sinon : polyligne (rect/tri/étoile/engrenage/polygone/free droit/texte)
     let st; try{ st=objToStrokes(o)||[]; }catch(e){ st=[]; }
-    for(const s of st){ if(!s||s.length<2) continue;
+    for(const s of st){ if(!s||s.length<2)continue;
       const closed=(s.length>2 && Math.abs(s[0][0]-s[s.length-1][0])<1e-6 && Math.abs(s[0][1]-s[s.length-1][1])<1e-6);
       const pts=closed?s.slice(0,-1):s;
-      ents+='0\nLWPOLYLINE\n8\n0\n90\n'+pts.length+'\n70\n'+(closed?1:0)+'\n';
-      for(const pt of pts){ ents+='10\n'+pt[0].toFixed(4)+'\n20\n'+pt[1].toFixed(4)+'\n'; } // Y deja vers le haut (G-code) = axe CAO
+      ents+=_dxfLwpoly(pts,closed);
     }
   }
   return '0\nSECTION\n2\nENTITIES\n'+ents+'0\nENDSEC\n0\nEOF\n';
