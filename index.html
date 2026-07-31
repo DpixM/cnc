@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AE ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AF ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6132,6 +6132,31 @@ function _cornerOnShape(kind, o, ia, ib, val){
 }
 // ── Petit champ de saisie flottant (haut-gauche) : dynamique, PAS de popup ──
 function _distPtSeg(px,py,ax,ay,bx,by){ const dx=bx-ax,dy=by-ay; const l2=dx*dx+dy*dy; let t=l2>0?((px-ax)*dx+(py-ay)*dy)/l2:0; t=Math.max(0,Math.min(1,t)); const qx=ax+t*dx,qy=ay+t*dy; return Math.hypot(px-qx,py-qy); }
+function _ensureFreePoly(o){
+  if(!o||o.type==='free'||o.type==='line')return o;
+  const CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon'];
+  if(!CLOSEDT.includes(o.type))return o;
+  try{ const st=objToStrokesRaw(o); let pts=(st&&st[0])?st[0].map(pt=>[pt[0],pt[1]]):null; if(!pts||pts.length<3)return o; if(Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])>1e-6)pts.push([pts[0][0],pts[0][1]]); const idx=paintObjects.indexOf(o); if(idx<0)return o; const free={id:o.id,type:'free',pts,strokeW:o.strokeW||currentStrokeW}; if(o.toolId!==undefined)free.toolId=o.toolId; if(o.fixed)free.fixed=true; paintObjects[idx]=free; return free; }catch(e){ return o; }
+}
+// Picker pour contraintes : renvoie un point, un cercle, OU une arête de forme
+function _conEntityPick(xm,ym){
+  const tol=16/(BASE_PX*vZoom); let best=null;
+  for(const o of paintObjects){ if(o.type==='point'){ const d=Math.hypot(xm-o.x,ym-o.y); if(d<=tol&&(!best||d<best.d))best={d,obj:o,edge:null,kind:'point'}; } }
+  if(best)return best;
+  for(const o of paintObjects){ if(o._circle||o.type==='ellipse'){ const r=((o.rx||0)+(o.ry||0))/2; const dc=Math.hypot(xm-o.x,ym-o.y); const d=Math.min(Math.abs(dc-r),dc); if(d<=tol&&(!best||d<best.d))best={d,obj:o,edge:null,kind:'circle'}; } }
+  if(best)return best;
+  const e=_pickEdgeAt(xm,ym); if(e)return {d:e.d,obj:e.obj,edge:e.edge,kind:'edge'};
+  return null;
+}
+// Transforme un pick en objet manipulable par segOf/setSeg (poignée d'arête si besoin)
+function _resolvePickToObj(pick){
+  if(!pick)return null;
+  if(pick.kind==='circle'||pick.kind==='point'||pick.edge==null)return pick.obj;
+  if(pick.obj.type==='line')return pick.obj;
+  const f=_ensureFreePoly(pick.obj);
+  if(f&&f.type==='free'&&f.pts&&pick.edge+1<f.pts.length)return {__eh:true, o:f, i:pick.edge};
+  return pick.obj;
+}
 function _pickEdgeAt(xm,ym){
   const CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon'];
   let best=null;
@@ -6185,9 +6210,9 @@ function cadChamfer(){ _setToolFromPick=true; if(typeof setPTool==='function')se
 function _doFillet(objs, R){ const lines=objs.filter(o=>segOf(o)); if(lines.length<2){ if(typeof toastHist==='function')toastHist('⚠️ Clique 2 lignes'); return; } if(!(R>0)){ R=parseFloat(prompt('Rayon du congé (mm) ?','5')); } if(!(R>0))return; const L1=lines[0],L2=lines[1]; const s1=segOf(L1).slice(),s2=segOf(L2).slice(); const I=_lineIntersect(s1,s2); if(!I){ if(typeof toastHist==='function')toastHist('⚠️ Lignes parallèles'); return; } const away=(s)=>{ const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-I[0],e0[1]-I[1])<Math.hypot(e1[0]-I[0],e1[1]-I[1]))?0:1; const far=near?e0:e1; const dl=Math.hypot(far[0]-I[0],far[1]-I[1])||1; return {u:[(far[0]-I[0])/dl,(far[1]-I[1])/dl], near}; }; const dA=away(s1), dB=away(s2); const dot=Math.max(-1,Math.min(1,dA.u[0]*dB.u[0]+dA.u[1]*dB.u[1])); const th=Math.acos(dot); if(th<0.05||th>Math.PI-0.05){ if(typeof toastHist==='function')toastHist('⚠️ Angle trop plat'); return; } const tanD=R/Math.tan(th/2); const TA=[I[0]+dA.u[0]*tanD,I[1]+dA.u[1]*tanD], TB=[I[0]+dB.u[0]*tanD,I[1]+dB.u[1]*tanD]; const setN=(o,s,near,np)=>{ if(near===0){s[0]=np[0];s[1]=np[1];}else{s[2]=np[0];s[3]=np[1];} setSeg(o,s); }; setN(L1,s1,dA.near,TA); setN(L2,s2,dB.near,TB); const bis=[dA.u[0]+dB.u[0],dA.u[1]+dB.u[1]]; const bl=Math.hypot(bis[0],bis[1])||1; const cen=[I[0]+bis[0]/bl*(R/Math.sin(th/2)), I[1]+bis[1]/bl*(R/Math.sin(th/2))]; const a1=Math.atan2(TA[1]-cen[1],TA[0]-cen[0]), a2=Math.atan2(TB[1]-cen[1],TB[0]-cen[0]); let span=a2-a1; while(span<=-Math.PI)span+=2*Math.PI; while(span>Math.PI)span-=2*Math.PI; const N=24,pts=[]; for(let i=0;i<=N;i++){ const a=a1+span*i/N; pts.push([cen[0]+R*Math.cos(a),cen[1]+R*Math.sin(a)]); } const through=pts[Math.floor(N/2)]; const mx=(TA[0]+TB[0])/2,my=(TA[1]+TB[1])/2, ndx=-(TB[1]-TA[1]),ndy=(TB[0]-TA[0]); const sgn=((through[0]-mx)*ndx+(through[1]-my)*ndy)>=0?1:-1; paintObjects.push({id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW,_arc:{p1:[TA[0],TA[1]],p2:[TB[0],TB[1]],r:R,sgn}}); redrawCanvasNow(); }
 
 function _doTrim(objs, click){ const L=objs.find(o=>segOf(o)); if(!L){ if(typeof toastHist==='function')toastHist('⚠️ Clique une ligne'); return; } const s=segOf(L).slice(); let best=null; for(const o of paintObjects){ if(o.id===L.id||o.type==='dim'||o.type==='constraint'||o.type==='group')continue; let segs; try{segs=objToStrokesRaw(o)||[];}catch(e){continue;} for(const poly of segs){ for(let i=0;i<poly.length-1;i++){ const ip=_segInt([s[0],s[1],s[2],s[3]],[poly[i][0],poly[i][1],poly[i+1][0],poly[i+1][1]]); if(ip){ const d=Math.hypot(ip[0]-click[0],ip[1]-click[1]); if(!best||d<best.d)best={d,ip}; } } } } if(!best){ if(typeof toastHist==='function')toastHist('✂️ Aucune intersection à couper ici'); return; } const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-click[0],e0[1]-click[1])<Math.hypot(e1[0]-click[0],e1[1]-click[1]))?0:1; if(near===0){s[0]=best.ip[0];s[1]=best.ip[1];}else{s[2]=best.ip[0];s[3]=best.ip[1];} setSeg(L,s); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('✂️ Coupé à l\'intersection'); }
-function cadTrim(){ _cadPickOp(1, _doTrim, '✂️ Ajuster : clique la partie à couper'); }
+function cadTrim(){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={need:1, picks:[], pickCon:true, fn:(objs,click)=>_doTrim(objs,click), hint:'✂️ Ajuster'}; _cadMode=true; _conHintShow('✂️ Ajuster — clique le côté (la partie à couper)'); redrawCanvasNow(); }
 function _doExtend(objs, click){ const L=objs.find(o=>segOf(o)); if(!L){ if(typeof toastHist==='function')toastHist('⚠️ Clique une ligne'); return; } const s=segOf(L).slice(); const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-click[0],e0[1]-click[1])<Math.hypot(e1[0]-click[0],e1[1]-click[1]))?1:0; const P=near?e1:e0, other=near?e0:e1; const dir=[P[0]-other[0],P[1]-other[1]]; const dl=Math.hypot(dir[0],dir[1])||1; const u=[dir[0]/dl,dir[1]/dl]; let best=null; for(const o of paintObjects){ if(o.id===L.id||o.type==='dim'||o.type==='constraint'||o.type==='group')continue; let segs; try{segs=objToStrokesRaw(o)||[];}catch(e){continue;} for(const poly of segs){ for(let i=0;i<poly.length-1;i++){ const ip=_raySegInt(P,u,[poly[i][0],poly[i][1],poly[i+1][0],poly[i+1][1]]); if(ip&&ip.t>0.001){ if(!best||ip.t<best.t)best={t:ip.t,p:ip.p}; } } } } if(!best){ if(typeof toastHist==='function')toastHist('⊢ Rien à atteindre dans cette direction'); return; } if(near){s[2]=best.p[0];s[3]=best.p[1];}else{s[0]=best.p[0];s[1]=best.p[1];} setSeg(L,s); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('⊢ Prolongé jusqu\'à l\'intersection'); }
-function cadExtend(){ _cadPickOp(1, _doExtend, '⊢ Prolonger : clique près du bout à étendre'); }
+function cadExtend(){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={need:1, picks:[], pickCon:true, fn:(objs,click)=>_doExtend(objs,click), hint:'⊢ Prolonger'}; _cadMode=true; _conHintShow('⊢ Prolonger — clique près du bout du côté à étendre'); redrawCanvasNow(); }
 function cadUnlock(){ const ids=[...getSelIds()]; if(!ids.length){ if(typeof toastHist==='function')toastHist('🔓 Sélectionne une forme (ou la base d\'un réseau) à déverrouiller'); return; } let n=0; for(const id of ids){ const o=getObj(id); if(!o)continue; if(o.fixed){o.fixed=false;n++;} for(const c of paintObjects){ if(c._link&&String(c._link.src)===String(id)){ delete c._link; c.fixed=false; n++; } } } if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('🔓 Déverrouillé ('+n+' forme(s)) — le réseau devient modifiable'); }
 function _rotateObj(o,cx,cy,a){ const co=Math.cos(a),si=Math.sin(a); const R=(x,y)=>[cx+(x-cx)*co-(y-cy)*si, cy+(x-cx)*si+(y-cy)*co];
   if(o.x1!=null){ const p1=R(o.x1,o.y1),p2=R(o.x2,o.y2); o.x1=p1[0];o.y1=p1[1];o.x2=p2[0];o.y2=p2[1]; }
@@ -6424,7 +6449,7 @@ function _conHintHide(){ const e=document.getElementById('cadHint'); if(e)e.remo
 function cadConstraint(type){
   // TOUJOURS tool-first : on choisit la contrainte PUIS on clique les formes (facon Fusion)
   const need=(type==='horiz'||type==='vert'||type==='fix')?1:(type==='symmetry'?3:2);
-  _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={type, need, picks:[]}; _cadMode=true;
+  _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={type, need, picks:[], pickCon:true}; _cadMode=true;
   _conHintShow('🔧 '+(_CON_LABEL[type]||type)+' — clique '+(need===1?'la forme':'la 1ʳᵉ forme'));
   if(typeof redrawCanvasNow==='function')redrawCanvasNow();
 }
@@ -6445,6 +6470,7 @@ function _pickObjForCon(xm,ym){
 }
 function _conPickClick(xm,ym){
   if(_conPick.pickEdges){ const e=_pickEdgeAt(xm,ym); if(!e){ _conHintShow('👉 Clique une arête (un côté de la forme, ou une ligne)'); return; } if(_conPick.picks.some(x=>x.obj===e.obj && x.edge===e.edge))return; _conPick.picks.push(e); redrawCanvasNow(); if(_conPick.picks.length>=_conPick.need){ const fn=_conPick.fn, picks=_conPick.picks.slice(); _conPick=null; _conHintHide(); if(fn)fn(picks); } else _conHintShow((_conPick.hint||'⌒')+' — clique la 2ème arête'); return; }
+  if(_conPick.pickCon){ const e=_conEntityPick(xm,ym); if(!e){ _conHintShow('👉 Clique un côté, un cercle ou un point'); return; } if(_conPick.picks.some(x=>x.obj===e.obj && x.edge===e.edge && x.kind===e.kind))return; _conPick.picks.push(e); redrawCanvasNow(); if(_conPick.picks.length>=_conPick.need){ const type=_conPick.type; const fn=_conPick.fn; const picks=_conPick.picks.slice(); _conPick=null; _conHintHide(); const resolved=picks.map(_resolvePickToObj).filter(Boolean); if(fn){ fn(resolved,[xm,ym]); } else { _applyConstraintNow(type, resolved); } if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); } else _conHintShow('🔧 '+(_CON_LABEL[_conPick.type]||_conPick.type)+' — clique le '+(_conPick.picks.length+1)+'ᵉ élément'); return; }
   const o=_pickObjForCon(xm,ym);
   if(!o){ _conHintShow('👉 Clique un trait, un cercle ou un point'); return; }
   if(_conPick.picks.some(p=>p.id===o.id)) return;
@@ -6483,7 +6509,7 @@ function _applyConstraintNow(type, objs){
       } else { T('⚠️ 2 points ou 2 lignes'); return; } break; }
     case 'midpoint': { if(pts.length&&lines.length){ const m=mid(L(lines[0])); pts[0].x=m[0]; pts[0].y=m[1]; } else { T('⚠️ 1 point + 1 ligne'); return; } break; }
     case 'tangent': { if(circs.length&&lines.length){ const c=circs[0],s=L(lines[0]); const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1,nx=-ey/Ln,ny=ex/Ln; const d=(c.x-s[0])*nx+(c.y-s[1])*ny,sg=d>=0?1:-1,r=(c.rx||c.ry),fx=c.x-nx*d,fy=c.y-ny*d; c.x=fx+nx*sg*r; c.y=fy+ny*sg*r; } else { T('⚠️ 1 cercle + 1 ligne'); return; } break; }
-    case 'fix': { if(!objs.length){ T('⚠️ Sélectionne une forme'); return; } for(const o of objs)o.fixed=!o.fixed; T('🔒 Fixé / défixé'); break; }
+    case 'fix': { if(!objs.length){ T('⚠️ Sélectionne une forme'); return; } for(const o of objs){ const t=o.__eh?o.o:o; t.fixed=!t.fixed; } T('🔒 Verrouillé / déverrouillé'); break; }
     case 'symmetry': {
       const axis=objs[2]; const A=objs[0], B=objs[1]; const s=axis?segOf(axis):null;
       if(!s||!A||!B){ T('⚠️ Symétrie : clique 2 formes puis une LIGNE axe'); return; }
@@ -6681,8 +6707,8 @@ function placeDim(spec,px,py){
   if(!meas) openDimInput(dim);
 }
 // Geometrie d'une cote pilote (calculee depuis la forme referencee)
-function segOf(o){ if(!o)return null; if(o.type==='line')return[o.x1,o.y1,o.x2,o.y2]; if(o.type==='free'&&o.pts&&o.pts.length===2)return[o.pts[0][0],o.pts[0][1],o.pts[1][0],o.pts[1][1]]; return null; }
-function setSeg(o,s){ if(!o)return; if(o.type==='line'){o.x1=s[0];o.y1=s[1];o.x2=s[2];o.y2=s[3];} else if(o.type==='free'){o.pts=[[s[0],s[1]],[s[2],s[3]]];} }
+function segOf(o){ if(!o)return null; if(o.__eh){ const q=o.o.pts; if(!q||o.i+1>=q.length)return null; return [q[o.i][0],q[o.i][1],q[o.i+1][0],q[o.i+1][1]]; } if(o.type==='line')return[o.x1,o.y1,o.x2,o.y2]; if(o.type==='free'&&o.pts&&o.pts.length===2)return[o.pts[0][0],o.pts[0][1],o.pts[1][0],o.pts[1][1]]; return null; }
+function setSeg(o,s){ if(!o)return; if(o.__eh){ const q=o.o.pts; if(!q)return; q[o.i]=[s[0],s[1]]; q[o.i+1]=[s[2],s[3]]; const n=q.length; if(n>1 && Math.hypot(q[0][0]-q[n-1][0],q[0][1]-q[n-1][1])<1e-6){} if(o.i===0)q[n-1]=[q[0][0],q[0][1]]; if(o.i+1===n-1)q[0]=[q[n-1][0],q[n-1][1]]; if(o.o._arc)delete o.o._arc; return; } if(o.type==='line'){o.x1=s[0];o.y1=s[1];o.x2=s[2];o.y2=s[3];} else if(o.type==='free'){o.pts=[[s[0],s[1]],[s[2],s[3]]];} }
 function edgesOf(o){
   let segs; try{ segs=objToStrokesRaw(o)||[]; }catch(e){ return []; }
   const closed=['rect','ellipse','tri','star','oblong','gear','text','polygon'].includes(o.type);
@@ -6875,7 +6901,7 @@ function _cadDimOverlay(){
     pCtx.restore(); }
   // Contrainte en cours : surligner les elements deja cliques (vert)
   if(pCtx && _conPick && _conPick.picks.length){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3;
-    for(const pk of _conPick.picks){ try{ if(pk && pk.obj && typeof pk.edge==='number'){ const sg=_edgeSeg(pk); if(sg){ const a=mmToPx(sg[0],sg[1]),b=mmToPx(sg[2],sg[3]); pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke(); } } else { for(const s of objToStrokesRaw(pk)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } } }catch(e){} }
+    for(const pk of _conPick.picks){ try{ if(pk && pk.obj && typeof pk.edge==='number'){ const sg=_edgeSeg(pk); if(sg){ const a=mmToPx(sg[0],sg[1]),b=mmToPx(sg[2],sg[3]); pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke(); } } else { const _tgt=pk&&pk.obj?pk.obj:pk; for(const s of objToStrokesRaw(_tgt)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } } }catch(e){} }
     pCtx.restore(); }
   // Apercu de la cote pendant la depose (suit le curseur)
   if(pCtx && _dimPlace && _dimPlace.px!=null){ const sp=_dimPlace.spec; const tmp=Object.assign({type:'dim',id:-999},sp);
@@ -7354,6 +7380,7 @@ function pmActivatePendingDrag(cpx,cpy){
     if(dragPending&&!isDragging){
         const dist=Math.hypot(cpx-dragPending.cpx,cpy-dragPending.cpy);
         if(dist>=2){
+          if(dragPending.obj&&dragPending.obj.fixed&&(dragPending.mode==='mv'||dragPending.mode==='rs')){ if(typeof toastHist==='function')toastHist('🔒 Forme verrouillée — déverrouille-la pour la déplacer'); dragPending=null; return 'attendre'; }
           isDragging=true;dragMode=dragPending.mode;dragObj=dragPending.obj;
           dragStart={cpx:dragPending.cpx,cpy:dragPending.cpy}; // original click px
           dragStartMm=dragPending.startMm;  // original click mm
