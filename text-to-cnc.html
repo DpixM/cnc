@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AH ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AI ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2945,6 +2945,45 @@ function buildSVG(){
     +paths.map(d=>'  <path d="'+d+'" fill="none" stroke="#000" stroke-width="0.2"/>').join('\n')
     +'\n</svg>\n';
 }
+// ── Ajustement d'arcs (arc-fitting) : polyligne facettée -> vrais arcs/cercles ──
+function _det3(m){ return m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]); }
+function _solve3(M,b){ const d=_det3(M); if(Math.abs(d)<1e-12)return null; const c=(k)=>{ const A=[[M[0][0],M[0][1],M[0][2]],[M[1][0],M[1][1],M[1][2]],[M[2][0],M[2][1],M[2][2]]]; for(let r=0;r<3;r++)A[r][k]=b[r]; return _det3(A)/d; }; return [c(0),c(1),c(2)]; }
+function _circleFitPts(pts){ const n=pts.length; if(n<3)return null; let sxx=0,sxy=0,syy=0,sx=0,sy=0,sxz=0,syz=0,sz=0; for(const q of pts){ const x=q[0],y=q[1],z=x*x+y*y; sxx+=x*x;sxy+=x*y;syy+=y*y;sx+=x;sy+=y;sxz+=x*z;syz+=y*z;sz+=z; } const sol=_solve3([[sxx,sxy,sx],[sxy,syy,sy],[sx,sy,n]],[-sxz,-syz,-sz]); if(!sol)return null; const cx=-sol[0]/2,cy=-sol[1]/2,r2=cx*cx+cy*cy-sol[2]; if(!(r2>0))return null; return {cx,cy,r:Math.sqrt(r2)}; }
+function _arcSpanDeg(cf,pa,pb,pmid){ const norm=x=>{while(x<0)x+=2*Math.PI;while(x>=2*Math.PI)x-=2*Math.PI;return x;}; let a1=norm(Math.atan2(pa[1]-cf.cy,pa[0]-cf.cx)),a2=norm(Math.atan2(pb[1]-cf.cy,pb[0]-cf.cx)),am=norm(Math.atan2(pmid[1]-cf.cy,pmid[0]-cf.cx)); let span=norm(a2-a1); if(norm(am-a1)>span)span=2*Math.PI-span; return span*180/Math.PI; }
+function _fitArcs(stroke, tol){
+  tol=tol||0.08;
+  let pts=stroke.map(p=>[p[0],p[1]]);
+  const wasClosed = pts.length>2 && Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])<1e-6;
+  if(wasClosed)pts.pop();
+  const m=pts.length;
+  if(m<3)return [{kind:'poly',pts:stroke, closed:wasClosed}];
+  // cercle complet ?
+  if(wasClosed && m>=8){ const cf=_circleFitPts(pts); if(cf&&cf.r<1e5){ let maxr=0; for(const q of pts)maxr=Math.max(maxr,Math.abs(Math.hypot(q[0]-cf.cx,q[1]-cf.cy)-cf.r)); if(maxr<=tol)return [{kind:'circle',cx:cf.cx,cy:cf.cy,r:cf.r}]; } }
+  const V = wasClosed ? pts.concat([pts[0]]) : pts;
+  const M=V.length; const prims=[]; let i=0;
+  while(i<M-1){
+    let bestJ=-1,bestCf=null;
+    for(let j=i+2;j<M;j++){ const run=V.slice(i,j+1); const cf=_circleFitPts(run); if(!cf||cf.r>1e5)break; let maxr=0; for(const q of run)maxr=Math.max(maxr,Math.abs(Math.hypot(q[0]-cf.cx,q[1]-cf.cy)-cf.r)); if(maxr>tol)break; bestJ=j;bestCf=cf; }
+    if(bestJ>=0 && (bestJ-i+1)>=6){ const pa=V[i],pb=V[bestJ],pmid=V[Math.floor((i+bestJ)/2)]; if(_arcSpanDeg(bestCf,pa,pb,pmid)>=8){ prims.push({kind:'arc',cx:bestCf.cx,cy:bestCf.cy,r:bestCf.r,pa,pb,pmid}); i=bestJ; continue; } }
+    prims.push({kind:'line',a:V[i],b:V[i+1]}); i++;
+  }
+  // fusion des segments droits colinéaires
+  const merged=[];
+  for(const pr of prims){ if(pr.kind==='line'&&merged.length&&merged[merged.length-1].kind==='line'){ const last=merged[merged.length-1]; const A=last.a,B=last.b,C=pr.b; const cross=(B[0]-A[0])*(C[1]-A[1])-(B[1]-A[1])*(C[0]-A[0]); const len=Math.hypot(C[0]-A[0],C[1]-A[1])||1; if(Math.abs(cross)/len<tol){ last.b=C; continue; } } merged.push(pr.kind==='line'?{kind:'line',a:pr.a,b:pr.b}:pr); }
+  return merged;
+}
+// Convertit une liste de primitives (_fitArcs) en entités DXF
+function _dxfFromPrims(prims){
+  let e=''; let run=null;
+  const flush=()=>{ if(run&&run.length>=2){ const closed=Math.hypot(run[0][0]-run[run.length-1][0],run[0][1]-run[run.length-1][1])<1e-6; const pp=closed?run.slice(0,-1):run; e+=_dxfLwpoly(pp,closed?1:0); } run=null; };
+  for(const pr of prims){
+    if(pr.kind==='arc'){ flush(); e+=_dxfArcCCW(pr.cx,pr.cy,pr.r,pr.pa,pr.pb,pr.pmid); }
+    else if(pr.kind==='circle'){ flush(); e+=_dxfCircle(pr.cx,pr.cy,pr.r); }
+    else if(pr.kind==='poly'){ flush(); const pp=pr.pts; e+=_dxfLwpoly(pr.closed?pp.slice(0,-1):pp, pr.closed?1:0); }
+    else if(pr.kind==='line'){ if(!run)run=[[pr.a[0],pr.a[1]]]; run.push([pr.b[0],pr.b[1]]); }
+  }
+  flush(); return e;
+}
 // ── Helpers DXF : vraies entités (pas de polylignes facettées) ────────────
 function _dxfCircle(cx,cy,r){ return '0\nCIRCLE\n8\n0\n10\n'+cx.toFixed(4)+'\n20\n'+cy.toFixed(4)+'\n40\n'+r.toFixed(4)+'\n'; }
 function _dxfLine(x1,y1,x2,y2){ return '0\nLINE\n8\n0\n10\n'+x1.toFixed(4)+'\n20\n'+y1.toFixed(4)+'\n11\n'+x2.toFixed(4)+'\n21\n'+y2.toFixed(4)+'\n'; }
@@ -2984,13 +3023,11 @@ function buildDXF(){
     if(o._arc){ try{ const C=_arcCenter(o), ap=_arcApexPt(o); const P1=o._arc.p1,P2=o._arc.p2; const r=Math.hypot(P1[0]-C[0],P1[1]-C[1]); if(C&&ap){ ents+=_dxfArcCCW(C[0],C[1],r,P1,P2,ap); continue; } }catch(e){} }
     // Free avec congés -> LINE + ARC
     if(o.type==='free' && o._fillets && o._fillets.length){ ents+=_dxfFreeFillets(o); continue; }
-    // Sinon : polyligne (rect/tri/étoile/engrenage/polygone/free droit/texte)
-    let st; try{ st=objToStrokes(o)||[]; }catch(e){ st=[]; }
-    for(const s of st){ if(!s||s.length<2)continue;
-      const closed=(s.length>2 && Math.abs(s[0][0]-s[s.length-1][0])<1e-6 && Math.abs(s[0][1]-s[s.length-1][1])<1e-6);
-      const pts=closed?s.slice(0,-1):s;
-      ents+=_dxfLwpoly(pts,closed);
-    }
+    // Sinon : polyligne — on tente l'ajustement d'arcs (image importée, spline, etc.)
+    const _CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon'];
+    const _isClosed=_CLOSEDT.includes(o.type)||o._poly;
+    let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; }
+    for(let s of st){ if(!s||s.length<2)continue; if(_isClosed){ const a=s[0],b=s[s.length-1]; if(Math.hypot(a[0]-b[0],a[1]-b[1])>1e-6)s=s.concat([[a[0],a[1]]]); } ents+=_dxfFromPrims(_fitArcs(s)); }
   }
   return '0\nSECTION\n2\nENTITIES\n'+ents+'0\nENDSEC\n0\nEOF\n';
 }
