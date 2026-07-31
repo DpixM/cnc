@@ -1441,7 +1441,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AM ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AN ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6731,6 +6731,7 @@ function pickEntity(xm,ym,tol){
 }
 function cadStartDim(){ _caddim=null; _dimA=null; _dimEdgeA=null; _dimHover=null; _dimPlace=null; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
 function cadDimClick(xm,ym){
+  if(document.getElementById('dimInputWrap')){ if(window._dimInputApply)window._dimInputApply(); return; } // une saisie de cote est ouverte : on la valide d'abord
   const tol=14/(BASE_PX*vZoom);
   // A) PLACEMENT en cours : la cote suit le curseur. Clic sur une AUTRE entite = upgrade
   //    (distance/angle), sinon on DEPOSE la cote a l'endroit clique.
@@ -6947,15 +6948,21 @@ function openDimInput(dim){
   if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; if(typeof redrawCanvas==='function')redrawCanvas();
   const g=dimGeom(dim); if(!g||typeof pCanvas==='undefined'||!pCanvas) return;
   const mid=mmToPx((g.ax+g.bx)/2,(g.ay+g.by)/2), rect=pCanvas.getBoundingClientRect();
-  let inp=document.getElementById('dimInput'); if(inp) inp.remove();
-  inp=document.createElement('input'); inp.id='dimInput'; inp.type='number'; inp.step='0.1'; inp.value=getDimValue(dim).toFixed(2);
-  inp.style.cssText='position:fixed;z-index:60;width:84px;padding:5px 6px;font-size:13px;font-family:var(--mono,monospace);background:#fff;color:#111;border:2px solid #2563eb;border-radius:6px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.4)';
-  inp.style.left=(rect.left+mid[0]-42)+'px'; inp.style.top=(rect.top+mid[1]-14)+'px';
-  document.body.appendChild(inp); inp.focus(); inp.select();
+  const oldw=document.getElementById('dimInputWrap'); if(oldw)oldw.remove();
+  const wrap=document.createElement('div'); wrap.id='dimInputWrap';
+  wrap.style.cssText='position:fixed;z-index:100003;display:flex;gap:5px;align-items:center;background:#0d0f14;border:2px solid #2563eb;border-radius:8px;padding:4px 5px;box-shadow:0 6px 18px rgba(0,0,0,.55)';
+  const inp=document.createElement('input'); inp.id='dimInput'; inp.type='text'; inp.value=getDimValue(dim).toFixed(2);
+  inp.style.cssText='width:78px;padding:5px 6px;font:14px monospace;background:#fff;color:#111;border:none;border-radius:5px;text-align:center';
+  const ok=document.createElement('button'); ok.textContent='✓'; ok.style.cssText='padding:4px 9px;border:none;border-radius:5px;background:#22c55e;color:#04240f;font-weight:800;cursor:pointer';
+  wrap.appendChild(inp); wrap.appendChild(ok); document.body.appendChild(wrap);
+  wrap.style.left=Math.max(6,rect.left+mid[0]-56)+'px'; wrap.style.top=Math.max(6,rect.top+mid[1]-16)+'px';
   let done=false;
-  const apply=()=>{ if(done)return; done=true; const v=parseFloat(inp.value); if(v>0){ applyDimValue(dim,v); if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); } inp.remove(); redrawCanvas(); };
-  inp.onkeydown=e=>{ if(e.key==='Enter'){ apply(); } else if(e.key==='Escape'){ done=true; inp.remove(); redrawCanvas(); } };
-  inp.onblur=apply;
+  const apply=()=>{ if(done)return; done=true; const v=parseFloat(String(inp.value||'').replace(',','.')); if(v>0){ applyDimValue(dim,v); if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); } wrap.remove(); redrawCanvas(); };
+  const cancel=()=>{ if(done)return; done=true; wrap.remove(); redrawCanvas(); };
+  inp.onkeydown=e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); apply(); } else if(e.key==='Escape'){ e.preventDefault(); cancel(); } };
+  ok.onclick=apply;
+  window._dimInputApply=apply; window._dimInputCancel=cancel;
+  setTimeout(()=>{ try{inp.focus();inp.select();}catch(e){} },20);
 }
 function _dimArrow(x,y,ang){ const s=6; pCtx.beginPath(); pCtx.moveTo(x,y); pCtx.lineTo(x+Math.cos(ang+0.38)*s, y+Math.sin(ang+0.38)*s); pCtx.lineTo(x+Math.cos(ang-0.38)*s, y+Math.sin(ang-0.38)*s); pCtx.closePath(); pCtx.fill(); }
 function _dimLabel(px,py,txt){ pCtx.save(); pCtx.font='11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle'; const w=pCtx.measureText(txt).width+8; pCtx.fillStyle='rgba(247,244,240,.95)'; pCtx.fillRect(px-w/2,py-8,w,16); pCtx.fillStyle='#4b5563'; pCtx.fillText(txt,px,py); pCtx.restore(); }
@@ -14182,7 +14189,11 @@ function applyHandleDrag(o,mode,orig,dxMm,dyMm){
   if(o&&o.fixed&&o.type!=='dim'){ return; } // forme verrouillee : pas de deplacement/redim
   if(o&&o._fillets&&orig&&orig._fillets&&mode==='mv'){ o._fillets=orig._fillets.map(f=>({...f, cx:f.cx+dxMm, cy:f.cy+dyMm, apex:[f.apex[0]+dxMm,f.apex[1]+dyMm], ta:[f.ta[0]+dxMm,f.ta[1]+dyMm], tb:[f.tb[0]+dxMm,f.tb[1]+dyMm], V:[f.V[0]+dxMm,f.V[1]+dyMm]})); } // le point du congé suit la forme
   if(o&&o._arc&&mode==='mv'){ const oa=(orig&&orig._arc)?orig._arc:o._arc; o._arc.p1=[oa.p1[0]+dxMm,oa.p1[1]+dyMm]; o._arc.p2=[oa.p2[0]+dxMm,oa.p2[1]+dyMm]; o._arc.r=oa.r; o._arc.sgn=oa.sgn; _arcRegen(o); return; } // arc : bouger les points parametriques + regen (les cotes suivent)
-  if(o.type==='dim'){ if(o.kind==='angle'||o.kind==='ptdist'){ const op=(orig&&orig._place)?orig._place:(o.place||[0,0]); o.place=[op[0]+dxMm, op[1]+dyMm]; return; } if(mode==='mv') o.mv=[((orig&&orig._mv)?orig._mv[0]:0)+dxMm, ((orig&&orig._mv)?orig._mv[1]:0)+dyMm]; return; } // deplacer une cote (angle/ptdist: axe restreint via place)
+  if(o.type==='dim'){ if(o.kind==='angle'||o.kind==='ptdist'){ const op=(orig&&orig._place)?orig._place:(o.place||[0,0]); o.place=[op[0]+dxMm, op[1]+dyMm]; return; }
+    if(mode==='mv'){ const sm=(orig&&orig._mv)?orig._mv:[0,0]; let base=null; try{ base=_dimGeomBase(Object.assign({},o,{mv:undefined})); }catch(e){}
+      if(base){ const dx=base.bx-base.ax, dy=base.by-base.ay, nl=Math.hypot(dx,dy)||1, nx=-dy/nl, ny=dx/nl; const des=[sm[0]+dxMm, sm[1]+dyMm]; const proj=des[0]*nx+des[1]*ny; o.mv=[nx*proj, ny*proj]; } // la cote reste ALIGNEE sur son axe (déplacement perpendiculaire seulement)
+      else { o.mv=[sm[0]+dxMm, sm[1]+dyMm]; } }
+    return; } // deplacer une cote (reste sur son axe, comme les angles)
   if(o.type!=='dim' && typeof objHasDim==='function' && objHasDim(o.id) && mode!=='mv') return; // cotee : redim verrouille (change via la cote)
   if(o._circle && mode==='rad'){ const rx0=(orig&&orig.w?orig.w/2:o.rx); const r=Math.max(0.5,Math.hypot(rx0+dxMm,dyMm)); o.rx=o.ry=r; return; } // cercle reste rond
   // Line: drag endpoints directly using delta from original pos
