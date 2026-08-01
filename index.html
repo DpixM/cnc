@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AU ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AV ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6800,7 +6800,7 @@ function placeDim(spec,px,py){
   let dim=paintObjects.find(o=>o.type==='dim'&&o.ref===spec.ref&&o.kind===spec.kind&&(o.ref2||null)===(spec.ref2||null));
   if(!dim){ dim=Object.assign({id:objCnt++,type:'dim'},spec); paintObjects.push(dim); if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); }
   if(dim.kind==='angle'||dim.kind==='ptdist'){ dim.place=[px,py]; }
-  else { const base=_dimGeomBase(Object.assign({},dim,{mv:undefined})); if(base){ const cx=(base.ax+base.bx)/2, cy=(base.ay+base.by)/2; let dx=base.bx-base.ax, dy=base.by-base.ay, nl=Math.hypot(dx,dy)||1; const rk=(dim.kind==='fillrad'||dim.kind==='arcrad'||dim.kind==='diam'); let ux,uy; if(rk){ux=dx/nl;uy=dy/nl;}else{ux=-dy/nl;uy=dx/nl;} let proj=(px-cx)*ux+(py-cy)*uy; proj=Math.max(-150,Math.min(150,proj)); dim.mv=[ux*proj, uy*proj]; } }
+  else { const base=_dimGeomBase(Object.assign({},dim,{mv:undefined})); if(base){ const cx=(base.ax+base.bx)/2, cy=(base.ay+base.by)/2; let dx=base.bx-base.ax, dy=base.by-base.ay, nl=Math.hypot(dx,dy)||1; const rk=(dim.kind==='fillrad'||dim.kind==='arcrad'||dim.kind==='diam'); let ux,uy; if(rk){ux=dx/nl;uy=dy/nl;}else{ux=-dy/nl;uy=dx/nl;} let proj=(px-cx)*ux+(py-cy)*uy; if(rk){proj=Math.max(-6,Math.min(28,proj));}else{proj=Math.max(-120,Math.min(120,proj));} dim.mv=[ux*proj, uy*proj]; } }
   if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null;
   if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow();
   const meas=(typeof dim.ref==='string'&&dim.ref.indexOf('#')>=0)||(typeof dim.ref2==='string'&&dim.ref2.indexOf('#')>=0);
@@ -14214,7 +14214,7 @@ function applyHandleDrag(o,mode,orig,dxMm,dyMm){
   if(o&&o._arc&&mode==='mv'){ const oa=(orig&&orig._arc)?orig._arc:o._arc; o._arc.p1=[oa.p1[0]+dxMm,oa.p1[1]+dyMm]; o._arc.p2=[oa.p2[0]+dxMm,oa.p2[1]+dyMm]; o._arc.r=oa.r; o._arc.sgn=oa.sgn; _arcRegen(o); return; } // arc : bouger les points parametriques + regen (les cotes suivent)
   if(o.type==='dim'){ if(o.kind==='angle'||o.kind==='ptdist'){ const op=(orig&&orig._place)?orig._place:(o.place||[0,0]); o.place=[op[0]+dxMm, op[1]+dyMm]; return; }
     if(mode==='mv'){ const sm=(orig&&orig._mv)?orig._mv:[0,0]; let base=null; try{ base=_dimGeomBase(Object.assign({},o,{mv:undefined})); }catch(e){}
-      if(base){ const dx=base.bx-base.ax, dy=base.by-base.ay, nl=Math.hypot(dx,dy)||1; const rk=(o.kind==='fillrad'||o.kind==='arcrad'||o.kind==='diam'); let ux,uy; if(rk){ux=dx/nl;uy=dy/nl;}else{ux=-dy/nl;uy=dx/nl;} const des=[sm[0]+dxMm, sm[1]+dyMm]; let proj=des[0]*ux+des[1]*uy; proj=Math.max(-200,Math.min(200,proj)); o.mv=[ux*proj, uy*proj]; } // la cote reste ALIGNEE sur son axe (rayon: radial ; linéaire: perpendiculaire)
+      if(base){ const dx=base.bx-base.ax, dy=base.by-base.ay, nl=Math.hypot(dx,dy)||1; const rk=(o.kind==='fillrad'||o.kind==='arcrad'||o.kind==='diam'); let ux,uy; if(rk){ux=dx/nl;uy=dy/nl;}else{ux=-dy/nl;uy=dx/nl;} const des=[sm[0]+dxMm, sm[1]+dyMm]; let proj=des[0]*ux+des[1]*uy; if(rk){proj=Math.max(-6,Math.min(28,proj));}else{proj=Math.max(-160,Math.min(160,proj));} o.mv=[ux*proj, uy*proj]; } // la cote reste ALIGNEE sur son axe (rayon: radial ; linéaire: perpendiculaire)
       else { o.mv=[sm[0]+dxMm, sm[1]+dyMm]; } }
     return; } // deplacer une cote (reste sur son axe, comme les angles)
   if(o.type!=='dim' && typeof objHasDim==='function' && objHasDim(o.id) && mode!=='mv') return; // cotee : redim verrouille (change via la cote)
