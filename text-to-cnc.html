@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AS ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AT ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6790,6 +6790,8 @@ function _dimUnderCursor(xm,ym,tol){
   for(const d of paintObjects){ if(d.type!=='dim')continue; const g=dimGeom(d); if(!g)continue;
     const lp = g._angle?[g.ax,g.ay]:[(g.ax+g.bx)/2,(g.ay+g.by)/2];
     if(Math.hypot(xm-lp[0],ym-lp[1])<tol*1.6) return d;
+    if(!g._angle && Math.hypot(xm-g.bx,ym-g.by)<tol*3) return d; // près de l'étiquette (label posé au bout du trait de rappel)
+    if(!g._angle && Math.hypot(xm-g.ax,ym-g.ay)<tol*2) return d; // près de l'ancrage (arc/entité)
     if(!g._angle){ const dx=g.bx-g.ax,dy=g.by-g.ay,L2=dx*dx+dy*dy; if(L2>1e-9){ let t=((xm-g.ax)*dx+(ym-g.ay)*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=g.ax+t*dx,fy=g.ay+t*dy; if(Math.hypot(xm-fx,ym-fy)<tol) return d; } }
   }
   return null;
@@ -7445,7 +7447,7 @@ function handlePointerMove(cpx,cpy){
       redrawCanvasNow(); return; } const tolE=14/(BASE_PX*vZoom);
     const e=pickEntity(xm,ym,tolE);
     let hv=null;
-    if(e){ if(e.kind==='edge') hv={seg:e.seg, foot:e.foot, d:e.d}; else hv={seg:null, foot:e.pt, d:e.d, _pt:true}; }
+    if(e){ if(e.kind==='edge') hv={seg:e.seg, foot:e.foot, d:e.d}; else if(e.kind==='fillrad'){ const _o=getObj(e.ref), _f=_o&&_o._fillets&&_o._fillets[e.fi]; if(_f){ const _dx=xm-_f.cx,_dy=ym-_f.cy,_dl=Math.hypot(_dx,_dy)||1; hv={seg:null, foot:[_f.cx+_dx/_dl*_f.r, _f.cy+_dy/_dl*_f.r], d:e.d, _pt:true}; } } else hv={seg:null, foot:e.pt, d:e.d, _pt:true}; }
     const ip=nearestIntersection(xm,ym,tolE); if(ip && (!hv||ip.d<hv.d)) hv={seg:null, foot:ip.pt, d:ip.d, _inter:true};
     _dimHover=hv; redrawCanvasNow(); return; }
   // ─────────────────────────────────────────────────────────────────────────
