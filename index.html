@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AV ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AW ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6513,6 +6513,7 @@ function _shpShowInputs(){
 }
 function _shpOverlay(){
   if(!pCtx||!_shp)return; pCtx.save(); pCtx.setLineDash([]);
+  if(_shp.cursor && _shp._snapped){ const _sc=mmToPx(_shp.cursor[0],_shp.cursor[1]); pCtx.save(); pCtx.strokeStyle='#22c55e'; pCtx.fillStyle='rgba(34,197,94,.28)'; pCtx.lineWidth=2; pCtx.beginPath(); pCtx.arc(_sc[0],_sc[1],7,0,2*Math.PI); pCtx.fill(); pCtx.stroke(); pCtx.restore(); }
   if(_shp.tool==='parc'){ const P=_shp.pts.slice(); if(_shp.cursor)P.push(_shp.cursor); pCtx.strokeStyle='#f5a623';pCtx.fillStyle='#f5a623';pCtx.lineWidth=1.8; for(const pt of _shp.pts){ const q=mmToPx(pt[0],pt[1]); pCtx.beginPath();pCtx.arc(q[0],q[1],3,0,Math.PI*2);pCtx.fill(); } if(_shp.pts.length>=2){ const P3=_arcP3()||P[2]; const poly=_arcPolyline(_shp.pts[0],_shp.pts[1],P3); pCtx.beginPath(); const q0=mmToPx(poly[0][0],poly[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<poly.length;i++){const q=mmToPx(poly[i][0],poly[i][1]);pCtx.lineTo(q[0],q[1]);} pCtx.stroke();
       // corde (distance entre les 2 extremites) : trait pointille gris + etiquette
       { const _a=mmToPx(_shp.pts[0][0],_shp.pts[0][1]), _bb=mmToPx(_shp.pts[1][0],_shp.pts[1][1]); pCtx.save(); pCtx.setLineDash([4,3]); pCtx.strokeStyle='#8b9098'; pCtx.lineWidth=1; pCtx.beginPath(); pCtx.moveTo(_a[0],_a[1]); pCtx.lineTo(_bb[0],_bb[1]); pCtx.stroke(); pCtx.setLineDash([]); const _cl=Math.hypot(_shp.pts[1][0]-_shp.pts[0][0],_shp.pts[1][1]-_shp.pts[0][1]); const _mm=[(_a[0]+_bb[0])/2,(_a[1]+_bb[1])/2]; const _ct=_cl.toFixed(1)+' mm'; pCtx.font='bold 11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle'; const _cw=pCtx.measureText(_ct).width+8; pCtx.fillStyle='rgba(0,0,0,.8)'; pCtx.fillRect(_mm[0]-_cw/2,_mm[1]-9,_cw,18); pCtx.fillStyle='#cfd4dc'; pCtx.fillText(_ct,_mm[0],_mm[1]); pCtx.restore(); }
@@ -7447,7 +7448,7 @@ function handlePointerMove(cpx,cpy){
       redrawCanvasNow(); return; } const tolE=14/(BASE_PX*vZoom);
     const e=pickEntity(xm,ym,tolE);
     let hv=null;
-    if(e){ if(e.kind==='edge') hv={seg:e.seg, foot:e.foot, d:e.d}; else if(e.kind==='fillrad'){ const _o=getObj(e.ref), _f=_o&&_o._fillets&&_o._fillets[e.fi]; if(_f){ const _dx=xm-_f.cx,_dy=ym-_f.cy,_dl=Math.hypot(_dx,_dy)||1; hv={seg:null, foot:[_f.cx+_dx/_dl*_f.r, _f.cy+_dy/_dl*_f.r], d:e.d, _pt:true}; } } else hv={seg:null, foot:e.pt, d:e.d, _pt:true}; }
+    if(e){ if(e.kind==='edge') hv={seg:e.seg, foot:e.foot, d:e.d}; else if(e.kind==='fillrad'){ const _o=getObj(e.ref), _f=_o&&_o._fillets&&_o._fillets[e.fi]; if(_f){ const _dx=xm-_f.cx,_dy=ym-_f.cy,_dl=Math.hypot(_dx,_dy)||1; hv={seg:null, foot:[_f.cx+_dx/_dl*_f.r, _f.cy+_dy/_dl*_f.r], d:e.d, _pt:true}; } } else if(e.kind==='arc'){ const _o=getObj(e.ref); if(_o&&_o._arc){ const _c=_arcCenter(_o), _r=_o._arc.r; if(_c){ const _dx=xm-_c[0],_dy=ym-_c[1],_dl=Math.hypot(_dx,_dy)||1; hv={seg:null, foot:[_c[0]+_dx/_dl*_r, _c[1]+_dy/_dl*_r], d:e.d, _pt:true}; } } } else hv={seg:null, foot:e.pt, d:e.d, _pt:true}; }
     const ip=nearestIntersection(xm,ym,tolE); if(ip && (!hv||ip.d<hv.d)) hv={seg:null, foot:ip.pt, d:ip.d, _inter:true};
     _dimHover=hv; redrawCanvasNow(); return; }
   // ─────────────────────────────────────────────────────────────────────────
