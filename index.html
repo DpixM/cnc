@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AT ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AU ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6505,7 +6505,7 @@ function _shpShowInputs(){
   if(_shp.tool==='ppoly'){ div.appendChild(lab('Côtés')); sidesI=inp(46,_shp.sides,true); div.appendChild(sidesI); }
   div.appendChild(lab('Ø')); dI=inp(64,_shp.typed||curD); div.appendChild(dI);
   document.body.appendChild(div); if(typeof _makePanelDraggable==='function')_makePanelDraggable(div);
-  const finish=(e)=>{ if(e.key==='Enter'){ if(_shp&&_shp.cx!=null)_shpFinalize(); e.preventDefault(); } else if(e.key==='Escape'){ _shp=null; _shpInputsRemove(); if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); } };
+  const finish=(e)=>{ if(e.key==='Enter'){ if(_shp){ if(_shp.cx==null){ let c=_shp.cursor; if(!c){ try{ c=pxToMm(pCanvas.width/2, pCanvas.height/2); }catch(_){ c=[0,0]; } } _shp.cx=c[0]; _shp.cy=c[1]; } if(_shp.cx!=null && (_shp.typed||_shpRadius()>0)) _shpFinalize(); } e.preventDefault(); } else if(e.key==='Escape'){ _shp=null; _shpInputsRemove(); if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); } };
   if(sidesI){ sidesI.oninput=()=>{ const n=parseInt(sidesI.value); if(n>=3&&_shp)_shp.sides=Math.min(64,n); redrawCanvasNow(); }; sidesI.onkeydown=finish; }
   dI.oninput=()=>{ if(_shp)_shp.typed=dI.value; redrawCanvasNow(); }; dI.onkeydown=finish;
   // focus : le champ pertinent
