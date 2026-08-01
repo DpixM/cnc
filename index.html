@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AW ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AX ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6755,9 +6755,9 @@ function cadDimClick(xm,ym){
   if(!hit){ if(typeof toastHist==='function')toastHist('📏 Clique un trait, un cercle ou un centre'); redrawCanvasNow(); return; }
   // D) 1 clic sur une entite -> la cote SUIT le curseur (clique pour la poser)
   if(hit.kind==='point'){ _dimEdgeA={kind:'point',ref:hit.ref}; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('📏 Point choisi — clique une 2e entité'); return; }
-  if(hit.kind==='ring'){ beginPlace({kind:'diam',ref:hit.ref}, {kind:'point',ref:'@'+hit.ref}); return; }
-  if(hit.kind==='arc'){ beginPlace({kind:'arcrad', ref:hit.ref}, {kind:'point',ref:'@'+hit.ref+'~0'}); return; }
-  if(hit.kind==='fillrad'){ beginPlace({kind:'fillrad', ref:hit.ref, fi:hit.fi}); return; }
+  if(hit.kind==='ring'){ _dimPlaceNow({kind:'diam',ref:hit.ref}); return; }
+  if(hit.kind==='arc'){ _dimPlaceNow({kind:'arcrad', ref:hit.ref}); return; }
+  if(hit.kind==='fillrad'){ _dimPlaceNow({kind:'fillrad', ref:hit.ref, fi:hit.fi}); return; }
   if(hit.kind==='edge'){ beginPlace(_edgeLenSpec(hit.ref), {kind:'edge',ref:hit.ref}); return; }
 }
 // Une arete appartenant a une ligne/free-2pt entiere -> ref objet (cote EDITABLE).
@@ -6765,6 +6765,13 @@ function cadDimClick(xm,ym){
 function _dimRef(ref){
   if(typeof ref==='string'&&ref.indexOf('#')>=0){ const id=ref.split('#')[0]; const o=paintObjects.find(x=>String(x.id)===id); if(o&&(o.type==='line'||(o.type==='free'&&o.pts&&o.pts.length===2))) return o.id; }
   return ref;
+}
+function _dimPlaceNow(spec){
+  let dim=paintObjects.find(o=>o.type==='dim'&&o.ref===spec.ref&&o.kind===spec.kind&&((o.fi==null&&spec.fi==null)||o.fi===spec.fi)&&(o.ref2||null)===(spec.ref2||null));
+  if(!dim){ dim=Object.assign({id:objCnt++,type:'dim',mv:[0,0]},spec); paintObjects.push(dim); if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); }
+  if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null;
+  if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow();
+  openDimInput(dim); // la cote est COLLÉE à la forme (mv=0) ; on saisit directement la valeur
 }
 function beginPlace(spec, src){ _dimPlace={spec, src:src||null, px:null, py:null}; _dimEdgeA=null; _dimHover=null; if(typeof toastHist==='function')toastHist('↔ Bouge puis clique pour déposer • clique une AUTRE entité = distance/angle'); redrawCanvasNow(); }
 function _edgeLenSpec(ref){
