@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BF ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BG ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2077,6 +2077,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     <button class="ptool" id="snapBtn" title="Accrochage" onclick="snapEnabled=!snapEnabled;renderSnapBtn()" style="gap:3px;cursor:pointer;flex-shrink:0">
       <span style="font-size:9px">🧲 Snap</span>
     </button>
+    <button class="ptool" id="logBtn" title="Enregistrer mes actions pour Claude" onclick="_logToggle()" style="gap:3px;cursor:pointer;flex-shrink:0;font-size:11px">🐞 Log</button>
     <button class="ptool" id="pt-bucket" onclick="startBucket()" title="Seau : remplir une zone fermée → poche" style="display:none;background:rgba(59,130,246,.22);color:#60a5fa"><svg viewBox="0 0 24 24" width="17" height="17" style="pointer-events:none"><path d="M4 7.5h16l-1.5 11.6a1.2 1.2 0 0 1-1.2 1H6.7a1.2 1.2 0 0 1-1.2-1L4 7.5z" fill="currentColor"/><rect x="2.7" y="4.3" width="18.6" height="2.6" rx="1.3" fill="currentColor"/></svg></button>
     <div class="tsep"></div>
     <span style="font-size:8px;color:var(--txt3);font-family:var(--mono);white-space:nowrap;letter-spacing:.5px">REMPLI :</span>
@@ -6457,16 +6458,16 @@ function _arcApexFromR(P1,P2,R,side){
   const sgn=(((side?side[0]:mx)-mx)*nx+((side?side[1]:my)-my)*ny)>=0?1:-1;
   return [mx+sgn*nx*s, my+sgn*ny*s];
 }
-function _arcApexSgn(P1,P2,R,sgn){ const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2, dx=P2[0]-P1[0],dy=P2[1]-P1[1], L=Math.hypot(dx,dy)||1, half=L/2; R=Math.max(R,half+0.01); const nx=-dy/L, ny=dx/L; const s=R-Math.sqrt(Math.max(0,R*R-half*half)); return [mx+sgn*nx*s, my+sgn*ny*s]; }
-function _arcRegen(o){ if(!o||!o._arc)return; const A=o._arc; const apex=_arcApexSgn(A.p1,A.p2,A.r,A.sgn); o.pts=_arcPolyline(A.p1,A.p2,apex); }
-function _arcCenter(o){ if(!o||!o._arc)return null; const A=o._arc,P1=A.p1,P2=A.p2; const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2,dx=P2[0]-P1[0],dy=P2[1]-P1[1],L=Math.hypot(dx,dy)||1,half=L/2,R=Math.max(A.r,half+0.01),nx=-dy/L,ny=dx/L,hh=Math.sqrt(Math.max(0,R*R-half*half)); return [mx-A.sgn*nx*hh, my-A.sgn*ny*hh]; }
-function _arcApexPt(o){ if(!o||!o._arc)return null; const A=o._arc; return _arcApexSgn(A.p1,A.p2,A.r,A.sgn); }
+function _arcApexSgn(P1,P2,R,sgn,big){ const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2, dx=P2[0]-P1[0],dy=P2[1]-P1[1], L=Math.hypot(dx,dy)||1, half=L/2; R=Math.max(R,half+0.01); const nx=-dy/L, ny=dx/L; const k=Math.sqrt(Math.max(0,R*R-half*half)); const s=big?(R+k):(R-k); return [mx+sgn*nx*s, my+sgn*ny*s]; }
+function _arcRegen(o){ if(!o||!o._arc)return; const A=o._arc; const apex=_arcApexSgn(A.p1,A.p2,A.r,A.sgn,A.big); o.pts=_arcPolyline(A.p1,A.p2,apex); }
+function _arcCenter(o){ if(!o||!o._arc)return null; const A=o._arc,P1=A.p1,P2=A.p2; const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2,dx=P2[0]-P1[0],dy=P2[1]-P1[1],L=Math.hypot(dx,dy)||1,half=L/2,R=Math.max(A.r,half+0.01),nx=-dy/L,ny=dx/L,hh=Math.sqrt(Math.max(0,R*R-half*half)); const _dir=(A.big?1:-1); return [mx+_dir*A.sgn*nx*hh, my+_dir*A.sgn*ny*hh]; }
+function _arcApexPt(o){ if(!o||!o._arc)return null; const A=o._arc; return _arcApexSgn(A.p1,A.p2,A.r,A.sgn,A.big); }
 function _arcP3(){ // 3e point effectif (apex si un rayon est tape)
   if(!_shp||_shp.pts.length<2)return null; const R=parseFloat(_shp.typed);
   if(R>0) return _arcApexFromR(_shp.pts[0],_shp.pts[1],R,_shp.cursor);
   return _shp.pts[2]||_shp.cursor;
 }
-function _arcFinalize(){ if(!_shp||_shp.pts.length<2)return; const P1=_shp.pts[0],P2=_shp.pts[1], P3=_arcP3(); if(!P3)return; const _c=_arcThrough(P1,P2,P3); const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2, ndx=-(P2[1]-P1[1]),ndy=(P2[0]-P1[0]); const sgn=((P3[0]-mx)*ndx+(P3[1]-my)*ndy)>=0?1:-1; const r=_c?_c.r:Math.hypot(P2[0]-P1[0],P2[1]-P1[1]); const pts=_arcPolyline(P1,P2,P3); const o={id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW,_arc:{p1:[P1[0],P1[1]],p2:[P2[0],P2[1]],r,sgn}}; paintObjects.push(o); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=o.id; if(typeof selObjIds!=='undefined'&&selObjIds.add)selObjIds.add(o.id); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); _shpInputsRemove(); _shp={tool:'parc',pts:[],cursor:null,cx:null,typed:'',_snapped:false}; redrawCanvasNow(); }
+function _arcFinalize(){ if(!_shp||_shp.pts.length<2)return; const P1=_shp.pts[0],P2=_shp.pts[1], P3=_arcP3(); if(!P3)return; const _c=_arcThrough(P1,P2,P3); const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2, ndx=-(P2[1]-P1[1]),ndy=(P2[0]-P1[0]); const sgn=((P3[0]-mx)*ndx+(P3[1]-my)*ndy)>=0?1:-1; const r=_c?_c.r:Math.hypot(P2[0]-P1[0],P2[1]-P1[1]); let _big=false; if(_c){ const _tp=2*Math.PI; const _nm=v=>((v%_tp)+_tp)%_tp; const _a1=Math.atan2(P1[1]-_c.cy,P1[0]-_c.cx); const _ds=_nm(Math.atan2(P2[1]-_c.cy,P2[0]-_c.cx)-_a1); const _dm=_nm(Math.atan2(P3[1]-_c.cy,P3[0]-_c.cx)-_a1); const _sp=(_dm<=_ds)?_ds:(_tp-_ds); _big=_sp>Math.PI; } const pts=_arcPolyline(P1,P2,P3); const o={id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW,_arc:{p1:[P1[0],P1[1]],p2:[P2[0],P2[1]],r,sgn,big:_big}}; paintObjects.push(o); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=o.id; if(typeof selObjIds!=='undefined'&&selObjIds.add)selObjIds.add(o.id); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); _shpInputsRemove(); _shp={tool:'parc',pts:[],cursor:null,cx:null,typed:'',_snapped:false}; redrawCanvasNow(); }
 // ── DESSIN INTERACTIF façon Fusion (clic centre -> taille au curseur -> valeur tapable) ──
 let _shp = null; // {tool:'pcircle'|'ppoly', cx, cy, sides, cursor, typed, _snapped}
 function cadCircleCenter(){ _shp={tool:'pcircle', cx:null, cy:null, cursor:null, typed:'', _snapped:false}; setPTool('pshape'); _cadMode=true; if(typeof toastHist==='function')toastHist('◯ Cercle : clique le centre (ou tape le Ø)'); if(typeof _shpShowInputs==='function')_shpShowInputs(); redrawCanvasNow(); }
@@ -6582,6 +6583,7 @@ function _conPickClick(xm,ym){
   else _conHintShow((_conPick.hint||('🔧 '+(_CON_LABEL[_conPick.type]||_conPick.type||'')))+' — clique la '+(_conPick.picks.length+1)+'ᵉ forme');
 }
 function _applyConstraintNow(type, objs){
+  _log('constraint',{ct:type, objs:(objs||[]).slice(0,4).map(_logObjBrief)});
   const lines=objs.filter(o=>segOf(o)); const circs=objs.filter(o=>o._circle||o.type==='ellipse'||o.__arccenter); const pts=objs.filter(o=>o.type==='point');
   const T=(m)=>{ if(typeof toastHist==='function')toastHist(m); };
   const setL=(o,s)=>setSeg(o,s), L=(o)=>segOf(o), half=(s)=>Math.hypot(s[2]-s[0],s[3]-s[1])/2, mid=(s)=>[(s[0]+s[2])/2,(s[1]+s[3])/2];
@@ -6661,6 +6663,7 @@ function _applyConstraintStep(c, anchorId){
   }
 }
 function solveSketch(anchorId){
+  _log('solve',{anchor:anchorId, cons:_constraints.length});
   if(!_constraints.length)return;
   // nettoyer les contraintes dont un objet a disparu
   _constraints=_constraints.filter(c=>getObj(c.a)&&(c.b==null||getObj(c.b)));
@@ -6963,6 +6966,7 @@ function _dimGeomBase(dim){
 }
 function getDimValue(dim){ const g=dimGeom(dim); return g?g.val:0; }
 function applyDimValue(dim,v){
+  _log('dimval',{kind:dim&&dim.kind, ref:dim&&dim.ref, v:v});
   if(dim.kind==='fillrad'){ const o=paintObjects.find(x=>x.id===dim.ref); if(!o||!o._fillets||!(v>0))return; _regenFillet(o,dim.fi,v); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); return; }
   if(dim.kind==='arcrad'){ const o=paintObjects.find(x=>x.id===dim.ref); if(!o||!o._arc||!(v>0))return; o._arc.r=v; _arcRegen(o); if(typeof updateLinkedCopies==='function')updateLinkedCopies(); if(typeof pushHistory==='function')pushHistory(); return; }
   if(dim.kind==='ptdist'){ const P=ptOfRef(dim.ref),Q=ptOfRef(dim.ref2); if(!P||!Q||!(v>0))return; const _mvp=(ref,dx,dy)=>{ if(typeof ref==='string'&&ref.indexOf('~')>=0){ const pr=ref.slice(1).split('~'); const oo=paintObjects.find(x=>String(x.id)===pr[0]); if(oo&&oo._arc){ const k=pr[1]==='1'?'p2':'p1'; oo._arc[k]=[oo._arc[k][0]+dx,oo._arc[k][1]+dy]; _arcRegen(oo); } return; } const oo=objForPointRef(ref); if(oo)_shiftObj(oo,dx,dy); };
@@ -7273,6 +7277,7 @@ function onME(e){handlePointerUp(e.offsetX,e.offsetY);pushHistoryIfDirty();}
 
 function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
+  _log('down',{x:+xm.toFixed(1),y:+ym.toFixed(1),tool:paintTool,mode:(_conPick?'con':(_rotActive?'rot':(_mirror?'mir':'')))});
   if(_mirror){ _mirrorClick(xm,ym); return; } // outil miroir 2 étapes
   if(_rotActive){ const a=_rotActive.deg*Math.PI/180; const hx=_rotActive.piv[0]+Math.cos(a)*_rotActive.hr, hy=_rotActive.piv[1]+Math.sin(a)*_rotActive.hr; const tolh=14/(BASE_PX*vZoom); if(Math.hypot(xm-hx,ym-hy)<=tolh){ _rotActive.dragging=true; return; } const sp=snapPoint(xm,ym,_rotActive.id); _rotActive.piv=[sp.x,sp.y]; _rotActive._pivChanged=true; if(_rotActive.reapply)_rotActive.reapply(); redrawCanvasNow(); return; } // rotation : poignée (drag) ou choix du pivot
   if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
@@ -8017,6 +8022,13 @@ function syncToolCats(){
   }
 }
 
+window.__LOG=[]; window.__LOGON=false;
+function _log(type,d){ if(!window.__LOGON)return; try{ window.__LOG.push(Object.assign({ms:Math.round((typeof performance!=='undefined'?performance.now():Date.now()))},{type:type},d||{})); if(window.__LOG.length>1200)window.__LOG.shift(); }catch(e){} }
+function _logObjBrief(o){ if(!o)return null; if(o.__eh)return {eh:(o.o&&o.o.id)+'#'+o.i}; const b={id:o.id,t:o.type}; if(o.x!=null){b.x=+(+o.x).toFixed(1);b.y=+(+o.y).toFixed(1);} if(o.rx!=null)b.rx=+(+o.rx).toFixed(1); if(o._arc)b.arc={r:+(+o._arc.r).toFixed(1),big:!!o._arc.big}; if(o._circle)b.circ=1; return b; }
+function _logToggle(){ const b=document.getElementById('logBtn'); if(!b)return; if(!window.__LOGON){ window.__LOG=[]; window.__LOGON=true; _log('start',{ver:(document.title||''),tool:(typeof paintTool!=='undefined'?paintTool:''),objs:(typeof paintObjects!=='undefined'?paintObjects.length:0)}); b.innerHTML='⏺ REC'; b.style.background='#e11d48'; b.style.color='#fff'; if(typeof toastHist==='function')toastHist('🐞 Enregistrement ON — fais ton geste, puis reclique 🐞 pour copier'); }
+  else { window.__LOGON=false; _log('end',{objs:(typeof paintObjects!=='undefined'?paintObjects.length:0), cons:(typeof _constraints!=='undefined'?_constraints.length:0)}); const payload='=== CNC LOG '+(document.title||'')+' ===\n'+JSON.stringify({objs:(typeof paintObjects!=='undefined'?paintObjects.map(_logObjBrief):[]), constraints:(typeof _constraints!=='undefined'?_constraints:[]), events:window.__LOG}, null, 0); const done=()=>{ b.innerHTML='✅ Copié'; b.style.background=''; b.style.color=''; if(typeof toastHist==='function')toastHist('✅ Log copié — colle-le à Claude'); setTimeout(()=>{ b.innerHTML='🐞 Log'; },2500); }; if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(payload).then(done,()=>_logFallback(payload)); } else { _logFallback(payload); } }
+}
+function _logFallback(txt){ const ta=document.createElement('textarea'); ta.value=txt; ta.readOnly=false; ta.style.cssText='position:fixed;left:8px;bottom:8px;width:70vw;height:140px;z-index:100020;font:11px monospace'; document.body.appendChild(ta); ta.focus(); ta.select(); if(typeof toastHist==='function')toastHist('🐞 Sélectionne tout (Ctrl+A) puis copie (Ctrl+C), colle à Claude'); setTimeout(()=>{ if(ta.parentNode)ta.remove(); },30000); }
 function setPTool(t){
   if(t!=='pshape'){ if(typeof _shpInputsRemove==='function')_shpInputsRemove(); if(typeof _shp!=='undefined')_shp=null; }
   if(t!=='select'){ if(typeof _selPanelRemove==='function')_selPanelRemove(); }
@@ -8034,6 +8046,7 @@ function setPTool(t){
   if(t!=='select'){selObjId=null;redrawCanvas();renderInspector();}
   if(pCanvas){pCanvas.style.cursor=t==='eraser'?'none':t==='select'?'default':'crosshair';}
   updateStyleBarVisibility();
+  _log('tool',{t});
 }
 
 function objHasStroke(o){
