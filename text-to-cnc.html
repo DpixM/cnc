@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AZ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BA ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6734,8 +6734,9 @@ function pickEntity(xm,ym,tol){
     if(isC){ const d=Math.hypot(xm-cx,ym-cy); if(d<=tol&&(!best||d<best.d)) best={kind:'point', ref:'@'+o.id, d, pt:[cx,cy]}; }
     if(o._arc){ for(const _k of [0,1]){ const _pp=_k?o._arc.p2:o._arc.p1; const _d=Math.hypot(xm-_pp[0],ym-_pp[1]); if(_d<=tol&&(!best||_d<best.d)) best={kind:'point', ref:'@'+o.id+'~'+_k, d:_d, pt:[_pp[0],_pp[1]]}; } } }
   for(const o of paintObjects){ let cc=null,rr=0;
-    if(o._circle){ cc=[o.x,o.y]; rr=((o.rx||0)+(o.ry||0))/2; } else if(o._poly){ cc=_polyCenter(o); rr=_polyR(o); }
-    if(cc){ const dr=Math.abs(Math.hypot(xm-cc[0],ym-cc[1])-rr); if(dr<=tol&&(!best||dr<best.d)) best={kind:'ring', ref:o.id, d:dr, pt:cc}; } }
+    let _isEll=false;
+    if(o._circle){ cc=[o.x,o.y]; rr=((o.rx||0)+(o.ry||0))/2; } else if(o.type==='ellipse'){ cc=[o.x,o.y]; rr=((o.rx||0)+(o.ry||0))/2; _isEll=true; } else if(o._poly){ cc=_polyCenter(o); rr=_polyR(o); }
+    if(cc){ const dr=Math.abs(Math.hypot(xm-cc[0],ym-cc[1])-rr); if(dr<=tol&&(!best||dr<best.d)) best={kind:_isEll?'ellipse':'ring', ref:o.id, d:dr, pt:cc}; } }
   for(const o of paintObjects){ if(o._arc){ let d=Infinity; try{d=distToObjStroke(o,xm,ym);}catch(e){} if(d<=tol&&(!best||d<best.d)) best={kind:'arc', ref:o.id, d}; } }
   const ne=nearestEdge(xm,ym); if(ne&&ne.d<=tol&&(!best||ne.d<best.d)) best={kind:'edge', ref:ne.ref, d:ne.d, seg:ne.seg, foot:ne.foot};
   // Congé : détecté PARTOUT sur son arc (distance r du centre), prioritaire sur les mini-segments
@@ -6763,6 +6764,7 @@ function cadDimClick(xm,ym){
   if(!hit){ if(typeof toastHist==='function')toastHist('📏 Clique un trait, un cercle ou un centre'); redrawCanvasNow(); return; }
   // D) 1 clic sur une entite -> la cote SUIT le curseur (clique pour la poser)
   if(hit.kind==='point'){ _dimEdgeA={kind:'point',ref:hit.ref}; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('📏 Point choisi — clique une 2e entité'); return; }
+  if(hit.kind==='ellipse'){ const mk=(k)=>{ let d=paintObjects.find(o=>o.type==='dim'&&o.ref===hit.ref&&o.kind===k); if(!d){ d=Object.assign({id:objCnt++,type:'dim',mv:[0,0]},{kind:k,ref:hit.ref}); paintObjects.push(d); } return d; }; const dw=mk('ellw'); mk('ellh'); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); openDimInput(dw); return; }
   if(hit.kind==='ring'){ _dimPlaceNow({kind:'diam',ref:hit.ref}); return; }
   if(hit.kind==='arc'){ _dimPlaceNow({kind:'arcrad', ref:hit.ref}); return; }
   if(hit.kind==='fillrad'){ _dimPlaceNow({kind:'fillrad', ref:hit.ref, fi:hit.fi}); return; }
@@ -6895,6 +6897,8 @@ function _dimGeomBase(dim){
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o && !(typeof dim.ref==='string' && dim.ref.indexOf('#')>=0)) return null;
   const off=6;
   if(dim.kind==='diam' && o._poly){ const c=_polyCenter(o), r=_polyR(o)||1; return {ax:c[0]-r, ay:c[1]-r-off, bx:c[0]+r, by:c[1]-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm', ext:[[[c[0]-r,c[1]],[c[0]-r,c[1]-r-off]],[[c[0]+r,c[1]],[c[0]+r,c[1]-r-off]]]}; }
+  if(dim.kind==='ellw' && o&&o.type==='ellipse'){ const rx=o.rx||1, ry=o.ry||1; const yy=o.y+ry+off; return {ax:o.x-rx, ay:yy, bx:o.x+rx, by:yy, val:2*rx, label:(2*rx).toFixed(1)+' mm', ext:[[[o.x-rx,o.y+ry],[o.x-rx,yy]],[[o.x+rx,o.y+ry],[o.x+rx,yy]]]}; }
+  if(dim.kind==='ellh' && o&&o.type==='ellipse'){ const rx=o.rx||1, ry=o.ry||1; const xx=o.x+rx+off; return {ax:xx, ay:o.y-ry, bx:xx, by:o.y+ry, val:2*ry, label:(2*ry).toFixed(1)+' mm', ext:[[[o.x+rx,o.y-ry],[xx,o.y-ry]],[[o.x+rx,o.y+ry],[xx,o.y+ry]]]}; }
   if(dim.kind==='diam' && (o._circle||o.type==='ellipse')){ const r=o.rx||o.ry||1; return {ax:o.x-r, ay:o.y-r-off, bx:o.x+r, by:o.y-r-off, val:2*r, label:'Ø '+(2*r).toFixed(1)+' mm', ext:[[[o.x-r,o.y],[o.x-r,o.y-r-off]],[[o.x+r,o.y],[o.x+r,o.y-r-off]]]}; }
   if(dim.kind==='fillrad'){ const of=paintObjects.find(x=>x.id===dim.ref); if(of&&of._fillets&&of._fillets[dim.fi]){ const f=of._fillets[dim.fi]; const dx=f.apex[0]-f.cx,dy=f.apex[1]-f.cy,L=Math.hypot(dx,dy)||1; const lead=16; const bx=f.apex[0]+dx/L*lead, by=f.apex[1]+dy/L*lead; return {ax:f.apex[0],ay:f.apex[1],bx,by,val:f.r,label:'R '+f.r.toFixed(1)+' mm'}; } return null; }
   if(dim.kind==='arcrad' && o._arc){ const C=_arcCenter(o), ap=_arcApexPt(o); if(!C||!ap)return null; const dx=ap[0]-C[0],dy=ap[1]-C[1],L=Math.hypot(dx,dy)||1; const lead=12; const bx=ap[0]+dx/L*lead, by=ap[1]+dy/L*lead; return {ax:ap[0],ay:ap[1],bx,by,val:o._arc.r,label:'R '+o._arc.r.toFixed(1)+' mm'}; }
@@ -6964,6 +6968,8 @@ function applyDimValue(dim,v){
     const cur=(bmx-amx)*nx+(bmy-amy)*ny, sign=cur>=0?1:-1, move=v*sign-cur;
     setSeg(Bo,[B[0]+nx*move,B[1]+ny*move,B[2]+nx*move,B[3]+ny*move]);
   }
+  else if(dim.kind==='ellw'){ o.rx=v/2; }
+  else if(dim.kind==='ellh'){ o.ry=v/2; }
   else if(dim.kind==='w'){ o.w=v; }
   else if(dim.kind==='h'){ o.h=v; }
   if(typeof updateLinkedCopies==='function')updateLinkedCopies();
