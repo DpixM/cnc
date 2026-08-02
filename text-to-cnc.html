@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BB ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BC ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6191,7 +6191,8 @@ function cadRotate(){ _cadPickOp(1, (objs)=>{ const o0=objs[0]; if(!o0)return; c
 function _doChamfer(objs, d){ const lines=objs.filter(o=>segOf(o)); if(lines.length<2){ if(typeof toastHist==='function')toastHist('⚠️ Clique 2 lignes'); return; } if(!(d>0)){ d=parseFloat(prompt('Longueur du chanfrein (mm) ?','5')); } if(!(d>0))return; const L1=lines[0],L2=lines[1]; const s1=segOf(L1).slice(),s2=segOf(L2).slice(); const I=_lineIntersect(s1,s2); if(!I){ if(typeof toastHist==='function')toastHist('⚠️ Lignes parallèles'); return; } const trim=(o,s)=>{ const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-I[0],e0[1]-I[1])<Math.hypot(e1[0]-I[0],e1[1]-I[1]))?0:1; const far=near?e0:e1; const dir=[far[0]-I[0],far[1]-I[1]]; const dl=Math.hypot(dir[0],dir[1])||1; const np=[I[0]+dir[0]/dl*d, I[1]+dir[1]/dl*d]; if(near===0){s[0]=np[0];s[1]=np[1];}else{s[2]=np[0];s[3]=np[1];} setSeg(o,s); return np; }; const p1=trim(L1,s1), p2=trim(L2,s2); paintObjects.push({id:Date.now()+Math.random(),type:'line',x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],strokeW:currentStrokeW}); redrawCanvasNow(); }
 function _cornerOnShape(kind, o, ia, ib, val){
   if(!o)return; let st; try{st=objToStrokesRaw(o);}catch(e){return;} if(!st||!st[0]){ if(typeof toastHist==='function')toastHist('⚠️ Forme non gérée'); return; }
-  let verts=st[0].map(pt=>[pt[0],pt[1]]); if(verts.length>1 && Math.hypot(verts[0][0]-verts[verts.length-1][0],verts[0][1]-verts[verts.length-1][1])<1e-6)verts.pop();
+  const _CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon']; let _wasClosed=_CLOSEDT.includes(o.type)||!!o._poly;
+  let verts=st[0].map(pt=>[pt[0],pt[1]]); if(verts.length>1 && Math.hypot(verts[0][0]-verts[verts.length-1][0],verts[0][1]-verts[verts.length-1][1])<1e-6){verts.pop(); _wasClosed=true;}
   const n=verts.length; if(n<3){ if(typeof toastHist==='function')toastHist('⚠️ Forme trop simple'); return; }
   const A=new Set([ia,(ia+1)%n]), B=new Set([ib,(ib+1)%n]); let vi=-1; for(const x of A){ if(B.has(x)){vi=x;break;} }
   if(vi<0){ if(typeof toastHist==='function')toastHist('⚠️ Choisis 2 côtés ADJACENTS (même coin)'); return; }
@@ -6202,7 +6203,7 @@ function _cornerOnShape(kind, o, ia, ib, val){
   let insert; let filletMeta=null;
   if(kind==='chamfer'){ const d=Math.min(val,l1-0.01,l2-0.01); const TA=[V[0]+u1[0]*d,V[1]+u1[1]*d], TB=[V[0]+u2[0]*d,V[1]+u2[1]*d]; insert=[TA,TB]; }
   else { const R=val; const tanD=Math.min(R/Math.tan(th/2), l1-0.01, l2-0.01); const TA=[V[0]+u1[0]*tanD,V[1]+u1[1]*tanD], TB=[V[0]+u2[0]*tanD,V[1]+u2[1]*tanD]; const bis=[u1[0]+u2[0],u1[1]+u2[1]],bl=Math.hypot(bis[0],bis[1])||1; const rr=tanD*Math.tan(th/2); const cen=[V[0]+bis[0]/bl*(rr/Math.sin(th/2)), V[1]+bis[1]/bl*(rr/Math.sin(th/2))]; const a1=Math.atan2(TA[1]-cen[1],TA[0]-cen[0]),a2=Math.atan2(TB[1]-cen[1],TB[0]-cen[0]); let span=a2-a1; while(span<=-Math.PI)span+=2*Math.PI; while(span>Math.PI)span-=2*Math.PI; const N=16; insert=[]; for(let i=0;i<=N;i++){ const a=a1+span*i/N; insert.push([cen[0]+rr*Math.cos(a),cen[1]+rr*Math.sin(a)]); } const apx=insert[Math.floor(insert.length/2)]; filletMeta={cx:cen[0],cy:cen[1],r:rr,apex:[apx[0],apx[1]],ta:[TA[0],TA[1]],tb:[TB[0],TB[1]],V:[V[0],V[1]],u1:[u1[0],u1[1]],u2:[u2[0],u2[1]]}; }
-  const nv=[]; for(let i=0;i<n;i++){ if(i===vi){ for(const q of insert)nv.push(q); } else nv.push(verts[i]); } nv.push([nv[0][0],nv[0][1]]);
+  const nv=[]; for(let i=0;i<n;i++){ if(i===vi){ for(const q of insert)nv.push(q); } else nv.push(verts[i]); } if(_wasClosed)nv.push([nv[0][0],nv[0][1]]);
   const idx=paintObjects.indexOf(o); const free={id:o.id,type:'free',pts:nv,strokeW:o.strokeW||currentStrokeW}; if(o.toolId!==undefined)free.toolId=o.toolId; free._fillets=(o._fillets?JSON.parse(JSON.stringify(o._fillets)):[]); if(filletMeta)free._fillets.push(filletMeta); if(o.fixed)free.fixed=true; paintObjects[idx]=free;
   redrawCanvasNow();
 }
@@ -6634,7 +6635,7 @@ function _applyConstraintNow(type, objs){
   else if(type==='concentric'){ if(circs.length>=2)_add('concentric',circs[0].id,circs[1].id); }
   else if(type==='coincident'){ if(lines.length>=2)_add('coincident',lines[0].id,lines[1].id); else if(pts.length>=2)_add('coincident',pts[0].id,pts[1].id); }
   else if(type==='midpoint'){ if(pts.length&&lines.length)_add('midpoint',pts[0].id,lines[0].id); }
-  else if(type==='tangent'){ if(circs.length&&lines.length)_add('tangent',circs[0].id,lines[0].id); }
+  else if(type==='tangent'){ if(circs.length&&lines.length&&lines[0].id!=null)_add('tangent',circs[0].id,lines[0].id); }
   if(typeof pushHistory==='function')pushHistory(); if(typeof redrawCanvasNow==='function')redrawCanvasNow();
   T('✅ Contrainte appliquée (persistante)');
 }
@@ -6657,7 +6658,7 @@ function _applyConstraintStep(c, anchorId){
       let best=null; for(const ea of [[a[0],a[1]],[a[2],a[3]]]) for(const w of [0,1]){ const eb=w?[s[2],s[3]]:[s[0],s[1]]; const d=Math.hypot(ea[0]-eb[0],ea[1]-eb[1]); if(!best||d<best.d)best={d,ea,w}; }
       const ns=s.slice(); if(best.w){ns[2]=best.ea[0];ns[3]=best.ea[1];}else{ns[0]=best.ea[0];ns[1]=best.ea[1];} setL(mov,ns); break; }
     case 'midpoint': { const pt=(A&&A.type==='point')?A:B, ln=(A&&A.type==='point')?B:A; if(!pt||!ln)return; if(_isAnchor(pt,anchorId))return; const s=L(ln); if(!s)return; pt.x=(s[0]+s[2])/2; pt.y=(s[1]+s[3])/2; break; }
-    case 'tangent': { const c=A, ln=B; if(!c||!ln)return; if(_isAnchor(c,anchorId))return; const s=L(ln); if(!s)return; const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1,nx=-ey/Ln,ny=ex/Ln,d=(c.x-s[0])*nx+(c.y-s[1])*ny,sg=d>=0?1:-1,r=(c.rx||c.ry),fx=c.x-nx*d,fy=c.y-ny*d; c.x=fx+nx*sg*r; c.y=fy+ny*sg*r; break; }
+    case 'tangent': { const c=A, ln=B; if(!c||!ln)return; const s=L(ln); if(!s)return; const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1,nx=-ey/Ln,ny=ex/Ln,d=(c.x-s[0])*nx+(c.y-s[1])*ny,sg=d>=0?1:-1,r=(c.rx||c.ry),fx=c.x-nx*d,fy=c.y-ny*d; c.x=fx+nx*sg*r; c.y=fy+ny*sg*r; break; }
   }
 }
 function solveSketch(anchorId){
