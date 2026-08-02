@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AY ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AZ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6233,12 +6233,20 @@ function _conEntityPick(xm,ym){
   if(best)return best;
   for(const o of paintObjects){ if(o._circle||o.type==='ellipse'){ const r=((o.rx||0)+(o.ry||0))/2; const dc=Math.hypot(xm-o.x,ym-o.y); const d=Math.min(Math.abs(dc-r),dc); if(d<=tol&&(!best||d<best.d))best={d,obj:o,edge:null,kind:'circle'}; } }
   if(best)return best;
+  // arcs (3 points) et congés : entité 'arc' avec un centre (pour concentrique/coïncidence/tangente)
+  let barc=null;
+  for(const o of paintObjects){
+    if(o._arc){ let d=Infinity; try{d=distToObjStroke(o,xm,ym);}catch(e){} if(d<=tol){ const c=_arcCenter(o); if(c&&(!barc||d<barc.d))barc={d,obj:o,edge:null,kind:'arc',center:c,r:o._arc.r}; } }
+    if(o._fillets){ for(let fi=0;fi<o._fillets.length;fi++){ const f=o._fillets[fi]; if(!f||f.cx==null)continue; const dr=Math.abs(Math.hypot(xm-f.cx,ym-f.cy)-f.r); if(dr<=tol && (!barc||dr<barc.d))barc={d:dr,obj:o,edge:null,kind:'arc',center:[f.cx,f.cy],r:f.r,fi}; } }
+  }
+  if(barc)return barc;
   const e=_pickEdgeAt(xm,ym); if(e)return {d:e.d,obj:e.obj,edge:e.edge,kind:'edge'};
   return null;
 }
 // Transforme un pick en objet manipulable par segOf/setSeg (poignée d'arête si besoin)
 function _resolvePickToObj(pick){
   if(!pick)return null;
+  if(pick.kind==='arc'&&pick.center)return {__arccenter:true, x:pick.center[0], y:pick.center[1], rx:pick.r, ry:pick.r, r:pick.r, _src:pick.obj};
   if(pick.kind==='circle'||pick.kind==='point'||pick.edge==null)return pick.obj;
   if(pick.obj.type==='line')return pick.obj;
   const f=_ensureFreePoly(pick.obj);
@@ -6298,7 +6306,7 @@ function _cornerOp(kind, picks){
 }
 function cadFillet(){ _setToolFromPick=true; if(typeof setPTool==='function')setPTool('select'); _setToolFromPick=false; _conPick={need:2, picks:[], pickEdges:true, fn:(edges)=>_cornerOp('fillet',edges), hint:'⌒ Congé'}; _cadMode=true; if(typeof _conHintShow==='function')_conHintShow('⌒ Congé — clique la 1ère arête'); redrawCanvasNow(); }
 function cadChamfer(){ _setToolFromPick=true; if(typeof setPTool==='function')setPTool('select'); _setToolFromPick=false; _conPick={need:2, picks:[], pickEdges:true, fn:(edges)=>_cornerOp('chamfer',edges), hint:'◣ Chanfrein'}; _cadMode=true; if(typeof _conHintShow==='function')_conHintShow('◣ Chanfrein — clique la 1ère arête'); redrawCanvasNow(); }
-function _doFillet(objs, R){ const lines=objs.filter(o=>segOf(o)); if(lines.length<2){ if(typeof toastHist==='function')toastHist('⚠️ Clique 2 lignes'); return; } if(!(R>0)){ R=parseFloat(prompt('Rayon du congé (mm) ?','5')); } if(!(R>0))return; const L1=lines[0],L2=lines[1]; const s1=segOf(L1).slice(),s2=segOf(L2).slice(); const I=_lineIntersect(s1,s2); if(!I){ if(typeof toastHist==='function')toastHist('⚠️ Lignes parallèles'); return; } const away=(s)=>{ const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-I[0],e0[1]-I[1])<Math.hypot(e1[0]-I[0],e1[1]-I[1]))?0:1; const far=near?e0:e1; const dl=Math.hypot(far[0]-I[0],far[1]-I[1])||1; return {u:[(far[0]-I[0])/dl,(far[1]-I[1])/dl], near}; }; const dA=away(s1), dB=away(s2); const dot=Math.max(-1,Math.min(1,dA.u[0]*dB.u[0]+dA.u[1]*dB.u[1])); const th=Math.acos(dot); if(th<0.05||th>Math.PI-0.05){ if(typeof toastHist==='function')toastHist('⚠️ Angle trop plat'); return; } const tanD=R/Math.tan(th/2); const TA=[I[0]+dA.u[0]*tanD,I[1]+dA.u[1]*tanD], TB=[I[0]+dB.u[0]*tanD,I[1]+dB.u[1]*tanD]; const setN=(o,s,near,np)=>{ if(near===0){s[0]=np[0];s[1]=np[1];}else{s[2]=np[0];s[3]=np[1];} setSeg(o,s); }; setN(L1,s1,dA.near,TA); setN(L2,s2,dB.near,TB); const bis=[dA.u[0]+dB.u[0],dA.u[1]+dB.u[1]]; const bl=Math.hypot(bis[0],bis[1])||1; const cen=[I[0]+bis[0]/bl*(R/Math.sin(th/2)), I[1]+bis[1]/bl*(R/Math.sin(th/2))]; const a1=Math.atan2(TA[1]-cen[1],TA[0]-cen[0]), a2=Math.atan2(TB[1]-cen[1],TB[0]-cen[0]); let span=a2-a1; while(span<=-Math.PI)span+=2*Math.PI; while(span>Math.PI)span-=2*Math.PI; const N=24,pts=[]; for(let i=0;i<=N;i++){ const a=a1+span*i/N; pts.push([cen[0]+R*Math.cos(a),cen[1]+R*Math.sin(a)]); } const through=pts[Math.floor(N/2)]; const mx=(TA[0]+TB[0])/2,my=(TA[1]+TB[1])/2, ndx=-(TB[1]-TA[1]),ndy=(TB[0]-TA[0]); const sgn=((through[0]-mx)*ndx+(through[1]-my)*ndy)>=0?1:-1; paintObjects.push({id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW,_arc:{p1:[TA[0],TA[1]],p2:[TB[0],TB[1]],r:R,sgn}}); redrawCanvasNow(); }
+function _doFillet(objs, R){ const lines=objs.filter(o=>segOf(o)); if(lines.length<2){ if(typeof toastHist==='function')toastHist('⚠️ Clique 2 lignes'); return; } if(!(R>0)){ R=parseFloat(prompt('Rayon du congé (mm) ?','5')); } if(!(R>0))return; const L1=lines[0],L2=lines[1]; const s1=segOf(L1).slice(),s2=segOf(L2).slice(); const I=_lineIntersect(s1,s2); if(!I){ if(typeof toastHist==='function')toastHist('⚠️ Lignes parallèles'); return; } const away=(s)=>{ const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-I[0],e0[1]-I[1])<Math.hypot(e1[0]-I[0],e1[1]-I[1]))?0:1; const far=near?e0:e1; const dl=Math.hypot(far[0]-I[0],far[1]-I[1])||1; return {u:[(far[0]-I[0])/dl,(far[1]-I[1])/dl], near, L:dl}; }; const dA=away(s1), dB=away(s2); const dot=Math.max(-1,Math.min(1,dA.u[0]*dB.u[0]+dA.u[1]*dB.u[1])); const th=Math.acos(dot); if(th<0.05||th>Math.PI-0.05){ if(typeof toastHist==='function')toastHist('⚠️ Angle trop plat'); return; } let tanD=Math.min(R/Math.tan(th/2), dA.L-0.05, dB.L-0.05); if(tanD<0.05)tanD=0.05; const Reff=tanD*Math.tan(th/2); const TA=[I[0]+dA.u[0]*tanD,I[1]+dA.u[1]*tanD], TB=[I[0]+dB.u[0]*tanD,I[1]+dB.u[1]*tanD]; const setN=(o,s,near,np)=>{ if(near===0){s[0]=np[0];s[1]=np[1];}else{s[2]=np[0];s[3]=np[1];} setSeg(o,s); }; setN(L1,s1,dA.near,TA); setN(L2,s2,dB.near,TB); const bis=[dA.u[0]+dB.u[0],dA.u[1]+dB.u[1]]; const bl=Math.hypot(bis[0],bis[1])||1; const cen=[I[0]+bis[0]/bl*(Reff/Math.sin(th/2)), I[1]+bis[1]/bl*(Reff/Math.sin(th/2))]; const a1=Math.atan2(TA[1]-cen[1],TA[0]-cen[0]), a2=Math.atan2(TB[1]-cen[1],TB[0]-cen[0]); let span=a2-a1; while(span<=-Math.PI)span+=2*Math.PI; while(span>Math.PI)span-=2*Math.PI; const N=24,pts=[]; for(let i=0;i<=N;i++){ const a=a1+span*i/N; pts.push([cen[0]+Reff*Math.cos(a),cen[1]+Reff*Math.sin(a)]); } const through=pts[Math.floor(N/2)]; const mx=(TA[0]+TB[0])/2,my=(TA[1]+TB[1])/2, ndx=-(TB[1]-TA[1]),ndy=(TB[0]-TA[0]); const sgn=((through[0]-mx)*ndx+(through[1]-my)*ndy)>=0?1:-1; paintObjects.push({id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW,_arc:{p1:[TA[0],TA[1]],p2:[TB[0],TB[1]],r:R,sgn}}); redrawCanvasNow(); }
 
 function _doTrim(objs, click){ const L=objs.find(o=>segOf(o)); if(!L){ if(typeof toastHist==='function')toastHist('⚠️ Clique une ligne'); return; } const s=segOf(L).slice(); let best=null; for(const o of paintObjects){ if(o.id===L.id||o.type==='dim'||o.type==='constraint'||o.type==='group')continue; let segs; try{segs=objToStrokesRaw(o)||[];}catch(e){continue;} for(const poly of segs){ for(let i=0;i<poly.length-1;i++){ const ip=_segInt([s[0],s[1],s[2],s[3]],[poly[i][0],poly[i][1],poly[i+1][0],poly[i+1][1]]); if(ip){ const d=Math.hypot(ip[0]-click[0],ip[1]-click[1]); if(!best||d<best.d)best={d,ip}; } } } } if(!best){ if(typeof toastHist==='function')toastHist('✂️ Aucune intersection à couper ici'); return; } const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-click[0],e0[1]-click[1])<Math.hypot(e1[0]-click[0],e1[1]-click[1]))?0:1; if(near===0){s[0]=best.ip[0];s[1]=best.ip[1];}else{s[2]=best.ip[0];s[3]=best.ip[1];} setSeg(L,s); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('✂️ Coupé à l\'intersection'); }
 function cadTrim(){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={need:1, picks:[], pickCon:true, fn:(objs,click)=>_doTrim(objs,click), hint:'✂️ Ajuster'}; _cadMode=true; _conHintShow('✂️ Ajuster — clique le côté (la partie à couper)'); redrawCanvasNow(); }
@@ -6571,7 +6579,7 @@ function _conPickClick(xm,ym){
   else _conHintShow((_conPick.hint||('🔧 '+(_CON_LABEL[_conPick.type]||_conPick.type||'')))+' — clique la '+(_conPick.picks.length+1)+'ᵉ forme');
 }
 function _applyConstraintNow(type, objs){
-  const lines=objs.filter(o=>segOf(o)); const circs=objs.filter(o=>o._circle||o.type==='ellipse'); const pts=objs.filter(o=>o.type==='point');
+  const lines=objs.filter(o=>segOf(o)); const circs=objs.filter(o=>o._circle||o.type==='ellipse'||o.__arccenter); const pts=objs.filter(o=>o.type==='point');
   const T=(m)=>{ if(typeof toastHist==='function')toastHist(m); };
   const setL=(o,s)=>setSeg(o,s), L=(o)=>segOf(o), half=(s)=>Math.hypot(s[2]-s[0],s[3]-s[1])/2, mid=(s)=>[(s[0]+s[2])/2,(s[1]+s[3])/2];
   let ok=true;
@@ -6588,7 +6596,7 @@ function _applyConstraintNow(type, objs){
       if(lines.length>=2){ const la=half(L(lines[0]))*2; const s=L(lines[1]); const dx=s[2]-s[0],dy=s[3]-s[1],cur=Math.hypot(dx,dy)||1,k=la/cur; setL(lines[1],[s[0],s[1],s[0]+dx*k,s[1]+dy*k]); }
       else if(circs.length>=2){ const r=(circs[0].rx||circs[0].ry); circs[1].rx=circs[1].ry=r; }
       else { T('⚠️ 2 lignes ou 2 cercles'); return; } break; }
-    case 'concentric': { if(circs.length<2){ T('⚠️ Sélectionne 2 cercles'); return; } circs[1].x=circs[0].x; circs[1].y=circs[0].y; break; }
+    case 'concentric': { if(circs.length<2){ T('⚠️ Sélectionne 2 cercles/arcs'); return; } const anc=circs.find(o=>o.__arccenter); if(anc){ const mov=circs.find(o=>o!==anc); if(mov){ mov.x=anc.x; mov.y=anc.y; } } else { circs[1].x=circs[0].x; circs[1].y=circs[0].y; } T('◎ Concentrique'); break; }
     case 'collinear': { if(lines.length<2){ T('⚠️ Sélectionne 2 lignes'); return; }
       const a=L(lines[0]); const ang=Math.atan2(a[3]-a[1],a[2]-a[0]),dx=Math.cos(ang),dy=Math.sin(ang);
       const s=L(lines[1]),m=mid(s),hh=half(s); const tp=((m[0]-a[0])*dx+(m[1]-a[1])*dy),px=a[0]+dx*tp,py=a[1]+dy*tp;
