@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BA ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BB ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6178,12 +6178,15 @@ function cadScale(){
 function _cadPickOp(need, fn, hint){ _setToolFromPick=true; if(typeof setPTool==='function')setPTool('select'); _setToolFromPick=false; _conPick={need, picks:[], fn, hint}; _cadMode=true; if(typeof _conHintShow==='function')_conHintShow(hint+' — clique la 1ère forme'); if(typeof redrawCanvasNow==='function')redrawCanvasNow(); }
 function _lineIntersect(A,B){ const x1=A[0],y1=A[1],x2=A[2],y2=A[3],x3=B[0],y3=B[1],x4=B[2],y4=B[3]; const d=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4); if(Math.abs(d)<1e-9)return null; const px=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/d; const py=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/d; return [px,py]; }
 function _raySegInt(P,u,S){ const x3=S[0],y3=S[1],x4=S[2],y4=S[3]; const dx=x4-x3,dy=y4-y3; const den=u[0]*dy-u[1]*dx; if(Math.abs(den)<1e-9)return null; const t=((x3-P[0])*dy-(y3-P[1])*dx)/den; const s=((x3-P[0])*u[1]-(y3-P[1])*u[0])/den; if(s<-0.001||s>1.001)return null; return {t, p:[P[0]+u[0]*t, P[1]+u[1]*t]}; }
-function cadRotate(){ _cadPickOp(1, (objs)=>{ const o0=objs[0]; if(!o0)return; const id=o0.id; const b=getObjBB(o0); const cx=b.x+b.w/2, cy=b.y+b.h/2; const snap=JSON.stringify(paintObjects);
-  const apply=(deg)=>{ paintObjects.length=0; JSON.parse(snap).forEach(x=>paintObjects.push(x)); let t=getObj(id); if(!t)return; const a=deg*Math.PI/180;
-    if(['rect','oblong','tri','star','gear','text','svg'].indexOf(t.type)>=0 && !t._circle){ try{ const st=objToStrokesRaw(t); let pts=(st&&st[0])?st[0].map(pt=>[pt[0],pt[1]]):null; if(pts&&pts.length>2){ if(Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])>1e-6)pts.push([pts[0][0],pts[0][1]]); const idx=paintObjects.indexOf(t); const free={id:t.id,type:'free',pts,strokeW:t.strokeW||currentStrokeW}; if(t.toolId!==undefined)free.toolId=t.toolId; paintObjects[idx]=free; t=free; } }catch(e){} }
-    _rotateObj(t,cx,cy,a); if(t._arc)_arcRegen(t); redrawCanvasNow(); };
-  apply(0);
-  _valInput('⟳ Angle (°)', 0, apply, (v)=>{ if(v==null){ paintObjects.length=0; JSON.parse(snap).forEach(x=>paintObjects.push(x)); redrawCanvasNow(); } else { apply(v); if(typeof pushHistory==='function')pushHistory(); if(typeof toastHist==='function')toastHist('⟳ Rotation '+v+'°'); } });
+function cadRotate(){ _cadPickOp(1, (objs)=>{ const o0=objs[0]; if(!o0)return; const id=o0.id; const b=getObjBB(o0); const snap=JSON.stringify(paintObjects);
+  const st={id, snap, piv:[b.x+b.w/2, b.y+b.h/2], deg:0, _pivChanged:false};
+  const apply=(deg)=>{ st.deg=deg; paintObjects.length=0; JSON.parse(snap).forEach(x=>paintObjects.push(x)); let t=getObj(id); if(!t)return; const a=deg*Math.PI/180;
+    if(['rect','oblong','tri','star','gear','text','svg'].indexOf(t.type)>=0 && !t._circle){ try{ const s2=objToStrokesRaw(t); let pts=(s2&&s2[0])?s2[0].map(pt=>[pt[0],pt[1]]):null; if(pts&&pts.length>2){ if(Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])>1e-6)pts.push([pts[0][0],pts[0][1]]); const idx=paintObjects.indexOf(t); const free={id:t.id,type:'free',pts,strokeW:t.strokeW||currentStrokeW}; if(t.toolId!==undefined)free.toolId=t.toolId; if(t._fillets)free._fillets=JSON.parse(JSON.stringify(t._fillets)); paintObjects[idx]=free; t=free; } }catch(e){} }
+    _rotateObj(t,st.piv[0],st.piv[1],a); if(t._arc)_arcRegen(t); redrawCanvasNow(); };
+  st.reapply=()=>apply(st.deg);
+  _rotActive=st; apply(0);
+  if(typeof _conHintShow==='function')_conHintShow('⟳ Clique un point = pivot (défaut : centre) • ou tape l\'angle');
+  _valInput('⟳ Angle (°)', 0, apply, (v)=>{ _rotActive=null; if(typeof _conHintHide==='function')_conHintHide(); if(v==null){ paintObjects.length=0; JSON.parse(snap).forEach(x=>paintObjects.push(x)); redrawCanvasNow(); } else { apply(v); if(typeof pushHistory==='function')pushHistory(); if(typeof toastHist==='function')toastHist('⟳ Rotation '+v+'° (pivot '+(st._pivChanged?'choisi':'centre')+')'); } });
   }, '⟳ Rotation'); }
 function _doChamfer(objs, d){ const lines=objs.filter(o=>segOf(o)); if(lines.length<2){ if(typeof toastHist==='function')toastHist('⚠️ Clique 2 lignes'); return; } if(!(d>0)){ d=parseFloat(prompt('Longueur du chanfrein (mm) ?','5')); } if(!(d>0))return; const L1=lines[0],L2=lines[1]; const s1=segOf(L1).slice(),s2=segOf(L2).slice(); const I=_lineIntersect(s1,s2); if(!I){ if(typeof toastHist==='function')toastHist('⚠️ Lignes parallèles'); return; } const trim=(o,s)=>{ const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-I[0],e0[1]-I[1])<Math.hypot(e1[0]-I[0],e1[1]-I[1]))?0:1; const far=near?e0:e1; const dir=[far[0]-I[0],far[1]-I[1]]; const dl=Math.hypot(dir[0],dir[1])||1; const np=[I[0]+dir[0]/dl*d, I[1]+dir[1]/dl*d]; if(near===0){s[0]=np[0];s[1]=np[1];}else{s[2]=np[0];s[3]=np[1];} setSeg(o,s); return np; }; const p1=trim(L1,s1), p2=trim(L2,s2); paintObjects.push({id:Date.now()+Math.random(),type:'line',x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],strokeW:currentStrokeW}); redrawCanvasNow(); }
 function _cornerOnShape(kind, o, ia, ib, val){
@@ -6542,7 +6545,7 @@ function _shpOverlay(){
   pCtx.restore();
 }
 // ── CONTRAINTES (version ponctuelle : applique une fois. Persistant = etape suivante) ──
-let _conPick = null; let _setToolFromPick=false; // {type, need, picks:[]} : selection guidee des elements d'une contrainte
+let _conPick = null; let _rotActive=null; let _setToolFromPick=false; // {type, need, picks:[]} : selection guidee des elements d'une contrainte
 const _CON_LABEL={horiz:'Horizontale',vert:'Verticale',parallel:'Parallèle',perp:'Perpendiculaire',equal:'Égal',concentric:'Concentrique',collinear:'Colinéaire',coincident:'Coïncident',midpoint:'Milieu',tangent:'Tangente',fix:'Fixer',symmetry:'Symétrie'};
 function _conHintShow(t){ let e=document.getElementById('cadHint'); if(!e){ e=document.createElement('div'); e.id='cadHint'; e.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:100001;background:#1f2430;border:1px solid #4a5568;border-radius:9px;padding:8px 16px;font:13px sans-serif;color:#ffd08a;box-shadow:0 4px 14px rgba(0,0,0,.5)'; document.body.appendChild(e);} e.textContent=t; }
 function _conHintHide(){ const e=document.getElementById('cadHint'); if(e)e.remove(); }
@@ -7044,6 +7047,7 @@ function _cadDimOverlay(){
     if(_arrayCursor){ const c=mmToPx(_arrayCursor[0],_arrayCursor[1]); pCtx.strokeStyle='#e11d9b'; pCtx.lineWidth=2; pCtx.beginPath(); pCtx.arc(c[0],c[1],7,0,Math.PI*2); pCtx.moveTo(c[0]-11,c[1]); pCtx.lineTo(c[0]+11,c[1]); pCtx.moveTo(c[0],c[1]-11); pCtx.lineTo(c[0],c[1]+11); pCtx.stroke(); }
     pCtx.restore(); }
   // Contrainte en cours : surligner les elements deja cliques (vert)
+  if(pCtx && _rotActive){ const _pc=mmToPx(_rotActive.piv[0],_rotActive.piv[1]); pCtx.save(); pCtx.strokeStyle='#e11d48'; pCtx.fillStyle='#e11d48'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(_pc[0],_pc[1],7,0,2*Math.PI); pCtx.stroke(); pCtx.beginPath(); pCtx.moveTo(_pc[0]-11,_pc[1]); pCtx.lineTo(_pc[0]+11,_pc[1]); pCtx.moveTo(_pc[0],_pc[1]-11); pCtx.lineTo(_pc[0],_pc[1]+11); pCtx.stroke(); pCtx.restore(); }
   if(pCtx){ for(const o of paintObjects){ if(o._fillets){ for(const f of o._fillets){ if(!f||f.cx==null)continue; const c=mmToPx(f.cx,f.cy); pCtx.save(); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='rgba(59,130,246,.18)'; pCtx.lineWidth=1.4; pCtx.beginPath(); pCtx.arc(c[0],c[1],4.5,0,2*Math.PI); pCtx.fill(); pCtx.stroke(); pCtx.restore(); } } } }
     if(pCtx && _conPick && _conPick.picks.length){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3;
     for(const pk of _conPick.picks){ try{ if(pk && pk.obj && typeof pk.edge==='number'){ const sg=_edgeSeg(pk); if(sg){ const a=mmToPx(sg[0],sg[1]),b=mmToPx(sg[2],sg[3]); pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke(); } } else { const _tgt=pk&&pk.obj?pk.obj:pk; for(const s of objToStrokesRaw(_tgt)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } } }catch(e){} }
@@ -7243,6 +7247,7 @@ function onME(e){handlePointerUp(e.offsetX,e.offsetY);pushHistoryIfDirty();}
 
 function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
+  if(_rotActive){ const sp=snapPoint(xm,ym,_rotActive.id); _rotActive.piv=[sp.x,sp.y]; _rotActive._pivChanged=true; if(_rotActive.reapply)_rotActive.reapply(); redrawCanvasNow(); return; } // rotation : choisir le point de pivot
   if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
   if(_arrayPick){ if(_arrayPick.stage==='obj'){ const o=_pickObjForCon(xm,ym); if(o){ _arrayPick.objs=[o.id]; _arrayPick.stage='pivot'; _conHintShow('✳️ Clique le point de PIVOT (centre)'); redrawCanvasNow(); } else _conHintShow('✳️ Clique une forme à répéter'); return; } const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _conHintHide(); _arrayDoPolar(sp.x,sp.y); return; } // reseau : etape forme puis pivot
   if(paintTool==='cadline'){ cadAddPoint(xm,ym); return; } // outil ligne CAD
