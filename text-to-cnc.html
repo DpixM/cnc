@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BE ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BF ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -7491,7 +7491,7 @@ function renderSnapBtn(){
 }
 
 function handlePointerMove(cpx,cpy){
-  if(_rotActive && _rotActive.dragging){ const[xm,ym]=pxToMm(cpx,cpy); let deg=Math.atan2(ym-_rotActive.piv[1], xm-_rotActive.piv[0])*180/Math.PI; deg=Math.round(deg*10)/10; if(_rotActive.apply)_rotActive.apply(deg); const _di=document.querySelector('#valInput input'); if(_di)_di.value=deg.toFixed(1); redrawCanvasNow(); return; }
+  if(_rotActive && _rotActive.dragging){ const[xm,ym]=pxToMm(cpx,cpy); let deg=Math.atan2(ym-_rotActive.piv[1], xm-_rotActive.piv[0])*180/Math.PI; const _pc=mmToPx(_rotActive.piv[0],_rotActive.piv[1]); const _distpx=Math.hypot(cpx-_pc[0],cpy-_pc[1]); const _inc=(_distpx<120)?5:45; const _near=Math.round(deg/_inc)*_inc; if(Math.abs(deg-_near)<3)deg=_near; deg=Math.round(deg*10)/10; if(_rotActive.apply)_rotActive.apply(deg); const _di=document.querySelector('#valInput input'); if(_di)_di.value=deg.toFixed(1); redrawCanvasNow(); return; }
   if(isDragging && dragMode==='pan'){ pmPanView(cpx,cpy); return; } // pan molette : marche dans TOUS les outils
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
   if(paintTool==='pshape'){ if(_shp){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _shp.cursor=[sp.x,sp.y]; _shp._snapped=sp.snapped; if(_shp.cx!=null && !_shp.typed && typeof _shpRadius==='function'){ const _di=document.querySelector('#shpInputs input:last-of-type'); if(_di && document.activeElement!==_di) _di.value=(_shpRadius()*2).toFixed(1); } redrawCanvasNow(); } return; }
