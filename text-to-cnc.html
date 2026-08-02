@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AX ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-AY ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6477,8 +6477,8 @@ function _shpFinalize(){
   if(!_shp||_shp.cx==null)return; const r=_shpRadius(); const o=_shpMake(_shp.tool,_shp.cx,_shp.cy,r,_shp.sides);
   paintObjects.push(o); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=o.id; if(typeof selObjIds!=='undefined'&&selObjIds.add)selObjIds.add(o.id);
   if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount();
-  const tool=_shp.tool, sides=_shp.sides; _shp={tool, cx:null, cy:null, cursor:null, typed:'', _snapped:false, sides}; // enchaine (Fusion continue)
-  if(typeof _shpShowInputs==='function')_shpShowInputs(); redrawCanvasNow();
+  const tool=_shp.tool, sides=_shp.sides; _shp={tool, cx:null, cy:null, cursor:null, typed:'', _snapped:false, sides}; // outil reste actif, mais la fenêtre disparaît jusqu'au prochain clic de centre
+  if(typeof _shpInputsRemove==='function')_shpInputsRemove(); redrawCanvasNow();
 }
 function _shpKey(e){
   if(!_shp)return false;
@@ -7447,7 +7447,7 @@ function renderSnapBtn(){
 function handlePointerMove(cpx,cpy){
   if(isDragging && dragMode==='pan'){ pmPanView(cpx,cpy); return; } // pan molette : marche dans TOUS les outils
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
-  if(paintTool==='pshape'){ if(_shp){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _shp.cursor=[sp.x,sp.y]; _shp._snapped=sp.snapped; redrawCanvasNow(); } return; }
+  if(paintTool==='pshape'){ if(_shp){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _shp.cursor=[sp.x,sp.y]; _shp._snapped=sp.snapped; if(_shp.cx!=null && !_shp.typed && typeof _shpRadius==='function'){ const _di=document.querySelector('#shpInputs input:last-of-type'); if(_di && document.activeElement!==_di) _di.value=(_shpRadius()*2).toFixed(1); } redrawCanvasNow(); } return; }
   if(_arrayPick){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _arrayCursor=[sp.x,sp.y]; redrawCanvasNow(); return; }
   if(paintTool==='caddim'){ const[xm,ym]=pxToMm(cpx,cpy); if(_dimPlace){ _dimPlace.px=xm; _dimPlace.py=ym;
       // pendant la depose : surligner la 2e entite (snap) tant qu'on n'a pas encore combine
