@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BD ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BE ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6178,11 +6178,11 @@ function _cadPickOp(need, fn, hint){ _setToolFromPick=true; if(typeof setPTool==
 function _lineIntersect(A,B){ const x1=A[0],y1=A[1],x2=A[2],y2=A[3],x3=B[0],y3=B[1],x4=B[2],y4=B[3]; const d=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4); if(Math.abs(d)<1e-9)return null; const px=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/d; const py=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/d; return [px,py]; }
 function _raySegInt(P,u,S){ const x3=S[0],y3=S[1],x4=S[2],y4=S[3]; const dx=x4-x3,dy=y4-y3; const den=u[0]*dy-u[1]*dx; if(Math.abs(den)<1e-9)return null; const t=((x3-P[0])*dy-(y3-P[1])*dx)/den; const s=((x3-P[0])*u[1]-(y3-P[1])*u[0])/den; if(s<-0.001||s>1.001)return null; return {t, p:[P[0]+u[0]*t, P[1]+u[1]*t]}; }
 function cadRotate(){ _cadPickOp(1, (objs)=>{ const o0=objs[0]; if(!o0)return; const id=o0.id; const b=getObjBB(o0); const snap=JSON.stringify(paintObjects);
-  const st={id, snap, piv:[b.x+b.w/2, b.y+b.h/2], deg:0, _pivChanged:false};
+  const st={id, snap, piv:[b.x+b.w/2, b.y+b.h/2], deg:0, _pivChanged:false, hr:Math.max(b.w,b.h)/2+12, dragging:false};
   const apply=(deg)=>{ st.deg=deg; paintObjects.length=0; JSON.parse(snap).forEach(x=>paintObjects.push(x)); let t=getObj(id); if(!t)return; const a=deg*Math.PI/180;
     if(['rect','oblong','tri','star','gear','text','svg'].indexOf(t.type)>=0 && !t._circle){ try{ const s2=objToStrokesRaw(t); let pts=(s2&&s2[0])?s2[0].map(pt=>[pt[0],pt[1]]):null; if(pts&&pts.length>2){ if(Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])>1e-6)pts.push([pts[0][0],pts[0][1]]); const idx=paintObjects.indexOf(t); const free={id:t.id,type:'free',pts,strokeW:t.strokeW||currentStrokeW}; if(t.toolId!==undefined)free.toolId=t.toolId; if(t._fillets)free._fillets=JSON.parse(JSON.stringify(t._fillets)); paintObjects[idx]=free; t=free; } }catch(e){} }
     _rotateObj(t,st.piv[0],st.piv[1],a); if(t._arc)_arcRegen(t); redrawCanvasNow(); };
-  st.reapply=()=>apply(st.deg);
+  st.reapply=()=>apply(st.deg); st.apply=apply;
   _rotActive=st; apply(0);
   if(typeof _conHintShow==='function')_conHintShow('⟳ Clique un point = pivot (défaut : centre) • ou tape l\'angle');
   _valInput('⟳ Angle (°)', 0, apply, (v)=>{ _rotActive=null; if(typeof _conHintHide==='function')_conHintHide(); if(v==null){ paintObjects.length=0; JSON.parse(snap).forEach(x=>paintObjects.push(x)); redrawCanvasNow(); } else { apply(v); if(typeof pushHistory==='function')pushHistory(); if(typeof toastHist==='function')toastHist('⟳ Rotation '+v+'° (pivot '+(st._pivChanged?'choisi':'centre')+')'); } });
@@ -7072,7 +7072,8 @@ function _cadDimOverlay(){
     pCtx.restore(); }
   // Contrainte en cours : surligner les elements deja cliques (vert)
   if(pCtx && _mirror && _mirror.shapes.size){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=2.4; for(const _id of _mirror.shapes){ const _o=getObj(_id); if(!_o)continue; try{ for(const _s of objToStrokesRaw(_o)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} pCtx.stroke(); } }catch(e){} } pCtx.restore(); }
-  if(pCtx && _rotActive){ const _pc=mmToPx(_rotActive.piv[0],_rotActive.piv[1]); pCtx.save(); pCtx.strokeStyle='#e11d48'; pCtx.fillStyle='#e11d48'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(_pc[0],_pc[1],7,0,2*Math.PI); pCtx.stroke(); pCtx.beginPath(); pCtx.moveTo(_pc[0]-11,_pc[1]); pCtx.lineTo(_pc[0]+11,_pc[1]); pCtx.moveTo(_pc[0],_pc[1]-11); pCtx.lineTo(_pc[0],_pc[1]+11); pCtx.stroke(); pCtx.restore(); }
+  if(pCtx && _rotActive){ const _pc=mmToPx(_rotActive.piv[0],_rotActive.piv[1]); pCtx.save(); pCtx.strokeStyle='#e11d48'; pCtx.fillStyle='#e11d48'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(_pc[0],_pc[1],7,0,2*Math.PI); pCtx.stroke(); pCtx.beginPath(); pCtx.moveTo(_pc[0]-11,_pc[1]); pCtx.lineTo(_pc[0]+11,_pc[1]); pCtx.moveTo(_pc[0],_pc[1]-11); pCtx.lineTo(_pc[0],_pc[1]+11); pCtx.stroke();
+    const _ha=_rotActive.deg*Math.PI/180; const _hmm=[_rotActive.piv[0]+Math.cos(_ha)*_rotActive.hr, _rotActive.piv[1]+Math.sin(_ha)*_rotActive.hr]; const _hp=mmToPx(_hmm[0],_hmm[1]); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='#3b82f6'; pCtx.lineWidth=1.8; pCtx.setLineDash([4,3]); pCtx.beginPath(); pCtx.moveTo(_pc[0],_pc[1]); pCtx.lineTo(_hp[0],_hp[1]); pCtx.stroke(); pCtx.setLineDash([]); pCtx.beginPath(); pCtx.arc(_hp[0],_hp[1],7,0,2*Math.PI); pCtx.fill(); pCtx.restore(); }
   if(pCtx){ for(const o of paintObjects){ if(o._fillets){ for(const f of o._fillets){ if(!f||f.cx==null)continue; const c=mmToPx(f.cx,f.cy); pCtx.save(); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='rgba(59,130,246,.18)'; pCtx.lineWidth=1.4; pCtx.beginPath(); pCtx.arc(c[0],c[1],4.5,0,2*Math.PI); pCtx.fill(); pCtx.stroke(); pCtx.restore(); } } } }
     if(pCtx && _conPick && _conPick.picks.length){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3;
     for(const pk of _conPick.picks){ try{ if(pk && pk.obj && typeof pk.edge==='number'){ const sg=_edgeSeg(pk); if(sg){ const a=mmToPx(sg[0],sg[1]),b=mmToPx(sg[2],sg[3]); pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke(); } } else { const _tgt=pk&&pk.obj?pk.obj:pk; for(const s of objToStrokesRaw(_tgt)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } } }catch(e){} }
@@ -7273,7 +7274,7 @@ function onME(e){handlePointerUp(e.offsetX,e.offsetY);pushHistoryIfDirty();}
 function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
   if(_mirror){ _mirrorClick(xm,ym); return; } // outil miroir 2 étapes
-  if(_rotActive){ const sp=snapPoint(xm,ym,_rotActive.id); _rotActive.piv=[sp.x,sp.y]; _rotActive._pivChanged=true; if(_rotActive.reapply)_rotActive.reapply(); redrawCanvasNow(); return; } // rotation : choisir le point de pivot
+  if(_rotActive){ const a=_rotActive.deg*Math.PI/180; const hx=_rotActive.piv[0]+Math.cos(a)*_rotActive.hr, hy=_rotActive.piv[1]+Math.sin(a)*_rotActive.hr; const tolh=14/(BASE_PX*vZoom); if(Math.hypot(xm-hx,ym-hy)<=tolh){ _rotActive.dragging=true; return; } const sp=snapPoint(xm,ym,_rotActive.id); _rotActive.piv=[sp.x,sp.y]; _rotActive._pivChanged=true; if(_rotActive.reapply)_rotActive.reapply(); redrawCanvasNow(); return; } // rotation : poignée (drag) ou choix du pivot
   if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
   if(_arrayPick){ if(_arrayPick.stage==='obj'){ const o=_pickObjForCon(xm,ym); if(o){ _arrayPick.objs=[o.id]; _arrayPick.stage='pivot'; _conHintShow('✳️ Clique le point de PIVOT (centre)'); redrawCanvasNow(); } else _conHintShow('✳️ Clique une forme à répéter'); return; } const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _conHintHide(); _arrayDoPolar(sp.x,sp.y); return; } // reseau : etape forme puis pivot
   if(paintTool==='cadline'){ cadAddPoint(xm,ym); return; } // outil ligne CAD
@@ -7490,6 +7491,7 @@ function renderSnapBtn(){
 }
 
 function handlePointerMove(cpx,cpy){
+  if(_rotActive && _rotActive.dragging){ const[xm,ym]=pxToMm(cpx,cpy); let deg=Math.atan2(ym-_rotActive.piv[1], xm-_rotActive.piv[0])*180/Math.PI; deg=Math.round(deg*10)/10; if(_rotActive.apply)_rotActive.apply(deg); const _di=document.querySelector('#valInput input'); if(_di)_di.value=deg.toFixed(1); redrawCanvasNow(); return; }
   if(isDragging && dragMode==='pan'){ pmPanView(cpx,cpy); return; } // pan molette : marche dans TOUS les outils
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
   if(paintTool==='pshape'){ if(_shp){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _shp.cursor=[sp.x,sp.y]; _shp._snapped=sp.snapped; if(_shp.cx!=null && !_shp.typed && typeof _shpRadius==='function'){ const _di=document.querySelector('#shpInputs input:last-of-type'); if(_di && document.activeElement!==_di) _di.value=(_shpRadius()*2).toFixed(1); } redrawCanvasNow(); } return; }
@@ -7787,6 +7789,7 @@ function pmDrawInProgress(xm,ym){
 }
 
 function handlePointerUp(cpx,cpy){
+  if(_rotActive && _rotActive.dragging){ _rotActive.dragging=false; return; }
   const[xm,ym]=pxToMm(cpx,cpy);
   if(isDragging&&dragMode==='marquee'){ isDragging=false;dragMode=null; if(pCanvas)pCanvas.style.cursor='default'; finishMarquee(); return; }
   if(isDragging&&dragMode==='pan'){isDragging=false;dragMode=null;if(pCanvas)pCanvas.style.cursor='default';return;}
