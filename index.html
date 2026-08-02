@@ -1444,7 +1444,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BC ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BD ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -4367,8 +4367,6 @@ const TOOL_MENUS = {
     {i:'∿', l:'Spline (tracé libre)', fn:"cadPick('free')"},
     {i:'•', l:'Point',                fn:"cadPick('point')"},
     {i:'T', l:'Texte',                fn:"cadPick('text')"},
-    {i:'🪞', l:'Miroir ⇋ (gauche-droite)', fn:"cadMirror('lr')"},
-    {i:'🪞', l:'Miroir ⥯ (haut-bas)',      fn:"cadMirror('ud')"},
   ],
   cadModify: [
     {i:'⌒', l:'Congé (arrondi)',   fn:"cadFillet()"},
@@ -4380,6 +4378,7 @@ const TOOL_MENUS = {
     {i:'🔓', l:'Déverrouiller',      fn:"cadUnlock()"},
     {i:'⧉', l:'Dupliquer (+5 mm)',  fn:"cadDuplicate()"},
     {i:'⤢', l:'Échelle',           fn:"cadScale()"},
+    {i:'🪞', l:'Miroir (formes → axe)', fn:"cadMirrorTool()"},
   ],
   cadConstrain: [
     {i:'—', l:'Horizontale',      fn:"cadConstraint('horiz')"},
@@ -6689,6 +6688,30 @@ function _mirrorY(o,cy){ const f=y=>2*cy-y;
     default: if(o.y!=null)o.y=f(o.y+(o.h||0));
   }
 }
+let _mirror=null;
+function cadMirrorTool(){ _setToolFromPick=true; if(typeof setPTool==='function')setPTool('select'); _setToolFromPick=false; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; _mirror={shapes:new Set(), stage:'shapes'}; _mirrorPanel(); if(typeof _conHintShow==='function')_conHintShow('🪞 Miroir — clique les formes, puis « Axe » et la ligne axe'); redrawCanvasNow(); }
+function _mirrorPanelRemove(){ const e=document.getElementById('mirrorPanel'); if(e)e.remove(); }
+function _mirrorPanel(){ _mirrorPanelRemove(); if(!_mirror)return; const d=document.createElement('div'); d.id='mirrorPanel'; d.style.cssText='position:fixed;left:16px;top:70px;z-index:100002;background:#1f2430;border:1px solid #4a5568;border-radius:10px;padding:8px 10px;font:13px sans-serif;color:#e5e9f0;display:flex;gap:6px;align-items:center;box-shadow:0 6px 18px rgba(0,0,0,.55)';
+  const mk=(txt,active,cb)=>{ const b=document.createElement('button'); b.textContent=txt; b.style.cssText='padding:5px 9px;border-radius:7px;border:1px solid '+(active?'#3b82f6':'#4a5568')+';background:'+(active?'#3b82f6':'#0e1116')+';color:'+(active?'#fff':'#cfd4dc')+';cursor:pointer;font-weight:600'; b.onclick=cb; return b; };
+  const t=document.createElement('span'); t.textContent='🪞'; d.appendChild(t);
+  d.appendChild(mk('① Formes ('+_mirror.shapes.size+')', _mirror.stage==='shapes', ()=>{ _mirror.stage='shapes'; _mirrorPanel(); _conHintShow('🪞 Clique les formes à refléter'); }));
+  d.appendChild(mk('② Axe de symétrie', _mirror.stage==='axis', ()=>{ if(!_mirror.shapes.size){ _conHintShow('🪞 Choisis d\'abord au moins une forme'); return; } _mirror.stage='axis'; _mirrorPanel(); _conHintShow('🪞 Clique la LIGNE (ou un côté) = axe de symétrie'); }));
+  const x=document.createElement('button'); x.textContent='✕'; x.title='Annuler'; x.style.cssText='padding:5px 8px;border-radius:7px;border:none;background:#374151;color:#fff;cursor:pointer'; x.onclick=()=>{ _mirror=null; _mirrorPanelRemove(); if(typeof _conHintHide==='function')_conHintHide(); redrawCanvasNow(); };
+  d.appendChild(x); document.body.appendChild(d);
+}
+function _mirrorClick(xm,ym){ if(!_mirror)return;
+  if(_mirror.stage==='shapes'){ const o=_pickObjForCon(xm,ym); if(o){ if(_mirror.shapes.has(o.id))_mirror.shapes.delete(o.id); else _mirror.shapes.add(o.id); _mirrorPanel(); redrawCanvasNow(); } return; }
+  if(_mirror.stage==='axis'){ const e=(typeof _pickEdgeAt==='function')?_pickEdgeAt(xm,ym):null; let s=(e&&typeof _edgeSeg==='function')?_edgeSeg(e):null; if(!s){ const o=_pickObjForCon(xm,ym); if(o&&segOf(o))s=segOf(o); } if(!s){ _conHintShow('🪞 Clique une ligne / un côté pour l\'axe'); return; } _doMirror([..._mirror.shapes], s); _mirror=null; _mirrorPanelRemove(); if(typeof _conHintHide==='function')_conHintHide(); redrawCanvasNow(); return; }
+}
+function _doMirror(ids, s){ const refl=(pt)=>{ const dx=s[2]-s[0],dy=s[3]-s[1],L2=dx*dx+dy*dy||1; const t=((pt[0]-s[0])*dx+(pt[1]-s[1])*dy)/L2; const fx=s[0]+t*dx,fy=s[1]+t*dy; return [2*fx-pt[0],2*fy-pt[1]]; }; const nid=()=>Date.now()+Math.random(); let made=0;
+  for(const id of ids){ const o=getObj(id); if(!o)continue; let c=null;
+    if(o.type==='line'){ const q1=refl([o.x1,o.y1]),q2=refl([o.x2,o.y2]); c={id:nid(),type:'line',x1:q1[0],y1:q1[1],x2:q2[0],y2:q2[1],strokeW:o.strokeW||currentStrokeW}; if(o.toolId!==undefined)c.toolId=o.toolId; }
+    else if(o._circle||o.type==='ellipse'){ c=JSON.parse(JSON.stringify(o)); c.id=nid(); const q=refl([o.x,o.y]); c.x=q[0];c.y=q[1]; }
+    else { let st=[]; try{st=objToStrokesRaw(o);}catch(e){} const poly=(st&&st[0])?st[0].map(pt=>refl([pt[0],pt[1]])):null; if(!poly||poly.length<2)continue; const closed=['rect','ellipse','tri','star','oblong','gear','text','polygon'].includes(o.type)||o._poly; if(closed && Math.hypot(poly[0][0]-poly[poly.length-1][0],poly[0][1]-poly[poly.length-1][1])>1e-6)poly.push([poly[0][0],poly[0][1]]); c={id:nid(),type:'free',pts:poly,strokeW:o.strokeW||currentStrokeW}; if(o.toolId!==undefined)c.toolId=o.toolId; }
+    if(c){ paintObjects.push(c); made++; }
+  }
+  if(made){ if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); if(typeof toastHist==='function')toastHist('🪞 Miroir : '+made+' copie(s)'); }
+}
 function cadMirror(dir){
   const ids=[...getSelIds()];
   if(!ids.length){ cadSoon('Miroir'); if(typeof toastHist==='function')toastHist('🪞 Sélectionne d\'abord une ou plusieurs formes'); return; }
@@ -7048,6 +7071,7 @@ function _cadDimOverlay(){
     if(_arrayCursor){ const c=mmToPx(_arrayCursor[0],_arrayCursor[1]); pCtx.strokeStyle='#e11d9b'; pCtx.lineWidth=2; pCtx.beginPath(); pCtx.arc(c[0],c[1],7,0,Math.PI*2); pCtx.moveTo(c[0]-11,c[1]); pCtx.lineTo(c[0]+11,c[1]); pCtx.moveTo(c[0],c[1]-11); pCtx.lineTo(c[0],c[1]+11); pCtx.stroke(); }
     pCtx.restore(); }
   // Contrainte en cours : surligner les elements deja cliques (vert)
+  if(pCtx && _mirror && _mirror.shapes.size){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=2.4; for(const _id of _mirror.shapes){ const _o=getObj(_id); if(!_o)continue; try{ for(const _s of objToStrokesRaw(_o)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} pCtx.stroke(); } }catch(e){} } pCtx.restore(); }
   if(pCtx && _rotActive){ const _pc=mmToPx(_rotActive.piv[0],_rotActive.piv[1]); pCtx.save(); pCtx.strokeStyle='#e11d48'; pCtx.fillStyle='#e11d48'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(_pc[0],_pc[1],7,0,2*Math.PI); pCtx.stroke(); pCtx.beginPath(); pCtx.moveTo(_pc[0]-11,_pc[1]); pCtx.lineTo(_pc[0]+11,_pc[1]); pCtx.moveTo(_pc[0],_pc[1]-11); pCtx.lineTo(_pc[0],_pc[1]+11); pCtx.stroke(); pCtx.restore(); }
   if(pCtx){ for(const o of paintObjects){ if(o._fillets){ for(const f of o._fillets){ if(!f||f.cx==null)continue; const c=mmToPx(f.cx,f.cy); pCtx.save(); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='rgba(59,130,246,.18)'; pCtx.lineWidth=1.4; pCtx.beginPath(); pCtx.arc(c[0],c[1],4.5,0,2*Math.PI); pCtx.fill(); pCtx.stroke(); pCtx.restore(); } } } }
     if(pCtx && _conPick && _conPick.picks.length){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3;
@@ -7248,6 +7272,7 @@ function onME(e){handlePointerUp(e.offsetX,e.offsetY);pushHistoryIfDirty();}
 
 function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
+  if(_mirror){ _mirrorClick(xm,ym); return; } // outil miroir 2 étapes
   if(_rotActive){ const sp=snapPoint(xm,ym,_rotActive.id); _rotActive.piv=[sp.x,sp.y]; _rotActive._pivChanged=true; if(_rotActive.reapply)_rotActive.reapply(); redrawCanvasNow(); return; } // rotation : choisir le point de pivot
   if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
   if(_arrayPick){ if(_arrayPick.stage==='obj'){ const o=_pickObjForCon(xm,ym); if(o){ _arrayPick.objs=[o.id]; _arrayPick.stage='pivot'; _conHintShow('✳️ Clique le point de PIVOT (centre)'); redrawCanvasNow(); } else _conHintShow('✳️ Clique une forme à répéter'); return; } const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _conHintHide(); _arrayDoPolar(sp.x,sp.y); return; } // reseau : etape forme puis pivot
@@ -7977,7 +8002,7 @@ function syncToolCats(){
     if(!btn) return;
     const items=TOOL_MENUS[cat]||[];
     const cur=items.find(it=>it.t && it.t===paintTool);
-    if(ico) ico.textContent = cur ? cur.i : defIco;
+    if(ico) ico.innerHTML = cur ? cur.i : defIco;
     btn.classList.toggle('active', !!cur);
   };
   setCat('draw','✏️');
