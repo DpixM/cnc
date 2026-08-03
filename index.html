@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BJ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BK ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6592,7 +6592,11 @@ function _applyConstraintNow(type, objs){
   switch(type){
     case 'horiz': case 'vert': {
       if(!lines.length){ T('⚠️ Sélectionne une ligne'); return; }
-      for(const o of lines){ const s=L(o),m=mid(s),hh=half(s); setL(o, type==='horiz'?[m[0]-hh,m[1],m[0]+hh,m[1]]:[m[0],m[1]-hh,m[0],m[1]+hh]); }
+      for(const o of lines){
+        if(o.__eh && o.o && o.o.pts && o.o.pts.length>3){ // arête d'une forme fermée -> on TOURNE toute la forme (elle garde sa forme)
+          const s=L(o); let ang=Math.atan2(s[3]-s[1], s[2]-s[0]); const target=(type==='horiz')?0:Math.PI/2; let d=target-ang; while(d>Math.PI/2)d-=Math.PI; while(d<-Math.PI/2)d+=Math.PI; const bb=getObjBB(o.o); _rotateObj(o.o, bb.x+bb.w/2, bb.y+bb.h/2, d);
+        } else { const s=L(o),m=mid(s),hh=half(s); setL(o, type==='horiz'?[m[0]-hh,m[1],m[0]+hh,m[1]]:[m[0],m[1]-hh,m[0],m[1]+hh]); }
+      }
       break; }
     case 'parallel': case 'perp': {
       if(lines.length<2){ T('⚠️ Sélectionne 2 lignes'); return; }
@@ -6766,9 +6770,8 @@ function pickEntity(xm,ym,tol){
     if(isC){ const d=Math.hypot(xm-cx,ym-cy); if(d<=tol&&(!best||d<best.d)) best={kind:'point', ref:'@'+o.id, d, pt:[cx,cy]}; }
     if(o._arc){ for(const _k of [0,1]){ const _pp=_k?o._arc.p2:o._arc.p1; const _d=Math.hypot(xm-_pp[0],ym-_pp[1]); if(_d<=tol&&(!best||_d<best.d)) best={kind:'point', ref:'@'+o.id+'~'+_k, d:_d, pt:[_pp[0],_pp[1]]}; } } }
   for(const o of paintObjects){ let cc=null,rr=0;
-    let _isEll=false;
-    if(o._circle){ cc=[o.x,o.y]; rr=((o.rx||0)+(o.ry||0))/2; } else if(o.type==='ellipse'){ cc=[o.x,o.y]; rr=((o.rx||0)+(o.ry||0))/2; _isEll=true; } else if(o._poly){ cc=_polyCenter(o); rr=_polyR(o); }
-    if(cc){ const dr=Math.abs(Math.hypot(xm-cc[0],ym-cc[1])-rr); if(dr<=tol&&(!best||dr<best.d)) best={kind:_isEll?'ellipse':'ring', ref:o.id, d:dr, pt:cc}; } }
+    if(o._circle){ cc=[o.x,o.y]; rr=((o.rx||0)+(o.ry||0))/2; } else if(o.type==='ellipse'){ const dx=xm-o.x,dy=ym-o.y,erx=o.rx||1,ery=o.ry||1; const tt=Math.hypot(dx/erx,dy/ery)||1e-9; const ex=o.x+dx/tt,ey=o.y+dy/tt; const de=Math.hypot(xm-ex,ym-ey); if(de<=tol&&(!best||de<best.d))best={kind:'ellipse',ref:o.id,d:de,pt:[o.x,o.y]}; } else if(o._poly){ cc=_polyCenter(o); rr=_polyR(o); }
+    if(cc){ const dr=Math.abs(Math.hypot(xm-cc[0],ym-cc[1])-rr); if(dr<=tol&&(!best||dr<best.d)) best={kind:'ring', ref:o.id, d:dr, pt:cc}; } }
   for(const o of paintObjects){ if(o._arc){ let d=Infinity; try{d=distToObjStroke(o,xm,ym);}catch(e){} if(d<=tol&&(!best||d<best.d)) best={kind:'arc', ref:o.id, d}; } }
   const ne=nearestEdge(xm,ym); if(ne&&ne.d<=tol&&(!best||ne.d<best.d)) best={kind:'edge', ref:ne.ref, d:ne.d, seg:ne.seg, foot:ne.foot};
   // Congé : détecté PARTOUT sur son arc (distance r du centre), prioritaire sur les mini-segments
