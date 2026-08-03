@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BK ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BL ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6583,6 +6583,8 @@ function _conPickClick(xm,ym){
   if(_conPick.picks.length>=_conPick.need){ const type=_conPick.type, fn=_conPick.fn, objs=_conPick.picks.slice(); _conPick=null; _conHintHide(); if(fn){ fn(objs,[xm,ym]); } else { _applyConstraintNow(type, objs); } }
   else _conHintShow((_conPick.hint||('🔧 '+(_CON_LABEL[_conPick.type]||_conPick.type||'')))+' — clique la '+(_conPick.picks.length+1)+'ᵉ forme');
 }
+function _rotateShapeEdgeTo(eh, targetAng){ if(!eh||!eh.__eh||!eh.o)return false; const s=segOf(eh); if(!s)return false; const ang=Math.atan2(s[3]-s[1],s[2]-s[0]); let d=targetAng-ang; d=d-Math.PI*Math.round(d/Math.PI); const bb=getObjBB(eh.o); if(!bb)return false; _rotateObj(eh.o, bb.x+bb.w/2, bb.y+bb.h/2, d); return true; }
+function _isShapeEdge(o){ return o && o.__eh && o.o && o.o.pts && o.o.pts.length>3; }
 function _applyConstraintNow(type, objs){
   _log('constraint',{ct:type, objs:(objs||[]).slice(0,4).map(_logObjBrief)});
   const lines=objs.filter(o=>segOf(o)); const circs=objs.filter(o=>o._circle||o.type==='ellipse'||o.__arccenter); const pts=objs.filter(o=>o.type==='point');
@@ -6601,7 +6603,7 @@ function _applyConstraintNow(type, objs){
     case 'parallel': case 'perp': {
       if(lines.length<2){ T('⚠️ Sélectionne 2 lignes'); return; }
       const a=L(lines[0]); let ang=Math.atan2(a[3]-a[1],a[2]-a[0]); if(type==='perp')ang+=Math.PI/2;
-      const s=L(lines[1]),m=mid(s),hh=half(s); setL(lines[1],[m[0]-Math.cos(ang)*hh,m[1]-Math.sin(ang)*hh,m[0]+Math.cos(ang)*hh,m[1]+Math.sin(ang)*hh]); break; }
+      if(_isShapeEdge(lines[1])){ _rotateShapeEdgeTo(lines[1], ang); } else { const s=L(lines[1]),m=mid(s),hh=half(s); setL(lines[1],[m[0]-Math.cos(ang)*hh,m[1]-Math.sin(ang)*hh,m[0]+Math.cos(ang)*hh,m[1]+Math.sin(ang)*hh]); } break; }
     case 'equal': {
       if(lines.length>=2){ const la=half(L(lines[0]))*2; const s=L(lines[1]); const dx=s[2]-s[0],dy=s[3]-s[1],cur=Math.hypot(dx,dy)||1,k=la/cur; setL(lines[1],[s[0],s[1],s[0]+dx*k,s[1]+dy*k]); }
       else if(circs.length>=2){ const r=(circs[0].rx||circs[0].ry); circs[1].rx=circs[1].ry=r; }
@@ -6610,7 +6612,7 @@ function _applyConstraintNow(type, objs){
     case 'collinear': { if(lines.length<2){ T('⚠️ Sélectionne 2 lignes'); return; }
       const a=L(lines[0]); const ang=Math.atan2(a[3]-a[1],a[2]-a[0]),dx=Math.cos(ang),dy=Math.sin(ang);
       const s=L(lines[1]),m=mid(s),hh=half(s); const tp=((m[0]-a[0])*dx+(m[1]-a[1])*dy),px=a[0]+dx*tp,py=a[1]+dy*tp;
-      setL(lines[1],[px-dx*hh,py-dy*hh,px+dx*hh,py+dy*hh]); break; }
+      if(_isShapeEdge(lines[1])){ _rotateShapeEdgeTo(lines[1], ang); } else { setL(lines[1],[px-dx*hh,py-dy*hh,px+dx*hh,py+dy*hh]); } break; }
     case 'coincident': {
       if(circs.length>=2){ const _anc=circs.find(o=>o.__arccenter); if(_anc){ const _mov=circs.find(o=>o!==_anc); if(_mov){_mov.x=_anc.x;_mov.y=_anc.y;} } else { circs[1].x=circs[0].x; circs[1].y=circs[0].y; } T('⌖ Coïncident'); }
       else if(pts.length>=2){ pts[1].x=pts[0].x; pts[1].y=pts[0].y; }
@@ -6618,7 +6620,7 @@ function _applyConstraintNow(type, objs){
         for(const ea of [[a[0],a[1]],[a[2],a[3]]]) for(const eb of [[b[0],b[1],0],[b[2],b[3],1]]){ const d=Math.hypot(ea[0]-eb[0],ea[1]-eb[1]); if(!best||d<best.d)best={d,ea,w:eb[2]}; }
         const s=L(lines[1]); if(best.w===0){s[0]=best.ea[0];s[1]=best.ea[1];}else{s[2]=best.ea[0];s[3]=best.ea[1];} setL(lines[1],s);
       } else { T('⚠️ 2 points ou 2 lignes'); return; } break; }
-    case 'midpoint': { if(pts.length&&lines.length){ const m=mid(L(lines[0])); pts[0].x=m[0]; pts[0].y=m[1]; } else { T('⚠️ 1 point + 1 ligne'); return; } break; }
+    case 'midpoint': { const P=pts[0]||circs[0]; if(P&&lines.length){ const m=mid(L(lines[0])); P.x=m[0]; P.y=m[1]; T('⟠ Milieu'); } else { T('⚠️ Clique un cercle/point + une ligne'); return; } break; }
     case 'tangent': { if(circs.length&&lines.length){ const c=circs[0],s=L(lines[0]); const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1,nx=-ey/Ln,ny=ex/Ln; const d=(c.x-s[0])*nx+(c.y-s[1])*ny,sg=d>=0?1:-1,r=(c.rx||c.ry),fx=c.x-nx*d,fy=c.y-ny*d; c.x=fx+nx*sg*r; c.y=fy+ny*sg*r; } else { T('⚠️ 1 cercle + 1 ligne'); return; } break; }
     case 'fix': { if(!objs.length){ T('⚠️ Sélectionne une forme'); return; } for(const o of objs){ const t=o.__eh?o.o:o; t.fixed=!t.fixed; } T('🔒 Verrouillé / déverrouillé'); break; }
     case 'symmetry': {
