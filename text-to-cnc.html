@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BI ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BJ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6608,7 +6608,8 @@ function _applyConstraintNow(type, objs){
       const s=L(lines[1]),m=mid(s),hh=half(s); const tp=((m[0]-a[0])*dx+(m[1]-a[1])*dy),px=a[0]+dx*tp,py=a[1]+dy*tp;
       setL(lines[1],[px-dx*hh,py-dy*hh,px+dx*hh,py+dy*hh]); break; }
     case 'coincident': {
-      if(pts.length>=2){ pts[1].x=pts[0].x; pts[1].y=pts[0].y; }
+      if(circs.length>=2){ const _anc=circs.find(o=>o.__arccenter); if(_anc){ const _mov=circs.find(o=>o!==_anc); if(_mov){_mov.x=_anc.x;_mov.y=_anc.y;} } else { circs[1].x=circs[0].x; circs[1].y=circs[0].y; } T('⌖ Coïncident'); }
+      else if(pts.length>=2){ pts[1].x=pts[0].x; pts[1].y=pts[0].y; }
       else if(lines.length>=2){ const a=L(lines[0]),b=L(lines[1]); let best=null;
         for(const ea of [[a[0],a[1]],[a[2],a[3]]]) for(const eb of [[b[0],b[1],0],[b[2],b[3],1]]){ const d=Math.hypot(ea[0]-eb[0],ea[1]-eb[1]); if(!best||d<best.d)best={d,ea,w:eb[2]}; }
         const s=L(lines[1]); if(best.w===0){s[0]=best.ea[0];s[1]=best.ea[1];}else{s[2]=best.ea[0];s[3]=best.ea[1];} setL(lines[1],s);
@@ -6839,7 +6840,7 @@ function _dimUnderCursor(xm,ym,tol){
   for(const d of paintObjects){ if(d.type!=='dim')continue; const g=dimGeom(d); if(!g)continue;
     const lp = g._angle?[g.ax,g.ay]:[(g.ax+g.bx)/2,(g.ay+g.by)/2];
     if(Math.hypot(xm-lp[0],ym-lp[1])<tol*1.6) return d;
-    if(!g._angle && Math.hypot(xm-g.bx,ym-g.by)<tol*3) return d; // près de l'étiquette (label posé au bout du trait de rappel)
+    if(!g._angle && Math.hypot(xm-g.bx,ym-g.by)<tol*4) return d; // près de l'étiquette (label posé au bout du trait de rappel)
     if(!g._angle && Math.hypot(xm-g.ax,ym-g.ay)<tol*2) return d; // près de l'ancrage (arc/entité)
     if(!g._angle){ const dx=g.bx-g.ax,dy=g.by-g.ay,L2=dx*dx+dy*dy; if(L2>1e-9){ let t=((xm-g.ax)*dx+(ym-g.ay)*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=g.ax+t*dx,fy=g.ay+t*dy; if(Math.hypot(xm-fx,ym-fy)<tol) return d; } }
   }
@@ -8025,7 +8026,7 @@ function syncToolCats(){
 
 window.__LOG=[]; window.__LOGON=false;
 function _log(type,d){ if(!window.__LOGON)return; try{ window.__LOG.push(Object.assign({ms:Math.round((typeof performance!=='undefined'?performance.now():Date.now()))},{type:type},d||{})); if(window.__LOG.length>1200)window.__LOG.shift(); }catch(e){} }
-function _logObjBrief(o){ if(!o)return null; if(o.__eh)return {eh:(o.o&&o.o.id)+'#'+o.i}; const b={id:o.id,t:o.type}; if(o.x!=null){b.x=+(+o.x).toFixed(1);b.y=+(+o.y).toFixed(1);} if(o.rx!=null)b.rx=+(+o.rx).toFixed(1); if(o._arc)b.arc={r:+(+o._arc.r).toFixed(1),big:!!o._arc.big}; if(o._circle)b.circ=1; return b; }
+function _logObjBrief(o){ if(!o)return null; if(o.__eh)return {eh:(o.o&&o.o.id)+'#'+o.i}; const b={id:o.id,t:o.type}; if(o.x!=null){b.x=+(+o.x).toFixed(1);b.y=+(+o.y).toFixed(1);} if(o.rx!=null)b.rx=+(+o.rx).toFixed(1); if(o._arc)b.arc={r:+(+o._arc.r).toFixed(1),big:!!o._arc.big}; if(o._circle)b.circ=1; if(o.type==='dim'){ try{ const _g=dimGeom(o); if(_g)b.dim={k:o.kind, lx:Math.round((_g.ax+_g.bx)/2), ly:Math.round((_g.ay+_g.by)/2), lbl:_g.label}; }catch(e){} } return b; }
 function _logToggle(){ const b=document.getElementById('logBtn'); if(!b)return; if(!window.__LOGON){ window.__LOG=[]; window.__LOGON=true; _log('start',{ver:(document.title||''),tool:(typeof paintTool!=='undefined'?paintTool:''),objs:(typeof paintObjects!=='undefined'?paintObjects.length:0)}); b.innerHTML='⏺ REC'; b.style.background='#e11d48'; b.style.color='#fff'; if(typeof toastHist==='function')toastHist('🐞 Enregistrement ON — fais ton geste, puis reclique 🐞 pour copier'); }
   else { window.__LOGON=false; _log('end',{objs:(typeof paintObjects!=='undefined'?paintObjects.length:0), cons:(typeof _constraints!=='undefined'?_constraints.length:0)}); const payload='=== CNC LOG '+(document.title||'')+' ===\n'+JSON.stringify({objs:(typeof paintObjects!=='undefined'?paintObjects.map(_logObjBrief):[]), constraints:(typeof _constraints!=='undefined'?_constraints:[]), events:window.__LOG}, null, 0); const done=()=>{ b.innerHTML='✅ Copié'; b.style.background=''; b.style.color=''; if(typeof toastHist==='function')toastHist('✅ Log copié — colle-le à Claude'); setTimeout(()=>{ b.innerHTML='🐞 Log'; },2500); }; if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(payload).then(done,()=>_logFallback(payload)); } else { _logFallback(payload); } }
 }
