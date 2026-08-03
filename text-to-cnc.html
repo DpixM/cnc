@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BL ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BM ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6784,7 +6784,39 @@ function pickEntity(xm,ym,tol){
   return best;
 }
 function cadStartDim(){ _caddim=null; _dimA=null; _dimEdgeA=null; _dimHover=null; _dimPlace=null; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
+function _polyRegen(o, n){ if(!o||!o._poly)return; const c=_polyCenter(o); const r=_polyR(o)||1; const p0=o.pts[0]; const a0=Math.atan2(p0[1]-c[1],p0[0]-c[0]); const pts=[]; for(let i=0;i<n;i++){ const a=a0+i*2*Math.PI/n; pts.push([c[0]+r*Math.cos(a), c[1]+r*Math.sin(a)]); } pts.push([pts[0][0],pts[0][1]]); o.pts=pts; o._polyN=n; }
+function _shapeParamsRemove(){ const e=document.getElementById('shapeParams'); if(e)e.remove(); }
+function _shapeParamsFor(o){ const P=[]; if(!o)return P;
+  const isC = o._circle || (o.type==='ellipse' && Math.abs((o.rx||0)-(o.ry||0))<0.01);
+  if(isC){ P.push({l:'Ø (mm)', g:()=>2*(o.rx||o.ry||0), s:v=>{o.rx=o.ry=v/2;}}); }
+  else if(o.type==='ellipse'){ P.push({l:'Longueur (mm)', g:()=>2*(o.rx||0), s:v=>{o.rx=v/2;}}); P.push({l:'Largeur (mm)', g:()=>2*(o.ry||0), s:v=>{o.ry=v/2;}}); }
+  else if(o.type==='rect'){ P.push({l:'Longueur (mm)', g:()=>o.w, s:v=>{o.w=v;}}); P.push({l:'Largeur (mm)', g:()=>o.h, s:v=>{o.h=v;}}); }
+  else if(o.type==='oblong'){ P.push({l:'Longueur (mm)', g:()=>o.w, s:v=>{o.w=v;}}); P.push({l:'Largeur (mm)', g:()=>o.h, s:v=>{o.h=v;}}); }
+  else if(o._poly){ P.push({l:'Côtés', g:()=>o._polyN||6, s:v=>_polyRegen(o,Math.max(3,Math.round(v))), int:true}); P.push({l:'Ø (mm)', g:()=>2*(_polyR(o)||0), s:v=>{ const c=_polyCenter(o), r=_polyR(o)||1, k=(v/2)/r; o.pts=o.pts.map(q=>[c[0]+(q[0]-c[0])*k, c[1]+(q[1]-c[1])*k]); }}); }
+  else if(o._arc){ P.push({l:'Rayon R (mm)', g:()=>o._arc.r, s:v=>{o._arc.r=v; _arcRegen(o);}}); }
+  else if(o.type==='free' && o.pts && o.pts.length===2){ P.push({l:'Longueur (mm)', g:()=>{const s=segOf(o);return Math.hypot(s[2]-s[0],s[3]-s[1]);}, s:v=>{const s=segOf(o);const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1;setSeg(o,[s[0],s[1],s[0]+dx/L*v,s[1]+dy/L*v]);}}); }
+  else if(o.type==='line'){ P.push({l:'Longueur (mm)', g:()=>{const s=segOf(o);return Math.hypot(s[2]-s[0],s[3]-s[1]);}, s:v=>{const s=segOf(o);const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1;setSeg(o,[s[0],s[1],s[0]+dx/L*v,s[1]+dy/L*v]);}}); }
+  else { P.push({l:'Largeur (mm)', g:()=>getObjBB(o).w, s:v=>{const b=getObjBB(o); applyBB(o,{x:b.x,y:b.y,w:Math.max(0.2,v),h:b.h});}}); P.push({l:'Hauteur (mm)', g:()=>getObjBB(o).h, s:v=>{const b=getObjBB(o); applyBB(o,{x:b.x,y:b.y,w:b.w,h:Math.max(0.2,v)});}}); }
+  return P; }
+function _shapeParamsPanel(o){ _shapeParamsRemove(); if(!o)return; const params=_shapeParamsFor(o); if(!params.length){ if(typeof toastHist==='function')toastHist('Forme non paramétrable'); return; }
+  const nm=(typeof OBJ_NAMES!=='undefined'&&OBJ_NAMES[o.type])?OBJ_NAMES[o.type]:(o._poly?'Polygone':(o._arc?'Arc':(o._circle?'Cercle':'Forme')));
+  const d=document.createElement('div'); d.id='shapeParams'; d.style.cssText='position:fixed;left:16px;top:70px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:11px 13px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:180px';
+  const title=document.createElement('div'); title.textContent='📏 '+nm; title.style.cssText='font-weight:800;cursor:move;user-select:none;margin-bottom:2px'; d.appendChild(title);
+  const commit=()=>{ _shapeParamsRemove(); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); };
+  for(const pr of params){ const row=document.createElement('div'); row.style.cssText='display:flex;gap:10px;align-items:center;justify-content:space-between';
+    const lab=document.createElement('span'); lab.textContent=pr.l; lab.style.opacity=.9; row.appendChild(lab);
+    const inp=document.createElement('input'); inp.type='text'; inp.value=(+pr.g()).toFixed(pr.int?0:1); inp.style.cssText='width:72px;padding:5px 7px;border-radius:7px;border:1px solid #6b7280;background:#0d0f14;color:#7ee787;font:14px monospace;text-align:right';
+    inp.addEventListener('input',()=>{ const v=parseFloat(String(inp.value).replace(',','.')); if(isFinite(v)&&v>0){ pr.s(v); if(typeof updateLinkedCopies==='function')updateLinkedCopies(); redrawCanvasNow(); } });
+    inp.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); commit(); } else if(e.key==='Escape'){ e.preventDefault(); _shapeParamsRemove(); redrawCanvasNow(); } });
+    row.appendChild(inp); d.appendChild(row); }
+  const ok=document.createElement('button'); ok.textContent='✓ OK'; ok.style.cssText='margin-top:3px;padding:6px 10px;border:none;border-radius:8px;background:#22c55e;color:#04240f;font-weight:800;cursor:pointer'; ok.onclick=commit; d.appendChild(ok);
+  document.body.appendChild(d);
+  // drag par le titre
+  title.addEventListener('mousedown',ev=>{ ev.preventDefault(); const r=d.getBoundingClientRect(); const ox=ev.clientX-r.left, oy=ev.clientY-r.top; const mv=e=>{ d.style.left=Math.max(0,e.clientX-ox)+'px'; d.style.top=Math.max(0,e.clientY-oy)+'px'; }; const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }; document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); });
+  setTimeout(()=>{ try{ const i0=d.querySelector('input'); if(i0){i0.focus();i0.select();} }catch(e){} },20);
+}
 function cadDimClick(xm,ym){
+  if(document.getElementById('shapeParams')){ _shapeParamsRemove(); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); return; }
   if(document.getElementById('dimInputWrap')){ if(window._dimInputApply)window._dimInputApply(); return; } // une saisie de cote est ouverte : on la valide d'abord
   const tol=14/(BASE_PX*vZoom);
   // A) PLACEMENT en cours : la cote suit le curseur. Clic sur une AUTRE entite = upgrade
@@ -6801,11 +6833,10 @@ function cadDimClick(xm,ym){
   if(!hit){ if(typeof toastHist==='function')toastHist('📏 Clique un trait, un cercle ou un centre'); redrawCanvasNow(); return; }
   // D) 1 clic sur une entite -> la cote SUIT le curseur (clique pour la poser)
   if(hit.kind==='point'){ _dimEdgeA={kind:'point',ref:hit.ref}; redrawCanvasNow(); if(typeof toastHist==='function')toastHist('📏 Point choisi — clique une 2e entité'); return; }
-  if(hit.kind==='ellipse'){ const mk=(k)=>{ let d=paintObjects.find(o=>o.type==='dim'&&o.ref===hit.ref&&o.kind===k); if(!d){ d=Object.assign({id:objCnt++,type:'dim',mv:[0,0]},{kind:k,ref:hit.ref}); paintObjects.push(d); } return d; }; const dw=mk('ellw'); mk('ellh'); if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; if(typeof markDirty==='function')markDirty(); if(typeof updateObjCount==='function')updateObjCount(); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); openDimInput(dw); return; }
-  if(hit.kind==='ring'){ _dimPlaceNow({kind:'diam',ref:hit.ref}); return; }
-  if(hit.kind==='arc'){ _dimPlaceNow({kind:'arcrad', ref:hit.ref}); return; }
+  if(hit.kind==='ellipse'||hit.kind==='ring'){ _shapeParamsPanel(getObj(hit.ref)); return; }
+  if(hit.kind==='arc'){ _shapeParamsPanel(getObj(hit.ref)); return; }
   if(hit.kind==='fillrad'){ _dimPlaceNow({kind:'fillrad', ref:hit.ref, fi:hit.fi}); return; }
-  if(hit.kind==='edge'){ beginPlace(_edgeLenSpec(hit.ref), {kind:'edge',ref:hit.ref}); return; }
+  if(hit.kind==='edge'){ const _eo=_pickEdgeAt(xm,ym); const _oo=_eo&&_eo.obj; if(_oo && _oo.type!=='line' && !(_oo.type==='free' && _oo.pts && _oo.pts.length===2)){ _shapeParamsPanel(_oo); return; } beginPlace(_edgeLenSpec(hit.ref), {kind:'edge',ref:hit.ref}); return; }
 }
 // Une arete appartenant a une ligne/free-2pt entiere -> ref objet (cote EDITABLE).
 // Une arete de rectangle / segment de polyligne -> ref d'arete 'id#idx' (mesure).
