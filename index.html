@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BN ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BO ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6644,7 +6644,7 @@ function _applyConstraintNow(type, objs){
   else if(type==='concentric'){ if(circs.length>=2)_add('concentric',circs[0].id,circs[1].id); }
   else if(type==='coincident'){ if(lines.length>=2)_add('coincident',lines[0].id,lines[1].id); else if(pts.length>=2)_add('coincident',pts[0].id,pts[1].id); }
   else if(type==='midpoint'){ if(pts.length&&lines.length)_add('midpoint',pts[0].id,lines[0].id); }
-  else if(type==='tangent'){ if(circs.length&&lines.length&&lines[0].id!=null)_add('tangent',circs[0].id,lines[0].id); }
+  else if(type==='tangent'){ if(circs.length&&lines.length){ const _ln=lines[0]; const _bref=_ln.__eh?(_ln.o.id+'#'+_ln.i):_ln.id; if(_bref!=null)_add('tangent',circs[0].id,_bref); } }
   if(typeof pushHistory==='function')pushHistory(); if(typeof redrawCanvasNow==='function')redrawCanvasNow();
   T('✅ Contrainte appliquée (persistante)');
 }
@@ -6667,14 +6667,14 @@ function _applyConstraintStep(c, anchorId){
       let best=null; for(const ea of [[a[0],a[1]],[a[2],a[3]]]) for(const w of [0,1]){ const eb=w?[s[2],s[3]]:[s[0],s[1]]; const d=Math.hypot(ea[0]-eb[0],ea[1]-eb[1]); if(!best||d<best.d)best={d,ea,w}; }
       const ns=s.slice(); if(best.w){ns[2]=best.ea[0];ns[3]=best.ea[1];}else{ns[0]=best.ea[0];ns[1]=best.ea[1];} setL(mov,ns); break; }
     case 'midpoint': { const pt=(A&&A.type==='point')?A:B, ln=(A&&A.type==='point')?B:A; if(!pt||!ln)return; if(_isAnchor(pt,anchorId))return; const s=L(ln); if(!s)return; pt.x=(s[0]+s[2])/2; pt.y=(s[1]+s[3])/2; break; }
-    case 'tangent': { const c=A, ln=B; if(!c||!ln)return; const s=L(ln); if(!s)return; const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1,nx=-ey/Ln,ny=ex/Ln,d=(c.x-s[0])*nx+(c.y-s[1])*ny,sg=d>=0?1:-1,r=(c.rx||c.ry),fx=c.x-nx*d,fy=c.y-ny*d; c.x=fx+nx*sg*r; c.y=fy+ny*sg*r; break; }
+    case 'tangent': { const circ=A; if(!circ)return; let s=null; if(typeof c.b==='string' && String(c.b).indexOf('#')>=0){ s=segOfRef(c.b); } else if(B){ s=L(B); } if(!s)return; const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1,nx=-ey/Ln,ny=ex/Ln,d=(circ.x-s[0])*nx+(circ.y-s[1])*ny,sg=d>=0?1:-1,r=(circ.rx||circ.ry),fx=circ.x-nx*d,fy=circ.y-ny*d; circ.x=fx+nx*sg*r; circ.y=fy+ny*sg*r; break; }
   }
 }
 function solveSketch(anchorId){
   _log('solve',{anchor:anchorId, cons:_constraints.length});
   if(!_constraints.length)return;
   // nettoyer les contraintes dont un objet a disparu
-  _constraints=_constraints.filter(c=>getObj(c.a)&&(c.b==null||getObj(c.b)));
+  _constraints=_constraints.filter(c=>getObj(c.a)&&(c.b==null||getObj(c.b)||(typeof c.b==='string'&&paintObjects.some(x=>String(x.id)===String(c.b).split('#')[0]))));
   for(let it=0; it<40; it++){ for(const c of _constraints) _applyConstraintStep(c, anchorId); }
 }
 function _mirrorX(o,cx){ const f=x=>2*cx-x;
@@ -7539,7 +7539,7 @@ function renderSnapBtn(){
 }
 
 function handlePointerMove(cpx,cpy){
-  if(_rotActive && _rotActive.dragging){ const[xm,ym]=pxToMm(cpx,cpy); let deg=Math.atan2(ym-_rotActive.piv[1], xm-_rotActive.piv[0])*180/Math.PI; const _pc=mmToPx(_rotActive.piv[0],_rotActive.piv[1]); const _distpx=Math.hypot(cpx-_pc[0],cpy-_pc[1]); const _inc=(_distpx<120)?5:45; const _near=Math.round(deg/_inc)*_inc; if(Math.abs(deg-_near)<3)deg=_near; deg=Math.round(deg*10)/10; if(_rotActive.apply)_rotActive.apply(deg); const _di=document.querySelector('#valInput input'); if(_di)_di.value=deg.toFixed(1); redrawCanvasNow(); return; }
+  if(_rotActive && _rotActive.dragging){ const[xm,ym]=pxToMm(cpx,cpy); let deg=Math.atan2(ym-_rotActive.piv[1], xm-_rotActive.piv[0])*180/Math.PI; const _pc=mmToPx(_rotActive.piv[0],_rotActive.piv[1]); const _distpx=Math.hypot(cpx-_pc[0],cpy-_pc[1]); const _inc=(_distpx<120)?5:45; const _near=Math.round(deg/_inc)*_inc; if(Math.abs(deg-_near)<_inc*0.45)deg=_near; deg=Math.round(deg*10)/10; if(_rotActive.apply)_rotActive.apply(deg); const _di=document.querySelector('#valInput input'); if(_di)_di.value=deg.toFixed(1); redrawCanvasNow(); return; }
   if(isDragging && dragMode==='pan'){ pmPanView(cpx,cpy); return; } // pan molette : marche dans TOUS les outils
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
   if(paintTool==='pshape'){ if(_shp){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _shp.cursor=[sp.x,sp.y]; _shp._snapped=sp.snapped; if(_shp.cx!=null && !_shp.typed && typeof _shpRadius==='function'){ const _di=document.querySelector('#shpInputs input:last-of-type'); if(_di && document.activeElement!==_di) _di.value=(_shpRadius()*2).toFixed(1); } redrawCanvasNow(); } return; }
