@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BM ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BN ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6758,7 +6758,7 @@ function cadDuplicate(){
 let _caddim = null; // {p1:[x,y]|null, cursor:[x,y]|null, _snapped}
 let _dimA = null; // 1ere entite cliquee pour une cote de DISTANCE entre 2 formes
 let _dimHover = null;    // arete surlignee au survol (cotation)
-let _dimPlace = null;    // (obsolete) ancienne depose au curseur
+let _dimPlace = null; let _dimHovId=null;    // (obsolete) ancienne depose au curseur
 let _dimEdgeA = null;    // 1ere arete choisie (ref 'id#idx')
 function objForPointRef(ref){ if(typeof ref==='string'&&ref[0]==='@') return paintObjects.find(x=>String(x.id)===ref.slice(1)); return null; }
 function _polyCenter(o){ if(!o||!o.pts||!o.pts.length)return null; const P=o.pts; let m=P.length; if(m>1 && Math.abs(P[0][0]-P[m-1][0])<1e-6 && Math.abs(P[0][1]-P[m-1][1])<1e-6)m--; let sx=0,sy=0; for(let i=0;i<m;i++){sx+=P[i][0];sy+=P[i][1];} return [sx/m,sy/m]; }
@@ -6793,12 +6793,16 @@ function _shapeParamsFor(o){ const P=[]; if(!o)return P;
   else if(o.type==='rect'){ P.push({l:'Longueur (mm)', g:()=>o.w, s:v=>{o.w=v;}}); P.push({l:'Largeur (mm)', g:()=>o.h, s:v=>{o.h=v;}}); }
   else if(o.type==='oblong'){ P.push({l:'Longueur (mm)', g:()=>o.w, s:v=>{o.w=v;}}); P.push({l:'Largeur (mm)', g:()=>o.h, s:v=>{o.h=v;}}); }
   else if(o._poly){ P.push({l:'Côtés', g:()=>o._polyN||6, s:v=>_polyRegen(o,Math.max(3,Math.round(v))), int:true}); P.push({l:'Ø (mm)', g:()=>2*(_polyR(o)||0), s:v=>{ const c=_polyCenter(o), r=_polyR(o)||1, k=(v/2)/r; o.pts=o.pts.map(q=>[c[0]+(q[0]-c[0])*k, c[1]+(q[1]-c[1])*k]); }}); }
-  else if(o._arc){ P.push({l:'Rayon R (mm)', g:()=>o._arc.r, s:v=>{o._arc.r=v; _arcRegen(o);}}); }
+  else if(o._arc){ P.push({l:'Rayon R (mm)', g:()=>o._arc.r, s:v=>{o._arc.r=v; _arcRegen(o);}}); P.push({l:'Corde (mm)', g:()=>Math.hypot(o._arc.p2[0]-o._arc.p1[0], o._arc.p2[1]-o._arc.p1[1]), s:v=>{ const P1=o._arc.p1, P2=o._arc.p2; const dx=P2[0]-P1[0],dy=P2[1]-P1[1],L=Math.hypot(dx,dy)||1; o._arc.p2=[P1[0]+dx/L*v, P1[1]+dy/L*v]; _arcRegen(o); }}); }
   else if(o.type==='free' && o.pts && o.pts.length===2){ P.push({l:'Longueur (mm)', g:()=>{const s=segOf(o);return Math.hypot(s[2]-s[0],s[3]-s[1]);}, s:v=>{const s=segOf(o);const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1;setSeg(o,[s[0],s[1],s[0]+dx/L*v,s[1]+dy/L*v]);}}); }
   else if(o.type==='line'){ P.push({l:'Longueur (mm)', g:()=>{const s=segOf(o);return Math.hypot(s[2]-s[0],s[3]-s[1]);}, s:v=>{const s=segOf(o);const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1;setSeg(o,[s[0],s[1],s[0]+dx/L*v,s[1]+dy/L*v]);}}); }
   else { P.push({l:'Largeur (mm)', g:()=>getObjBB(o).w, s:v=>{const b=getObjBB(o); applyBB(o,{x:b.x,y:b.y,w:Math.max(0.2,v),h:b.h});}}); P.push({l:'Hauteur (mm)', g:()=>getObjBB(o).h, s:v=>{const b=getObjBB(o); applyBB(o,{x:b.x,y:b.y,w:b.w,h:Math.max(0.2,v)});}}); }
   return P; }
-function _shapeParamsPanel(o){ _shapeParamsRemove(); if(!o)return; const params=_shapeParamsFor(o); if(!params.length){ if(typeof toastHist==='function')toastHist('Forme non paramétrable'); return; }
+function _placeShapeCotes(o){ if(!o||typeof objCnt==='undefined')return; const mk=(k,ex)=>{ let d=paintObjects.find(x=>x.type==='dim'&&x.ref===o.id&&x.kind===k); if(!d){ d=Object.assign({id:objCnt++,type:'dim',mv:[0,0]},{kind:k,ref:o.id},ex||{}); paintObjects.push(d); } };
+  const isC=o._circle||(o.type==='ellipse'&&Math.abs((o.rx||0)-(o.ry||0))<0.01);
+  if(isC){ mk('diam'); } else if(o.type==='ellipse'){ mk('ellw'); mk('ellh'); } else if(o.type==='rect'||o.type==='oblong'){ mk('w'); mk('h'); } else if(o._poly){ mk('diam'); } else if(o._arc){ mk('arcrad'); }
+  if(typeof updateObjCount==='function')updateObjCount(); }
+function _shapeParamsPanel(o){ _shapeParamsRemove(); if(!o)return; _placeShapeCotes(o); const params=_shapeParamsFor(o); if(!params.length){ if(typeof toastHist==='function')toastHist('Forme non paramétrable'); return; }
   const nm=(typeof OBJ_NAMES!=='undefined'&&OBJ_NAMES[o.type])?OBJ_NAMES[o.type]:(o._poly?'Polygone':(o._arc?'Arc':(o._circle?'Cercle':'Forme')));
   const d=document.createElement('div'); d.id='shapeParams'; d.style.cssText='position:fixed;left:16px;top:70px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:11px 13px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:180px';
   const title=document.createElement('div'); title.textContent='📏 '+nm; title.style.cssText='font-weight:800;cursor:move;user-select:none;margin-bottom:2px'; d.appendChild(title);
@@ -7107,6 +7111,7 @@ function drawDim(dim){
   pCtx.restore();
 }
 function _cadDimOverlay(){
+  if(pCtx && paintTool==='caddim' && _dimHovId!=null){ const _ho=getObj(_dimHovId); if(_ho){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='rgba(34,197,94,.9)'; pCtx.lineWidth=2.5; try{ for(const _s of objToStrokesRaw(_ho)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} pCtx.stroke(); } }catch(e){} pCtx.restore(); } }
   // Réseau circulaire : formes à répéter surlignées + croix du pivot sous le curseur
   if(pCtx && _arrayPick){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=2.4;
     for(const id of _arrayPick.objs){ const o=getObj(id); if(!o)continue; try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]);pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } }catch(e){} }
@@ -7547,6 +7552,7 @@ function handlePointerMove(cpx,cpy){
     let hv=null;
     if(e){ if(e.kind==='edge') hv={seg:e.seg, foot:e.foot, d:e.d}; else if(e.kind==='fillrad'){ const _o=getObj(e.ref), _f=_o&&_o._fillets&&_o._fillets[e.fi]; if(_f){ const _dx=xm-_f.cx,_dy=ym-_f.cy,_dl=Math.hypot(_dx,_dy)||1; hv={seg:null, foot:[_f.cx+_dx/_dl*_f.r, _f.cy+_dy/_dl*_f.r], d:e.d, _pt:true}; } } else if(e.kind==='arc'){ const _o=getObj(e.ref); if(_o&&_o._arc){ const _c=_arcCenter(_o), _r=_o._arc.r; if(_c){ const _dx=xm-_c[0],_dy=ym-_c[1],_dl=Math.hypot(_dx,_dy)||1; hv={seg:null, foot:[_c[0]+_dx/_dl*_r, _c[1]+_dy/_dl*_r], d:e.d, _pt:true}; } } } else hv={seg:null, foot:e.pt, d:e.d, _pt:true}; }
     const ip=nearestIntersection(xm,ym,tolE); if(ip && (!hv||ip.d<hv.d)) hv={seg:null, foot:ip.pt, d:ip.d, _inter:true};
+    _dimHovId=(e&&e.ref!=null)?e.ref:null;
     _dimHover=hv; redrawCanvasNow(); return; }
   // ─────────────────────────────────────────────────────────────────────────
   // AIGUILLEUR DES GESTES
