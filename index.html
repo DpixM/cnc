@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BU ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BV ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -1501,6 +1501,11 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
   <div class="wz-h1">⚙️ Mode d'usinage</div>
   <div class="wz-sub">Que veux-tu usiner ?</div>
   <div class="bc">
+    <button class="bc-btn" id="modeL" onclick="wzPickMode('laser')">
+      <span class="bc-icon"><svg viewBox="0 0 24 24" width="30" height="30" style="vertical-align:middle"><rect x="7" y="3" width="10" height="7.5" rx="1.5" fill="#ef4444"/><circle cx="12" cy="6.7" r="1.5" fill="#fff"/><path d="M12 10.5v9.5" stroke="#f87171" stroke-width="2.2"/><path d="M8.5 20.3h7" stroke="#fca5a5" stroke-width="1.6"/></svg></span>
+      Découpe laser
+      <span class="bc-desc">Contours au laser — 1 fichier .LST (machine TRUMPF)</span>
+    </button>
     <button class="bc-btn" id="modeN" onclick="wzPickMode('normal')">
       <span class="bc-icon"><svg viewBox="0 0 24 24" width="30" height="30" style="vertical-align:middle"><rect x="9.5" y="3" width="5" height="10" rx="1" fill="#3b82f6"/><path d="M9.5 13h5l-2.5 7z" fill="#60a5fa"/><path d="M10.2 5.5h3.6M10.2 7.5h3.6M10.2 9.5h3.6" stroke="#1e3a8a" stroke-width="1"/></svg></span>
       Usinage normal
@@ -1510,11 +1515,6 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <span class="bc-icon"><svg viewBox="0 0 24 24" width="30" height="30" style="vertical-align:middle"><rect x="9.5" y="3" width="5" height="8.5" rx="1" fill="#a16207"/><path d="M9 11.5l3 8 3-8z" fill="#ca8a04"/></svg></span>
       Incrustation bois (V-Carve Inlay)
       <span class="bc-desc">Mâle ♂ + Femelle ♀ — noyer &amp; érable — 4 fichiers G-code</span>
-    </button>
-    <button class="bc-btn" id="modeL" onclick="wzPickMode('laser')">
-      <span class="bc-icon"><svg viewBox="0 0 24 24" width="30" height="30" style="vertical-align:middle"><rect x="7" y="3" width="10" height="7.5" rx="1.5" fill="#ef4444"/><circle cx="12" cy="6.7" r="1.5" fill="#fff"/><path d="M12 10.5v9.5" stroke="#f87171" stroke-width="2.2"/><path d="M8.5 20.3h7" stroke="#fca5a5" stroke-width="1.6"/></svg></span>
-      Découpe laser
-      <span class="bc-desc">Contours au laser — 1 fichier .LST (machine TRUMPF)</span>
     </button>
   </div>
   <div id="modeHint" class="al al-w" style="display:none"></div>
@@ -1930,6 +1930,8 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
         <input id="laserTechno" type="text" value="A CHANGER!" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
       <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Priorité laser
         <input id="laserReq" type="number" value="2" min="0" max="9" step="1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+      <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Levée Z fin de forme (mm)
+        <input id="laserZlift" type="number" value="30" min="0" max="200" step="1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
     </div>
     <div style="font-size:9px;color:var(--txt3);margin-top:6px">Le nom du tableau techno doit correspondre EXACTEMENT à celui créé dans la machine (puissance/vitesse). « A CHANGER! » = à remplacer par le tien (ex : INOX3MM_S).</div>
   </div>
@@ -2430,9 +2432,9 @@ let pInited = false;
 // Flow selon mode
 // step 10 = page G-code unique (mode normal)
 function wzFlow(){
-  if(appMode==='inlay') return [0,1,2,3,11,12,13,9];
-  if(appMode==='laser') return [0,1,2,10,9]; // laser: brut→mode→dessin→LST→récap
-  return [0,1,2,3,4,10,9]; // normal: brut→mode→dessin→outils→modeUsinage→gcode→récap
+  if(appMode==='inlay') return [1,0,2,3,11,12,13,9];
+  if(appMode==='laser') return [1,2,10,9]; // laser: mode→dessin→LST→récap (pas de brut)
+  return [1,0,2,3,4,10,9]; // normal: mode→brut→dessin→outils→modeUsinage→gcode→récap
 }
 
 function wzGo(step){
@@ -3090,31 +3092,36 @@ function _laserArc(C,P1,P2,apex){
   return g+' X'+_lc(P2[0])+' Y'+_lc(P2[1])+' I'+_lc(C[0]-P1[0])+' J'+_lc(C[1]-P1[1]);
 }
 // Construit tous les blocs de contour. Renvoie {text, count}.
+function _pointInPoly(pt, poly){
+  let inside=false; const n=poly.length;
+  for(let i=0,j=n-1;i<n;j=i++){
+    const xi=poly[i][0],yi=poly[i][1],xj=poly[j][0],yj=poly[j][1];
+    if(((yi>pt[1])!==(yj>pt[1])) && (pt[0] < (xj-xi)*(pt[1]-yi)/((yj-yi)||1e-12)+xi)) inside=!inside;
+  }
+  return inside;
+}
+// Construit tous les contours, les TRIE (intérieurs d'abord, extérieur en dernier),
+// et lève la tete en Z apres chaque forme. Renvoie {text, count}.
 function buildLaserBody(){
   const flat=_exportFlatObjs();
-  const blocks=[]; let count=0;
-  const emit=(start, moves)=>{
-    if(!moves||!moves.length) return;
-    blocks.push('G1 X'+_lc(start[0])+' Y'+_lc(start[1])+'\n'
-      +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-      +moves.join('\n')+'\n'
-      +'TC_LASER_OFF(2)');
-    count++;
-  };
+  const _zl=parseFloat(document.getElementById('laserZlift')?.value); const ZL=isNaN(_zl)?30:_zl;
+  const contours=[]; // {poly, start, moves}
+  const add=(poly,start,moves)=>{ if(moves&&moves.length) contours.push({poly,start,moves}); };
   for(const o of flat){
     if(!o || o.type==='dim' || o.type==='point') continue;
     // Cercle -> un seul G2 (tour complet)
     if((o.type==='ellipse' && Math.abs((o.rx||0)-(o.ry||0))<0.01) || o._circle){
       const r=o._circle?(o.rx||o.ry||o.r||0):o.rx, cx=o.x, cy=o.y;
-      if(r>0) emit([cx+r,cy], ['G2 X'+_lc(cx+r)+' Y'+_lc(cy)+' I'+_lc(-r)+' J0']);
+      if(r>0){ const poly=[]; for(let k=0;k<24;k++){ const a=k/24*2*Math.PI; poly.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); }
+        add(poly, [cx+r,cy], ['G2 X'+_lc(cx+r)+' Y'+_lc(cy)+' I'+_lc(-r)+' J0']); }
       continue;
     }
     // Ligne
-    if(o.type==='line'){ emit([o.x1,o.y1], ['G1 X'+_lc(o.x2)+' Y'+_lc(o.y2)]); continue; }
+    if(o.type==='line'){ add([[o.x1,o.y1],[o.x2,o.y2]], [o.x1,o.y1], ['G1 X'+_lc(o.x2)+' Y'+_lc(o.y2)]); continue; }
     // Arc 3 points -> G2/G3
     if(o._arc){ try{ const C=_arcCenter(o), ap=_arcApexPt(o); const P1=o._arc.p1, P2=o._arc.p2;
-      if(C&&ap){ emit([P1[0],P1[1]], [_laserArc(C,P1,P2,ap)]); continue; } }catch(e){} }
-    // Sinon : polyligne FIDÈLE (même logique que l'export DXF, pas d'arc-fitting).
+      if(C&&ap){ add([P1,ap,P2], [P1[0],P1[1]], [_laserArc(C,P1,P2,ap)]); continue; } }catch(e){} }
+    // Sinon : polyligne FIDELE (meme logique que l'export DXF).
     const _CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon'];
     const _isClosed=_CLOSEDT.includes(o.type)||o._poly;
     let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; }
@@ -3123,10 +3130,24 @@ function buildLaserBody(){
       if(_isClosed){ const a=s[0],b=s[s.length-1]; if(Math.hypot(a[0]-b[0],a[1]-b[1])>1e-6) s=s.concat([[a[0],a[1]]]); closed=true; }
       else { closed=(s.length>2 && Math.hypot(s[0][0]-s[s.length-1][0],s[0][1]-s[s.length-1][1])<1e-6); }
       const moves=[]; for(let i=1;i<s.length;i++) moves.push('G1 X'+_lc(s[i][0])+' Y'+_lc(s[i][1]));
-      emit([s[0][0],s[0][1]], moves);
+      add(s.slice(), [s[0][0],s[0][1]], moves);
     }
   }
-  return {text:blocks.join('\n\n'), count};
+  // ORDRE DE COUPE : profondeur d'imbrication (un contour DANS un autre = coupe avant).
+  const cent=c=>{ let sx=0,sy=0; for(const q of c.poly){sx+=q[0];sy+=q[1];} const n=c.poly.length||1; return [sx/n,sy/n]; };
+  const _area=poly=>{ let s=0; const n=poly.length; for(let i=0,j=n-1;i<n;j=i++){ s+=(poly[j][0]+poly[i][0])*(poly[j][1]-poly[i][1]); } return Math.abs(s/2); };
+  contours.forEach(c=>{ c._c=cent(c); c._a=_area(c.poly); });
+  // A est "dans" B seulement si B est plus GRAND (evite le piege des formes concentriques)
+  contours.forEach((c,i)=>{ let d=0; contours.forEach((o,j)=>{ if(i!==j && o.poly.length>=3 && o._a>c._a+1e-6 && _pointInPoly(c._c,o.poly)) d++; }); c._depth=d; });
+  const order=contours.map((c,i)=>[c,i]).sort((a,b)=> (b[0]._depth-a[0]._depth) || (a[1]-b[1]) ).map(x=>x[0]); // profondeur decroissante = interieurs d'abord
+  const blocks=order.map(c=>
+    'G1 X'+_lc(c.start[0])+' Y'+_lc(c.start[1])+'\n'
+    +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+    +c.moves.join('\n')+'\n'
+    +'TC_LASER_OFF(2)\n'
+    +'G1 Z'+_lc(ZL)+'   ;lever la tete pour degager la piece coupee'
+  );
+  return {text:blocks.join('\n\n'), count:contours.length};
 }
 // Emballe le corps dans le squelette .LST (fourni par l'ingénieur).
 function _buildLST(progName, techno, req, body){
@@ -4004,7 +4025,7 @@ function shareInlay(key){ wzShare(key); }
 window.addEventListener('DOMContentLoaded',()=>{
   loadAll();
   wzInitOrigin();
-  wzGo(0);
+  wzGo(1);
   if(typeof wzPickMode==='function') wzPickMode(appMode||'normal'); // Usinage normal coche par defaut
   setTimeout(()=>{ if(typeof pushHistory==='function') pushHistory(); },200); // état initial
   setTimeout(()=>{ if(typeof renderSnapBtn==='function') renderSnapBtn(); },100); // Snap ON par défaut
@@ -10637,6 +10658,7 @@ function openGcSimAll(){
   const list=generatedGcodes._list||[];
   if(!list.length){
     if(generatedGcodes.normal) openGcSim(generatedGcodes.normal);
+    else if(generatedGcodes.laser) openGcSim(generatedGcodes.laser);
     else alert('Générez d\'abord le G-code');
     return;
   }
