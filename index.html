@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BS ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BT ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6626,7 +6626,9 @@ function _applyConstraintNow(type, objs){
       if(_isShapeEdge(lines[1])){ _rotateShapeEdgeTo(lines[1], ang); } else { const s=L(lines[1]),m=mid(s),hh=half(s); setL(lines[1],[m[0]-Math.cos(ang)*hh,m[1]-Math.sin(ang)*hh,m[0]+Math.cos(ang)*hh,m[1]+Math.sin(ang)*hh]); } break; }
     case 'equal': {
       if(lines.length>=2){ const la=half(L(lines[0]))*2; const s=L(lines[1]); const dx=s[2]-s[0],dy=s[3]-s[1],cur=Math.hypot(dx,dy)||1,k=la/cur;
-        if(_isShapeEdge(lines[1]) && typeof _scaleObj==='function'){ const bb=getObjBB(lines[1].o); _scaleObj(lines[1].o, bb.x+bb.w/2, bb.y+bb.h/2, k); } // arête de forme -> échelle de toute la forme
+        const _o0e=lines[0].__eh?lines[0].o:lines[0], _o1e=lines[1].__eh?lines[1].o:lines[1];
+        if(_isShapeEdge(lines[1]) && _o0e===_o1e){ if(typeof T==='function')T('⚠️ Égal : choisis 2 côtés de 2 formes DIFFÉRENTES'); return; }
+        else if(_isShapeEdge(lines[1]) && typeof _scaleObj==='function'){ const bb=getObjBB(lines[1].o); _scaleObj(lines[1].o, bb.x+bb.w/2, bb.y+bb.h/2, k); } // arête de forme -> échelle de toute la forme
         else { setL(lines[1],[s[0],s[1],s[0]+dx*k,s[1]+dy*k]); } }
       else if(circs.length>=2){ const r=(circs[0].rx||circs[0].ry); circs[1].rx=circs[1].ry=r; }
       else { T('⚠️ 2 lignes ou 2 cercles'); return; } break; }
@@ -6809,6 +6811,7 @@ function pickEntity(xm,ym,tol){
 function cadStartDim(){ _caddim=null; _dimA=null; _dimEdgeA=null; _dimHover=null; _dimPlace=null; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
 function _polyRegen(o, n){ if(!o||!o._poly)return; const c=_polyCenter(o); const r=_polyR(o)||1; const p0=o.pts[0]; const a0=Math.atan2(p0[1]-c[1],p0[0]-c[0]); const pts=[]; for(let i=0;i<n;i++){ const a=a0+i*2*Math.PI/n; pts.push([c[0]+r*Math.cos(a), c[1]+r*Math.sin(a)]); } pts.push([pts[0][0],pts[0][1]]); o.pts=pts; o._polyN=n; }
 function _shapeParamsRemove(){ const e=document.getElementById('shapeParams'); if(e)e.remove(); }
+function _isParametricShape(o){ return !!(o && (o.type==='rect'||o.type==='oblong'||o.type==='ellipse'||o._circle||o._poly||o._arc)); }
 function _shapeParamsFor(o){ const P=[]; if(!o)return P;
   const isC = o._circle || (o.type==='ellipse' && Math.abs((o.rx||0)-(o.ry||0))<0.01);
   if(isC){ P.push({l:'Ø (mm)', g:()=>2*(o.rx||o.ry||0), s:v=>{o.rx=o.ry=v/2;}}); }
@@ -6863,7 +6866,7 @@ function cadDimClick(xm,ym){
   if(hit.kind==='ellipse'||hit.kind==='ring'){ _shapeParamsPanel(getObj(hit.ref)); return; }
   if(hit.kind==='arc'){ _shapeParamsPanel(getObj(hit.ref)); return; }
   if(hit.kind==='fillrad'){ _dimPlaceNow({kind:'fillrad', ref:hit.ref, fi:hit.fi}); return; }
-  if(hit.kind==='edge'){ const _eo=_pickEdgeAt(xm,ym); const _oo=_eo&&_eo.obj; if(_oo && _oo.type!=='line' && !(_oo.type==='free' && _oo.pts && _oo.pts.length===2)){ _shapeParamsPanel(_oo); return; } beginPlace(_edgeLenSpec(hit.ref), {kind:'edge',ref:hit.ref}); return; }
+  if(hit.kind==='edge'){ const _eo=_pickEdgeAt(xm,ym); const _oo=_eo&&_eo.obj; if(_oo && _isParametricShape(_oo)){ _shapeParamsPanel(_oo); return; } beginPlace(_edgeLenSpec(hit.ref), {kind:'edge',ref:hit.ref}); return; }
 }
 // Une arete appartenant a une ligne/free-2pt entiere -> ref objet (cote EDITABLE).
 // Une arete de rectangle / segment de polyligne -> ref d'arete 'id#idx' (mesure).

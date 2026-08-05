@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Déployer un site multi-pages sur GitHub — Guide & Prompts</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --card2:#1d212b; --ink:#e8eaf0; --mut:#9aa3b2;
+    --line:#2a2f3a; --acc:#6aa6ff; --acc2:#7ee0b8; --warn:#ffcf6a; --code:#0b0d11;
+    --pill:#232838;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1a2740 0%, transparent 60%), var(--bg);
+    color:var(--ink); font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; padding:0 20px 80px;
+  }
+  .wrap{max-width:860px; margin:0 auto}
+  header.hero{padding:64px 0 40px; border-bottom:1px solid var(--line); margin-bottom:44px}
+  .kicker{display:inline-block; font-size:12px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--acc2); background:var(--pill); border:1px solid var(--line); padding:6px 12px; border-radius:999px; margin-bottom:22px}
+  h1{font-size:40px; line-height:1.12; margin:0 0 14px; letter-spacing:-.02em}
+  h1 .grad{background:linear-gradient(90deg,var(--acc),var(--acc2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .sub{color:var(--mut); font-size:18px; max-width:640px; margin:0}
+  h2{font-size:24px; margin:52px 0 4px; letter-spacing:-.01em; display:flex; align-items:center; gap:12px}
+  h2 .n{font-size:14px; color:#0f1115; background:linear-gradient(135deg,var(--acc),var(--acc2));
+    width:30px; height:30px; border-radius:9px; display:inline-flex; align-items:center; justify-content:center; font-weight:700; flex:0 0 auto}
+  h3{font-size:17px; margin:26px 0 8px; color:var(--ink)}
+  p{color:#cfd4de}
+  .lead{color:var(--mut); margin-top:6px}
+  .card{background:linear-gradient(180deg,var(--card),var(--card2)); border:1px solid var(--line);
+    border-radius:16px; padding:22px 24px; margin:18px 0}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  @media(max-width:640px){.grid{grid-template-columns:1fr} h1{font-size:32px}}
+  .opt{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px}
+  .opt .url{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; color:var(--acc); word-break:break-all; margin:8px 0}
+  .opt .tag{font-size:12px; color:var(--mut)}
+  .opt.best{border-color:#3a5a8a; box-shadow:0 0 0 1px #24406a inset}
+  .badge{display:inline-block; font-size:11px; padding:3px 9px; border-radius:999px; background:var(--pill); color:var(--acc2); border:1px solid var(--line); margin-bottom:8px}
+  ol.steps{list-style:none; counter-reset:s; padding:0; margin:14px 0}
+  ol.steps li{counter-increment:s; position:relative; padding:14px 0 14px 46px; border-bottom:1px dashed var(--line)}
+  ol.steps li:last-child{border-bottom:0}
+  ol.steps li::before{content:counter(s); position:absolute; left:0; top:12px; width:30px; height:30px;
+    border-radius:8px; background:var(--pill); border:1px solid var(--line); color:var(--acc);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px}
+  code.inl{font-family:ui-monospace,Menlo,monospace; font-size:.9em; background:var(--pill); padding:2px 7px; border-radius:6px; color:var(--acc2); border:1px solid var(--line)}
+  .prompt{position:relative; background:var(--code); border:1px solid var(--line); border-left:3px solid var(--acc);
+    border-radius:12px; padding:18px 20px; margin:12px 0; font-family:ui-monospace,Menlo,monospace; font-size:13.5px;
+    line-height:1.6; color:#d7deea; white-space:pre-wrap}
+  .prompt .lbl{position:absolute; top:-11px; left:16px; font-family:-apple-system,sans-serif; font-size:11px;
+    letter-spacing:.06em; text-transform:uppercase; background:var(--acc); color:#0b0d11; padding:3px 10px; border-radius:6px; font-weight:700}
+  .copy{position:absolute; top:12px; right:12px; font-family:-apple-system,sans-serif; font-size:12px;
+    background:var(--pill); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:6px 11px; cursor:pointer}
+  .copy:hover{border-color:var(--acc); color:var(--acc)}
+  .copy.ok{color:var(--acc2); border-color:var(--acc2)}
+  .note{border-left:3px solid var(--warn); background:#1e1b12; border-radius:0 12px 12px 0; padding:14px 18px; margin:16px 0; color:#e9dcbf; font-size:14.5px}
+  .tip{border-left:3px solid var(--acc2); background:#101f19; border-radius:0 12px 12px 0; padding:14px 18px; margin:16px 0; color:#cfeede; font-size:14.5px}
+  footer{margin-top:60px; padding-top:24px; border-top:1px solid var(--line); color:var(--mut); font-size:13px; text-align:center}
+  a{color:var(--acc)}
+  .tree{font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#cfd4de; background:var(--code); border:1px solid var(--line); border-radius:12px; padding:18px 20px; white-space:pre; overflow-x:auto}
+  .tree .c{color:var(--mut)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <span class="kicker">Guide · GitHub Pages</span>
+    <h1>Déployer un site <span class="grad">multi-pages</span><br>sur GitHub, sans <span class="grad">.github.io</span></h1>
+    <p class="sub">La marche à suivre claire, plus les prompts prêts à copier-coller pour faire créer tout ça automatiquement. À transmettre tel quel à ton ingénieur.</p>
+  </header>
+
+  <!-- 1 -->
+  <h2><span class="n">1</span> D'où vient le <code class="inl">/cnc/</code> dans l'adresse</h2>
+  <p class="lead">GitHub Pages fabrique l'URL à partir du <strong>nom du dépôt</strong>. Il existe 3 cas — c'est toute la clé.</p>
+
+  <div class="grid">
+    <div class="opt">
+      <span class="badge">Cas actuel de Seb</span>
+      <h3 style="margin-top:4px">Project page</h3>
+      <div class="url">pseudo.github.io/<b>cnc</b>/</div>
+      <div class="tag">Le <code class="inl">/cnc/</code> = le nom du repo. Un repo par site. Le plus simple, c'est ce que tu as déjà.</div>
+    </div>
+    <div class="opt">
+      <span class="badge">Enlève le /nom/</span>
+      <h3 style="margin-top:4px">User page</h3>
+      <div class="url">pseudo.github.io/</div>
+      <div class="tag">Nomme le repo <strong>exactement</strong> <code class="inl">pseudo.github.io</code>. Servi à la racine, sans dossier. Un seul par compte.</div>
+    </div>
+    <div class="opt best">
+      <span class="badge">Sans .github.io</span>
+      <h3 style="margin-top:4px">Domaine perso ★</h3>
+      <div class="url">monsite.com</div>
+      <div class="tag">Un nom de domaine acheté (~10 €/an) branché sur GitHub. Plus aucun <code class="inl">.github.io</code>. HTTPS gratuit inclus.</div>
+    </div>
+    <div class="opt">
+      <span class="badge">Bonus</span>
+      <h3 style="margin-top:4px">Plusieurs pages</h3>
+      <div class="url">/ · /contact.html · /blog/</div>
+      <div class="tag">Chaque fichier <code class="inl">.html</code> = une URL. Un dossier avec un <code class="inl">index.html</code> = une jolie URL propre.</div>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <h2><span class="n">2</span> La marche à suivre</h2>
+
+  <h3>A · Un site auto-déployé en 5 étapes</h3>
+  <ol class="steps">
+    <li><strong>Créer le dépôt</strong> sur GitHub (bouton <em>New repository</em>). Public.</li>
+    <li><strong>Ajouter les fichiers</strong> : au minimum un <code class="inl">index.html</code>.</li>
+    <li><strong>Activer Pages</strong> : Settings → Pages → Source = <em>Deploy from a branch</em> → branche <code class="inl">main</code>, dossier <code class="inl">/root</code>.</li>
+    <li><strong>Attendre ~1 min</strong> : le site est en ligne sur <code class="inl">pseudo.github.io/nom-du-repo/</code>.</li>
+    <li><strong>Déploiement auto</strong> : désormais chaque <code class="inl">git push</code> sur <code class="inl">main</code> met le site à jour tout seul.</li>
+  </ol>
+
+  <h3>B · Structure conseillée pour du multi-pages</h3>
+  <div class="tree">mon-site/
+├── index.html        <span class="c"># page d'accueil  → monsite.com/</span>
+├── contact.html      <span class="c"># → monsite.com/contact.html</span>
+├── blog/
+│   └── index.html    <span class="c"># → monsite.com/blog/</span>
+├── assets/
+│   ├── style.css     <span class="c"># styles partagés</span>
+│   └── logo.svg
+└── CNAME             <span class="c"># contient : monsite.com  (pour le domaine perso)</span></div>
+  <div class="tip"><strong>Astuce propre :</strong> mets chaque section dans son dossier avec un <code class="inl">index.html</code> dedans → tu obtiens <code class="inl">/blog/</code> au lieu de <code class="inl">/blog.html</code>. Plus classe et plus facile à retenir.</div>
+
+  <h3>C · Supprimer le <code class="inl">.github.io</code> (domaine perso)</h3>
+  <ol class="steps">
+    <li><strong>Acheter un domaine</strong> chez OVH, Gandi ou Namecheap (~10 €/an).</li>
+    <li><strong>GitHub</strong> : Settings → Pages → <em>Custom domain</em> → taper <code class="inl">monsite.com</code> → Save. Ça crée le fichier <code class="inl">CNAME</code>.</li>
+    <li><strong>Chez le fournisseur de domaine</strong> : ajouter les enregistrements DNS de GitHub — un <code class="inl">CNAME</code> <code class="inl">www</code> → <code class="inl">pseudo.github.io</code>, et 4 <code class="inl">A</code> vers les IP de GitHub Pages.</li>
+    <li><strong>Cocher</strong> « Enforce HTTPS » dans GitHub une fois le DNS propagé (quelques minutes à quelques heures).</li>
+  </ol>
+  <div class="note"><strong>Important :</strong> les IP exactes des enregistrements <code class="inl">A</code> et la procédure DNS peuvent évoluer. Prends la liste à jour dans la doc officielle → <a href="https://docs.github.com/pages/configuring-a-custom-domain-for-your-github-pages-site">docs.github.com · Custom domain</a>.</div>
+
+  <!-- 3 -->
+  <h2><span class="n">3</span> Les prompts à me donner</h2>
+  <p class="lead">Copie-colle ces prompts dans Cowork / Claude. Remplace juste les <code class="inl">MOTS EN MAJUSCULES</code>. Ils sont faits pour s'enchaîner.</p>
+
+  <div class="prompt"><span class="lbl">① Créer le repo-modèle</span><button class="copy" onclick="cp(this)">Copier</button>Crée-moi un site web statique multi-pages prêt pour GitHub Pages.
+Nom du projet : NOM-DU-SITE.
+Pages voulues : accueil, à propos, contact (ajoute/retire au besoin).
+Structure : un index.html à la racine, un dossier assets/ avec un style.css partagé,
+et chaque page secondaire dans son propre dossier avec un index.html dedans
+(pour avoir des URLs propres du type /contact/).
+Style : sobre et moderne, responsive, un menu de navigation identique sur toutes les pages.
+Tout en HTML/CSS pur, sans dépendance. Donne-moi les fichiers organisés.</div>
+
+  <div class="prompt"><span class="lbl">② Ajouter une page</span><button class="copy" onclick="cp(this)">Copier</button>Ajoute une nouvelle page « TITRE-DE-LA-PAGE » au site.
+Réutilise exactement le même en-tête, menu et pied de page que les autres pages,
+ajoute le lien dans le menu de navigation partout,
+et place-la dans son propre dossier avec un index.html pour l'URL /NOM-COURT/.</div>
+
+  <div class="prompt"><span class="lbl">③ Préparer le déploiement</span><button class="copy" onclick="cp(this)">Copier</button>Prépare ce site pour GitHub Pages :
+- vérifie que tous les liens entre pages et vers assets/ sont relatifs (pas d'URL en dur),
+- ajoute un fichier CNAME contenant : MONSITE.COM,
+- ajoute un fichier 404.html simple,
+- et donne-moi la liste exacte des étapes à faire côté GitHub (Settings → Pages)
+  et côté DNS pour brancher mon domaine MONSITE.COM.</div>
+
+  <div class="prompt"><span class="lbl">④ Mettre en ligne / mettre à jour</span><button class="copy" onclick="cp(this)">Copier</button>Pousse la dernière version du site sur le repo GitHub PSEUDO/NOM-DU-REPO,
+branche main, pour que GitHub Pages le redéploie automatiquement.
+Confirme-moi l'URL en ligne une fois que c'est poussé.</div>
+
+  <div class="prompt"><span class="lbl">⑤ Débuguer un souci</span><button class="copy" onclick="cp(this)">Copier</button>Mon site GitHub Pages affiche PROBLÈME (ex : page blanche, CSS non chargé,
+domaine qui ne marche pas, vieille version en cache).
+Analyse la cause probable et corrige les fichiers concernés.
+Si c'est un souci de cache, ajoute les bonnes balises no-cache.</div>
+
+  <div class="tip"><strong>Le réflexe qui change tout :</strong> demande toujours « garde le même menu / en-tête / pied de page sur toutes les pages ». C'est ce qui fait qu'un multi-pages reste cohérent et propre au fil des ajouts.</div>
+
+  <footer>
+    Guide préparé pour Seb · à transmettre à ton équipe · GitHub Pages<br>
+    Doc officielle : docs.github.com/pages
+  </footer>
+
+</div>
+<script>
+  function cp(btn){
+    const box = btn.parentElement;
+    const txt = box.innerText.replace(/^.*?Copier/s,'').trim();
+    navigator.clipboard.writeText(txt).then(()=>{
+      const o=btn.textContent; btn.textContent='✓ Copié'; btn.classList.add('ok');
+      setTimeout(()=>{btn.textContent=o; btn.classList.remove('ok');},1500);
+    });
+  }
+</script>
+</body>
+</html>
