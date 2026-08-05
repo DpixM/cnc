@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BW ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BX ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2417,7 +2417,7 @@ window.__PARSED_FONTS__={};
 // WIZARD CORE
 // ════════════════════════════════════════════════════════════
 let wzStep = 0;
-let appMode = 'normal';
+let appMode = 'laser'; // defaut a l'ouverture = Decoupe laser
 let originKey = 'c'; // defaut : centre
 const ORIGIN_NAMES = {tl:'Haut-Gauche',tc:'Haut-Centre',tr:'Haut-Droite',
   cl:'Mi-Gauche',c:'Centre',cr:'Mi-Droite',bl:'Bas-Gauche',bc:'Bas-Centre',br:'Bas-Droite'};
@@ -4027,7 +4027,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   loadAll();
   wzInitOrigin();
   wzGo(1);
-  if(typeof wzPickMode==='function') wzPickMode(appMode||'normal'); // Usinage normal coche par defaut
+  if(typeof wzPickMode==='function') wzPickMode(appMode||'laser'); // Decoupe laser cochee par defaut
   setTimeout(()=>{ if(typeof pushHistory==='function') pushHistory(); },200); // état initial
   setTimeout(()=>{ if(typeof renderSnapBtn==='function') renderSnapBtn(); },100); // Snap ON par défaut
   setTimeout(()=>{if(typeof updateStyleBarVisibility==='function')updateStyleBarVisibility();},100);
