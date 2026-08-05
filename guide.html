@@ -111,9 +111,9 @@
   <ol class="steps">
     <li><strong>Créer le dépôt</strong> sur GitHub (bouton <em>New repository</em>). Public.</li>
     <li><strong>Ajouter les fichiers</strong> : au minimum un <code class="inl">index.html</code>.</li>
-    <li><strong>Activer Pages</strong> : Settings → Pages → Source = <em>Deploy from a branch</em> → branche <code class="inl">main</code>, dossier <code class="inl">/root</code>.</li>
+    <li><strong>Activer Pages</strong> : Settings → Pages → Source = <em>Deploy from a branch</em> → branche <code class="inl">main</code>, dossier <code class="inl">/ (root)</code>.</li>
     <li><strong>Attendre ~1 min</strong> : le site est en ligne sur <code class="inl">pseudo.github.io/nom-du-repo/</code>.</li>
-    <li><strong>Déploiement auto</strong> : désormais chaque <code class="inl">git push</code> sur <code class="inl">main</code> met le site à jour tout seul.</li>
+    <li><strong>Déploiement auto</strong> : désormais chaque <code class="inl">git push</code> sur <code class="inl">main</code> met le site à jour tout seul. <em>(Le tout premier push demande une clé d'accès → voir le point <strong>D</strong> plus bas.)</em></li>
   </ol>
 
   <h3>B · Structure conseillée pour du multi-pages</h3>
@@ -127,6 +127,7 @@
 │   └── logo.svg
 └── CNAME             <span class="c"># contient : monsite.com  (pour le domaine perso)</span></div>
   <div class="tip"><strong>Astuce propre :</strong> mets chaque section dans son dossier avec un <code class="inl">index.html</code> dedans → tu obtiens <code class="inl">/blog/</code> au lieu de <code class="inl">/blog.html</code>. Plus classe et plus facile à retenir.</div>
+  <div class="note"><strong>⚠️ Piège fréquent (à connaître) :</strong> par défaut GitHub Pages passe le site dans « Jekyll », qui <strong>ignore les fichiers et dossiers commençant par <code class="inl">_</code></strong> (comme <code class="inl">_headers</code>, <code class="inl">_assets</code>…). Pour un site HTML pur, ajoute un fichier <strong>vide</strong> nommé <code class="inl">.nojekyll</code> à la racine du repo → plus aucun fichier ne disparaît mystérieusement.</div>
 
   <h3>C · Supprimer le <code class="inl">.github.io</code> (domaine perso)</h3>
   <ol class="steps">
@@ -147,6 +148,7 @@
     <li><strong>Generate token</strong> → le token apparaît (commence par <code class="inl">ghp_…</code>). <strong>Copie-le tout de suite</strong> : il ne s'affiche qu'une seule fois.</li>
   </ol>
   <div class="note"><strong>⚠️ Le token = un mot de passe.</strong> Ne le partage avec personne, ne le mets jamais dans un fichier du site ni dans un dépôt public. Chaque personne crée le sien. Garde-le dans un gestionnaire de mots de passe pour ne pas avoir à le refaire.</div>
+  <div class="tip"><strong>Plus sûr (recommandé) :</strong> un token <strong>« Fine-grained »</strong> limité au <strong>seul repo</strong> concerné, avec la permission <em>Contents : Read and write</em>. Un token « classic » avec la case <code class="inl">repo</code> donne accès à <strong>tous</strong> tes dépôts — pratique mais moins prudent.</div>
 
   <!-- 3 -->
   <h2><span class="n">3</span> Les prompts à me donner</h2>
@@ -176,6 +178,13 @@ et place-la dans son propre dossier avec un index.html pour l'URL /NOM-COURT/.</
   <div class="prompt"><span class="lbl">④ Mettre en ligne / mettre à jour</span><button class="copy" onclick="cp(this)">Copier</button>Pousse la dernière version du site sur le repo GitHub PSEUDO/NOM-DU-REPO,
 branche main, pour que GitHub Pages le redéploie automatiquement.
 Confirme-moi l'URL en ligne une fois que c'est poussé.</div>
+  <div class="tip" style="margin-top:2px"><strong>Au moment du push :</strong> Claude te demandera ta clé d'accès → colle ton token (<code class="inl">ghp_…</code>) quand il la réclame. <strong>Méthode manuelle</strong> (sans Claude, en terminal) :</div>
+  <div class="tree">git clone https://github.com/PSEUDO/REPO.git
+cd REPO
+<span class="c"># ... modifier / ajouter tes fichiers ...</span>
+git add .
+git commit -m "mise à jour du site"
+git push        <span class="c"># identifiant = ton pseudo, mot de passe = ton token ghp_…</span></div>
 
   <div class="prompt"><span class="lbl">⑤ Débuguer un souci</span><button class="copy" onclick="cp(this)">Copier</button>Mon site GitHub Pages affiche PROBLÈME (ex : page blanche, CSS non chargé,
 domaine qui ne marche pas, vieille version en cache).
