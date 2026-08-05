@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BT ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BU ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -1502,14 +1502,19 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
   <div class="wz-sub">Que veux-tu usiner ?</div>
   <div class="bc">
     <button class="bc-btn" id="modeN" onclick="wzPickMode('normal')">
-      <span class="bc-icon">🔷</span>
+      <span class="bc-icon"><svg viewBox="0 0 24 24" width="30" height="30" style="vertical-align:middle"><rect x="9.5" y="3" width="5" height="10" rx="1" fill="#3b82f6"/><path d="M9.5 13h5l-2.5 7z" fill="#60a5fa"/><path d="M10.2 5.5h3.6M10.2 7.5h3.6M10.2 9.5h3.6" stroke="#1e3a8a" stroke-width="1"/></svg></span>
       Usinage normal
       <span class="bc-desc">Gravure, découpe, fraisage — 1 fichier G-code</span>
     </button>
     <button class="bc-btn" id="modeI" onclick="wzPickMode('inlay')">
-      <span class="bc-icon">🪵</span>
+      <span class="bc-icon"><svg viewBox="0 0 24 24" width="30" height="30" style="vertical-align:middle"><rect x="9.5" y="3" width="5" height="8.5" rx="1" fill="#a16207"/><path d="M9 11.5l3 8 3-8z" fill="#ca8a04"/></svg></span>
       Incrustation bois (V-Carve Inlay)
       <span class="bc-desc">Mâle ♂ + Femelle ♀ — noyer &amp; érable — 4 fichiers G-code</span>
+    </button>
+    <button class="bc-btn" id="modeL" onclick="wzPickMode('laser')">
+      <span class="bc-icon"><svg viewBox="0 0 24 24" width="30" height="30" style="vertical-align:middle"><rect x="7" y="3" width="10" height="7.5" rx="1.5" fill="#ef4444"/><circle cx="12" cy="6.7" r="1.5" fill="#fff"/><path d="M12 10.5v9.5" stroke="#f87171" stroke-width="2.2"/><path d="M8.5 20.3h7" stroke="#fca5a5" stroke-width="1.6"/></svg></span>
+      Découpe laser
+      <span class="bc-desc">Contours au laser — 1 fichier .LST (machine TRUMPF)</span>
     </button>
   </div>
   <div id="modeHint" class="al al-w" style="display:none"></div>
@@ -1917,6 +1922,17 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <div class="wz-wrap" id="wzp10">
   <div class="wz-h1">⚡ G-Code</div>
   <div class="wz-sub" id="p10sub">Usinage normal — 1 fichier</div>
+  <div id="laserCfg" style="display:none;background:var(--surf2);border-radius:10px;border:1.5px solid var(--brd2);padding:12px;margin-bottom:10px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <label style="flex:2;min-width:150px;font-size:10px;color:var(--txt2)">Nom du programme (unique)
+        <input id="laserProgName" type="text" value="PROGRAMME1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+      <label style="flex:2;min-width:150px;font-size:10px;color:var(--txt2)">Tableau techno — TM_LTTNAME
+        <input id="laserTechno" type="text" value="A CHANGER!" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+      <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Priorité laser
+        <input id="laserReq" type="number" value="2" min="0" max="9" step="1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+    </div>
+    <div style="font-size:9px;color:var(--txt3);margin-top:6px">Le nom du tableau techno doit correspondre EXACTEMENT à celui créé dans la machine (puissance/vitesse). « A CHANGER! » = à remplacer par le tien (ex : INOX3MM_S).</div>
+  </div>
   <div id="p10st" class="al al-w">⏳ Génération...</div>
   <pre class="gc-pre" id="p10gc"></pre>
   <!-- Boutons G-code dynamiques (un par fichier) -->
@@ -2415,6 +2431,7 @@ let pInited = false;
 // step 10 = page G-code unique (mode normal)
 function wzFlow(){
   if(appMode==='inlay') return [0,1,2,3,11,12,13,9];
+  if(appMode==='laser') return [0,1,2,10,9]; // laser: brut→mode→dessin→LST→récap
   return [0,1,2,3,4,10,9]; // normal: brut→mode→dessin→outils→modeUsinage→gcode→récap
 }
 
@@ -2499,7 +2516,7 @@ function wzOnEnter(step){
   if(step===12){ wzGenInlay(); }
   if(step===13){ /* mâle déjà généré dans step 12 */ }
   if(step===4&&appMode==='normal'){ wzInitMachineMode(); }
-  if(step===10){ wzGenNormal(); }
+  if(step===10){ const _lc=document.getElementById('laserCfg'); if(_lc)_lc.style.display=(appMode==='laser')?'block':'none'; if(appMode==='laser') wzGenLaser(); else wzGenNormal(); }
   if(step===9){ wzRenderRecap(); if(appMode==='inlay') setTimeout(()=>{ if(window.THREE) wz3dInit(); },100); }
 }
 
@@ -2546,14 +2563,18 @@ function wzUpdateBar(){
 // ── Mode picker ──
 function wzPickMode(mode){
   appMode=mode;
-  const n=document.getElementById('modeN'), i=document.getElementById('modeI');
+  const n=document.getElementById('modeN'), i=document.getElementById('modeI'), l=document.getElementById('modeL');
   n.classList.toggle('sel', mode==='normal'); n.classList.remove('g');
   i.classList.toggle('sel', mode==='inlay'); i.classList.toggle('g', mode==='inlay');
+  if(l){ l.classList.toggle('sel', mode==='laser'); l.classList.toggle('g', mode==='laser'); }
   const hint=document.getElementById('modeHint');
   hint.style.display='flex';
   if(mode==='inlay'){
     hint.className='al al-ok';
     hint.textContent='✅ 4 fichiers seront générés : ébauche ♂, ébauche ♀, finition ♂, finition ♀';
+  } else if(mode==='laser'){
+    hint.className='al al-w';
+    hint.textContent='🔦 1 fichier .LST (découpe laser) sera généré';
   } else {
     hint.className='al al-w';
     hint.textContent='ℹ️ 1 fichier G-code sera généré';
@@ -3051,6 +3072,105 @@ function exportDrawing(fmt){
   if(typeof toastHist==='function')toastHist('📤 Export '+(fmt||'svg').toUpperCase());
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// DÉCOUPE LASER — génération .LST (machine TRUMPF, commandes TC_/TM_)
+// Tiroir SÉPARÉ de l'usinage. Géométrie identique à l'export DXF (Y CAO/haut).
+// Chaque contour : G1 (aller, laser éteint) -> LASER_ON -> coupes -> LASER_OFF.
+// ═══════════════════════════════════════════════════════════════════════════
+function _lc(v){ return (+((v||0).toFixed(4))).toString(); }
+// Arc laser : renvoie "G2/G3 X.. Y.. I.. J.." (I,J = décalage point courant -> centre)
+function _laserArc(C,P1,P2,apex){
+  const norm=x=>{ while(x<0)x+=2*Math.PI; while(x>=2*Math.PI)x-=2*Math.PI; return x; };
+  const a1=norm(Math.atan2(P1[1]-C[1],P1[0]-C[0]));
+  const am=norm(Math.atan2(apex[1]-C[1],apex[0]-C[0]));
+  const a2=norm(Math.atan2(P2[1]-C[1],P2[0]-C[0]));
+  const span=norm(a2-a1), mm=norm(am-a1);
+  const ccw=(mm<=span && span>1e-9);           // sens anti-horaire à travers l'apex ?
+  const g=ccw?'G3':'G2';                        // G3 = anti-horaire, G2 = horaire
+  return g+' X'+_lc(P2[0])+' Y'+_lc(P2[1])+' I'+_lc(C[0]-P1[0])+' J'+_lc(C[1]-P1[1]);
+}
+// Construit tous les blocs de contour. Renvoie {text, count}.
+function buildLaserBody(){
+  const flat=_exportFlatObjs();
+  const blocks=[]; let count=0;
+  const emit=(start, moves)=>{
+    if(!moves||!moves.length) return;
+    blocks.push('G1 X'+_lc(start[0])+' Y'+_lc(start[1])+'\n'
+      +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+      +moves.join('\n')+'\n'
+      +'TC_LASER_OFF(2)');
+    count++;
+  };
+  for(const o of flat){
+    if(!o || o.type==='dim' || o.type==='point') continue;
+    // Cercle -> un seul G2 (tour complet)
+    if((o.type==='ellipse' && Math.abs((o.rx||0)-(o.ry||0))<0.01) || o._circle){
+      const r=o._circle?(o.rx||o.ry||o.r||0):o.rx, cx=o.x, cy=o.y;
+      if(r>0) emit([cx+r,cy], ['G2 X'+_lc(cx+r)+' Y'+_lc(cy)+' I'+_lc(-r)+' J0']);
+      continue;
+    }
+    // Ligne
+    if(o.type==='line'){ emit([o.x1,o.y1], ['G1 X'+_lc(o.x2)+' Y'+_lc(o.y2)]); continue; }
+    // Arc 3 points -> G2/G3
+    if(o._arc){ try{ const C=_arcCenter(o), ap=_arcApexPt(o); const P1=o._arc.p1, P2=o._arc.p2;
+      if(C&&ap){ emit([P1[0],P1[1]], [_laserArc(C,P1,P2,ap)]); continue; } }catch(e){} }
+    // Sinon : polyligne FIDÈLE (même logique que l'export DXF, pas d'arc-fitting).
+    const _CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon'];
+    const _isClosed=_CLOSEDT.includes(o.type)||o._poly;
+    let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; }
+    for(let s of st){ if(!s||s.length<2) continue;
+      let closed=false;
+      if(_isClosed){ const a=s[0],b=s[s.length-1]; if(Math.hypot(a[0]-b[0],a[1]-b[1])>1e-6) s=s.concat([[a[0],a[1]]]); closed=true; }
+      else { closed=(s.length>2 && Math.hypot(s[0][0]-s[s.length-1][0],s[0][1]-s[s.length-1][1])<1e-6); }
+      const moves=[]; for(let i=1;i<s.length;i++) moves.push('G1 X'+_lc(s[i][0])+' Y'+_lc(s[i][1]));
+      emit([s[0][0],s[0][1]], moves);
+    }
+  }
+  return {text:blocks.join('\n\n'), count};
+}
+// Emballe le corps dans le squelette .LST (fourni par l'ingénieur).
+function _buildLST(progName, techno, req, body){
+  const P=(progName||'PROGRAMME1').trim().toUpperCase().replace(/[^A-Z0-9_]/g,'_')||'PROGRAMME1';
+  const T=(techno||'A CHANGER!');
+  const R=(req===0||req)?req:2;
+  return "DA,'"+P+"','HP','',0,0\n"
+    +"START_TEXT\n"
+    +"TC_RESET\n"
+    +'TM_LTTNAME="'+T+'"\n'
+    +"TC_DYNAMIC_LEVEL(0)\n"
+    +";G01 G90 B=0 F2000\n"
+    +"TC_TRAFO_OFF\n"
+    +"SET_POS(0,0,0)\n"
+    +"TC_LASER_REQUEST("+R+")\n\n"
+    +body+"\n\n"
+    +"TC_LASER_REQUEST(0)\n"
+    +"M30\n"
+    +"G90 G01 X00 Y0 Z0 F5000\n"
+    +"M30\n"
+    +"TC_AUX_LIGHT(5,0)\n"
+    +"TC_AUX_LIGHT(6,0)\n"
+    +"TC_OPEN_DOOR(0,1,0,0)\n"
+    +"TC_RESET\n"
+    +"STOP_TEXT\n";
+}
+function wzGenLaser(){
+  const stEl=document.getElementById('p10st'), gcEl=document.getElementById('p10gc');
+  const sub=document.getElementById('p10sub'); if(sub) sub.textContent='Découpe laser — 1 fichier .LST';
+  const progName=document.getElementById('laserProgName')?.value||'PROGRAMME1';
+  const techno=document.getElementById('laserTechno')?.value||'A CHANGER!';
+  const req=parseInt(document.getElementById('laserReq')?.value,10); const R=isNaN(req)?2:req;
+  try{
+    const body=buildLaserBody();
+    if(!body.count){ if(stEl){stEl.className='al al-err'; stEl.textContent='❌ Aucun contour à découper — retourne dessiner';} if(gcEl)gcEl.textContent=''; return; }
+    const lst=_buildLST(progName, techno, R, body.text);
+    if(gcEl) gcEl.textContent=lst;
+    if(stEl){ stEl.className='al al-ok'; stEl.textContent='✅ '+body.count+' contour(s) — fichier .LST prêt'; }
+    const Pn=(progName||'PROGRAMME1').trim().toUpperCase().replace(/[^A-Z0-9_]/g,'_')||'PROGRAMME1';
+    const dl=document.getElementById('gcDlButtons');
+    if(dl){ dl.innerHTML=''; const b=document.createElement('button'); b.className='btn btn-p'; b.style.width='100%'; b.textContent='⬇ Télécharger '+Pn+'.LST'; b.onclick=()=>_dlBlob(Pn+'.LST', lst, 'text/plain'); dl.appendChild(b); }
+    generatedGcode=lst; generatedGcodes={laser:lst};
+  }catch(e){ if(stEl){ stEl.className='al al-err'; stEl.textContent='❌ Erreur laser : '+e.message; } }
+}
 function wzGenNormal(){
   const safeZ=parseFloat(document.getElementById('safeZ2')?.value||5);
   const date=new Date().toLocaleString('fr-FR');
