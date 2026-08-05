@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BY ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BZ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -1932,6 +1932,8 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
         <input id="laserReq" type="number" value="2" min="0" max="9" step="1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
       <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Levée Z fin de forme (mm)
         <input id="laserZlift" type="number" value="30" min="0" max="200" step="1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+      <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Vitesse F (mm/min)
+        <input id="laserFeed" type="number" value="500" min="1" max="20000" step="50" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
     </div>
     <div style="font-size:9px;color:var(--txt3);margin-top:6px">Le nom du tableau techno doit correspondre EXACTEMENT à celui créé dans la machine (puissance/vitesse). « A CHANGER! » = à remplacer par le tien (ex : INOX3MM_S).</div>
   </div>
@@ -3105,6 +3107,7 @@ function _pointInPoly(pt, poly){
 function buildLaserBody(){
   const flat=_exportFlatObjs();
   const _zl=parseFloat(document.getElementById('laserZlift')?.value); const ZL=isNaN(_zl)?30:_zl;
+  const _fd=parseFloat(document.getElementById('laserFeed')?.value); const FEED=isNaN(_fd)?500:_fd;
   const contours=[]; // {poly, start, moves}
   const add=(poly,start,moves)=>{ if(moves&&moves.length) contours.push({poly,start,moves}); };
   for(const o of flat){
@@ -3140,8 +3143,8 @@ function buildLaserBody(){
   // A est "dans" B seulement si B est plus GRAND (evite le piege des formes concentriques)
   contours.forEach((c,i)=>{ let d=0; contours.forEach((o,j)=>{ if(i!==j && o.poly.length>=3 && o._a>c._a+1e-6 && _pointInPoly(c._c,o.poly)) d++; }); c._depth=d; });
   const order=contours.map((c,i)=>[c,i]).sort((a,b)=> (b[0]._depth-a[0]._depth) || (a[1]-b[1]) ).map(x=>x[0]); // profondeur decroissante = interieurs d'abord
-  const blocks=order.map(c=>
-    'G1 X'+_lc(c.start[0])+' Y'+_lc(c.start[1])+'\n'
+  const blocks=order.map((c,bi)=>
+    'G1 X'+_lc(c.start[0])+' Y'+_lc(c.start[1])+(bi===0?(' F'+_lc(FEED)+'   ;vitesse d\'avance (reste active ensuite)'):'')+'\n'
     +'G1 Z0   ;redescendre sur la tole avant de percer\n'
     +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
     +c.moves.join('\n')+'\n'
@@ -11074,7 +11077,7 @@ function closeSim3D() {
 // ── Panneau G-code + lecture progressive dans la vue 3D ──
 function _s3dRenderCode(){
   const el=document.getElementById('s3dCode'); if(!el) return;
-  const lines=window._simGcodeLines||[];
+  const lines=(typeof _simGcodeLines!=='undefined'&&_simGcodeLines)||[];
   el.innerHTML=lines.map((ln,i)=>'<div class="s3d-ln" data-l="'+i+'" onclick="s3dGotoLine('+i+')" style="padding:1px 8px;cursor:pointer;white-space:pre;color:#c9d1d9">'
     +String(i+1).padStart(4,' ')+'  '+String(ln).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('');
 }
