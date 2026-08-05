@@ -137,6 +137,17 @@
   </ol>
   <div class="note"><strong>Important :</strong> les IP exactes des enregistrements <code class="inl">A</code> et la procédure DNS peuvent évoluer. Prends la liste à jour dans la doc officielle → <a href="https://docs.github.com/pages/configuring-a-custom-domain-for-your-github-pages-site">docs.github.com · Custom domain</a>.</div>
 
+  <h3>D · La clé d'accès (token) — pour pouvoir pousser</h3>
+  <p class="lead">Pour que le déploiement automatique marche, GitHub demande une preuve d'identité à chaque <code class="inl">git push</code> : un <strong>token personnel</strong> (Personal Access Token). Chacun crée le sien.</p>
+  <ol class="steps">
+    <li>Sur <strong>github.com</strong> (connecté) → clique ta <strong>photo de profil</strong> → <strong>Settings</strong>.</li>
+    <li>Tout en <strong>bas</strong> du menu de gauche → <strong>Developer settings</strong> (ou va direct sur <code class="inl">github.com/settings/tokens</code>).</li>
+    <li><strong>Personal access tokens</strong> → <strong>Tokens (classic)</strong> → <strong>Generate new token (classic)</strong>.</li>
+    <li>Donne un <strong>nom</strong> (ex : <code class="inl">deploy</code>), une <strong>expiration</strong>, et <strong>coche la case <code class="inl">repo</code></strong> (la première, en gras — elle coche tout le reste toute seule).</li>
+    <li><strong>Generate token</strong> → le token apparaît (commence par <code class="inl">ghp_…</code>). <strong>Copie-le tout de suite</strong> : il ne s'affiche qu'une seule fois.</li>
+  </ol>
+  <div class="note"><strong>⚠️ Le token = un mot de passe.</strong> Ne le partage avec personne, ne le mets jamais dans un fichier du site ni dans un dépôt public. Chaque personne crée le sien. Garde-le dans un gestionnaire de mots de passe pour ne pas avoir à le refaire.</div>
+
   <!-- 3 -->
   <h2><span class="n">3</span> Les prompts à me donner</h2>
   <p class="lead">Copie-colle ces prompts dans Cowork / Claude. Remplace juste les <code class="inl">MOTS EN MAJUSCULES</code>. Ils sont faits pour s'enchaîner.</p>
