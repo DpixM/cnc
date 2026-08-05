@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BX ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BY ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -11071,6 +11071,50 @@ function closeSim3D() {
   if (_s3d && _s3d.rafId) { cancelAnimationFrame(_s3d.rafId); _s3d.rafId = null; }
 }
 
+// ── Panneau G-code + lecture progressive dans la vue 3D ──
+function _s3dRenderCode(){
+  const el=document.getElementById('s3dCode'); if(!el) return;
+  const lines=window._simGcodeLines||[];
+  el.innerHTML=lines.map((ln,i)=>'<div class="s3d-ln" data-l="'+i+'" onclick="s3dGotoLine('+i+')" style="padding:1px 8px;cursor:pointer;white-space:pre;color:#c9d1d9">'
+    +String(i+1).padStart(4,' ')+'  '+String(ln).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('');
+}
+function _s3dSetSpeed(v){ if(_s3d)_s3d.speed=parseInt(v)||20; const l=document.getElementById('s3dSpeedLbl'); if(l)l.textContent='×'+v; }
+function _s3dSetIdx(idx){
+  if(!_s3d||!_s3d.combGeo) return;
+  const n=_s3d.moves.length;
+  idx=Math.max(0,Math.min(n,Math.round(idx)));
+  _s3d.idx=idx;
+  _s3d.combGeo.setDrawRange(0, idx*2);
+  if(idx>0){ const m=_s3d.moves[idx-1]; _s3d.mark.visible=true; _s3d.mark.position.set(m.x1,m.y1,m.z1); }
+  else if(_s3d.mark) _s3d.mark.visible=false;
+  const pct=n?Math.round(idx/n*100):0;
+  const sk=document.getElementById('s3dSeek'); if(sk&&document.activeElement!==sk)sk.value=pct;
+  const pr=document.getElementById('s3dProgress'); if(pr)pr.textContent=pct+'%';
+  _s3dHiLine();
+}
+function _s3dHiLine(){
+  const el=document.getElementById('s3dCode'); if(!el||!_s3d) return;
+  const cur=(_s3d.idx>0&&_s3d.moves[_s3d.idx-1])?_s3d.moves[_s3d.idx-1].line:(_s3d.moves[0]?_s3d.moves[0].line:0);
+  if(cur===_s3d._hi) return; _s3d._hi=cur;
+  const prev=el.querySelector('.s3d-ln._on'); if(prev){ prev.classList.remove('_on'); prev.style.background=''; }
+  const row=el.querySelector('.s3d-ln[data-l="'+cur+'"]');
+  if(row){ row.classList.add('_on'); row.style.background='rgba(245,166,35,.28)'; try{row.scrollIntoView({block:'nearest'});}catch(e){} }
+}
+function s3dSeekTo(pct){ if(!_s3d)return; _s3dSetIdx(pct/100*_s3d.moves.length); }
+function s3dTogglePlay(){
+  if(!_s3d)return;
+  if(!_s3d.playing && _s3d.idx>=_s3d.moves.length) _s3dSetIdx(0);
+  _s3d.playing=!_s3d.playing;
+  const b=document.getElementById('s3dPlayBtn'); if(b)b.textContent=_s3d.playing?'⏸':'▶';
+}
+function s3dGotoLine(lineNo){
+  if(!_s3d)return;
+  let idx=_s3d.moves.findIndex(m=>m.line>=lineNo);
+  if(idx<0) idx=_s3d.moves.length-1;
+  _s3dSetIdx(idx+1);
+  _s3d.playing=false; const b=document.getElementById('s3dPlayBtn'); if(b)b.textContent='▶';
+}
+
 
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -15996,27 +16040,26 @@ function _s3dInit(moves) {
   dl.position.set(spanXY, -spanXY, spanXY*2);
   scene.add(dl);
 
-  // ── Lignes G-code ──
-  const verts = { rapid:[], cut:[], plunge:[] };
+  // ── Lignes G-code : UN seul buffer ordonné par mouvement (révélation progressive) ──
+  const _positions=[], _colors=[];
+  const _CT={rapid:[0.23,0.51,1.0], cut:[0.13,0.77,0.37], plunge:[0.94,0.27,0.27]};
   for (const m of moves) {
-    // Dans Three.js on met X→X, Y→Y, Z→Z (Z vers le haut = profondeur)
-    // On inverse Z pour que "creuser" aille vers le bas
     const type = (m.z1 >= -0.001 && m.z0 >= -0.001) ? 'rapid'
                : (m.z0 >= -0.001) ? 'plunge' : 'cut';
-    verts[type].push(m.x0, m.y0, m.z0,  m.x1, m.y1, m.z1);
+    _positions.push(m.x0, m.y0, m.z0,  m.x1, m.y1, m.z1);
+    const c=_CT[type]; _colors.push(c[0],c[1],c[2], c[0],c[1],c[2]);
   }
-  const clrs = { rapid:0x3b82f6, cut:0x22c55e, plunge:0xef4444 };
-  const opac = { rapid:0.25, cut:0.95, plunge:0.95 };
-  const lineObjs = {};
-  for (const [type, v] of Object.entries(verts)) {
-    if (!v.length) continue;
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-    const mat = new THREE.LineBasicMaterial({color:clrs[type],transparent:true,opacity:opac[type]});
-    const obj = new THREE.LineSegments(geo, mat);
-    pivot.add(obj);
-    lineObjs[type] = obj;
-  }
+  const combGeo = new THREE.BufferGeometry();
+  combGeo.setAttribute('position', new THREE.Float32BufferAttribute(_positions,3));
+  combGeo.setAttribute('color',    new THREE.Float32BufferAttribute(_colors,3));
+  const combLine = new THREE.LineSegments(combGeo, new THREE.LineBasicMaterial({vertexColors:true, transparent:true, opacity:0.95}));
+  pivot.add(combLine);
+  const lineObjs = {}; // compat (filtres masqués)
+  // Tête de coupe (marqueur)
+  const _mr = Math.max(0.6, spanXY*0.012);
+  const mark = new THREE.Mesh(new THREE.SphereGeometry(_mr,12,12), new THREE.MeshBasicMaterial({color:0xffd24a}));
+  mark.visible=false;
+  pivot.add(mark);
 
   // ── Axes XYZ (coin bas-gauche) ──
   const axV = [
@@ -16049,20 +16092,22 @@ function _s3dInit(moves) {
     initRadius,
     lines: lineObjs,
     vis: {rapid:true,cut:true,plunge:true},
+    moves, combGeo, mark,
+    idx: moves.length, playing:false,
+    speed:(parseInt(document.getElementById('s3dSpeed')&&document.getElementById('s3dSpeed').value)||20),
     drag: false, lx:0, ly:0,
     pinch0: 0,
     rafId: null
   };
 
-  // Boutons
-  ['rapid','cut','plunge'].forEach(t => {
-    const b = document.getElementById('s3d_btn_'+t);
-    if (b) { b.style.display=''; b.style.opacity = '1'; }
-  });
+  // Filtres masqués (révélation progressive + couleurs suffisent)
+  ['rapid','cut','plunge'].forEach(t => { const b = document.getElementById('s3d_btn_'+t); if (b) b.style.display='none'; });
   const layerBtnsDiv2 = document.getElementById('s3d_layer_btns');
   if (layerBtnsDiv2) { layerBtnsDiv2.style.display = 'none'; layerBtnsDiv2.innerHTML = ''; }
 
   _s3dAttachControls(canvas, spanXY);
+  _s3dRenderCode();
+  _s3dSetIdx(moves.length);   // tout visible au départ
   _s3dStartRender();
 }
 
@@ -16122,7 +16167,7 @@ function _s3dAttachControls(canvas, spanXY) {
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('mousedown', e => {
     _lx = e.clientX; _ly = e.clientY;
-    _mode = e.button === 0 ? 'orbit' : 'pan';
+    _mode = e.shiftKey ? 'pan' : 'orbit';   // Fusion : Maj+glisser = déplacer, sinon tourner
     e.preventDefault();
   });
   canvas.addEventListener('mousemove', e => {
@@ -16148,6 +16193,7 @@ function _s3dStartRender() {
   function animate() {
     if (!document.getElementById('sim3DModal').classList.contains('open')) return;
     _s3d.rafId = requestAnimationFrame(animate);
+    if (_s3d.playing) { _s3dSetIdx(_s3d.idx + (_s3d.speed||20)); if (_s3d.idx >= _s3d.moves.length) { _s3d.playing=false; const _pb=document.getElementById('s3dPlayBtn'); if(_pb)_pb.textContent='▶'; } }
     const sinPhi = Math.sin(_s3d.phi), cosPhi = Math.cos(_s3d.phi);
     camera.position.set(
       _s3d.cx + _s3d.radius * sinPhi * Math.cos(_s3d.theta),
@@ -16280,7 +16326,7 @@ function _s3dStartRender() {
   <div style="width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg)">
     <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surf);border-bottom:1px solid var(--brd);flex-shrink:0">
       <span style="font-family:var(--mono);font-size:12px;color:var(--acc);flex:1">🧊 VUE 3D</span>
-      <span style="font-size:10px;color:var(--txt3)">Glisse=tourner · Pinch=zoom</span>
+      <span style="font-size:10px;color:var(--txt3)">Glisser=tourner · molette=zoom · Maj+glisser=déplacer</span>
       <button class="btn btn-dim" style="padding:5px 10px" onclick="closeSim3D()">✕</button>
     </div>
     <div style="display:flex;gap:6px;padding:6px 10px;background:var(--surf);border-bottom:1px solid var(--brd);flex-wrap:wrap;flex-shrink:0" id="s3d_toolbar">
@@ -16292,9 +16338,23 @@ function _s3dStartRender() {
       <div style="flex:1"></div>
       <button class="btn btn-dim" style="padding:4px 10px;font-size:10px" onclick="s3dResetView()">⌂ Reset</button>
     </div>
-    <div id="sim3DContainer" style="flex:1;position:relative;overflow:hidden;touch-action:none">
-      <canvas id="sim3DCanvas" style="width:100%;height:100%;display:block"></canvas>
-      <div id="sim3DInfo" style="position:absolute;bottom:8px;left:8px;font-family:var(--mono);font-size:10px;color:rgba(255,255,255,.4);pointer-events:none"></div>
+    <div style="flex:1;display:flex;min-height:0">
+      <div id="sim3DContainer" style="flex:1;position:relative;overflow:hidden;touch-action:none">
+        <canvas id="sim3DCanvas" style="width:100%;height:100%;display:block"></canvas>
+        <div id="sim3DInfo" style="position:absolute;bottom:8px;left:8px;font-family:var(--mono);font-size:10px;color:rgba(255,255,255,.4);pointer-events:none"></div>
+      </div>
+      <div id="s3dSide" style="width:300px;flex-shrink:0;display:flex;flex-direction:column;border-left:1px solid var(--brd);background:var(--surf)">
+        <div style="padding:6px 8px;font-size:10px;color:var(--txt3);border-bottom:1px solid var(--brd)">📄 G-code — touche une ligne pour y aller</div>
+        <div id="s3dCode" style="flex:1;overflow:auto;font-family:var(--mono);font-size:10px;line-height:1.5;background:#0d1117"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surf);border-top:1px solid var(--brd);flex-shrink:0">
+      <button id="s3dPlayBtn" class="btn btn-p" style="padding:6px 14px;font-size:15px" onclick="s3dTogglePlay()">▶</button>
+      <input type="range" id="s3dSeek" min="0" max="100" value="100" style="flex:1;accent-color:var(--acc)" oninput="s3dSeekTo(parseInt(this.value))">
+      <span id="s3dProgress" style="font-family:var(--mono);font-size:11px;color:var(--txt2);min-width:40px">100%</span>
+      <span style="font-size:10px;color:var(--txt2)">Vitesse</span>
+      <input type="range" id="s3dSpeed" min="1" max="300" value="20" style="width:90px;accent-color:var(--txt2)" oninput="_s3dSetSpeed(this.value)">
+      <span id="s3dSpeedLbl" style="font-family:var(--mono);font-size:11px;color:var(--txt2);min-width:34px">×20</span>
     </div>
   </div>
 </div>
