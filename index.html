@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BV ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-BW ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3142,6 +3142,7 @@ function buildLaserBody(){
   const order=contours.map((c,i)=>[c,i]).sort((a,b)=> (b[0]._depth-a[0]._depth) || (a[1]-b[1]) ).map(x=>x[0]); // profondeur decroissante = interieurs d'abord
   const blocks=order.map(c=>
     'G1 X'+_lc(c.start[0])+' Y'+_lc(c.start[1])+'\n'
+    +'G1 Z0   ;redescendre sur la tole avant de percer\n'
     +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
     +c.moves.join('\n')+'\n'
     +'TC_LASER_OFF(2)\n'
