@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CB ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CC ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6947,7 +6947,7 @@ function _applyConstraintStep(c, anchorId){
       let best=null; for(const ea of [[a[0],a[1]],[a[2],a[3]]]) for(const w of [0,1]){ const eb=w?[s[2],s[3]]:[s[0],s[1]]; const d=Math.hypot(ea[0]-eb[0],ea[1]-eb[1]); if(!best||d<best.d)best={d,ea,w}; }
       const ns=s.slice(); if(best.w){ns[2]=best.ea[0];ns[3]=best.ea[1];}else{ns[0]=best.ea[0];ns[1]=best.ea[1];} setL(mov,ns); break; }
     case 'midpoint': { const pt=(A&&A.type==='point')?A:B, ln=(A&&A.type==='point')?B:A; if(!pt||!ln)return; if(_isAnchor(pt,anchorId))return; const s=L(ln); if(!s)return; pt.x=(s[0]+s[2])/2; pt.y=(s[1]+s[3])/2; break; }
-    case 'tangent': { const circ=A; if(!circ)return; let s=null; if(typeof c.b==='string' && String(c.b).indexOf('#')>=0){ s=segOfRef(c.b); } else if(B){ s=L(B); } if(!s)return; const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1,nx=-ey/Ln,ny=ex/Ln,d=(circ.x-s[0])*nx+(circ.y-s[1])*ny,sg=d>=0?1:-1,r=(circ.rx||circ.ry),fx=circ.x-nx*d,fy=circ.y-ny*d; circ.x=fx+nx*sg*r; circ.y=fy+ny*sg*r; break; }
+    case 'tangent': { const circ=A; if(!circ)return; let s=null; if(typeof c.b==='string' && String(c.b).indexOf('#')>=0){ s=segOfRef(c.b); } else if(B){ s=L(B); } if(!s)return; const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1,nx=-ey/Ln,ny=ex/Ln,d=(circ.x-s[0])*nx+(circ.y-s[1])*ny,sg=(c.side||(c.side=(d>=0?1:-1))),r=(circ.rx||circ.ry),fx=circ.x-nx*d,fy=circ.y-ny*d; circ.x=fx+nx*sg*r; circ.y=fy+ny*sg*r; break; }
   }
 }
 function solveSketch(anchorId){
@@ -13793,7 +13793,7 @@ function initCanvas(){
   pCanvas.addEventListener('mousemove',onMM);
   pCanvas.addEventListener('mouseup',onME);
   pCanvas.addEventListener('mouseleave',()=>{isDragging=false;isDrawing=false;pinchActive=false;dragMode=null;if(pCanvas)pCanvas.style.cursor='default';});
-  pCanvas.addEventListener('dblclick',e=>{e.preventDefault(); if(paintTool==='cadline'&&_cad){ cadFinish(); return; } const r=pCanvas.getBoundingClientRect(); const [dxm,dym]=pxToMm(e.clientX-r.left,e.clientY-r.top); for(let i=paintObjects.length-1;i>=0;i--){ const dd=paintObjects[i]; if(dd.type==='dim'&&hitTest(dd,dxm,dym)){ openDimInput(dd); return; } } const o=getObj(selObjId);if(o)centerViewOnObj(o);});
+  pCanvas.addEventListener('dblclick',e=>{e.preventDefault(); if(paintTool==='cadline'&&_cad){ cadFinish(); return; } const r=pCanvas.getBoundingClientRect(); const [dxm,dym]=pxToMm(e.clientX-r.left,e.clientY-r.top); for(let i=paintObjects.length-1;i>=0;i--){ const dd=paintObjects[i]; if(dd.type==='dim'&&hitTest(dd,dxm,dym)){ openDimInput(dd); return; } } for(let i=paintObjects.length-1;i>=0;i--){ const dd=paintObjects[i]; if(dd.type==='text'&&hitTest(dd,dxm,dym)){ if(typeof iEditText==='function'){ iEditText(dd.id); return; } } } const o=getObj(selObjId);if(o)centerViewOnObj(o);});
   document.addEventListener('keydown',e=>{
     if(typeof _shpKey==='function' && _shp){ const ae=document.activeElement; if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))return; if(_shpKey(e)){ e.preventDefault(); } return; }
     if(paintTool!=='cadline'||!_cad) return;
