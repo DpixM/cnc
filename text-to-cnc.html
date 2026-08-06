@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CF ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CG ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2084,6 +2084,14 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 
   <!-- Barre de style (Paint-style) -->
   <div class="toolbar" id="styleBar" style="padding:4px 7px;gap:6px;border-top:1px solid var(--brd);background:var(--surf2);flex-wrap:nowrap;overflow-x:auto">
+    <div id="eraserSizeRow" style="display:none;align-items:center;gap:4px;flex-shrink:0">
+      <span style="font-size:9px;color:var(--txt3)">🧽 Gomme:</span>
+      <input type="number" id="eraserSizeInput" min="0.2" max="50" step="0.2" value="4"
+        style="width:52px;padding:3px 5px;font-family:var(--mono);font-size:10px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:4px;color:var(--acc);outline:none"
+        title="Taille de la gomme (mm)" oninput="eraserRadius=Math.max(0.2,parseFloat(this.value)||4)">
+      <span style="font-size:8px;color:var(--txt3);font-family:var(--mono)">mm</span>
+      <div class="tsep"></div>
+    </div>
     <div id="starOpts" style="display:none;align-items:center;gap:4px;flex-shrink:0">
       <span style="font-size:9px;color:var(--txt3)">★ Branches:</span>
       <button class="ptool" style="min-width:30px;min-height:30px;padding:3px 6px;font-size:14px" onclick="currentStarBranches=Math.max(4,currentStarBranches-1);document.getElementById('starNb').textContent=currentStarBranches">−</button>
@@ -7636,10 +7644,15 @@ function handlePointerDown(cpx,cpy){
           return;
         }
         if(h==='mv'){
-          // Move: start from cursor position
-          const origBB=o.type==='line'?{...o}:{...getObjBB(o)}; if(o._fillets)origBB._fillets=JSON.parse(JSON.stringify(o._fillets)); if(o._arc)origBB._arc=JSON.parse(JSON.stringify(o._arc)); if(typeof snapPointsOf==='function')origBB._pts=snapPointsOf(o).map(pt=>[pt[0],pt[1]]);
-          dragPending={mode:'mv',obj:o,cpx,cpy,origBB,startMm:{x:xm,y:ym}};
-          return;
+          // Re-clic au MÊME endroit sur un empilement -> cycler vers la forme du dessous
+          // (on ne déclenche pas le déplacement ; glisser = déplacer marche encore).
+          const _reclicCycle=(Math.hypot(cpx-(_lastSelCpx||0),cpy-(_lastSelCpy||0))<24) && (paintObjects.filter(x=>hitTest(x,xm,ym)).length>1);
+          if(!_reclicCycle){
+            // Move: start from cursor position
+            const origBB=o.type==='line'?{...o}:{...getObjBB(o)}; if(o._fillets)origBB._fillets=JSON.parse(JSON.stringify(o._fillets)); if(o._arc)origBB._arc=JSON.parse(JSON.stringify(o._arc)); if(typeof snapPointsOf==='function')origBB._pts=snapPointsOf(o).map(pt=>[pt[0],pt[1]]);
+            dragPending={mode:'mv',obj:o,cpx,cpy,origBB,startMm:{x:xm,y:ym}};
+            return;
+          }
         }
         // No handle : déplacer le sélectionné en le prenant par son corps, SAUF si
         // le clic est sur le TRAIT d'une AUTRE forme (contours dissociés qui se
@@ -7648,7 +7661,10 @@ function handlePointerDown(cpx,cpy){
         if(h==null && hitTest(o,xm,ym)){
           const _tol=Math.max(1.2,10/(BASE_PX*vZoom));
           const autreTrait=paintObjects.some(x=>x.id!==o.id && distToObjStroke(x,xm,ym)<=_tol);
-          if(!autreTrait){
+          // Re-clic au MÊME endroit sur un empilement -> on ne déplace pas, on laisse
+          // la sélection cycler vers la forme du dessous (glisser = déplacer marche encore).
+          const _reclicCycle=(Math.hypot(cpx-(_lastSelCpx||0),cpy-(_lastSelCpy||0))<24) && (paintObjects.filter(x=>hitTest(x,xm,ym)).length>1);
+          if(!autreTrait && !_reclicCycle){
             const origBB=o.type==='line'?{...o}:{...getObjBB(o)}; if(o._fillets)origBB._fillets=JSON.parse(JSON.stringify(o._fillets)); if(o._arc)origBB._arc=JSON.parse(JSON.stringify(o._arc)); if(typeof snapPointsOf==='function')origBB._pts=snapPointsOf(o).map(pt=>[pt[0],pt[1]]);
             dragPending={mode:'mv',obj:o,cpx,cpy,origBB,startMm:{x:xm,y:ym}};
             return;
@@ -7662,29 +7678,21 @@ function handlePointerDown(cpx,cpy){
     const allHit=paintObjects.filter(o=>hitTest(o,xm,ym));
     let found=null;
     if(allHit.length>1){
-      const nearLast=Math.hypot(cpx-(_lastSelCpx||0),cpy-(_lastSelCpy||0))<20;
-      // Tolérance de "toucher le trait" : ~10px écran convertis en mm
+      const nearLast=Math.hypot(cpx-(_lastSelCpx||0),cpy-(_lastSelCpy||0))<24;
       const tol=10/(BASE_PX*vZoom);
-      const onStroke=allHit
-        .map(o=>({o, d:distToObjStroke(o,xm,ym)}))
-        .filter(h=>h.d<=tol)
-        .sort((a,b)=>a.d-b.d);
-
-      if(onStroke.length){
-        // Au moins un trait sous le doigt : le plus proche gagne.
-        // Re-tap au même endroit -> passer au trait suivant.
-        const curIdx=onStroke.findIndex(h=>h.o.id===selObjId);
-        found=(nearLast&&curIdx>=0&&onStroke.length>1)
-          ? onStroke[(curIdx+1)%onStroke.length].o
-          : onStroke[0].o;
-      } else {
-        // Aucun trait proche (clic dans le vide d'une forme) : ancien
-        // comportement — cycle, sinon la forme du dessus.
-        const curIdx=allHit.findIndex(o=>o.id===selObjId);
-        found=(nearLast&&curIdx>=0)
-          ? allHit[(curIdx+1)%allHit.length]
-          : allHit[allHit.length-1];
-      }
+      // Ordre de cycle : d'abord les formes dont le TRAIT est sous le doigt (plus
+      // proche en 1er), puis les autres du DESSUS vers le DESSOUS. Un re-clic au
+      // même endroit passe à la suivante (et fait le tour) -> on atteint ce qui est derrière.
+      const ordered=allHit.slice().sort((a,b)=>{
+        const da=distToObjStroke(a,xm,ym), db=distToObjStroke(b,xm,ym);
+        const na=(da<=tol)?0:1, nb=(db<=tol)?0:1;
+        if(na!==nb) return na-nb;
+        if(na===0) return da-db;
+        return paintObjects.indexOf(b)-paintObjects.indexOf(a);
+      });
+      const curIdx=ordered.findIndex(o=>o.id===selObjId);
+      found=(nearLast&&curIdx>=0) ? ordered[(curIdx+1)%ordered.length] : ordered[0];
+      if(!nearLast && ordered.length>1 && typeof toastHist==='function') toastHist('🔁 Reclique au même endroit pour la forme derrière ('+ordered.length+')');
     } else {
       found=allHit[0]||null;
     }
