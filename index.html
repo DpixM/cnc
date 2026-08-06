@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CG ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CH ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -5670,6 +5670,12 @@ function hitTest(o,xm,ym){
     const tolS=Math.max(1.2, 8/(BASE_PX*vZoom));
     try{ return distToObjStroke(o,xm,ym) <= tolS; }catch(e){}
   }
+  if(o.type==='text'){
+    // Sélection AU TRAIT (sur les lettres) : la boîte du texte ne correspond pas
+    // à la position réelle des glyphes (texte centré), donc on teste les traits.
+    const tolT=Math.max(1.6, 11/(BASE_PX*vZoom));
+    try{ return distToObjStroke(o,xm,ym) <= tolT; }catch(e){}
+  }
   const bb=getObjBB(o);const t=7/(BASE_PX*vZoom); // generous hit zone
   return xm>=bb.x-t&&xm<=bb.x+bb.w+t&&ym>=bb.y-t&&ym<=bb.y+bb.h+t;
 }
@@ -5825,9 +5831,13 @@ function objToStrokesRaw(o){
     }
   }
   else if(o.type==='text'){
-    // Texte : contour de la bounding box seulement (le rendu se fait dans wzDrawToolAssign)
-    const bb=getObjBB(o);
-    s.push([[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x+bb.w,bb.y+bb.h],[bb.x,bb.y+bb.h],[bb.x,bb.y]]);
+    // Texte : VRAIES lettres, EXACTEMENT comme à l'écran (objToStrokes gère le centrage).
+    // Indispensable pour la sélection au trait, la cotation et l'export laser/DXF fidèle.
+    try{
+      const ts=objToStrokes(o)||[];
+      if(ts.length){ for(const t of ts) if(t&&t.length>1) s.push(t); }
+      else { const bb=getObjBB(o); s.push([[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x+bb.w,bb.y+bb.h],[bb.x,bb.y+bb.h],[bb.x,bb.y]]); }
+    }catch(e){ const bb=getObjBB(o); s.push([[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x+bb.w,bb.y+bb.h],[bb.x,bb.y+bb.h],[bb.x,bb.y]]); }
   }
   else if(o.type==='free'&&o.pts&&o.pts.length>1){s.push(o.pts);}
   else if(o.type==='oblong'){
