@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CA ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CB ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6478,7 +6478,61 @@ function cadChamfer(){ _setToolFromPick=true; if(typeof setPTool==='function')se
 function _doFillet(objs, R){ const lines=objs.filter(o=>segOf(o)); if(lines.length<2){ if(typeof toastHist==='function')toastHist('⚠️ Clique 2 lignes'); return; } if(!(R>0)){ R=parseFloat(prompt('Rayon du congé (mm) ?','5')); } if(!(R>0))return; const L1=lines[0],L2=lines[1]; const s1=segOf(L1).slice(),s2=segOf(L2).slice(); const I=_lineIntersect(s1,s2); if(!I){ if(typeof toastHist==='function')toastHist('⚠️ Lignes parallèles'); return; } const away=(s)=>{ const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-I[0],e0[1]-I[1])<Math.hypot(e1[0]-I[0],e1[1]-I[1]))?0:1; const far=near?e0:e1; const dl=Math.hypot(far[0]-I[0],far[1]-I[1])||1; return {u:[(far[0]-I[0])/dl,(far[1]-I[1])/dl], near, L:dl}; }; const dA=away(s1), dB=away(s2); const dot=Math.max(-1,Math.min(1,dA.u[0]*dB.u[0]+dA.u[1]*dB.u[1])); const th=Math.acos(dot); if(th<0.05||th>Math.PI-0.05){ if(typeof toastHist==='function')toastHist('⚠️ Angle trop plat'); return; } let tanD=Math.min(R/Math.tan(th/2), dA.L-0.05, dB.L-0.05); if(tanD<0.05)tanD=0.05; const Reff=tanD*Math.tan(th/2); const TA=[I[0]+dA.u[0]*tanD,I[1]+dA.u[1]*tanD], TB=[I[0]+dB.u[0]*tanD,I[1]+dB.u[1]*tanD]; const setN=(o,s,near,np)=>{ if(near===0){s[0]=np[0];s[1]=np[1];}else{s[2]=np[0];s[3]=np[1];} setSeg(o,s); }; setN(L1,s1,dA.near,TA); setN(L2,s2,dB.near,TB); const bis=[dA.u[0]+dB.u[0],dA.u[1]+dB.u[1]]; const bl=Math.hypot(bis[0],bis[1])||1; const cen=[I[0]+bis[0]/bl*(Reff/Math.sin(th/2)), I[1]+bis[1]/bl*(Reff/Math.sin(th/2))]; const a1=Math.atan2(TA[1]-cen[1],TA[0]-cen[0]), a2=Math.atan2(TB[1]-cen[1],TB[0]-cen[0]); let span=a2-a1; while(span<=-Math.PI)span+=2*Math.PI; while(span>Math.PI)span-=2*Math.PI; const N=24,pts=[]; for(let i=0;i<=N;i++){ const a=a1+span*i/N; pts.push([cen[0]+Reff*Math.cos(a),cen[1]+Reff*Math.sin(a)]); } const through=pts[Math.floor(N/2)]; const mx=(TA[0]+TB[0])/2,my=(TA[1]+TB[1])/2, ndx=-(TB[1]-TA[1]),ndy=(TB[0]-TA[0]); const sgn=((through[0]-mx)*ndx+(through[1]-my)*ndy)>=0?1:-1; paintObjects.push({id:Date.now()+Math.random(),type:'free',pts,strokeW:currentStrokeW,_arc:{p1:[TA[0],TA[1]],p2:[TB[0],TB[1]],r:R,sgn}}); redrawCanvasNow(); }
 
 function _removeShapeEdge(o, i){ if(!o||!o.pts)return; let pts=o.pts.slice(); const n0=pts.length; const closed=n0>1 && Math.hypot(pts[0][0]-pts[n0-1][0],pts[0][1]-pts[n0-1][1])<1e-6; const verts=closed?pts.slice(0,-1):pts.slice(); const n=verts.length; if(i<0||i>=n){ if(typeof toastHist==='function')toastHist('⚠️ Arête invalide'); return; } const np=[]; for(let k=1;k<=n;k++)np.push(verts[(i+k)%n]); o.pts=np; delete o._poly; delete o._polyN; delete o._fillets; if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('✂️ Côté supprimé (forme ouverte)'); }
-function _doTrim(objs, click){ if(click && typeof _pickEdgeAt==='function'){ const pk=_pickEdgeAt(click[0],click[1]); if(pk && pk.obj){ const f=(typeof _ensureFreePoly==='function')?_ensureFreePoly(pk.obj):pk.obj; if(f && f.type==='free' && f.pts && f.pts.length>3){ _removeShapeEdge(f, pk.edge); return; } } } const _eh=objs&&objs[0]; if(_eh&&_eh.__eh&&_eh.o&&_eh.o.pts&&_eh.o.pts.length>3){ _removeShapeEdge(_eh.o, _eh.i); return; } const L=objs.find(o=>segOf(o)); if(!L){ if(typeof toastHist==='function')toastHist('⚠️ Clique une ligne'); return; } const s=segOf(L).slice(); let best=null; for(const o of paintObjects){ if(o.id===L.id||o.type==='dim'||o.type==='constraint'||o.type==='group')continue; let segs; try{segs=objToStrokesRaw(o)||[];}catch(e){continue;} for(const poly of segs){ for(let i=0;i<poly.length-1;i++){ const ip=_segInt([s[0],s[1],s[2],s[3]],[poly[i][0],poly[i][1],poly[i+1][0],poly[i+1][1]]); if(ip){ const d=Math.hypot(ip[0]-click[0],ip[1]-click[1]); if(!best||d<best.d)best={d,ip}; } } } } if(!best){ if(typeof toastHist==='function')toastHist('✂️ Aucune intersection à couper ici'); return; } const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e0[0]-click[0],e0[1]-click[1])<Math.hypot(e1[0]-click[0],e1[1]-click[1]))?0:1; if(near===0){s[0]=best.ip[0];s[1]=best.ip[1];}else{s[2]=best.ip[0];s[3]=best.ip[1];} setSeg(L,s); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('✂️ Coupé à l\'intersection'); }
+function _polyAtT(V,t){ const n=V.length; if(t<=0)return [V[0][0],V[0][1]]; if(t>=n-1)return [V[n-1][0],V[n-1][1]]; const i=Math.floor(t),f=t-i,a=V[i],b=V[i+1]; return [a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f]; }
+function _polyAtC(V,M,t){ t=((t%M)+M)%M; const i=Math.floor(t)%M,f=t-Math.floor(t),a=V[i],b=V[(i+1)%M]; return [a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f]; }
+function _trimSub(V,a,b){ if(b-a<1e-6)return null; const pts=[_polyAtT(V,a)]; for(let k=Math.floor(a)+1;k<b-1e-9;k++){ if(k>a+1e-9)pts.push([V[k][0],V[k][1]]); } pts.push(_polyAtT(V,b)); return pts.length>=2?pts:null; }
+function _trimSubC(V,M,from,to,fromP,toP){ const pts=[fromP?[fromP[0],fromP[1]]:_polyAtC(V,M,from)]; let end=(to>from)?to:to+M; for(let k=Math.floor(from)+1;k<end-1e-9;k++){ if(k>from+1e-9)pts.push([V[k%M][0],V[k%M][1]]); } pts.push(toP?[toP[0],toP[1]]:_polyAtC(V,M,to)); return pts.length>=2?pts:null; }
+// TRIM style Fusion : retire seulement le morceau cliqué, borné par les intersections.
+function _doTrim(objs, click){
+  if(!click)return;
+  const pk=(typeof _pickEdgeAt==='function')?_pickEdgeAt(click[0],click[1]):null;
+  const obj=pk&&pk.obj;
+  if(!obj||obj.type==='dim'||obj.type==='point'){ if(typeof toastHist==='function')toastHist('✂️ Clique un trait à ajuster'); return; }
+  let strokes; try{ strokes=objToStrokesRaw(obj)||[]; }catch(e){ strokes=[]; }
+  if(!strokes.length)return;
+  let stroke=strokes[0], sbest=Infinity;
+  for(const s of strokes){ for(let i=0;i<s.length-1;i++){ const d=_distPtSeg(click[0],click[1],s[i][0],s[i][1],s[i+1][0],s[i+1][1]); if(d<sbest){sbest=d;stroke=s;} } }
+  const CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon'];
+  let V=stroke.map(pt=>[pt[0],pt[1]]);
+  let closed=CLOSEDT.includes(obj.type)||obj._poly;
+  if(V.length>2 && Math.hypot(V[0][0]-V[V.length-1][0],V[0][1]-V[V.length-1][1])<1e-6){ closed=true; V.pop(); }
+  const M=closed?V.length:V.length-1;
+  const segPt=i=>closed?[V[i],V[(i+1)%V.length]]:[V[i],V[i+1]];
+  const inter=[];
+  for(let i=0;i<M;i++){ const A=segPt(i)[0],B=segPt(i)[1]; const segLen=Math.hypot(B[0]-A[0],B[1]-A[1])||1e-9;
+    for(const o2 of paintObjects){ if(o2===obj||o2.id===obj.id||o2.type==='dim'||o2.type==='point'||o2.type==='constraint'||o2.type==='group')continue;
+      let s2; try{s2=objToStrokesRaw(o2)||[];}catch(e){continue;}
+      for(const poly2 of s2){ for(let j=0;j<poly2.length-1;j++){
+        const ip=_segInt([A[0],A[1],B[0],B[1]],[poly2[j][0],poly2[j][1],poly2[j+1][0],poly2[j+1][1]]);
+        if(ip){ let fr=Math.hypot(ip[0]-A[0],ip[1]-A[1])/segLen; fr=Math.max(0,Math.min(1,fr)); inter.push({t:i+fr,p:[ip[0],ip[1]]}); }
+      } }
+    }
+  }
+  let tc=0,tcd=Infinity;
+  for(let i=0;i<M;i++){ const A=segPt(i)[0],B=segPt(i)[1]; const dx=B[0]-A[0],dy=B[1]-A[1],L2=dx*dx+dy*dy||1e-9; let u=((click[0]-A[0])*dx+(click[1]-A[1])*dy)/L2; u=Math.max(0,Math.min(1,u)); const px=A[0]+dx*u,py=A[1]+dy*u,d=Math.hypot(click[0]-px,click[1]-py); if(d<tcd){tcd=d;tc=i+u;} }
+  inter.sort((a,b)=>a.t-b.t);
+  const idx=paintObjects.indexOf(obj);
+  const _mkFree=(pts,id)=>{ if(!pts||pts.length<2)return null; const o={id:(id!=null?id:(Date.now()+Math.random())), type:'free', pts, strokeW:obj.strokeW||currentStrokeW}; if(obj.toolId!==undefined)o.toolId=obj.toolId; return o; };
+  if(inter.length===0 || (closed && inter.length<2)){ if(idx>=0)paintObjects.splice(idx,1); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('✂️ Trait supprimé (rien pour le borner)'); return; }
+  let newObjs=[];
+  if(!closed){
+    const bnds=[{t:0,p:[V[0][0],V[0][1]]}].concat(inter,[{t:M,p:[V[M][0],V[M][1]]}]);
+    let lo=bnds[0]; for(const b of bnds){ if(b.t<=tc+1e-9 && b.t>=lo.t)lo=b; }
+    let hi=bnds[bnds.length-1]; for(let k=bnds.length-1;k>=0;k--){ if(bnds[k].t>=tc-1e-9 && bnds[k].t<=hi.t)hi=bnds[k]; }
+    const left=_trimSub(V,0,lo.t), right=_trimSub(V,hi.t,M);
+    newObjs=[_mkFree(left,obj.id),_mkFree(right)].filter(Boolean);
+  } else {
+    let a=null,b=null;
+    for(let k=0;k<inter.length;k++){ const cur=inter[k], nxt=inter[(k+1)%inter.length]; const t0=cur.t, t1=(nxt.t>cur.t)?nxt.t:nxt.t+M; let tcx=tc; if(tcx<t0)tcx+=M; if(tcx>=t0-1e-9 && tcx<=t1+1e-9){ a=cur; b=nxt; break; } }
+    if(!a){ a=inter[inter.length-1]; b=inter[0]; }
+    const keep=_trimSubC(V,M,b.t,a.t,b.p,a.p);
+    newObjs=[_mkFree(keep,obj.id)].filter(Boolean);
+  }
+  if(idx>=0) paintObjects.splice(idx,1,...newObjs);
+  if(typeof pushHistory==='function')pushHistory();
+  redrawCanvasNow();
+  if(typeof toastHist==='function')toastHist('✂️ Ajusté — morceau retiré');
+}
 function cadTrim(){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={need:1, picks:[], pickCon:true, fn:(objs,click)=>_doTrim(objs,click), hint:'✂️ Ajuster'}; _cadMode=true; _conHintShow('✂️ Ajuster — clique le côté (la partie à couper)'); redrawCanvasNow(); }
 function _doExtend(objs, click){ const L=objs.find(o=>segOf(o)); if(!L){ if(typeof toastHist==='function')toastHist('⚠️ Clique une ligne'); return; } const s=segOf(L).slice(); const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e1[0]-click[0],e1[1]-click[1])<Math.hypot(e0[0]-click[0],e0[1]-click[1]))?1:0; const P=near?e1:e0, other=near?e0:e1; const dir=[P[0]-other[0],P[1]-other[1]]; const dl=Math.hypot(dir[0],dir[1])||1; const u=[dir[0]/dl,dir[1]/dl]; let best=null; for(const o of paintObjects){ if(o.id===L.id||o.type==='dim'||o.type==='constraint'||o.type==='group')continue; let segs; try{segs=objToStrokesRaw(o)||[];}catch(e){continue;} for(const poly of segs){ for(let i=0;i<poly.length-1;i++){ const ip=_raySegInt(P,u,[poly[i][0],poly[i][1],poly[i+1][0],poly[i+1][1]]); if(ip&&ip.t>0.001){ if(!best||ip.t<best.t)best={t:ip.t,p:ip.p}; } } } } if(!best){ if(typeof toastHist==='function')toastHist('⊢ Rien à atteindre dans cette direction'); return; } if(near){s[2]=best.p[0];s[3]=best.p[1];}else{s[0]=best.p[0];s[1]=best.p[1];} setSeg(L,s); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('⊢ Prolongé jusqu\'à l\'intersection'); }
 function cadExtend(){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={need:1, picks:[], pickCon:true, fn:(objs,click)=>_doExtend(objs,click), hint:'⊢ Prolonger'}; _cadMode=true; _conHintShow('⊢ Prolonger — clique près du bout du côté à étendre'); redrawCanvasNow(); }
