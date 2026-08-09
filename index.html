@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CL ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CM ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -4313,6 +4313,7 @@ let panStart = {cpx:0,cpy:0,panX:0,panY:0};
 let dragPending = null; // {mode,obj,cpx,cpy,origBB,startMm} — activated after 4px movement
 let dragStartMm = {x:0,y:0}; // cursor position in mm at drag start
 let eraserRadius = 4; // mm
+let _tabW = 0.8; // largeur d'un tab (pont non coupé), en mm
 let currentTextH = 10; // mm — current text height
 
 // Drawing state
@@ -4590,6 +4591,7 @@ const TOOL_MENUS = {
     {i:'◣', l:'Chanfrein',         fn:"cadChamfer()"},
     {i:'⧉', l:'Décalage (offset)', fn:"cadOffset()"},
     {i:'✂️', l:'Ajuster (trim)',   fn:"cadTrim()"},
+    {i:'🔗', l:'Tab (pont de maintien)', fn:"cadTabs()"},
     {i:'⊢', l:'Prolonger',         fn:"cadExtend()"},
     {i:'⟳', l:'Rotation',          fn:"cadRotate()"},
     {i:'🔓', l:'Déverrouiller',      fn:"cadUnlock()"},
@@ -6671,6 +6673,18 @@ function _doTrimFusion(click){
   if(typeof toastHist==='function')toastHist('✂️ Tronçon coupé');
 }
 function cadTrim(){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={need:1, picks:[], pickCon:true, fn:(objs,click)=>_doTrimFusion(click), hint:'✂️ Ajuster'}; _cadMode=true; _conHintShow('✂️ Ajuster — clique le tronçon à retirer (entre 2 intersections)'); redrawCanvasNow(); }
+function cadTabs(){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _armTab(); }
+function _armTab(){ _conPick={need:1, picks:[], pickCon:true, fn:(objs,click)=>{ _placeTab(click); _armTab(); }, hint:'🔗 Tab'}; _cadMode=true; if(typeof _conHintShow==='function')_conHintShow('🔗 Tab (pont) — clique un contour pour laisser un petit pont non coupé. Change d\'outil pour finir.'); if(typeof redrawCanvasNow==='function')redrawCanvasNow(); }
+function _placeTab(click){
+  if(!click)return;
+  const tw=(typeof _tabW!=='undefined'&&_tabW>0)?_tabW:0.8;
+  const savedR=eraserRadius; eraserRadius=Math.max(0.12, tw/2);
+  try{ if(typeof pmErase==='function')pmErase(click[0], click[1]); }catch(e){}
+  eraserRadius=savedR;
+  if(typeof pushHistory==='function')pushHistory();
+  if(typeof redrawCanvasNow==='function')redrawCanvasNow();
+  if(typeof toastHist==='function')toastHist('🔗 Pont posé ('+tw+' mm)');
+}
 function _doExtend(objs, click){ const L=objs.find(o=>segOf(o)); if(!L){ if(typeof toastHist==='function')toastHist('⚠️ Clique une ligne'); return; } const s=segOf(L).slice(); const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e1[0]-click[0],e1[1]-click[1])<Math.hypot(e0[0]-click[0],e0[1]-click[1]))?1:0; const P=near?e1:e0, other=near?e0:e1; const dir=[P[0]-other[0],P[1]-other[1]]; const dl=Math.hypot(dir[0],dir[1])||1; const u=[dir[0]/dl,dir[1]/dl]; let best=null; for(const o of paintObjects){ if(o.id===L.id||o.type==='dim'||o.type==='constraint'||o.type==='group')continue; let segs; try{segs=objToStrokesRaw(o)||[];}catch(e){continue;} for(const poly of segs){ for(let i=0;i<poly.length-1;i++){ const ip=_raySegInt(P,u,[poly[i][0],poly[i][1],poly[i+1][0],poly[i+1][1]]); if(ip&&ip.t>0.001){ if(!best||ip.t<best.t)best={t:ip.t,p:ip.p}; } } } } if(!best){ if(typeof toastHist==='function')toastHist('⊢ Rien à atteindre dans cette direction'); return; } if(near){s[2]=best.p[0];s[3]=best.p[1];}else{s[0]=best.p[0];s[1]=best.p[1];} setSeg(L,s); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('⊢ Prolongé jusqu\'à l\'intersection'); }
 function cadExtend(){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={need:1, picks:[], pickCon:true, fn:(objs,click)=>_doExtend(objs,click), hint:'⊢ Prolonger'}; _cadMode=true; _conHintShow('⊢ Prolonger — clique près du bout du côté à étendre'); redrawCanvasNow(); }
 function cadUnlock(){ const ids=[...getSelIds()]; if(!ids.length){ if(typeof toastHist==='function')toastHist('🔓 Sélectionne une forme (ou la base d\'un réseau) à déverrouiller'); return; } let n=0; for(const id of ids){ const o=getObj(id); if(!o)continue; if(o.fixed){o.fixed=false;n++;} for(const c of paintObjects){ if(c._link&&String(c._link.src)===String(id)){ delete c._link; c.fixed=false; n++; } } } if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('🔓 Déverrouillé ('+n+' forme(s)) — le réseau devient modifiable'); }
