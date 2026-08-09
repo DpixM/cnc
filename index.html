@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CK ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CL ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -1934,7 +1934,13 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
         <input id="laserZlift" type="number" value="5" min="0" max="200" step="1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
       <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Vitesse F (mm/min)
         <input id="laserFeed" type="number" value="5000" min="1" max="20000" step="50" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+      <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Amorce/perçage (mm)
+        <input id="laserLead" type="number" value="1" min="0.1" max="10" step="0.1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
     </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
+      <input type="checkbox" id="laserLeadin" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
+      <span><b>Perçage dans la chute</b> (trous > 0,5 mm) — le perçage démarre dans la partie qui part, pas sur le bord gardé.</span>
+    </label>
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
       <input type="checkbox" id="laserFullFile" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
       <span><b>Fichier complet machine</b> (entête + pied machine TRUMPF). Décoche pour la version simple lisible.</span>
@@ -2086,9 +2092,10 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
   <div class="toolbar" id="styleBar" style="padding:4px 7px;gap:6px;border-top:1px solid var(--brd);background:var(--surf2);flex-wrap:nowrap;overflow-x:auto">
     <div id="eraserSizeRow" style="display:none;align-items:center;gap:4px;flex-shrink:0">
       <span style="font-size:9px;color:var(--txt3)">🧽 Gomme:</span>
+      <input type="range" id="eraserSizeSlider" min="0.2" max="20" step="0.2" value="4" style="width:80px;accent-color:var(--acc);vertical-align:middle" oninput="eraserRadius=parseFloat(this.value)||4;var n=document.getElementById('eraserSizeInput');if(n)n.value=this.value">
       <input type="number" id="eraserSizeInput" min="0.2" max="50" step="0.2" value="4"
         style="width:52px;padding:3px 5px;font-family:var(--mono);font-size:10px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:4px;color:var(--acc);outline:none"
-        title="Taille de la gomme (mm)" oninput="eraserRadius=Math.max(0.2,parseFloat(this.value)||4)">
+        title="Taille de la gomme (mm)" oninput="eraserRadius=Math.max(0.2,parseFloat(this.value)||4);var s=document.getElementById('eraserSizeSlider');if(s)s.value=this.value">
       <span style="font-size:8px;color:var(--txt3);font-family:var(--mono)">mm</span>
       <div class="tsep"></div>
     </div>
@@ -3122,6 +3129,8 @@ function buildLaserBody(){
   const flat=_exportFlatObjs();
   const _zl=parseFloat(document.getElementById('laserZlift')?.value); const ZL=isNaN(_zl)?5:_zl;
   const _fd=parseFloat(document.getElementById('laserFeed')?.value); const FEED=isNaN(_fd)?5000:_fd;
+  const _li=document.getElementById('laserLeadin'); const LEADIN=_li?_li.checked:true;
+  const _ll=parseFloat(document.getElementById('laserLead')?.value); const LEAD=isNaN(_ll)?1:_ll;
   const contours=[]; // {poly, start, moves}
   const add=(poly,start,moves)=>{ if(moves&&moves.length) contours.push({poly,start,moves}); };
   for(const o of flat){
@@ -3157,14 +3166,31 @@ function buildLaserBody(){
   // A est "dans" B seulement si B est plus GRAND (evite le piege des formes concentriques)
   contours.forEach((c,i)=>{ let d=0; contours.forEach((o,j)=>{ if(i!==j && o.poly.length>=3 && o._a>c._a+1e-6 && _pointInPoly(c._c,o.poly)) d++; }); c._depth=d; });
   const order=contours.map((c,i)=>[c,i]).sort((a,b)=> (b[0]._depth-a[0]._depth) || (a[1]-b[1]) ).map(x=>x[0]); // profondeur decroissante = interieurs d'abord
-  const blocks=order.map((c,bi)=>
-    'G1 X'+_lc(c.start[0])+' Y'+_lc(c.start[1])+(bi===0?(' F'+_lc(FEED)+'   ;vitesse d\'avance (reste active ensuite)'):'')+'\n'
-    +'G1 Z0   ;redescendre sur la tole avant de percer\n'
-    +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-    +c.moves.join('\n')+'\n'
-    +'TC_LASER_OFF(2)\n'
-    +'G1 Z'+_lc(ZL)+'   ;lever la tete pour degager la piece coupee'
-  );
+  const blocks=order.map((c,bi)=>{
+    const S=c.start;
+    const isHole=(c._depth>=1);                       // contour interieur = trou (chute a l'interieur)
+    const diam=(c._a>0)?2*Math.sqrt(c._a/Math.PI):0;  // taille equivalente du trou
+    const Fstr=(bi===0?(' F'+_lc(FEED)+'   ;vitesse d\'avance (reste active ensuite)'):'');
+    let head;
+    if(LEADIN && isHole && diam>0.5 && c._c){
+      // Percage DANS la chute (vers le centre du trou) puis amorce jusqu'au contour :
+      // le point d'entree (avec bavure/trou) reste sur la partie qui part, pas sur le bord garde.
+      const dx=c._c[0]-S[0], dy=c._c[1]-S[1], d=Math.hypot(dx,dy)||1;
+      const L=Math.min(LEAD, 0.45*d);
+      const P=[S[0]+dx/d*L, S[1]+dy/d*L];
+      head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute\n'
+          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
+          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+          +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;amorce -> rejoint le contour\n';
+    } else {
+      head='G1 X'+_lc(S[0])+' Y'+_lc(S[1])+Fstr+'\n'
+          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
+          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n';
+    }
+    return head + c.moves.join('\n')+'\n'
+      +'TC_LASER_OFF(2)\n'
+      +'G1 Z'+_lc(ZL)+'   ;lever la tete pour degager la piece coupee';
+  });
   return {text:blocks.join('\n\n'), count:contours.length};
 }
 // Emballe le corps dans le squelette .LST (fourni par l'ingénieur).
