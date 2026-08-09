@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CJ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CK ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -1919,7 +1919,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 </div><!-- /wz-wrap wzp9 -->
 
 <!-- PAGE 10 : G-CODE NORMAL (1 fichier) -->
-<div class="wz-wrap" id="wzp10">
+<div class="wz-wrap" id="wzp10" style="padding-bottom:90px">
   <div class="wz-h1">⚡ G-Code</div>
   <div class="wz-sub" id="p10sub">Usinage normal — 1 fichier</div>
   <div id="laserCfg" style="display:none;background:var(--surf2);border-radius:10px;border:1.5px solid var(--brd2);padding:12px;margin-bottom:10px">
@@ -2610,13 +2610,15 @@ function wzShowDraw(){
     else { resizeCanvas(); redrawCanvas(); renderInspector(); }
     if(!document.getElementById('wzDrawOkBtn')){
       const tb=document.querySelector('#drawShell .toolbar');
+      const shell=document.getElementById('drawShell');
+      // Bouton Suivant : FLOTTANT en bas à droite, jaune, cohérent avec tout le reste.
+      const btn=document.createElement('button');
+      btn.id='wzDrawOkBtn'; btn.className='btn btn-p';
+      btn.style.cssText='position:fixed;bottom:16px;right:16px;z-index:300;padding:12px 22px;font-size:15px;font-weight:900;box-shadow:0 6px 18px rgba(0,0,0,.5)';
+      btn.textContent='Suivant →'; btn.onclick=wzDrawDone;
+      if(shell)shell.appendChild(btn);
+      // Retour : reste dans la barre d'outils (à gauche).
       if(tb){
-        const sep=document.createElement('div');
-        sep.style.cssText='width:1px;height:24px;background:var(--brd2);flex-shrink:0';
-        const btn=document.createElement('button');
-        btn.id='wzDrawOkBtn'; btn.className='ptool';
-        btn.style.cssText='color:var(--grn);font-weight:900;font-size:13px;padding:0 10px';
-        btn.textContent='Suivant →'; btn.onclick=wzDrawDone;
         const btnBack=document.createElement('button');
         btnBack.className='ptool';
         btnBack.style.cssText='color:var(--txt2);font-size:12px;padding:0 8px;order:-1';
@@ -2624,7 +2626,6 @@ function wzShowDraw(){
         btnBack.title='Retour au wizard (dessin conservé)';
         btnBack.onclick=function(){wzDrawBack();};
         tb.insertBefore(btnBack,tb.firstChild);
-        tb.appendChild(sep); tb.appendChild(btn);
       }
     }
   }));
