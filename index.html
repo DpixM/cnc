@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CI ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CJ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -1968,7 +1968,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     <button class="tool-btn" id="tb_gear"   onclick="setTool('gear')">⚙️</button>
     <div style="width:1px;height:24px;background:var(--brd2);flex-shrink:0"></div>
     <button class="tool-btn" onclick="addConjGear()">⚙⚙</button>
-    <button class="tool-btn" title="Importer SVG" onclick="triggerFilePick('svg')">📥SVG</button>
+    <button class="tool-btn" title="Importer SVG" onclick="triggerFilePick('svg')">📥 Importer</button>
     <button class="tool-btn" id="tb_snap" onclick="toggleSnap()">🧲</button>
     <button class="tool-btn" onclick="clearAll()">🗑️</button>
     <!-- Bouton retour wizard -->
@@ -2363,6 +2363,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 
 <input type="file" id="fontFileInput" accept=".ttf,.otf,.woff" style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px" onchange="importFontFile(this)">
 <input type="file" id="svgFileInput" accept=".svg,.dxf,.png,.jpg,.jpeg,.gif,.bmp,.webp,image/*" style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px" onchange="importSvgOrImage(this)">
+<input type="file" id="projFileInput" accept=".json,application/json" style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px" onchange="loadProjectFile(this)">
 
 <script>
 /* opentype.js v2.0.0 */
@@ -3617,6 +3618,42 @@ function wzRenderRecap(){
 // ════════════════════════════════════════════════════════════
 const STORE = 'cnc9_';
 
+function saveProject(){
+  try{
+    const data={ _cncproj:1, ver:'CJ',
+      objs:paintObjects,
+      cons:(typeof _constraints!=='undefined'?_constraints:[]),
+      brut:{ x:document.getElementById('brtX')?.value, y:document.getElementById('brtY')?.value,
+             z:document.getElementById('brtZ')?.value, origin:(typeof originKey!=='undefined'?originKey:'c'),
+             mode:(typeof appMode!=='undefined'?appMode:'laser') } };
+    _dlBlob('projet-cnc.json', JSON.stringify(data), 'application/json');
+    if(typeof toastHist==='function')toastHist('💾 Projet enregistré');
+  }catch(e){ if(typeof toastHist==='function')toastHist('Erreur enregistrement: '+e.message); }
+}
+function openProject(){ const inp=document.getElementById('projFileInput'); if(inp){ inp.value=''; inp.click(); } }
+function loadProjectFile(input){
+  const f=input&&input.files&&input.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{ try{
+    const d=JSON.parse(e.target.result);
+    if(!d||!Array.isArray(d.objs)){ if(typeof toastHist==='function')toastHist('❌ Fichier projet invalide'); return; }
+    paintObjects=d.objs;
+    if(d.cons && typeof _constraints!=='undefined') _constraints=d.cons;
+    if(d.brut){ const b=d.brut;
+      const setv=(id,v)=>{ if(v!=null){ const el=document.getElementById(id); if(el)el.value=v; } };
+      setv('brtX',b.x); setv('brtY',b.y); setv('brtZ',b.z);
+      if(b.origin && typeof originKey!=='undefined') originKey=b.origin;
+    }
+    if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null;
+    if(typeof pushHistory==='function')pushHistory();
+    if(typeof redrawCanvas==='function')redrawCanvas();
+    if(typeof renderInspector==='function')renderInspector();
+    if(typeof updateObjCount==='function')updateObjCount();
+    if(typeof fitView==='function')fitView();
+    if(typeof toastHist==='function')toastHist('📂 Projet chargé ('+d.objs.length+' objets)');
+  }catch(err){ if(typeof toastHist==='function')toastHist('❌ Lecture projet: '+err.message); } };
+  r.readAsText(f);
+}
 function saveAll(){
   // Paramètres brut
   const brt = {
@@ -3666,6 +3703,12 @@ function loadAll(){
     Object.entries(f).forEach(([id,val])=>{
       const el=document.getElementById(id); if(el&&val) el.value=val;
     });
+  } catch(e){}
+  // Restaurer le dernier dessin auto-sauvegardé (anti perte de travail)
+  try {
+    const draw = localStorage.getItem(STORE+'draw');
+    if(draw){ const objs=JSON.parse(draw); if(Array.isArray(objs)&&objs.length){ paintObjects=objs;
+      const cc=localStorage.getItem(STORE+'cons'); if(cc && typeof _constraints!=='undefined') _constraints=JSON.parse(cc); } }
   } catch(e){}
   // Polices importées (noms seulement — les données TTF ne sont pas stockées,
   // mais on affiche un rappel)
@@ -4498,6 +4541,8 @@ const TOOL_MENUS = {
     {i:'🖥️',  l:'Ajuster',      fn:'fitView()'},
   ],
   export: [
+    {i:'💾', l:'Enregistrer le projet', fn:'saveProject()'},
+    {i:'📂', l:'Ouvrir un projet',      fn:'openProject()'},
     {i:'🟩', l:'Export SVG', fn:"exportDrawing('svg')"},
     {i:'🟦', l:'Export DXF', fn:"exportDrawing('dxf')"},
   ],
@@ -7309,6 +7354,14 @@ function applyDimValue(dim,v){
     if(typeof updateLinkedCopies==='function')updateLinkedCopies(); if(typeof pushHistory==='function')pushHistory(); return; }
   if(dim.kind==='pdist'){ const o=objForPointRef(dim.ref); const E=segOfRef(dim.ref2); if(!o||!E||!(v>0))return; const P=ptOfRef(dim.ref); const ex=E[2]-E[0],ey=E[3]-E[1],L=Math.hypot(ex,ey)||1,nx=-ey/L,ny=ex/L; const d=(P[0]-E[0])*nx+(P[1]-E[1])*ny; const sgn=d>=0?1:-1; const foot=[P[0]-nx*d,P[1]-ny*d]; _shiftObj(o, (foot[0]+nx*sgn*v)-P[0], (foot[1]+ny*sgn*v)-P[1]); if(typeof pushHistory==='function')pushHistory(); return; }
   const o=paintObjects.find(x=>x.id===dim.ref); if(!o||!(v>0)) return;
+  if(o.type==='text' && (dim.kind==='w'||dim.kind==='h')){
+    const bb=getObjBB(o);
+    if(dim.kind==='h') applyBB(o,{x:bb.x,y:bb.y,w:bb.w,h:Math.max(1,v)});
+    else applyBB(o,{x:bb.x,y:bb.y,w:Math.max(1,v),h:bb.h});
+    if(typeof pushHistory==='function')pushHistory();
+    if(typeof updateLinkedCopies==='function')updateLinkedCopies();
+    return;
+  }
   if(dim.kind==='diam'){ if(o._poly){ const c=_polyCenter(o), r=_polyR(o)||1, k=(v/2)/r; o.pts=o.pts.map(pt=>[c[0]+(pt[0]-c[0])*k, c[1]+(pt[1]-c[1])*k]); } else { o.rx=o.ry=v/2; } }
   else if(dim.kind==='len'){ const s=segOf(o); if(s){ const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1; setSeg(o,[s[0],s[1],s[0]+dx/L*v,s[1]+dy/L*v]); } }
   else if(dim.kind==='angle'){
@@ -8202,6 +8255,8 @@ function pushHistory(){
   if(_hist.length>HIST_MAX) _hist.shift();
   _histIdx=_hist.length-1;
   updateUndoBtns();
+  // Auto-sauvegarde du dessin (survit à un refresh / coupure de courant)
+  try{ localStorage.setItem(STORE+'draw', JSON.stringify(paintObjects)); localStorage.setItem(STORE+'cons', JSON.stringify(typeof _constraints!=='undefined'?_constraints:[])); }catch(e){}
 }
 
 function _histRestore(i){
