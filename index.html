@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CN ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CO ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -5744,13 +5744,7 @@ function hitTest(o,xm,ym){
     const tolS=Math.max(1.2, 8/(BASE_PX*vZoom));
     try{ return distToObjStroke(o,xm,ym) <= tolS; }catch(e){}
   }
-  if(o.type==='text'){
-    // Sélection AU TRAIT (sur les lettres) : la boîte du texte ne correspond pas
-    // à la position réelle des glyphes (texte centré), donc on teste les traits.
-    const tolT=Math.max(1.6, 11/(BASE_PX*vZoom));
-    try{ return distToObjStroke(o,xm,ym) <= tolT; }catch(e){}
-  }
-  const bb=getObjBB(o);const t=7/(BASE_PX*vZoom); // generous hit zone
+  const bb=getObjBB(o);const t=7/(BASE_PX*vZoom); // generous hit zone (le texte utilise sa boîte = ce qui est affiché)
   return xm>=bb.x-t&&xm<=bb.x+bb.w+t&&ym>=bb.y-t&&ym<=bb.y+bb.h+t;
 }
 
@@ -5905,12 +5899,17 @@ function objToStrokesRaw(o){
     }
   }
   else if(o.type==='text'){
-    // Texte : VRAIES lettres, EXACTEMENT comme à l'écran (objToStrokes gère le centrage).
-    // Indispensable pour la sélection au trait, la cotation et l'export laser/DXF fidèle.
+    // Texte : VRAIES lettres, remises À LA POSITION AFFICHÉE (boîte getObjBB, haut-gauche à o.x,o.y).
+    // textToStrokes est dans un repère décalé -> on recale ses lettres dans la boîte d'affichage.
     try{
-      const ts=objToStrokes(o)||[];
-      if(ts.length){ for(const t of ts) if(t&&t.length>1) s.push(t); }
-      else { const bb=getObjBB(o); s.push([[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x+bb.w,bb.y+bb.h],[bb.x,bb.y+bb.h],[bb.x,bb.y]]); }
+      const raw=textToStrokes(o.text||'',o.h||10,o.spacing||2,0,0,o.fontFamily,o.fontWeight,o.fontItalic,o.engMode||'contour')||[];
+      let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
+      for(const st of raw)for(const p of st){ if(p[0]<mnx)mnx=p[0]; if(p[0]>mxx)mxx=p[0]; if(p[1]<mny)mny=p[1]; if(p[1]>mxy)mxy=p[1]; }
+      const bb=getObjBB(o);
+      if(mnx<=mxx){
+        const sw=(mxx-mnx)||1, sh=(mxy-mny)||1, kx=bb.w/sw, ky=bb.h/sh;
+        for(const st of raw){ if(st&&st.length>1) s.push(st.map(p=>[ bb.x+(p[0]-mnx)*kx, bb.y+(p[1]-mny)*ky ])); }
+      } else { s.push([[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x+bb.w,bb.y+bb.h],[bb.x,bb.y+bb.h],[bb.x,bb.y]]); }
     }catch(e){ const bb=getObjBB(o); s.push([[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x+bb.w,bb.y+bb.h],[bb.x,bb.y+bb.h],[bb.x,bb.y]]); }
   }
   else if(o.type==='free'&&o.pts&&o.pts.length>1){s.push(o.pts);}
