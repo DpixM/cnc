@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CY ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CZ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2455,7 +2455,7 @@ let pInited = false;
 // step 10 = page G-code unique (mode normal)
 function wzFlow(){
   if(appMode==='inlay') return [1,0,2,3,11,12,13,9];
-  if(appMode==='laser') return [1,2,10,9]; // laser: mode→dessin→LST→récap (pas de brut)
+  if(appMode==='laser') return [1,2,10]; // laser: mode→dessin→LST (pas de brut, pas de récap : inutile en laser)
   return [1,0,2,3,4,10,9]; // normal: mode→brut→dessin→outils→modeUsinage→gcode→récap
 }
 
@@ -3255,7 +3255,7 @@ function _buildLST(progName, techno, req, body){
   const P=(progName||'PROGRAMME1').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'_')||'PROGRAMME1';
   const T=(techno||'INOX2MM');
   const R=(req===0||req)?req:2;
-  const inner="TC_RESET\n"+'TM_LTTNAME="'+T+'"\n'+"TC_DYNAMIC_LEVEL(0)\n"+";G01 G90 B=0 F2000\n"+"TC_TRAFO_OFF\n"+"SET_POS(0,0,0)\n"+"TC_LASER_REQUEST("+R+")\n\n"+body+"\n\n"+"TC_LASER_REQUEST(0)\n"+"M30\n"+"G90 G01 X00 Y0 Z0 F5000\n"+"M30\n"+"TC_AUX_LIGHT(5,0)\n"+"TC_AUX_LIGHT(6,0)\n"+"TC_OPEN_DOOR(0,1,0,0)\n"+"TC_RESET";
+  const inner="TC_RESET\n"+'TM_LTTNAME="'+T+'"\n'+"TC_DYNAMIC_LEVEL(0)\n"+";G01 G90 B=0 F2000\n"+"TC_TRAFO_OFF\n"+"SET_POS(0,0,0)\n"+"TC_LASER_REQUEST("+R+")\n\n"+body+"\n\n"+"TC_LASER_REQUEST(0)\n"+"G90 G01 X00 Y0 Z0 F5000\n\n"+"TC_AUX_LIGHT(5,0)\n"+"TC_AUX_LIGHT(6,0)\n"+"TC_OPEN_DOOR(0,1,0,0)\n"+"TC_RESET\n"+"M30";
   const _ff=document.getElementById('laserFullFile'); const full=_ff?_ff.checked:true;
   if(full){ return _LST_HEADER.replace(/__PROGNAME__/g,P).replace(/__TECHNO__/g,T)+inner+"\n"+_LST_FOOTER.replace(/__TECHNO__/g,T); }
   return "DA,'"+P+"','HP','',0,0\nSTART_TEXT\n"+inner+"\nSTOP_TEXT\n";
