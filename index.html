@@ -1440,12 +1440,12 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 </style>
 </head>
 <body>
-<button id="logBtn" title="Enregistrer mes actions pour Claude" onclick="_logToggle()" style="position:fixed;left:14px;bottom:14px;z-index:100030;background:#374151;color:#fff;border:1px solid #4a5568;border-radius:10px;padding:8px 12px;font:13px sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5)">🐞 Log</button>
+<button id="logBtn" title="Enregistrer mes actions pour Claude" onclick="_logToggle()" style="position:fixed;right:172px;bottom:18px;z-index:100030;background:#374151;color:#fff;border:1px solid #4a5568;border-radius:10px;padding:8px 12px;font:13px sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5)">🐞 Log</button>
 
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CO ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CQ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -1939,7 +1939,15 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     </div>
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
       <input type="checkbox" id="laserLeadin" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
-      <span><b>Perçage dans la chute</b> (trous > 0,5 mm) — le perçage démarre dans la partie qui part, pas sur le bord gardé.</span>
+      <span><b>Perçage au centre de la chute</b> — perce au milieu de la partie qui tombe (loin du bord gardé, moins de projections), puis rejoint le contour.</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
+      <input type="checkbox" id="laserArc" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
+      <span><b>Entrée en arc</b> (courbe tangente au contour si la place le permet, sinon ligne droite).</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
+      <input type="checkbox" id="laserInvert" onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
+      <span><b>Inverser plein/vide</b> — coche si c'est l'inverse qui doit tomber (ex : tu gardes la petite pièce au lieu du tour).</span>
     </label>
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
       <input type="checkbox" id="laserFullFile" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
@@ -3131,6 +3139,8 @@ function buildLaserBody(){
   const _fd=parseFloat(document.getElementById('laserFeed')?.value); const FEED=isNaN(_fd)?5000:_fd;
   const _li=document.getElementById('laserLeadin'); const LEADIN=_li?_li.checked:true;
   const _ll=parseFloat(document.getElementById('laserLead')?.value); const LEAD=isNaN(_ll)?1:_ll;
+  const ARC=document.getElementById('laserArc')?.checked!==false;   // entree en arc
+  const INV=document.getElementById('laserInvert')?.checked||false; // inverser plein/vide
   const contours=[]; // {poly, start, moves}
   const add=(poly,start,moves)=>{ if(moves&&moves.length) contours.push({poly,start,moves}); };
   for(const o of flat){
@@ -3168,21 +3178,50 @@ function buildLaserBody(){
   const order=contours.map((c,i)=>[c,i]).sort((a,b)=> (b[0]._depth-a[0]._depth) || (a[1]-b[1]) ).map(x=>x[0]); // profondeur decroissante = interieurs d'abord
   const blocks=order.map((c,bi)=>{
     const S=c.start;
-    const isHole=(c._depth>=1);                       // contour interieur = trou (chute a l'interieur)
-    const diam=(c._a>0)?2*Math.sqrt(c._a/Math.PI):0;  // taille equivalente du trou
+    const diam=(c._a>0)?2*Math.sqrt(c._a/Math.PI):0;  // taille equivalente de la region
     const Fstr=(bi===0?(' F'+_lc(FEED)+'   ;vitesse d\'avance (reste active ensuite)'):'');
-    let head;
-    if(LEADIN && isHole && diam>0.5 && c._c){
-      // Percage DANS la chute (vers le centre du trou) puis amorce jusqu'au contour :
-      // le point d'entree (avec bavure/trou) reste sur la partie qui part, pas sur le bord garde.
-      const dx=c._c[0]-S[0], dy=c._c[1]-S[1], d=Math.hypot(dx,dy)||1;
-      const L=Math.min(LEAD, 0.45*d);
-      const P=[S[0]+dx/d*L, S[1]+dy/d*L];
-      head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute\n'
-          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
-          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-          +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;amorce -> rejoint le contour\n';
-    } else {
+    // Cote CHUTE : par defaut la chute est a l'interieur quand la profondeur est IMPAIRE
+    // (dehors depth0 = tole=chute ; entre 0 et 1 = garde ; dans depth1 = chute ; etc). INV inverse.
+    let wasteInside=(c._depth%2===1); if(INV) wasteInside=!wasteInside;
+    const poly=c.poly, np=poly?poly.length:0;
+    let head=null;
+    if(LEADIN && diam>0.5 && np>=3 && c._c){
+      let T=[poly[1][0]-poly[0][0], poly[1][1]-poly[0][1]];
+      const tl=Math.hypot(T[0],T[1]);
+      if(tl>1e-6){
+        T=[T[0]/tl,T[1]/tl];
+        // normale pointant vers la CHUTE (on teste de quel cote on est)
+        let N=[-T[1],T[0]];
+        if(_pointInPoly([S[0]+N[0]*0.05,S[1]+N[1]*0.05],poly)!==wasteInside) N=[-N[0],-N[1]];
+        // Point de PERCAGE : au centre de la chute (loin du bord garde) si possible.
+        let P;
+        if(wasteInside){
+          const cen=c._c, mid=[(S[0]+cen[0])/2,(S[1]+cen[1])/2];
+          if(_pointInPoly(cen,poly)&&_pointInPoly(mid,poly)) P=[cen[0],cen[1]];              // milieu du trou (forme convexe)
+          else { const m=Math.min(Math.max(LEAD,1),0.4*diam||LEAD); P=[S[0]+N[0]*m,S[1]+N[1]*m]; } // forme concave -> pres du bord mais dans la chute (sur)
+        } else {
+          const m=Math.max(LEAD,3); P=[S[0]+N[0]*m,S[1]+N[1]*m];                              // chute exterieure (tole autour)
+        }
+        // ENTREE EN ARC (tangente au contour) si la place le permet, sinon ligne droite.
+        const r=LEAD, roomOK = wasteInside ? (diam>=5*r) : true;
+        if(ARC && roomOK){
+          const O=[S[0]+N[0]*r,S[1]+N[1]*r], A=[O[0]-T[0]*r,O[1]-T[1]*r];
+          const cross=(A[0]-O[0])*(S[1]-O[1])-(A[1]-O[1])*(S[0]-O[0]);
+          const g=cross>0?'G3':'G2';
+          head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute (loin du bord garde)\n'
+              +'G1 Z0   ;redescendre sur la tole avant de percer\n'
+              +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+              +'G1 X'+_lc(A[0])+' Y'+_lc(A[1])+'   ;rejoint le depart de l\'arc\n'
+              +g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(O[0]-A[0])+' J'+_lc(O[1]-A[1])+'   ;entree en arc, tangente au contour\n';
+        } else {
+          head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute (loin du bord garde)\n'
+              +'G1 Z0   ;redescendre sur la tole avant de percer\n'
+              +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+              +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;amorce droite -> rejoint le contour\n';
+        }
+      }
+    }
+    if(head===null){
       head='G1 X'+_lc(S[0])+' Y'+_lc(S[1])+Fstr+'\n'
           +'G1 Z0   ;redescendre sur la tole avant de percer\n'
           +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n';
@@ -5859,7 +5898,15 @@ function objToStrokes(o){
     }
     if(seg.length>1)s.push(seg);
   }
-  else if(o.type==='text')s.push(...textToStrokes(o.text||'',o.h||10,o.spacing||2,o.x,o.y,o.fontFamily,o.fontWeight,o.fontItalic,o.engMode||'contour'));
+  else if(o.type==='text'){
+    // Lettres recalées sur la boîte affichée (haut-gauche à o.x,o.y) — même repère que le rendu.
+    const raw=textToStrokes(o.text||'',o.h||10,o.spacing||2,0,0,o.fontFamily,o.fontWeight,o.fontItalic,o.engMode||'contour')||[];
+    let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
+    for(const st of raw)for(const p of st){ if(p[0]<mnx)mnx=p[0]; if(p[0]>mxx)mxx=p[0]; if(p[1]<mny)mny=p[1]; if(p[1]>mxy)mxy=p[1]; }
+    const bb=getObjBB(o);
+    if(mnx<=mxx){ const sw2=(mxx-mnx)||1, sh2=(mxy-mny)||1, kx=bb.w/sw2, ky=bb.h/sh2;
+      for(const st of raw){ if(st&&st.length>1) s.push(st.map(p=>[ bb.x+(p[0]-mnx)*kx, bb.y+(p[1]-mny)*ky ])); } }
+  }
   else if(o.type==='svg'&&o.paths){
     const scX=(o.svgW&&o.svgW>0)?o.w/o.svgW:1, scY=(o.svgH&&o.svgH>0)?o.h/o.svgH:1;
     for(const p of o.paths)if(p?.length>1){
