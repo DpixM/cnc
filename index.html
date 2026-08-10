@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CR ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CS ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -16374,9 +16374,11 @@ function _s3dInit(moves) {
   _s3d = {
     renderer, scene, camera, pivot, woodMesh,
     cx, cy, cz: czVis,
+    cx0: cx, cy0: cy, cz0: czVis,   // centre d'origine (pour recentrer)
     theta: Math.PI/4,    // vue de 45°
     phi:   Math.PI/3.5,  // vue légèrement de dessus (~51°)
-    radius: initRadius,
+    tTheta: Math.PI/4, tPhi: Math.PI/3.5,   // cibles (lissage)
+    radius: initRadius, tRadius: initRadius,
     initRadius,
     lines: lineObjs,
     vis: {rapid:true,cut:true,plunge:true},
@@ -16464,17 +16466,24 @@ function _s3dAttachControls(canvas, spanXY) {
     if (_mode === 'none') return;
     const dx = e.clientX-_lx, dy = e.clientY-_ly;
     if (_mode === 'orbit') {
-      _s3d.theta -= dx * 0.008;
-      _s3d.phi = Math.max(0.02, Math.min(Math.PI-0.02, _s3d.phi + dy * 0.008));
+      // On ecrit des CIBLES (la boucle de rendu lisse vers elles) + inclinaison bornee (pas de bascule verticale).
+      _s3d.tTheta -= dx * 0.006;
+      _s3d.tPhi = Math.max(0.28, Math.min(1.5, _s3d.tPhi + dy * 0.006));
     } else if (_mode === 'pan') {
       s3dPan(-dx, -dy);
     }
     _lx = e.clientX; _ly = e.clientY;
   });
   canvas.addEventListener('mouseup', () => { _mode = 'none'; });
+  // Double-clic = recentrer (repivote autour du centre du dessin, remet une vue propre)
+  canvas.addEventListener('dblclick', e => {
+    e.preventDefault();
+    if(_s3d.cx0!==undefined){ _s3d.cx=_s3d.cx0; _s3d.cy=_s3d.cy0; _s3d.cz=_s3d.cz0; }
+    _s3d.tTheta=Math.PI/4; _s3d.tPhi=Math.PI/3.5; _s3d.tRadius=_s3d.initRadius||_s3d.radius;
+  });
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
-    _s3d.radius = Math.max(sp*0.05, Math.min(sp*12, _s3d.radius * (1 + e.deltaY*0.001)));
+    _s3d.tRadius = Math.max(sp*0.05, Math.min(sp*12, _s3d.tRadius * (1 + e.deltaY*0.001)));
   }, {passive:false});
 }
 
@@ -16484,6 +16493,12 @@ function _s3dStartRender() {
     if (!document.getElementById('sim3DModal').classList.contains('open')) return;
     _s3d.rafId = requestAnimationFrame(animate);
     if (_s3d.playing) { _s3dSetIdx(_s3d.idx + (_s3d.speed||20)); if (_s3d.idx >= _s3d.moves.length) { _s3d.playing=false; const _pb=document.getElementById('s3dPlayBtn'); if(_pb)_pb.textContent='▶'; } }
+    // Lissage (damping) : on avance doucement vers les cibles -> mouvement fluide, pas saccade.
+    if (_s3d.tTheta===undefined) { _s3d.tTheta=_s3d.theta; _s3d.tPhi=_s3d.phi; _s3d.tRadius=_s3d.radius; }
+    const k=0.22;
+    _s3d.theta  += (_s3d.tTheta  - _s3d.theta ) * k;
+    _s3d.phi    += (_s3d.tPhi    - _s3d.phi   ) * k;
+    _s3d.radius += (_s3d.tRadius - _s3d.radius) * k;
     const sinPhi = Math.sin(_s3d.phi), cosPhi = Math.cos(_s3d.phi);
     camera.position.set(
       _s3d.cx + _s3d.radius * sinPhi * Math.cos(_s3d.theta),
