@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DE ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DF ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -5767,9 +5767,19 @@ function getHandlesPx(o){
     const[bx,by]=mmToPx(o.x2,o.y2);
     return[{id:'p1',x:ax,y:ay},{id:'p2',x:bx,y:by},{id:'mv',x:(ax+bx)/2,y:(ay+by)/2}];
   }
-  // Formes fermees : deplacement seul, AUCUNE poignee de redimensionnement
-  // (on redimensionne par la fenetre de parametres ou par les cotes).
+  // Formes fermees : poignees de COIN + BORD pour redimensionner a la volee, + centre pour deplacer.
   const bb=getObjBB(o); const cc=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2);
+  const RESIZE=['rect','oblong','tri','star','ellipse','gear','svg','text','polygon'].includes(o.type)||o._poly;
+  if(RESIZE && bb.w>0.05 && bb.h>0.05){
+    const L=bb.x, R=bb.x+bb.w, T=bb.y, B=bb.y+bb.h, MX=bb.x+bb.w/2, MY=bb.y+bb.h/2;
+    const m=(x,y)=>{ const p=mmToPx(x,y); return {x:p[0],y:p[1]}; };
+    return [
+      {id:'tl',...m(L,T)},{id:'t',...m(MX,T)},{id:'tr',...m(R,T)},
+      {id:'r',...m(R,MY)},{id:'br',...m(R,B)},{id:'b',...m(MX,B)},
+      {id:'bl',...m(L,B)},{id:'l',...m(L,MY)},
+      {id:'mv',x:cc[0],y:cc[1]}
+    ];
+  }
   return[{id:'mv',x:cc[0],y:cc[1]}];
 }
 
@@ -6246,6 +6256,13 @@ function redrawCanvasNow(){
         pCtx.strokeStyle='rgba(59,130,246,.95)'; pCtx.lineWidth=2.6; pCtx.lineJoin='round'; pCtx.lineCap='round';
         const _closed=['rect','oblong','tri','star','gear','polygon'].includes(o.type)||o._poly; try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} if(_closed)pCtx.closePath(); pCtx.stroke(); } }catch(e){}
         pCtx.restore();
+      }
+      // Poignées de redimensionnement (coins + bords) — glisser pour agrandir/réduire à la volée.
+      if(o.type!=='line'){
+        for(const h of getHandlesPx(o)){ if(h.id==='mv')continue;
+          pCtx.save(); pCtx.fillStyle='#fff'; pCtx.strokeStyle='#3b82f6'; pCtx.lineWidth=1.6;
+          pCtx.fillRect(h.x-4.5,h.y-4.5,9,9); pCtx.strokeRect(h.x-4.5,h.y-4.5,9,9); pCtx.restore();
+        }
       }
     }
   }
