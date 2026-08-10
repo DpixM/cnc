@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DF ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DG ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6331,6 +6331,7 @@ function redrawCanvasNow(){
   pCtx.fillStyle='rgba(80,90,100,.7)';pCtx.font='10px monospace';pCtx.textAlign='right';
   pCtx.fillText(Math.round(vZoom*100)+'%',cw-6,ch-6);
   if(typeof cadDrawOverlay==='function') cadDrawOverlay();
+  if(typeof drawConstraintSymbols==='function') drawConstraintSymbols();
   if(typeof _shpOverlay==='function') _shpOverlay();
   if(typeof _cadDimOverlay==='function') _cadDimOverlay();
   if(typeof _selPanelShow==='function') _selPanelShow();
@@ -7046,6 +7047,41 @@ let _conPick = null; let _rotActive=null; let _rot2=null; let _setToolFromPick=f
 const _CON_LABEL={horiz:'Horizontale',vert:'Verticale',parallel:'Parallèle',perp:'Perpendiculaire',equal:'Égal',concentric:'Concentrique',collinear:'Colinéaire',coincident:'Coïncident',midpoint:'Milieu',tangent:'Tangente',fix:'Fixer',symmetry:'Symétrie'};
 function _conHintShow(t){ let e=document.getElementById('cadHint'); if(!e){ e=document.createElement('div'); e.id='cadHint'; e.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:100001;background:#1f2430;border:1px solid #4a5568;border-radius:9px;padding:8px 16px;font:13px sans-serif;color:#ffd08a;box-shadow:0 4px 14px rgba(0,0,0,.5)'; document.body.appendChild(e);} e.textContent=t; }
 function _conHintHide(){ const e=document.getElementById('cadHint'); if(e)e.remove(); }
+// ── Affichage des CONTRAINTES : un petit symbole près des éléments concernés ──
+const _CON_SYM={horiz:'—',vert:'|',parallel:'∥',perp:'⟂',equal:'=',concentric:'◎',collinear:'∥',coincident:'⊙',midpoint:'▲',tangent:'○',symmetry:'⋈',fix:'🔒'};
+function _conElemPos(ref){
+  if(ref==null) return null;
+  try{
+    const s=String(ref);
+    if(s[0]==='@'){ const o=getObj(s.slice(1))||getObj(Number(s.slice(1))); return o?[o.x,o.y]:null; }
+    if(s.indexOf('#')>=0){ const p=s.split('#'); const o=getObj(p[0])||getObj(Number(p[0])); const i=+p[1];
+      if(o&&o.pts&&o.pts[i]&&o.pts[i+1]) return [(o.pts[i][0]+o.pts[i+1][0])/2,(o.pts[i][1]+o.pts[i+1][1])/2];
+      if(o&&o.type==='line') return [(o.x1+o.x2)/2,(o.y1+o.y2)/2]; return null; }
+    const o=getObj(ref)||getObj(Number(ref)); if(!o)return null;
+    if(o.type==='line') return [(o.x1+o.x2)/2,(o.y1+o.y2)/2];
+    if(o._circle) return [o.x,o.y];
+    const bb=getObjBB(o); return bb?[bb.x+bb.w/2,bb.y+bb.h/2]:null;
+  }catch(e){ return null; }
+}
+function drawConstraintSymbols(){
+  if(!pCtx || typeof _constraints==='undefined' || !_constraints || !_constraints.length) return;
+  pCtx.save(); pCtx.font='bold 11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle';
+  const used=[];
+  for(const c of _constraints){
+    const sym=_CON_SYM[c.ct]||'•';
+    const pa=_conElemPos(c.a), pb=(c.b!=null)?_conElemPos(c.b):null;
+    let pos = (pa&&pb)?[(pa[0]+pb[0])/2,(pa[1]+pb[1])/2]:(pa||pb);
+    if(!pos) continue;
+    let q=mmToPx(pos[0],pos[1]);
+    // décale si un badge est déjà au même endroit (évite la superposition)
+    let tries=0; while(used.some(u=>Math.hypot(u[0]-q[0],u[1]-q[1])<16) && tries<8){ q=[q[0]+15,q[1]]; tries++; }
+    used.push(q);
+    pCtx.fillStyle='rgba(59,130,246,.92)'; pCtx.strokeStyle='#0b1220'; pCtx.lineWidth=1.5;
+    pCtx.beginPath(); pCtx.arc(q[0],q[1],8.5,0,Math.PI*2); pCtx.fill(); pCtx.stroke();
+    pCtx.fillStyle='#fff'; pCtx.fillText(sym,q[0],q[1]+0.5);
+  }
+  pCtx.restore();
+}
 function cadConstraint(type){
   // TOUJOURS tool-first : on choisit la contrainte PUIS on clique les formes (facon Fusion)
   const need=(type==='horiz'||type==='vert'||type==='fix')?1:(type==='symmetry'?3:2);
