@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CQ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CR ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3177,6 +3177,18 @@ function buildLaserBody(){
   contours.forEach((c,i)=>{ let d=0; contours.forEach((o,j)=>{ if(i!==j && o.poly.length>=3 && o._a>c._a+1e-6 && _pointInPoly(c._c,o.poly)) d++; }); c._depth=d; });
   const order=contours.map((c,i)=>[c,i]).sort((a,b)=> (b[0]._depth-a[0]._depth) || (a[1]-b[1]) ).map(x=>x[0]); // profondeur decroissante = interieurs d'abord
   const blocks=order.map((c,bi)=>{
+    // Demarrer la coupe au MILIEU de la plus longue arete (tangente franche + place pour l'arc d'entree).
+    if(LEADIN && c.poly && c.poly.length>=5 && c.moves.length>=4){
+      const pl=c.poly, cl=Math.hypot(pl[0][0]-pl[pl.length-1][0],pl[0][1]-pl[pl.length-1][1])<1e-6;
+      if(cl){ const base=pl.slice(0,pl.length-1), nB=base.length; let best=-1,bk=0;
+        for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB],d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d>best){best=d;bk=k;} }
+        const a=base[bk],b=base[(bk+1)%nB],mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+        const rot=base.slice(bk+1).concat(base.slice(0,bk+1));
+        const np2=[mid].concat(rot).concat([mid]);
+        c.poly=np2; c.start=[mid[0],mid[1]];
+        c.moves=np2.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1]));
+      }
+    }
     const S=c.start;
     const diam=(c._a>0)?2*Math.sqrt(c._a/Math.PI):0;  // taille equivalente de la region
     const Fstr=(bi===0?(' F'+_lc(FEED)+'   ;vitesse d\'avance (reste active ensuite)'):'');
@@ -3202,22 +3214,34 @@ function buildLaserBody(){
         } else {
           const m=Math.max(LEAD,3); P=[S[0]+N[0]*m,S[1]+N[1]*m];                              // chute exterieure (tole autour)
         }
-        // ENTREE EN ARC (tangente au contour) si la place le permet, sinon ligne droite.
-        const r=LEAD, roomOK = wasteInside ? (diam>=5*r) : true;
-        if(ARC && roomOK){
-          const O=[S[0]+N[0]*r,S[1]+N[1]*r], A=[O[0]-T[0]*r,O[1]-T[1]*r];
-          const cross=(A[0]-O[0])*(S[1]-O[1])-(A[1]-O[1])*(S[0]-O[0]);
-          const g=cross>0?'G3':'G2';
+        // ENTREE EN ARC (tangente au contour) : on prend le PLUS GRAND rayon qui TIENT dans la chute.
+        // Test geometrique reel (pas un seuil de taille) => l'arc se fait des que la forme le permet.
+        const onWaste=(pt)=> _pointInPoly(pt,poly)===wasteInside;
+        let arc=null;
+        if(ARC){
+          for(const r of [LEAD, LEAD*0.6, LEAD*0.35, LEAD*0.2]){
+            const O=[S[0]+N[0]*r,S[1]+N[1]*r], A=[O[0]-T[0]*r,O[1]-T[1]*r];
+            // milieu du quart de cercle (pour verifier qu'il ne mord pas le bord garde)
+            let mvx=(A[0]-O[0])+(S[0]-O[0]), mvy=(A[1]-O[1])+(S[1]-O[1]);
+            const ml=Math.hypot(mvx,mvy)||1; const M=[O[0]+mvx/ml*r, O[1]+mvy/ml*r];
+            const midPA=[(P[0]+A[0])/2,(P[1]+A[1])/2];   // le trajet percage->arc doit rester dans la chute
+            if(onWaste(A)&&onWaste(M)&&onWaste(midPA)){
+              const cross=(A[0]-O[0])*(S[1]-O[1])-(A[1]-O[1])*(S[0]-O[0]);
+              arc={A,O,g:cross>0?'G3':'G2'}; break;
+            }
+          }
+        }
+        if(arc){
           head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute (loin du bord garde)\n'
               +'G1 Z0   ;redescendre sur la tole avant de percer\n'
               +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-              +'G1 X'+_lc(A[0])+' Y'+_lc(A[1])+'   ;rejoint le depart de l\'arc\n'
-              +g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(O[0]-A[0])+' J'+_lc(O[1]-A[1])+'   ;entree en arc, tangente au contour\n';
+              +'G1 X'+_lc(arc.A[0])+' Y'+_lc(arc.A[1])+'   ;chemin vers le depart de l\'arc\n'
+              +arc.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(arc.O[0]-arc.A[0])+' J'+_lc(arc.O[1]-arc.A[1])+'   ;entree en arc, tangente au contour\n';
         } else {
           head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute (loin du bord garde)\n'
               +'G1 Z0   ;redescendre sur la tole avant de percer\n'
               +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-              +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;amorce droite -> rejoint le contour\n';
+              +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;amorce droite -> rejoint le contour (pas la place pour un arc)\n';
         }
       }
     }
@@ -16429,9 +16453,11 @@ function _s3dAttachControls(canvas, spanXY) {
   });
 
   canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.title = 'Glisser gauche = tourner · Clic droit (ou molette enfoncée / Maj) = déplacer · Molette = zoom';
   canvas.addEventListener('mousedown', e => {
     _lx = e.clientX; _ly = e.clientY;
-    _mode = e.shiftKey ? 'pan' : 'orbit';   // Fusion : Maj+glisser = déplacer, sinon tourner
+    // Gauche = tourner ; Clic droit / molette enfoncée / Maj+gauche = déplacer.
+    _mode = (e.button === 2 || e.button === 1 || e.shiftKey) ? 'pan' : 'orbit';
     e.preventDefault();
   });
   canvas.addEventListener('mousemove', e => {
