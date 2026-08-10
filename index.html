@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DL ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DM ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -5662,7 +5662,7 @@ function resizeCanvas(){
 }
 
 function applyZoomAt(cpx,cpy,factor){
-  const newZ=Math.min(Math.max(vZoom*factor,.08),40);
+  const newZ=Math.min(Math.max(vZoom*factor,.02),80);
   const f=newZ/vZoom;
   vPanX=cpx-(cpx-vPanX)*f;
   vPanY=cpy-(cpy-vPanY)*f;
@@ -5766,6 +5766,13 @@ function getHandlesPx(o){
     const[ax,ay]=mmToPx(o.x1,o.y1);
     const[bx,by]=mmToPx(o.x2,o.y2);
     return[{id:'p1',x:ax,y:ay},{id:'p2',x:bx,y:by},{id:'mv',x:(ax+bx)/2,y:(ay+by)/2}];
+  }
+  // Formes à POINTS (tracé libre, polygone, arc) : une poignée par point -> étirer un bout sans bouger le reste.
+  if((o.type==='free'||o._poly) && o.pts && o.pts.length>=2 && o.pts.length<=60){
+    const H=[]; const seen=new Set();
+    for(let i=0;i<o.pts.length;i++){ const k=(+o.pts[i][0]).toFixed(2)+','+(+o.pts[i][1]).toFixed(2); if(seen.has(k))continue; seen.add(k); const q=mmToPx(o.pts[i][0],o.pts[i][1]); H.push({id:'n'+i,x:q[0],y:q[1]}); }
+    const _bb=getObjBB(o); const _cc=mmToPx(_bb.x+_bb.w/2,_bb.y+_bb.h/2); H.push({id:'mv',x:_cc[0],y:_cc[1]});
+    return H;
   }
   // Formes fermees : poignees de COIN + BORD pour redimensionner a la volee, + centre pour deplacer.
   const bb=getObjBB(o); const cc=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2);
@@ -6164,6 +6171,11 @@ function redrawCanvasNow(){
   const oy=((vPanY%dotSpx)+dotSpx)%dotSpx;
   pCtx.fillStyle='rgba(255,255,255,.05)';
   for(let dx=ox;dx<cw;dx+=dotSpx)for(let dy=oy;dy<ch;dy+=dotSpx)pCtx.fillRect(dx-1,dy-1,2,2);
+  // Grille de lignes légères sur TOUT l'espace (impression de canvas infini) — la feuille la recouvre dans ses limites.
+  { pCtx.strokeStyle='rgba(255,255,255,.035)'; pCtx.lineWidth=1;
+    if(cw/dotSpx<500){ for(let x=ox;x<cw;x+=dotSpx){ pCtx.beginPath(); pCtx.moveTo(x,0); pCtx.lineTo(x,ch); pCtx.stroke(); } }
+    if(ch/dotSpx<500){ for(let y=oy;y<ch;y+=dotSpx){ pCtx.beginPath(); pCtx.moveTo(0,y); pCtx.lineTo(cw,y); pCtx.stroke(); } }
+  }
 
   // ── Sheet shadow ──
   const[sx0,sy0]=mmToPx(0,0);const[sx1,sy1]=mmToPx(wMm(),hMm());
@@ -6257,11 +6269,13 @@ function redrawCanvasNow(){
         const _closed=['rect','oblong','tri','star','gear','polygon'].includes(o.type)||o._poly; try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} if(_closed)pCtx.closePath(); pCtx.stroke(); } }catch(e){}
         pCtx.restore();
       }
-      // Poignées de redimensionnement (coins + bords) — glisser pour agrandir/réduire à la volée.
+      // Poignées : nœuds (ronds verts = étirer un point) OU redimensionnement (carrés bleus = coins/bords).
       if(o.type!=='line'){
         for(const h of getHandlesPx(o)){ if(h.id==='mv')continue;
-          pCtx.save(); pCtx.fillStyle='#fff'; pCtx.strokeStyle='#3b82f6'; pCtx.lineWidth=1.6;
-          pCtx.fillRect(h.x-4.5,h.y-4.5,9,9); pCtx.strokeRect(h.x-4.5,h.y-4.5,9,9); pCtx.restore();
+          pCtx.save();
+          if(String(h.id).charAt(0)==='n'){ pCtx.fillStyle='#fff'; pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(h.x,h.y,4,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); }
+          else { pCtx.fillStyle='#fff'; pCtx.strokeStyle='#3b82f6'; pCtx.lineWidth=1.6; pCtx.fillRect(h.x-4.5,h.y-4.5,9,9); pCtx.strokeRect(h.x-4.5,h.y-4.5,9,9); }
+          pCtx.restore();
         }
       }
     }
@@ -7272,8 +7286,16 @@ function _applyConstraintStep(c, anchorId){
     case 'equal': { if(!A||!B)return; const [ref,mov]=pickMove(A,B); if(_isAnchor(mov,anchorId))return;
       if(L(ref)&&L(mov)){ const a=L(ref),la=Math.hypot(a[2]-a[0],a[3]-a[1]),s=L(mov),dx=s[2]-s[0],dy=s[3]-s[1],cur=Math.hypot(dx,dy)||1,k=la/cur; setL(mov,[s[0],s[1],s[0]+dx*k,s[1]+dy*k]); }
       else if((ref._circle||ref.type==='ellipse')&&(mov._circle||mov.type==='ellipse')){ mov.rx=mov.ry=(ref.rx||ref.ry); } break; }
-    case 'concentric': { if(!A||!B)return; const [ref,mov]=pickMove(A,B); if(_isAnchor(mov,anchorId))return; mov.x=ref.x; mov.y=ref.y; break; }
+    case 'concentric': { if(!A||!B)return; const [ref,mov]=pickMove(A,B); if(_isAnchor(mov,anchorId))return;
+      const rc = ref._arc ? _arcCenter(ref) : [ref.x,ref.y];
+      if(mov._arc){ const mc=_arcCenter(mov); if(mc){ const dx=rc[0]-mc[0], dy=rc[1]-mc[1]; mov._arc.p1=[mov._arc.p1[0]+dx,mov._arc.p1[1]+dy]; mov._arc.p2=[mov._arc.p2[0]+dx,mov._arc.p2[1]+dy]; _arcRegen(mov); } }
+      else if(mov.x!=null){ mov.x=rc[0]; mov.y=rc[1]; }
+      break; }
     case 'coincident': { if(!A||!B)return;
+      const _cl=(o)=>o&&(o._circle||o.type==='ellipse'||o._arc);
+      if(_cl(A)&&_cl(B)){ const [ref,mov]=pickMove(A,B); if(_isAnchor(mov,anchorId))return; const rc = ref._arc ? _arcCenter(ref) : [ref.x,ref.y];
+        if(mov._arc){ const mc=_arcCenter(mov); if(mc){ const dx=rc[0]-mc[0], dy=rc[1]-mc[1]; mov._arc.p1=[mov._arc.p1[0]+dx,mov._arc.p1[1]+dy]; mov._arc.p2=[mov._arc.p2[0]+dx,mov._arc.p2[1]+dy]; _arcRegen(mov); } }
+        else if(mov.x!=null){ mov.x=rc[0]; mov.y=rc[1]; } break; }
       if(A.type==='point'&&B.type==='point'){ const [ref,mov]=pickMove(A,B); if(_isAnchor(mov,anchorId))return; mov.x=ref.x; mov.y=ref.y; break; }
       const [ref,mov]=pickMove(A,B); if(_isAnchor(mov,anchorId))return; const a=L(ref),s=L(mov); if(!a||!s)return;
       let best=null; for(const ea of [[a[0],a[1]],[a[2],a[3]]]) for(const w of [0,1]){ const eb=w?[s[2],s[3]]:[s[0],s[1]]; const d=Math.hypot(ea[0]-eb[0],ea[1]-eb[1]); if(!best||d<best.d)best={d,ea,w}; }
@@ -7986,14 +8008,19 @@ function handlePointerDown(cpx,cpy){
           const origBB=o.type==='line'?{...o}:{...getObjBB(o)}; if(o._fillets)origBB._fillets=JSON.parse(JSON.stringify(o._fillets)); if(o._arc)origBB._arc=JSON.parse(JSON.stringify(o._arc)); if(typeof snapPointsOf==='function')origBB._pts=snapPointsOf(o).map(pt=>[pt[0],pt[1]]);
           // Calculate handle mm position (same logic as getHandlesPx but in mm)
           const bb=origBB;
-          const handleMm={
-            tl:{x:bb.x,y:bb.y}, t:{x:bb.x+bb.w/2,y:bb.y}, tr:{x:bb.x+bb.w,y:bb.y},
-            r:{x:bb.x+bb.w,y:bb.y+bb.h/2}, br:{x:bb.x+bb.w,y:bb.y+bb.h},
-            b:{x:bb.x+bb.w/2,y:bb.y+bb.h}, bl:{x:bb.x,y:bb.y+bb.h},
-            l:{x:bb.x,y:bb.y+bb.h/2},
-            // line handles
-            p1:{x:o.x1,y:o.y1}, p2:{x:o.x2,y:o.y2},
-          }[h]||{x:xm,y:ym};
+          let handleMm;
+          if(String(h).charAt(0)==='n' && o.pts){ // NŒUD : on retient le point et tous les points d'origine
+            const _ni=parseInt(h.slice(1)); origBB._nodeI=_ni; origBB._origPts=o.pts.map(p=>[p[0],p[1]]);
+            handleMm=(o.pts[_ni])?{x:o.pts[_ni][0],y:o.pts[_ni][1]}:{x:xm,y:ym};
+          } else {
+            handleMm={
+              tl:{x:bb.x,y:bb.y}, t:{x:bb.x+bb.w/2,y:bb.y}, tr:{x:bb.x+bb.w,y:bb.y},
+              r:{x:bb.x+bb.w,y:bb.y+bb.h/2}, br:{x:bb.x+bb.w,y:bb.y+bb.h},
+              b:{x:bb.x+bb.w/2,y:bb.y+bb.h}, bl:{x:bb.x,y:bb.y+bb.h},
+              l:{x:bb.x,y:bb.y+bb.h/2},
+              p1:{x:o.x1,y:o.y1}, p2:{x:o.x2,y:o.y2},
+            }[h]||{x:xm,y:ym};
+          }
           dragPending={mode:h,obj:o,cpx,cpy,origBB,startMm:handleMm};
           return;
         }
@@ -8141,6 +8168,11 @@ function snapPoint(xm,ym,excludeId){
   // Accroche sur les INTERSECTIONS de segments (croisements) — point discret prioritaire.
   { const _S=_allSegs(excludeId);
     if(_S.length<=160){ for(let i=0;i<_S.length;i++){ for(let j=i+1;j<_S.length;j++){ const ip=_segInt(_S[i],_S[j]); if(ip){ const d=Math.hypot(xm-ip[0],ym-ip[1]); if(d<bd){bd=d;bx=ip[0];by=ip[1];snapped=true;snapKind='point';} } } } } }
+  // Accroche sur les AXES de l'origine (lignes x=origine / y=origine) — sauf si un point précis est déjà pris.
+  if(snapKind!=='point'){
+    if(Math.abs(xm-org.x) < SNAP_MM){ bx=org.x; snapped=true; snapKind=snapKind||'axisX'; }
+    if(Math.abs(ym-org.y) < SNAP_MM){ by=org.y; snapped=true; snapKind=snapKind||'axisY'; }
+  }
   // Accroche sur les SEGMENTS : UNIQUEMENT si aucun point discret (coin / milieu / centre /
   // intersection) n'est deja accroche. Ainsi coins ET milieux gardent la priorite, et le
   // trait ne sert que de repli quand on est loin de tout point remarquable.
@@ -10213,8 +10245,12 @@ function textNaturalWidth(o){
     const ff=o.fontFamily||'IBM Plex Mono';
     const tmp=document.createElement('canvas').getContext('2d');
     tmp.font=`${fi} ${fw} 100px ${ff}`;
-    const m=tmp.measureText((o.text||'X').trimEnd());
-    const w100=(m.actualBoundingBoxRight-m.actualBoundingBoxLeft)||tmp.measureText((o.text||'X').trimEnd()).width;
+    const txt=(o.text||'X').trimEnd();
+    const m=tmp.measureText(txt);
+    // Largeur = max de l'avance (comme fillText) et de l'encre réelle (débord gauche + droite).
+    const adv=m.width||0;
+    const ink=(m.actualBoundingBoxLeft||0)+(m.actualBoundingBoxRight||0);
+    const w100=Math.max(adv, ink)||adv||1;
     return w100/100*(o.h||10);
   }catch(e){return (o.text||'X').length*(o.h||10)*0.55;}
 }
@@ -15027,6 +15063,16 @@ function snapPointsOf(o){
 
 function applyHandleDrag(o,mode,orig,dxMm,dyMm){
   if(o&&o.fixed&&o.type!=='dim'){ return; } // forme verrouillee : pas de deplacement/redim
+  // NŒUD : on déplace UN point sans bouger le reste (étirer un bout)
+  if(o && typeof mode==='string' && mode.charAt(0)==='n' && o.pts && orig && orig._origPts){
+    const i=orig._nodeI, op=orig._origPts, n=op.length;
+    if(op[i]){ o.pts[i]=[op[i][0]+dxMm, op[i][1]+dyMm];
+      const closed = n>2 && Math.hypot(op[0][0]-op[n-1][0], op[0][1]-op[n-1][1])<1e-6;
+      if(closed){ if(i===0) o.pts[n-1]=[o.pts[0][0],o.pts[0][1]]; else if(i===n-1) o.pts[0]=[o.pts[n-1][0],o.pts[n-1][1]]; }
+      if(o._arc) delete o._arc; // un arc édité au point devient une polyligne libre
+    }
+    return;
+  }
   if(o&&o._fillets&&orig&&orig._fillets&&mode==='mv'){ o._fillets=orig._fillets.map(f=>({...f, cx:f.cx+dxMm, cy:f.cy+dyMm, apex:[f.apex[0]+dxMm,f.apex[1]+dyMm], ta:[f.ta[0]+dxMm,f.ta[1]+dyMm], tb:[f.tb[0]+dxMm,f.tb[1]+dyMm], V:[f.V[0]+dxMm,f.V[1]+dyMm]})); } // le point du congé suit la forme
   if(o&&o._arc&&mode==='mv'){ const oa=(orig&&orig._arc)?orig._arc:o._arc; o._arc.p1=[oa.p1[0]+dxMm,oa.p1[1]+dyMm]; o._arc.p2=[oa.p2[0]+dxMm,oa.p2[1]+dyMm]; o._arc.r=oa.r; o._arc.sgn=oa.sgn; _arcRegen(o); return; } // arc : bouger les points parametriques + regen (les cotes suivent)
   if(o.type==='dim'){ if(o.kind==='angle'||o.kind==='ptdist'){ const op=(orig&&orig._place)?orig._place:(o.place||[0,0]); o.place=[op[0]+dxMm, op[1]+dyMm]; return; }
