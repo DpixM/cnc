@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DK ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DL ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6853,10 +6853,10 @@ function cadArraysMenu(){
 let _rectPat = null; // {ids, base:{x,y,w,h}, cols, rows, hx, hy, dragging}
 function cadRectPatDyn(){
   const objs=(typeof getSelObjs==='function')?getSelObjs():[];
-  if(!objs.length){ // tool-first : clique la forme d'abord
-    _arrayPick={objs:[], stage:'obj', kind:'rectdyn'}; _arrayCursor=null;
-    if(typeof _setToolFromPick!=='undefined'){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; } else setPTool('select');
-    _cadMode=true; if(typeof _conHintShow==='function')_conHintShow('▦ Réseau (glisser) — clique la forme à répéter'); redrawCanvasNow(); return;
+  if(!objs.length){
+    // SELECT-FIRST : on demande de choisir les formes AVANT (plus clair que le clic unique)
+    if(typeof toastHist==='function')toastHist('▦ Sélectionne d\'abord tes formes (clic + Maj-clic), puis relance ❋ Réseaux → Réseau (glisser)');
+    return;
   }
   _rectPatStart(objs);
 }
@@ -6895,12 +6895,13 @@ function drawRectPatOverlay(){
 }
 function _rectPatPanel(){
   _rectPatPanelRemove();
-  const d=document.createElement('div'); d.id='rectPatPanel'; d.style.cssText='position:fixed;left:16px;top:80px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:12px 13px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:200px';
-  const title=document.createElement('div'); title.textContent='▦ Réseau rectangulaire'; title.style.cssText='font-weight:800;margin-bottom:2px'; d.appendChild(title);
-  const mkrow=(lbl,val,on)=>{ const r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px'; const s=document.createElement('span'); s.textContent=lbl; const inp=document.createElement('input'); inp.type='number'; inp.min='1'; inp.value=val; inp.style.cssText='width:64px;padding:5px;border-radius:7px;border:1px solid #6b7280;background:#0d0f14;color:#7ee787;font:14px monospace;text-align:right'; inp.addEventListener('input',()=>{ on(Math.max(1,Math.min(500,parseInt(inp.value)||1))); redrawCanvasNow(); }); inp.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){e.preventDefault();_rectPatCommit();} }); r.appendChild(s); r.appendChild(inp); return r; };
-  d.appendChild(mkrow('Colonnes (X)', _rectPat.cols, v=>_rectPat.cols=v));
-  d.appendChild(mkrow('Rangées (Y)', _rectPat.rows, v=>_rectPat.rows=v));
-  const hint=document.createElement('div'); hint.textContent='Tire la poignée orange ✋ pour écarter les copies.'; hint.style.cssText='font-size:10px;color:#9aa4b2'; d.appendChild(hint);
+  const d=document.createElement('div'); d.id='rectPatPanel'; d.style.cssText='position:fixed;left:16px;top:130px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:12px 13px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:210px';
+  const nb=_rectPat.ids.length;
+  const title=document.createElement('div'); title.innerHTML='▦ Réseau rectangulaire<div style="font-size:10px;color:#22c55e;font-weight:600;margin-top:2px">'+nb+' forme(s) source en vert</div>'; title.style.cssText='font-weight:800;margin-bottom:2px'; d.appendChild(title);
+  const mkrow=(lbl,val,on)=>{ const r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px'; const s=document.createElement('span'); s.innerHTML=lbl; const inp=document.createElement('input'); inp.type='number'; inp.min='1'; inp.value=val; inp.style.cssText='width:64px;padding:5px;border-radius:7px;border:1px solid #6b7280;background:#0d0f14;color:#7ee787;font:15px monospace;text-align:right'; inp.addEventListener('input',()=>{ on(Math.max(1,Math.min(500,parseInt(inp.value)||1))); redrawCanvasNow(); }); inp.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){e.preventDefault();_rectPatCommit();} }); r.appendChild(s); r.appendChild(inp); return r; };
+  d.appendChild(mkrow('Nombre en X →', _rectPat.cols, v=>_rectPat.cols=v));
+  d.appendChild(mkrow('Nombre en Y ↑', _rectPat.rows, v=>_rectPat.rows=v));
+  const hint=document.createElement('div'); hint.innerHTML='Nombre <b>total</b> (l\'originale comprise).<br>Tire la poignée orange ✋ pour écarter.'; hint.style.cssText='font-size:10px;color:#9aa4b2'; d.appendChild(hint);
   const btns=document.createElement('div'); btns.style.cssText='display:flex;gap:8px;margin-top:4px';
   const ok=document.createElement('button'); ok.textContent='✓ Valider'; ok.style.cssText='flex:1;padding:7px;border:none;border-radius:8px;background:#22c55e;color:#04240f;font-weight:800;cursor:pointer'; ok.onclick=_rectPatCommit;
   const ca=document.createElement('button'); ca.textContent='Annuler'; ca.style.cssText='padding:7px 10px;border:none;border-radius:8px;background:#374151;color:#fff;cursor:pointer'; ca.onclick=_rectPatCancel;
