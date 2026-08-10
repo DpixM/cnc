@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DO ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DP ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -4691,6 +4691,7 @@ const TOOL_MENUS = {
     {i:'⧉', l:'Dupliquer (+5 mm)',  fn:"cadDuplicate()"},
     {i:'⤢', l:'Échelle',           fn:"cadScale()"},
     {i:'🪞', l:'Miroir (formes → axe)', fn:"cadMirrorTool()"},
+    {i:'⚓', l:'Accrocher 2 points', fn:"cadAlign2()"},
   ],
   cadConstrain: [
     {i:'—', l:'Horizontale',      fn:"cadConstraint('horiz')"},
@@ -6354,6 +6355,7 @@ function redrawCanvasNow(){
   if(typeof cadDrawOverlay==='function') cadDrawOverlay();
   if(typeof drawConstraintSymbols==='function') drawConstraintSymbols();
   if(typeof drawRectPatOverlay==='function') drawRectPatOverlay();
+  if(typeof drawAlign2Overlay==='function') drawAlign2Overlay();
   if(typeof _shpOverlay==='function') _shpOverlay();
   if(typeof _cadDimOverlay==='function') _cadDimOverlay();
   if(typeof _selPanelShow==='function') _selPanelShow();
@@ -6550,6 +6552,41 @@ function cadScale(){
   const apply=(k)=>{ if(!(k>0))return; paintObjects.length=0; JSON.parse(snap).forEach(o=>paintObjects.push(o)); const objs=ids.map(getObj).filter(Boolean); let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9; for(const o of objs){ const b=getObjBB(o); if(!b)continue; minX=Math.min(minX,b.x);minY=Math.min(minY,b.y);maxX=Math.max(maxX,b.x+b.w);maxY=Math.max(maxY,b.y+b.h); } const cx=(minX+maxX)/2, cy=(minY+maxY)/2; for(const o of objs)_scaleObj(o,cx,cy,k); redrawCanvasNow(); };
   apply(2);
   _valInput('⤢ Échelle (×)', 2, apply, (v)=>{ if(v==null||!(v>0)){ paintObjects.length=0; JSON.parse(snap).forEach(o=>paintObjects.push(o)); redrawCanvasNow(); } else { apply(v); if(typeof pushHistory==='function')pushHistory(); if(typeof toastHist==='function')toastHist('⤢ Échelle ×'+v); } });
+}
+// ─── ACCROCHER 2 POINTS : placer une forme pour que 2 de ses points tombent pile sur 2 cibles ───
+function _translateExact(o,dx,dy){
+  if(!o||(!dx&&!dy))return;
+  if(o.x1!=null){ o.x1+=dx;o.y1+=dy;o.x2+=dx;o.y2+=dy; }
+  else if(o.pts){ o.pts=o.pts.map(p=>[p[0]+dx,p[1]+dy]); if(o._arc){o._arc.p1=[o._arc.p1[0]+dx,o._arc.p1[1]+dy];o._arc.p2=[o._arc.p2[0]+dx,o._arc.p2[1]+dy];} }
+  else if(o._circle||o.type==='ellipse'){ o.x+=dx; o.y+=dy; }
+  else { if(o.x!=null)o.x+=dx; if(o.y!=null)o.y+=dy; if(o.cx!=null)o.cx+=dx; if(o.cy!=null)o.cy+=dy; }
+  if(o._fillets)o._fillets.forEach(f=>{ f.cx+=dx;f.cy+=dy; f.apex=[f.apex[0]+dx,f.apex[1]+dy]; f.ta=[f.ta[0]+dx,f.ta[1]+dy]; f.tb=[f.tb[0]+dx,f.tb[1]+dy]; f.V=[f.V[0]+dx,f.V[1]+dy]; });
+}
+let _align2 = null; // {objId, stage, srcA, dstA, srcB}
+function cadAlign2(){
+  const ids=[...getSelIds()];
+  if(ids.length!==1){ if(typeof toastHist==='function')toastHist('⚓ Sélectionne UNE seule forme, puis relance « Accrocher 2 points »'); return; }
+  _align2={objId:ids[0], stage:'srcA', srcA:null, dstA:null, srcB:null};
+  if(typeof _setToolFromPick!=='undefined'){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; } else setPTool('select');
+  _cadMode=true; if(typeof _conHintShow==='function')_conHintShow('⚓ 1/4 — clique le 1er point DE TA FORME');
+  redrawCanvasNow();
+}
+function _align2Click(xm,ym){
+  if(!_align2)return true;
+  const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym};
+  const P=[sp.x,sp.y]; const A=_align2; const o=getObj(A.objId);
+  if(A.stage==='srcA'){ A.srcA=P; A.stage='dstA'; _conHintShow('⚓ 2/4 — clique la CIBLE du 1er point'); redrawCanvasNow(); return true; }
+  if(A.stage==='dstA'){ A.dstA=P; if(o) _translateExact(o, A.dstA[0]-A.srcA[0], A.dstA[1]-A.srcA[1]); A.stage='srcB'; _conHintShow('⚓ 3/4 — clique le 2e point DE TA FORME'); redrawCanvasNow(); return true; }
+  if(A.stage==='srcB'){ A.srcB=P; A.stage='dstB'; _conHintShow('⚓ 4/4 — clique la CIBLE du 2e point'); redrawCanvasNow(); return true; }
+  if(A.stage==='dstB'){ const dstB=P; if(o){ const piv=A.dstA; const u=[A.srcB[0]-piv[0],A.srcB[1]-piv[1]], v=[dstB[0]-piv[0],dstB[1]-piv[1]]; const lu=Math.hypot(u[0],u[1]); if(lu>1e-6){ const s=Math.hypot(v[0],v[1])/lu, ang=Math.atan2(v[1],v[0])-Math.atan2(u[1],u[0]); _scaleObj(o,piv[0],piv[1],s); _rotateObj(o,piv[0],piv[1],ang); if(o._arc&&typeof _arcRegen==='function')_arcRegen(o); } }
+    _align2=null; if(typeof _conHintHide==='function')_conHintHide(); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('⚓ Forme accrochée sur les 2 points'); return true; }
+  return true;
+}
+function drawAlign2Overlay(){
+  if(!_align2||!pCtx)return; const A=_align2; pCtx.save();
+  const dot=(p,col)=>{ if(!p)return; const q=mmToPx(p[0],p[1]); pCtx.fillStyle=col; pCtx.strokeStyle='#111'; pCtx.lineWidth=1.4; pCtx.beginPath(); pCtx.arc(q[0],q[1],5,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); };
+  dot(A.srcA,'#22c55e'); dot(A.dstA,'#f5a623'); dot(A.srcB,'#22c55e');
+  pCtx.restore();
 }
 function _cadPickOp(need, fn, hint){ _setToolFromPick=true; if(typeof setPTool==='function')setPTool('select'); _setToolFromPick=false; _conPick={need, picks:[], fn, hint}; _cadMode=true; if(typeof _conHintShow==='function')_conHintShow(hint+' — clique la 1ère forme'); if(typeof redrawCanvasNow==='function')redrawCanvasNow(); }
 function _lineIntersect(A,B){ const x1=A[0],y1=A[1],x2=A[2],y2=A[3],x3=B[0],y3=B[1],x4=B[2],y4=B[3]; const d=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4); if(Math.abs(d)<1e-9)return null; const px=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/d; const py=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/d; return [px,py]; }
@@ -7982,6 +8019,7 @@ function onME(e){handlePointerUp(e.offsetX,e.offsetY);pushHistoryIfDirty();}
 function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
   _log('down',{x:+xm.toFixed(1),y:+ym.toFixed(1),tool:paintTool,mode:(_conPick?'con':(_rot2?'rot':(_mirror?'mir':'')))});
+  if(_align2){ _align2Click(xm,ym); return; } // outil accrocher 2 points
   if(_rectPat){ const tol=16/(BASE_PX*vZoom); if(Math.hypot(xm-_rectPat.hx,ym-_rectPat.hy)<=tol){ _rectPat.dragging=true; } return; } // réseau dynamique : saisir la poignée
   if(_mirror){ _mirrorClick(xm,ym); return; } // outil miroir 2 étapes
   if(_rot2){ const piv=_rotPiv(); const hr=_rotHR(); const a=_rot2.deg*Math.PI/180; const hx=piv[0]+Math.cos(a)*hr, hy=piv[1]+Math.sin(a)*hr; const tolh=16/(BASE_PX*vZoom); if(_rot2.shapes.size && Math.hypot(xm-hx,ym-hy)<=tolh){ _rot2.dragging=true; return; } _rot2Click(xm,ym); return; } // rotation : poignée ou clic (pivot/forme)
