@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DM ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DN ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -8168,10 +8168,11 @@ function snapPoint(xm,ym,excludeId){
   // Accroche sur les INTERSECTIONS de segments (croisements) — point discret prioritaire.
   { const _S=_allSegs(excludeId);
     if(_S.length<=160){ for(let i=0;i<_S.length;i++){ for(let j=i+1;j<_S.length;j++){ const ip=_segInt(_S[i],_S[j]); if(ip){ const d=Math.hypot(xm-ip[0],ym-ip[1]); if(d<bd){bd=d;bx=ip[0];by=ip[1];snapped=true;snapKind='point';} } } } } }
-  // Accroche sur les AXES de l'origine (lignes x=origine / y=origine) — sauf si un point précis est déjà pris.
+  // Accroche sur les AXES de l'origine (lignes x=origine / y=origine) — zone d'accroche PLUS LARGE que les points.
   if(snapKind!=='point'){
-    if(Math.abs(xm-org.x) < SNAP_MM){ bx=org.x; snapped=true; snapKind=snapKind||'axisX'; }
-    if(Math.abs(ym-org.y) < SNAP_MM){ by=org.y; snapped=true; snapKind=snapKind||'axisY'; }
+    const AX=SNAP_MM*2.2;
+    if(Math.abs(xm-org.x) < AX){ bx=org.x; snapped=true; snapKind=snapKind||'axisX'; }
+    if(Math.abs(ym-org.y) < AX){ by=org.y; snapped=true; snapKind=snapKind||'axisY'; }
   }
   // Accroche sur les SEGMENTS : UNIQUEMENT si aucun point discret (coin / milieu / centre /
   // intersection) n'est deja accroche. Ainsi coins ET milieux gardent la priorite, et le
