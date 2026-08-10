@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DN ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DO ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6214,6 +6214,13 @@ function redrawCanvasNow(){
   pCtx.save();pCtx.translate(sx0-dimFz*.3,(sy0+sy1)/2);pCtx.rotate(-Math.PI/2);
   pCtx.textAlign='center';pCtx.fillText(`${hMm()} mm`,0,0);pCtx.restore();
 
+  // Axes de l'origine : lignes COMPLÈTES X (rouge) et Y (vert), semi-transparentes, des 2 côtés du 0. Snap dessus.
+  { const og=getOriginMm(); const oX=mmToPx(og.x,og.y)[0], oY=mmToPx(og.x,og.y)[1];
+    pCtx.save(); pCtx.setLineDash([]); pCtx.lineWidth=1.3;
+    pCtx.strokeStyle='rgba(90,185,100,.30)'; pCtx.beginPath(); pCtx.moveTo(oX,0); pCtx.lineTo(oX,ch); pCtx.stroke();   // axe Y (vertical, x=0)
+    pCtx.strokeStyle='rgba(220,95,95,.30)'; pCtx.beginPath(); pCtx.moveTo(0,oY); pCtx.lineTo(cw,oY); pCtx.stroke();   // axe X (horizontal, y=0)
+    pCtx.restore();
+  }
   // Origin cross
   const org=getOriginMm();const[opx,opy]=mmToPx(org.x,org.y);
   const cs=Math.max(8,Math.min(16,S*.5));
