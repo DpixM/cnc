@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DI ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DJ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6332,6 +6332,7 @@ function redrawCanvasNow(){
   pCtx.fillText(Math.round(vZoom*100)+'%',cw-6,ch-6);
   if(typeof cadDrawOverlay==='function') cadDrawOverlay();
   if(typeof drawConstraintSymbols==='function') drawConstraintSymbols();
+  if(typeof drawRectPatOverlay==='function') drawRectPatOverlay();
   if(typeof _shpOverlay==='function') _shpOverlay();
   if(typeof _cadDimOverlay==='function') _cadDimOverlay();
   if(typeof _selPanelShow==='function') _selPanelShow();
@@ -6844,8 +6845,64 @@ function cadArraysMenu(){
   const d=document.createElement('div'); d.id='arrPop'; d.style.cssText='position:fixed;left:70px;top:120px;z-index:99999;background:#1f2430;border:1px solid #4a5568;border-radius:8px;padding:6px;box-shadow:0 6px 18px rgba(0,0,0,.5);min-width:190px;font:13px sans-serif;color:#e5e9f0';
   const mk=(lbl,fn)=>{const b=document.createElement('div'); b.textContent=lbl; b.style.cssText='padding:8px 10px;border-radius:6px;cursor:pointer'; b.onmouseenter=()=>b.style.background='#2b3242'; b.onmouseleave=()=>b.style.background=''; b.onclick=()=>{ bk.remove(); d.remove(); fn(); }; return b;};
   d.appendChild(mk('❋  Réseau circulaire', cadPolarArray));
-  d.appendChild(mk('▦  Réseau rectangulaire', ()=>{ if(typeof openPatternRect==='function')openPatternRect(); }));
+  d.appendChild(mk('▦  Réseau rectangulaire (fenêtre)', ()=>{ if(typeof openPatternRect==='function')openPatternRect(); }));
+  d.appendChild(mk('▦  Réseau rectangulaire (glisser) ✋', ()=>{ if(typeof cadRectPatDyn==='function')cadRectPatDyn(); }));
   document.body.appendChild(bk); document.body.appendChild(d);
+}
+// ─── RESEAU RECTANGULAIRE DYNAMIQUE (facon Fusion : tu mets le nombre, tu tires la poignee) ───
+let _rectPat = null; // {ids, base:{x,y,w,h}, cols, rows, hx, hy, dragging}
+function cadRectPatDyn(){
+  const objs=(typeof getSelObjs==='function')?getSelObjs():[];
+  if(!objs.length){ // tool-first : clique la forme d'abord
+    _arrayPick={objs:[], stage:'obj', kind:'rectdyn'}; _arrayCursor=null;
+    if(typeof _setToolFromPick!=='undefined'){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; } else setPTool('select');
+    _cadMode=true; if(typeof _conHintShow==='function')_conHintShow('▦ Réseau (glisser) — clique la forme à répéter'); redrawCanvasNow(); return;
+  }
+  _rectPatStart(objs);
+}
+function _rectPatStart(objs){
+  const bb=selBBox(objs);
+  _rectPat={ ids:objs.map(o=>o.id), base:bb, cols:3, rows:2,
+             hx: bb.x + Math.max(bb.w*3, bb.w+20), hy: bb.y + Math.max(bb.h*2, bb.h+15), dragging:false };
+  if(typeof setPTool==='function')setPTool('select'); _cadMode=true;
+  _rectPatPanel(); if(typeof _conHintShow==='function')_conHintShow('▦ Tire la poignée orange pour écarter · règle le nombre dans la fenêtre'); redrawCanvasNow();
+}
+function _rectPatStep(){ const p=_rectPat; return { sx:(p.cols>1)?(p.hx-p.base.x)/(p.cols-1):0, sy:(p.rows>1)?(p.hy-p.base.y)/(p.rows-1):0 }; }
+function drawRectPatOverlay(){
+  if(!_rectPat||!pCtx)return; const p=_rectPat, bb=p.base; const {sx,sy}=_rectPatStep();
+  pCtx.save();
+  pCtx.strokeStyle='rgba(245,166,35,.85)'; pCtx.setLineDash([5,3]); pCtx.lineWidth=1.4;
+  for(let i=0;i<p.cols;i++)for(let j=0;j<p.rows;j++){ if(i===0&&j===0)continue; const q0=mmToPx(bb.x+i*sx,bb.y+j*sy),q1=mmToPx(bb.x+bb.w+i*sx,bb.y+bb.h+j*sy); pCtx.strokeRect(Math.min(q0[0],q1[0]),Math.min(q0[1],q1[1]),Math.abs(q1[0]-q0[0]),Math.abs(q1[1]-q0[1])); }
+  pCtx.setLineDash([]);
+  const b0=mmToPx(bb.x,bb.y), h=mmToPx(p.hx,p.hy);
+  pCtx.strokeStyle='rgba(245,166,35,.5)'; pCtx.setLineDash([4,4]); pCtx.beginPath(); pCtx.moveTo(b0[0],b0[1]); pCtx.lineTo(h[0],h[1]); pCtx.stroke(); pCtx.setLineDash([]);
+  pCtx.fillStyle='#f5a623'; pCtx.strokeStyle='#111'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(h[0],h[1],8,0,Math.PI*2); pCtx.fill(); pCtx.stroke();
+  pCtx.fillStyle='#111'; pCtx.font='bold 10px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle'; pCtx.fillText('✋',h[0],h[1]);
+  pCtx.restore();
+}
+function _rectPatPanel(){
+  _rectPatPanelRemove();
+  const d=document.createElement('div'); d.id='rectPatPanel'; d.style.cssText='position:fixed;left:16px;top:80px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:12px 13px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:200px';
+  const title=document.createElement('div'); title.textContent='▦ Réseau rectangulaire'; title.style.cssText='font-weight:800;margin-bottom:2px'; d.appendChild(title);
+  const mkrow=(lbl,val,on)=>{ const r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px'; const s=document.createElement('span'); s.textContent=lbl; const inp=document.createElement('input'); inp.type='number'; inp.min='1'; inp.value=val; inp.style.cssText='width:64px;padding:5px;border-radius:7px;border:1px solid #6b7280;background:#0d0f14;color:#7ee787;font:14px monospace;text-align:right'; inp.addEventListener('input',()=>{ on(Math.max(1,Math.min(500,parseInt(inp.value)||1))); redrawCanvasNow(); }); inp.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){e.preventDefault();_rectPatCommit();} }); r.appendChild(s); r.appendChild(inp); return r; };
+  d.appendChild(mkrow('Colonnes (X)', _rectPat.cols, v=>_rectPat.cols=v));
+  d.appendChild(mkrow('Rangées (Y)', _rectPat.rows, v=>_rectPat.rows=v));
+  const hint=document.createElement('div'); hint.textContent='Tire la poignée orange ✋ pour écarter les copies.'; hint.style.cssText='font-size:10px;color:#9aa4b2'; d.appendChild(hint);
+  const btns=document.createElement('div'); btns.style.cssText='display:flex;gap:8px;margin-top:4px';
+  const ok=document.createElement('button'); ok.textContent='✓ Valider'; ok.style.cssText='flex:1;padding:7px;border:none;border-radius:8px;background:#22c55e;color:#04240f;font-weight:800;cursor:pointer'; ok.onclick=_rectPatCommit;
+  const ca=document.createElement('button'); ca.textContent='Annuler'; ca.style.cssText='padding:7px 10px;border:none;border-radius:8px;background:#374151;color:#fff;cursor:pointer'; ca.onclick=_rectPatCancel;
+  btns.appendChild(ok); btns.appendChild(ca); d.appendChild(btns);
+  document.body.appendChild(d);
+}
+function _rectPatPanelRemove(){ const e=document.getElementById('rectPatPanel'); if(e)e.remove(); }
+function _rectPatCancel(){ _rectPat=null; _rectPatPanelRemove(); if(typeof _conHintHide==='function')_conHintHide(); redrawCanvasNow(); }
+function _rectPatCommit(){
+  if(!_rectPat)return; const p=_rectPat; const objs=p.ids.map(getObj).filter(Boolean); if(!objs.length){ _rectPatCancel(); return; }
+  const {sx,sy}=_rectPatStep(); const added=[];
+  for(let i=0;i<p.cols;i++)for(let j=0;j<p.rows;j++){ if(i===0&&j===0)continue; for(const src of objs){ const cl=cloneObjDeep(src); translateObj(cl, i*sx, j*sy); paintObjects.push(cl); added.push(cl); } }
+  _rectPat=null; _rectPatPanelRemove(); if(typeof _conHintHide==='function')_conHintHide();
+  selObjId=null; selObjIds=new Set(added.map(o=>o.id)); if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); redrawCanvasNow();
+  if(typeof toastHist==='function')toastHist('▦ '+added.length+' copie(s) créée(s)');
 }
 // ─── COPIES LIEES (patterns parametriques : editer la base met a jour les copies) ───
 function _applyLink(o){
@@ -7882,10 +7939,11 @@ function onME(e){handlePointerUp(e.offsetX,e.offsetY);pushHistoryIfDirty();}
 function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
   _log('down',{x:+xm.toFixed(1),y:+ym.toFixed(1),tool:paintTool,mode:(_conPick?'con':(_rot2?'rot':(_mirror?'mir':'')))});
+  if(_rectPat){ const tol=16/(BASE_PX*vZoom); if(Math.hypot(xm-_rectPat.hx,ym-_rectPat.hy)<=tol){ _rectPat.dragging=true; } return; } // réseau dynamique : saisir la poignée
   if(_mirror){ _mirrorClick(xm,ym); return; } // outil miroir 2 étapes
   if(_rot2){ const piv=_rotPiv(); const hr=_rotHR(); const a=_rot2.deg*Math.PI/180; const hx=piv[0]+Math.cos(a)*hr, hy=piv[1]+Math.sin(a)*hr; const tolh=16/(BASE_PX*vZoom); if(_rot2.shapes.size && Math.hypot(xm-hx,ym-hy)<=tolh){ _rot2.dragging=true; return; } _rot2Click(xm,ym); return; } // rotation : poignée ou clic (pivot/forme)
   if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
-  if(_arrayPick){ if(_arrayPick.stage==='obj'){ const o=_pickObjForCon(xm,ym); if(o){ _arrayPick.objs=[o.id]; if(_arrayPick.kind==='rect'){ _arrayPick=null; _arrayCursor=null; if(typeof _conHintHide==='function')_conHintHide(); selObjId=o.id; selObjIds=new Set([o.id]); openPatternRect(); redrawCanvasNow(); return; } _arrayPick.stage='pivot'; _conHintShow('✳️ Clique le point de PIVOT (centre)'); redrawCanvasNow(); } else _conHintShow('✳️ Clique une forme à répéter'); return; } const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _conHintHide(); _arrayDoPolar(sp.x,sp.y); return; } // reseau : etape forme puis pivot (rect: forme puis fenetre)
+  if(_arrayPick){ if(_arrayPick.stage==='obj'){ const o=_pickObjForCon(xm,ym); if(o){ _arrayPick.objs=[o.id]; if(_arrayPick.kind==='rect'||_arrayPick.kind==='rectdyn'){ const _k=_arrayPick.kind; _arrayPick=null; _arrayCursor=null; if(typeof _conHintHide==='function')_conHintHide(); selObjId=o.id; selObjIds=new Set([o.id]); if(_k==='rectdyn'){ _rectPatStart([o]); } else { openPatternRect(); } redrawCanvasNow(); return; } _arrayPick.stage='pivot'; _conHintShow('✳️ Clique le point de PIVOT (centre)'); redrawCanvasNow(); } else _conHintShow('✳️ Clique une forme à répéter'); return; } const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _conHintHide(); _arrayDoPolar(sp.x,sp.y); return; } // reseau : etape forme puis pivot (rect: forme puis fenetre)
   if(paintTool==='cadline'){ cadAddPoint(xm,ym); return; } // outil ligne CAD
   if(paintTool==='pshape'){ _shpDown(xm,ym); return; } // dessin interactif (cercle/polygone)
   if(paintTool==='caddim'){ cadDimClick(xm,ym); return; } // outil cote
@@ -8101,6 +8159,7 @@ function renderSnapBtn(){
 }
 
 function handlePointerMove(cpx,cpy){
+  if(_rectPat && _rectPat.dragging){ const[xm,ym]=pxToMm(cpx,cpy); const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _rectPat.hx=sp.x; _rectPat.hy=sp.y; redrawCanvasNow(); return; }
   if(_rot2 && _rot2.dragging){ const[xm,ym]=pxToMm(cpx,cpy); const piv=_rotPiv(); let deg=Math.atan2(ym-piv[1], xm-piv[0])*180/Math.PI; const hr=_rotHR(); const _distmm=Math.hypot(xm-piv[0], ym-piv[1]); const _inc=(_distmm < hr*1.5)?5:45; const _near=Math.round(deg/_inc)*_inc; if(Math.abs(deg-_near)<_inc*0.5)deg=_near; deg=Math.round(deg*10)/10; _rotApply(deg); const _di=document.getElementById('rotAngleInp'); if(_di)_di.value=deg.toFixed(1); redrawCanvasNow(); return; }
   if(isDragging && dragMode==='pan'){ pmPanView(cpx,cpy); return; } // pan molette : marche dans TOUS les outils
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
@@ -8400,6 +8459,7 @@ function pmDrawInProgress(xm,ym){
 }
 
 function handlePointerUp(cpx,cpy){
+  if(_rectPat && _rectPat.dragging){ _rectPat.dragging=false; return; }
   if(_rot2 && _rot2.dragging){ _rot2.dragging=false; return; }
   const[xm,ym]=pxToMm(cpx,cpy);
   if(isDragging&&dragMode==='marquee'){ isDragging=false;dragMode=null; if(pCanvas)pCanvas.style.cursor='default'; finishMarquee(); return; }
