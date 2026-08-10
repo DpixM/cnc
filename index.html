@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DB ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DC ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -7803,7 +7803,7 @@ function handlePointerDown(cpx,cpy){
   if(_mirror){ _mirrorClick(xm,ym); return; } // outil miroir 2 étapes
   if(_rot2){ const piv=_rotPiv(); const hr=_rotHR(); const a=_rot2.deg*Math.PI/180; const hx=piv[0]+Math.cos(a)*hr, hy=piv[1]+Math.sin(a)*hr; const tolh=16/(BASE_PX*vZoom); if(_rot2.shapes.size && Math.hypot(xm-hx,ym-hy)<=tolh){ _rot2.dragging=true; return; } _rot2Click(xm,ym); return; } // rotation : poignée ou clic (pivot/forme)
   if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
-  if(_arrayPick){ if(_arrayPick.stage==='obj'){ const o=_pickObjForCon(xm,ym); if(o){ _arrayPick.objs=[o.id]; _arrayPick.stage='pivot'; _conHintShow('✳️ Clique le point de PIVOT (centre)'); redrawCanvasNow(); } else _conHintShow('✳️ Clique une forme à répéter'); return; } const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _conHintHide(); _arrayDoPolar(sp.x,sp.y); return; } // reseau : etape forme puis pivot
+  if(_arrayPick){ if(_arrayPick.stage==='obj'){ const o=_pickObjForCon(xm,ym); if(o){ _arrayPick.objs=[o.id]; if(_arrayPick.kind==='rect'){ _arrayPick=null; _arrayCursor=null; if(typeof _conHintHide==='function')_conHintHide(); selObjId=o.id; selObjIds=new Set([o.id]); openPatternRect(); redrawCanvasNow(); return; } _arrayPick.stage='pivot'; _conHintShow('✳️ Clique le point de PIVOT (centre)'); redrawCanvasNow(); } else _conHintShow('✳️ Clique une forme à répéter'); return; } const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _conHintHide(); _arrayDoPolar(sp.x,sp.y); return; } // reseau : etape forme puis pivot (rect: forme puis fenetre)
   if(paintTool==='cadline'){ cadAddPoint(xm,ym); return; } // outil ligne CAD
   if(paintTool==='pshape'){ _shpDown(xm,ym); return; } // dessin interactif (cercle/polygone)
   if(paintTool==='caddim'){ cadDimClick(xm,ym); return; } // outil cote
@@ -8812,7 +8812,15 @@ function doPatternRect(objs, cols, rows, gapX, gapY){
 
 function openPatternRect(){
   const objs = getSelObjs();
-  if(!objs.length){ alert('Sélectionne d\'abord au moins un objet (ou ⬚ Tout sélect.).'); return; }
+  if(!objs.length){
+    // TOOL-FIRST : pas de sélection -> on demande de cliquer la forme à répéter (comme le réseau circulaire)
+    _arrayPick={objs:[], stage:'obj', kind:'rect'}; _arrayCursor=null;
+    if(typeof _setToolFromPick!=='undefined'){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; } else setPTool('select');
+    _cadMode=true;
+    if(typeof _conHintShow==='function')_conHintShow('▦ Réseau rectangulaire — clique la forme à répéter');
+    if(typeof redrawCanvasNow==='function')redrawCanvasNow();
+    return;
+  }
   const bb = selBBox(objs);
   const dw = Math.max(1, Math.round(bb.w+2)), dh = Math.max(1, Math.round(bb.h+2));
   const ov = document.createElement('div');
