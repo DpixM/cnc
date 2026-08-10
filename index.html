@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DH ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DI ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -7176,7 +7176,7 @@ function _applyConstraintNow(type, objs){
     default: return;
   }
   // Persistance : mémoriser pour le re-solveur au déplacement
-  const _add=(ct,a,b)=>{ if(a!=null)_constraints.push({ct,a,b:(b==null?null:b)}); };
+  const _add=(ct,a,b)=>{ if(a==null)return; const bb=(b==null?null:b); if(_constraints.some(c=>c.ct===ct&&String(c.a)===String(a)&&String(c.b)===String(bb)))return; _constraints.push({ct,a,b:bb}); };
   // id reel : un arc est resolu en cercle synthetique (__arccenter) -> on prend l'id de la vraie forme (_src)
   const _rid=(o)=>o?(o.__arccenter?(o._src&&o._src.id):(o.__eh?(o.o&&o.o.id):o.id)):null;
   if(type==='horiz'||type==='vert'){ for(const o of lines)_add(type,_rid(o),null); }
@@ -7208,7 +7208,15 @@ function _applyConstraintStep(c, anchorId){
       let best=null; for(const ea of [[a[0],a[1]],[a[2],a[3]]]) for(const w of [0,1]){ const eb=w?[s[2],s[3]]:[s[0],s[1]]; const d=Math.hypot(ea[0]-eb[0],ea[1]-eb[1]); if(!best||d<best.d)best={d,ea,w}; }
       const ns=s.slice(); if(best.w){ns[2]=best.ea[0];ns[3]=best.ea[1];}else{ns[0]=best.ea[0];ns[1]=best.ea[1];} setL(mov,ns); break; }
     case 'midpoint': { const pt=(A&&A.type==='point')?A:B, ln=(A&&A.type==='point')?B:A; if(!pt||!ln)return; if(_isAnchor(pt,anchorId))return; const s=L(ln); if(!s)return; pt.x=(s[0]+s[2])/2; pt.y=(s[1]+s[3])/2; break; }
-    case 'tangent': { const circ=A; if(!circ)return; let s=null; if(typeof c.b==='string' && String(c.b).indexOf('#')>=0){ s=segOfRef(c.b); } else if(B){ s=L(B); } if(!s)return; const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1; let nx=-ey/Ln,ny=ex/Ln; if(ny<-1e-9||(Math.abs(ny)<=1e-9&&nx<0)){nx=-nx;ny=-ny;} const d=(circ.x-s[0])*nx+(circ.y-s[1])*ny,sg=(c.side||(c.side=(d>=0?1:-1))),r=(circ.rx||circ.ry),fx=circ.x-nx*d,fy=circ.y-ny*d; circ.x=fx+nx*sg*r; circ.y=fy+ny*sg*r; break; }
+    case 'tangent': { const circ=A; if(!circ)return; let s=null; if(typeof c.b==='string' && String(c.b).indexOf('#')>=0){ s=segOfRef(c.b); } else if(B){ s=L(B); } if(!s)return; const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1; let nx=-ey/Ln,ny=ex/Ln; if(ny<-1e-9||(Math.abs(ny)<=1e-9&&nx<0)){nx=-nx;ny=-ny;}
+      if(circ._arc){ // ARC : on translate le vrai arc pour qu'il RESTE tangent (comme le cercle)
+        const C=(typeof _arcCenter==='function')?_arcCenter(circ):null; if(!C)return; const r=circ._arc.r;
+        const d=(C[0]-s[0])*nx+(C[1]-s[1])*ny, sg=(c.side||(c.side=(d>=0?1:-1))), shift=sg*r-d;
+        circ._arc.p1=[circ._arc.p1[0]+nx*shift, circ._arc.p1[1]+ny*shift];
+        circ._arc.p2=[circ._arc.p2[0]+nx*shift, circ._arc.p2[1]+ny*shift];
+        if(typeof _arcRegen==='function')_arcRegen(circ);
+      } else { const d=(circ.x-s[0])*nx+(circ.y-s[1])*ny,sg=(c.side||(c.side=(d>=0?1:-1))),r=(circ.rx||circ.ry),fx=circ.x-nx*d,fy=circ.y-ny*d; circ.x=fx+nx*sg*r; circ.y=fy+ny*sg*r; }
+      break; }
   }
 }
 function solveSketch(anchorId){
