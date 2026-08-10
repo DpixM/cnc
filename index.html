@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CW ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CX ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2061,37 +2061,53 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <!-- filled by JS -->
     </div>
 
-    <!-- Toolbar -->
-    <div class="toolbar">
+    <!-- Barre d'outils UNIQUE : dessin + CAD + fichiers regroupés (plus de barre CAD séparée) -->
+    <div class="toolbar" style="flex-wrap:nowrap;overflow-x:auto">
       <button class="ptool" id="btnUndo" onclick="undoAction()" title="Annuler [Ctrl+Z]" style="opacity:0.3">↶</button>
       <button class="ptool" id="btnRedo" onclick="redoAction()" title="Rétablir [Ctrl+Y]" style="opacity:0.3">↷</button>
       <div class="tsep"></div>
 
       <button class="ptool active" id="pt-select" onclick="setPTool('select')" title="Sélectionner">↖</button>
 
-      <!-- Famille DESSIN (tracé libre / ligne) -->
+      <!-- DESSIN / FORMES / TEXTE / GOMME -->
       <button class="ptool tcat" id="cat-draw" onclick="openToolMenu('draw',this)" title="Dessin">
         <span id="cat-draw-ico">✏️</span><span class="tcar">▾</span>
       </button>
-
-      <!-- Famille FORMES (rect, cercle, ellipse, triangle, étoile, oblong, engrenage) -->
       <button class="ptool tcat" id="cat-shape" onclick="openToolMenu('shape',this)" title="Formes">
         <span id="cat-shape-ico">▭</span><span class="tcar">▾</span>
       </button>
-
       <button class="ptool" id="pt-text" onclick="setPTool('text')" title="Texte">T</button>
       <button class="ptool" id="pt-eraser" onclick="setPTool('eraser')" title="Gomme">🧽</button>
-      <button class="ptool" title="Importer SVG / image / DXF" onclick="triggerFilePick('svg')" style="font-size:11px;gap:2px">📥<span style="font-size:9px">SVG</span></button>
-      <button class="ptool tcat" id="cat-export" onclick="openToolMenu('export',this)" title="Exporter (SVG / DXF)" style="font-size:11px;gap:2px">📤<span style="font-size:9px">Export</span><span class="tcar">▾</span></button>
-      <button class="ptool" id="btnCenterView" onclick="(function(){var o=getObj(selObjId);o?centerViewOnObj(o):fitView();})()" title="Centrer la vue sur la sélection"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none"><circle cx="12" cy="12" r="6.5"/><line x1="12" y1="1.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.5" y2="12"/></svg></button>
 
       <div class="tsep"></div>
 
-      <!-- Famille PLUS (sélection, groupes, zoom) -->
+      <!-- CAD (fusionné depuis l'ancienne barre gauche) -->
+      <button class="ptool" title="Cote : longueur / Ø (édition directe)" onclick="cadStartDim()">📏</button>
+      <button class="ptool tcat" id="cat-cadCreate" onclick="openToolMenu('cadCreate',this)" title="CAD — Créer (ligne, cercle, arc, polygone…)">
+        📐<span class="tcar">▾</span>
+      </button>
+      <button class="ptool tcat" id="cat-cadModify" onclick="openToolMenu('cadModify',this)" title="CAD — Modifier (congé, ajuster, tab, offset…)">
+        🔧<span class="tcar">▾</span>
+      </button>
+      <button class="ptool tcat" id="cat-cadConstrain" onclick="openToolMenu('cadConstrain',this)" title="CAD — Contraintes (parallèle, tangente, égal…)">
+        ⟂<span class="tcar">▾</span>
+      </button>
+      <button class="ptool" title="Réseaux : répétition circulaire / rectangulaire" onclick="cadArraysMenu()">❋</button>
+
+      <div class="tsep"></div>
+
+      <!-- FICHIERS : import / retouche SVG / export / projet -->
+      <button class="ptool" title="Importer SVG / image / DXF" onclick="triggerFilePick('svg')" style="font-size:11px;gap:2px">📥<span style="font-size:9px">SVG</span></button>
+      <button class="ptool tcat" id="cat-svgedit" onclick="openToolMenu('svgedit',this)" title="Retoucher un SVG (dissocier, nettoyer, remplir…)" style="font-size:11px;gap:2px">🩹<span style="font-size:9px">SVG</span><span class="tcar">▾</span></button>
+      <button class="ptool tcat" id="cat-export" onclick="openToolMenu('export',this)" title="Exporter (SVG / DXF)" style="font-size:11px;gap:2px">📤<span style="font-size:9px">Export</span><span class="tcar">▾</span></button>
+      <button class="ptool tcat" id="cat-projet" onclick="openToolMenu('projet',this)" title="Projet : enregistrer / ouvrir" style="font-size:11px;gap:2px">📁<span style="font-size:9px">Projet</span><span class="tcar">▾</span></button>
+
+      <div class="tsep"></div>
+
+      <button class="ptool" id="btnCenterView" onclick="(function(){var o=getObj(selObjId);o?centerViewOnObj(o):fitView();})()" title="Centrer / ajuster la vue"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none"><circle cx="12" cy="12" r="6.5"/><line x1="12" y1="1.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.5" y2="12"/></svg></button>
       <button class="ptool tcat" id="cat-more" onclick="openToolMenu('more',this)" title="Plus d'actions">
         ⋯<span class="tcar">▾</span>
       </button>
-
       <button class="ptool" id="delSelBtn" onclick="deleteSel()" title="Supprimer [Suppr]" style="color:var(--red);opacity:0.3">🗑</button>
     </div>
   </div>
@@ -2134,23 +2150,6 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 
   <!-- Canvas infini -->
   <div id="canvasWrap" class="canvas-area" style="touch-action:none"><canvas id="paintCanvas" touch-action="none"></canvas>
-    <div id="cadBar">
-      <div class="cadlbl">CAD</div>
-      <button class="cadb" title="Sélection CAD" onclick="setPTool('select');_cadMode=true;redrawCanvas()">↖</button>
-      <button class="cadb" title="Cote : 1 clic = longueur/Ø (édition directe)" onclick="cadStartDim()">📏</button>
-      <div class="cadsep"></div>
-      <button class="cadb" title="Créer : ligne, rectangle, cercle, arc, polygone…" onclick="openToolMenu('cadCreate',this)">✏️<span style="font-size:7px;margin-left:1px">▾</span></button>
-      <div class="cadlbl">Créer</div>
-      <button class="cadb" title="Modifier : congé, ajuster, décalage, déplacer…" onclick="openToolMenu('cadModify',this)">🔧<span style="font-size:7px;margin-left:1px">▾</span></button>
-      <div class="cadlbl">Modif.</div>
-      <button class="cadb" title="Contraintes : parallèle, perpendiculaire, milieu…" onclick="openToolMenu('cadConstrain',this)">📐<span style="font-size:7px;margin-left:1px">▾</span></button>
-      <div class="cadlbl">Contr.</div>
-      <div class="cadsep"></div>
-      <button class="cadb" title="Réseaux : circulaire / rectangulaire" onclick="cadArraysMenu()">❋</button>
-      <div class="cadlbl">Réseaux</div>
-      <div class="cadsep"></div>
-      <button class="cadb" title="Ajuster la vue" onclick="fitView()" style="font-size:12px">🖥</button>
-    </div>
     <div id="cadStatus" style="display:none">
       <span id="cadStatusTxt">Ligne : clique le 1er point</span>
       <button onclick="cadFinish()">✓ Terminer</button>
@@ -4624,18 +4623,27 @@ const TOOL_MENUS = {
   more: [
     {i:'⬚',   l:'Tout sélect.', fn:'selectAllObjs()'},
     {i:'🔗',  l:'Grouper',      fn:'groupSel()',        show:()=>getSelIds().size>=2},
-    {i:'✂️',  l:'Dissocier',    fn:'ungroupSel()',      show:()=>{const o=getObj(selObjId);return !!o&&(o.type==='group'||o.type==='svg');}},
     {i:'▦',   l:'Répétition',   fn:'openPatternRect()', show:()=>getSelIds().size>=1},
-    {i:'🧹',  l:'Nettoyer petits', fn:'openCleanSmall()', show:()=>{const o=getObj(selObjId);return !!o&&o.type==='svg';}},
     {i:'🔍−', l:'Dézoom',       fn:"applyZoomAt(pCanvas.width/2,pCanvas.height/2,1/1.2)"},
     {i:'🔍+', l:'Zoom',         fn:"applyZoomAt(pCanvas.width/2,pCanvas.height/2,1.2)"},
     {i:'🖥️',  l:'Ajuster',      fn:'fitView()'},
   ],
+  // Retouche d'un SVG importé (section dédiée)
+  svgedit: [
+    {i:'✂️', l:'Dissocier (séparer les traits)', fn:'ungroupSel()'},
+    {i:'🧹', l:'Nettoyer les petits contours',   fn:'openCleanSmall()'},
+    {i:'🪣', l:'Remplir une zone (→ poche à évider)', fn:'startBucket()'},
+    {i:'🔗', l:'Regrouper',                       fn:'groupSel()'},
+  ],
+  // Export fichiers de dessin uniquement
   export: [
-    {i:'💾', l:'Enregistrer le projet', fn:'saveProject()'},
-    {i:'📂', l:'Ouvrir un projet',      fn:'openProject()'},
     {i:'🟩', l:'Export SVG', fn:"exportDrawing('svg')"},
     {i:'🟦', l:'Export DXF', fn:"exportDrawing('dxf')"},
+  ],
+  // Projet : enregistrer / ouvrir (section dédiée)
+  projet: [
+    {i:'💾', l:'Enregistrer le projet', fn:'saveProject()'},
+    {i:'📂', l:'Ouvrir un projet',      fn:'openProject()'},
   ],
   cadCreate: [
     {i:'╱', l:'Ligne',                fn:'cadStartLine()'},
