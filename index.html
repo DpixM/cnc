@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DA ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DB ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -15539,10 +15539,14 @@ function parseGcode(gc){
   const moves=[];
   let x=0,y=0,z=5,abs=true;
   let lineIdx=-1;
+  let laserOn=null, pierceNext=false;   // null = usinage (pas de laser) ; true/false = laser on/off
   for(const raw of lines){
     lineIdx++;
     const line=raw.split(';')[0].trim().toUpperCase();
     if(!line) continue;
+    // Etat laser (pour colorer la simulation : coupe = laser ON, déplacement = laser OFF)
+    if(line.indexOf('TC_LASER_ON')>=0){ laserOn=true; pierceNext=true; continue; }
+    if(line.indexOf('TC_LASER_OFF')>=0){ laserOn=false; continue; }
     if(line.startsWith('G90')){abs=true;continue;}
     if(line.startsWith('G91')){abs=false;continue;}
     const isG0=line.startsWith('G0 ')||line==='G0';
@@ -15568,14 +15572,18 @@ function parseGcode(gc){
       for(let i=1;i<=N;i++){
         const a=isG3?(a0+da*i/N):(a0-da*i/N);
         const px=cx+r*Math.cos(a), py=cy+r*Math.sin(a);
-        moves.push({x0:i===1?x:cx+r*Math.cos(isG3?(a0+da*(i-1)/N):(a0-da*(i-1)/N)),
+        const _mv={x0:i===1?x:cx+r*Math.cos(isG3?(a0+da*(i-1)/N):(a0-da*(i-1)/N)),
                     y0:i===1?y:cy+r*Math.sin(isG3?(a0+da*(i-1)/N):(a0-da*(i-1)/N)),
-                    z0:nz,x1:px,y1:py,z1:nz,rapid:false,line:lineIdx});
+                    z0:nz,x1:px,y1:py,z1:nz,rapid:false,line:lineIdx,laser:laserOn};
+        if(i===1&&laserOn&&pierceNext){ _mv.pierce=true; pierceNext=false; }
+        moves.push(_mv);
       }
       x=nx;y=ny;z=nz; continue;
     }
     if(nx!==x||ny!==y||nz!==z){
-      moves.push({x0:x,y0:y,z0:z,x1:nx,y1:ny,z1:nz,rapid:isG0,line:lineIdx});
+      const _mv={x0:x,y0:y,z0:z,x1:nx,y1:ny,z1:nz,rapid:isG0,line:lineIdx,laser:laserOn};
+      if(laserOn&&pierceNext){ _mv.pierce=true; pierceNext=false; }
+      moves.push(_mv);
       x=nx;y=ny;z=nz;
     }
   }
@@ -16358,7 +16366,10 @@ function _s3dInit(moves) {
   const _positions=[], _colors=[];
   const _CT={rapid:[0.23,0.51,1.0], cut:[0.13,0.77,0.37], plunge:[0.94,0.27,0.27]};
   for (const m of moves) {
-    const type = (m.z1 >= -0.001 && m.z0 >= -0.001) ? 'rapid'
+    let type;
+    if (m.laser===true)  type = m.pierce ? 'plunge' : 'cut';   // laser : coupe=vert, perçage=rouge
+    else if (m.laser===false) type = 'rapid';                  // laser OFF = déplacement (bleu)
+    else type = (m.z1 >= -0.001 && m.z0 >= -0.001) ? 'rapid'   // usinage : par le Z (comme avant)
                : (m.z0 >= -0.001) ? 'plunge' : 'cut';
     _positions.push(m.x0, m.y0, m.z0,  m.x1, m.y1, m.z1);
     const c=_CT[type]; _colors.push(c[0],c[1],c[2], c[0],c[1],c[2]);
