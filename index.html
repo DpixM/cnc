@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CV ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CW ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -16484,12 +16484,14 @@ function _s3dAttachControls(canvas, spanXY) {
         // inclinaison bornee : jamais pile au-dessus ni a l'horizon (evite la bascule)
         _s3d.phi = Math.max(0.15, Math.min(Math.PI - 0.15, _s3d.phi + dy * 0.01));
       } else if (nv.mode === 'pan') {
+        // Pan a partir des VRAIS axes de la camera -> sens correct quel que soit l'angle.
+        // "Attrape-tire" facon Fusion : le dessin suit la souris.
         const panF = (_s3d.radius * 2) / (_s3d.renderer.domElement.clientHeight || 500);
-        const cosT = Math.cos(_s3d.theta), sinT = Math.sin(_s3d.theta), cosP = Math.cos(_s3d.phi), sinP = Math.sin(_s3d.phi);
-        // sens naturel "attrape et tire" : le dessin suit la souris
-        _s3d.cx += ( dx * sinT - dy * cosT * cosP) * panF;
-        _s3d.cy += (-dx * cosT - dy * sinT * cosP) * panF;
-        _s3d.cz += ( dy * sinP) * panF;
+        const R = new THREE.Vector3().setFromMatrixColumn(_s3d.camera.matrixWorld, 0); // droite ecran
+        const U = new THREE.Vector3().setFromMatrixColumn(_s3d.camera.matrixWorld, 1); // haut ecran
+        _s3d.cx += (-R.x * dx + U.x * dy) * panF;
+        _s3d.cy += (-R.y * dx + U.y * dy) * panF;
+        _s3d.cz += (-R.z * dx + U.z * dy) * panF;
       }
       nv.lx = e.clientX; nv.ly = e.clientY;
     });
