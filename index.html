@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DC ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DD ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3719,7 +3719,7 @@ function loadProjectFile(input){
   r.onload=e=>{ try{
     const d=JSON.parse(e.target.result);
     if(!d||!Array.isArray(d.objs)){ if(typeof toastHist==='function')toastHist('❌ Fichier projet invalide'); return; }
-    paintObjects=d.objs;
+    paintObjects=d.objs; _syncObjCnt();
     if(d.cons && typeof _constraints!=='undefined') _constraints=d.cons;
     if(d.brut){ const b=d.brut;
       const setv=(id,v)=>{ if(v!=null){ const el=document.getElementById(id); if(el)el.value=v; } };
@@ -3789,7 +3789,7 @@ function loadAll(){
   // Restaurer le dernier dessin auto-sauvegardé (anti perte de travail)
   try {
     const draw = localStorage.getItem(STORE+'draw');
-    if(draw){ const objs=JSON.parse(draw); if(Array.isArray(objs)&&objs.length){ paintObjects=objs;
+    if(draw){ const objs=JSON.parse(draw); if(Array.isArray(objs)&&objs.length){ paintObjects=objs; _syncObjCnt();
       const cc=localStorage.getItem(STORE+'cons'); if(cc && typeof _constraints!=='undefined') _constraints=JSON.parse(cc); } }
   } catch(e){}
   // Polices importées (noms seulement — les données TTF ne sont pas stockées,
@@ -4351,6 +4351,18 @@ let selToolId = tools[0]?.id || null; // outil actif dans canvas
 let paintObjects = [];
 let selObjId = null;
 let objCnt = 1;
+// Resynchronise le compteur d'id après un chargement/undo : évite les id EN DOUBLE
+// (ex: un rect id:1 déjà présent + un nouveau texte id:1 -> sélection qui déconne).
+function _syncObjCnt(){
+  try{
+    let mx=0;
+    for(const o of (paintObjects||[])){
+      const id=Number(o.id); if(isFinite(id)&&id>mx)mx=id;
+      if(o.children)for(const c of o.children){ const cid=Number(c.id); if(isFinite(cid)&&cid>mx)mx=cid; }
+    }
+    if(objCnt<=mx) objCnt=mx+1;
+  }catch(e){}
+}
 
 // Canvas / viewport
 let pCanvas, pCtx;
@@ -7933,6 +7945,7 @@ function handlePointerDown(cpx,cpy){
     return;
   }
   if(paintTool==='text'){
+    _syncObjCnt();
     const id=objCnt++;
     const obj={id,type:'text',text:'Texte',x:xm,y:ym,h:currentTextH||10,spacing:2,
       strokeW:currentStrokeW,fill:currentFill,toolId:selToolId||null};
@@ -8398,7 +8411,7 @@ function pushHistory(){
 
 function _histRestore(i){
   try{
-    paintObjects=JSON.parse(_hist[i]);
+    paintObjects=JSON.parse(_hist[i]); _syncObjCnt();
     _histIdx=i;
     selObjId=null; selObjIds.clear();
     redrawCanvas(); renderInspector(); updateObjCount();
