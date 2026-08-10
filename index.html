@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CX ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CY ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2069,24 +2069,17 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 
       <button class="ptool active" id="pt-select" onclick="setPTool('select')" title="Sélectionner">↖</button>
 
-      <!-- DESSIN / FORMES / TEXTE / GOMME -->
-      <button class="ptool tcat" id="cat-draw" onclick="openToolMenu('draw',this)" title="Dessin">
-        <span id="cat-draw-ico">✏️</span><span class="tcar">▾</span>
+      <!-- CRÉER : menu UNIQUE (toutes les formes, lignes, texte, point) -->
+      <button class="ptool tcat" id="cat-create" onclick="openToolMenu('create',this)" title="Créer : toutes les formes, lignes, texte, point…" style="gap:2px">
+        <span id="cat-create-ico">✏️</span><span style="font-size:9px">Créer</span><span class="tcar">▾</span>
       </button>
-      <button class="ptool tcat" id="cat-shape" onclick="openToolMenu('shape',this)" title="Formes">
-        <span id="cat-shape-ico">▭</span><span class="tcar">▾</span>
-      </button>
-      <button class="ptool" id="pt-text" onclick="setPTool('text')" title="Texte">T</button>
       <button class="ptool" id="pt-eraser" onclick="setPTool('eraser')" title="Gomme">🧽</button>
 
       <div class="tsep"></div>
 
-      <!-- CAD (fusionné depuis l'ancienne barre gauche) -->
+      <!-- CAD : cote + modifier + contraintes + réseaux -->
       <button class="ptool" title="Cote : longueur / Ø (édition directe)" onclick="cadStartDim()">📏</button>
-      <button class="ptool tcat" id="cat-cadCreate" onclick="openToolMenu('cadCreate',this)" title="CAD — Créer (ligne, cercle, arc, polygone…)">
-        📐<span class="tcar">▾</span>
-      </button>
-      <button class="ptool tcat" id="cat-cadModify" onclick="openToolMenu('cadModify',this)" title="CAD — Modifier (congé, ajuster, tab, offset…)">
+      <button class="ptool tcat" id="cat-cadModify" onclick="openToolMenu('cadModify',this)" title="Modifier : congé, ajuster, tab, offset…">
         🔧<span class="tcar">▾</span>
       </button>
       <button class="ptool tcat" id="cat-cadConstrain" onclick="openToolMenu('cadConstrain',this)" title="CAD — Contraintes (parallèle, tangente, égal…)">
@@ -4619,6 +4612,23 @@ const TOOL_MENUS = {
     {t:'star',    i:'★', l:'Étoile'},
     {t:'oblong',  i:"<svg width='15' height='15' viewBox='0 0 24 24' style='vertical-align:middle'><rect x='2' y='8' width='20' height='8' rx='4' ry='4' fill='none' stroke='currentColor' stroke-width='2.2'/></svg>", l:'Oblong'},
     {t:'gear',    i:'⚙️', l:'Engrenage', fn:'openGearModal()'},
+  ],
+  // MENU UNIQUE de création (fusionne Dessin + Formes + CAD-Créer, sans doublon).
+  // Tout passe par cadPick => mode CAD (accrochage + cotes façon Fusion).
+  create: [
+    {i:'╱', l:'Ligne',                fn:'cadStartLine()'},
+    {i:'∿', l:'Tracé libre / Spline', fn:"cadPick('free')"},
+    {i:'▭', l:'Rectangle',            fn:"cadPick('rect')"},
+    {i:'◯', l:'Cercle',               fn:"cadCircleCenter()"},
+    {i:'⬭', l:'Ellipse',              fn:"cadPick('ellipse')"},
+    {i:'△', l:'Triangle',             fn:"cadPick('tri')"},
+    {i:'★', l:'Étoile',               fn:"cadPick('star')"},
+    {i:"<svg width='15' height='15' viewBox='0 0 24 24' style='vertical-align:middle'><rect x='2' y='8' width='20' height='8' rx='4' ry='4' fill='none' stroke='currentColor' stroke-width='2.2'/></svg>", l:'Oblong / Rainure', fn:"cadPick('oblong')"},
+    {i:'⬠', l:'Polygone',             fn:"cadPolyFusion()"},
+    {i:'◠', l:'Arc (3 points)',        fn:"cadArc3()"},
+    {i:'⚙️', l:'Engrenage',            fn:'openGearModal()'},
+    {i:'•', l:'Point',                fn:"cadPick('point')"},
+    {i:'T', l:'Texte',                fn:"cadPick('text')"},
   ],
   more: [
     {i:'⬚',   l:'Tout sélect.', fn:'selectAllObjs()'},
