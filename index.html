@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CT ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-30-CU ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -16455,15 +16455,18 @@ function _s3dAttachControls(canvas, spanXY) {
   });
 
   canvas.addEventListener('contextmenu', e => e.preventDefault());
-  canvas.title = 'Glisser gauche = tourner · Clic droit = déplacer · Molette = zoom · Double-clic = recentrer';
+  canvas.title = 'Glisser gauche = tourner · Molette pressée (ou Maj+glisser) = déplacer · Molette = zoom · Double-clic = recentrer';
 
   // Etat de navigation stocke sur _s3d (les handlers window lisent le _s3d courant).
+  // Facon Fusion : molette PRESSEE = deplacer (pan), Maj+glisser = deplacer aussi, gauche = tourner.
+  // Le clic DROIT ne fait rien pour la nav (pas de doublon avec la molette).
   canvas.addEventListener('mousedown', e => {
     if (!_s3d) return;
-    _s3d._nav = {
-      mode: (e.button === 2 || e.button === 1 || e.shiftKey) ? 'pan' : 'orbit',
-      lx: e.clientX, ly: e.clientY, sp
-    };
+    let mode;
+    if (e.button === 1 || e.shiftKey) mode = 'pan';      // molette pressee / Maj = deplacer
+    else if (e.button === 2) mode = 'none';               // clic droit = rien
+    else mode = 'orbit';                                   // gauche = tourner
+    _s3d._nav = { mode, lx: e.clientX, ly: e.clientY, sp };
     e.preventDefault();
   });
 
@@ -16476,7 +16479,8 @@ function _s3dAttachControls(canvas, spanXY) {
       const nv = _s3d._nav;
       const dx = e.clientX - nv.lx, dy = e.clientY - nv.ly;
       if (nv.mode === 'orbit') {
-        _s3d.theta -= dx * 0.01;
+        // sens naturel : glisser a droite -> le modele tourne a droite (comme Fusion)
+        _s3d.theta += dx * 0.01;
         // inclinaison bornee : jamais pile au-dessus ni a l'horizon (evite la bascule)
         _s3d.phi = Math.max(0.15, Math.min(Math.PI - 0.15, _s3d.phi + dy * 0.01));
       } else if (nv.mode === 'pan') {
