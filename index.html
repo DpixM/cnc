@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DD ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DE ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -7295,7 +7295,11 @@ function _shapeParamsPanel(o){ _shapeParamsRemove(); if(!o)return; _placeShapeCo
     const lab=document.createElement('span'); lab.textContent=pr.l; lab.style.opacity=.9; row.appendChild(lab);
     const inp=document.createElement('input'); inp.type='text'; inp.value=(+pr.g()).toFixed(pr.int?0:1); inp.style.cssText='width:72px;padding:5px 7px;border-radius:7px;border:1px solid #6b7280;background:#0d0f14;color:#7ee787;font:14px monospace;text-align:right';
     inp.addEventListener('input',()=>{ const v=parseFloat(String(inp.value).replace(',','.')); if(isFinite(v)&&v>0){ pr.s(v); if(typeof updateLinkedCopies==='function')updateLinkedCopies(); redrawCanvasNow(); } });
-    inp.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); commit(); } else if(e.key==='Escape'){ e.preventDefault(); _shapeParamsRemove(); redrawCanvasNow(); } });
+    inp.addEventListener('keydown',e=>{ e.stopPropagation();
+      if(e.key==='Enter'){ e.preventDefault(); commit(); }
+      else if(e.key==='Escape'){ e.preventDefault(); _shapeParamsRemove(); redrawCanvasNow(); }
+      else if(e.key==='Tab'){ e.preventDefault(); const ins=[...d.querySelectorAll('input')]; const i=ins.indexOf(inp); const nx=ins[(i+(e.shiftKey?-1:1)+ins.length)%ins.length]; if(nx){ nx.focus(); if(nx.select)nx.select(); } }
+    });
     row.appendChild(inp); d.appendChild(row); }
   const ok=document.createElement('button'); ok.textContent='✓ OK'; ok.style.cssText='margin-top:3px;padding:6px 10px;border:none;border-radius:8px;background:#22c55e;color:#04240f;font-weight:800;cursor:pointer'; ok.onclick=commit; d.appendChild(ok);
   document.body.appendChild(d);
@@ -8346,7 +8350,7 @@ function handlePointerUp(cpx,cpy){
   const exm=snpEnd.x,eym=snpEnd.y;
   const x0=Math.min(drawStartMm.x,exm),y0=Math.min(drawStartMm.y,eym);
   const w=Math.abs(exm-drawStartMm.x)||2,h=Math.abs(eym-drawStartMm.y)||2;
-  let obj=null;const id=objCnt++;
+  let obj=null; _syncObjCnt(); const id=objCnt++;
   if(paintTool==='free'&&freePts.length>2)obj={id,type:'free',pts:[...freePts]};
   else if(paintTool==='line')obj={id,type:'line',x1:drawStartMm.x,y1:drawStartMm.y,x2:exm,y2:eym};
   else if(paintTool==='rect')obj={id,type:'rect',x:x0,y:y0,w,h};
@@ -8374,6 +8378,11 @@ function handlePointerUp(cpx,cpy){
     obj.strokeW=currentStrokeW;
     obj.fill=currentFill;
     paintObjects.push(obj);selObjId=obj.id;{const _cm=_cadMode;setPTool('select');_cadMode=_cm;}
+    // Ouvre tout de suite le panneau de cotes (champ focalisé) -> saisie clavier : tape la 1re cote,
+    // TAB pour la suivante, Entrée pour valider. Le check vert reste (utile sur mobile).
+    if(typeof _shapeParamsPanel==='function' && typeof _isParametricShape==='function' && _isParametricShape(obj)){
+      setTimeout(()=>{ try{ _shapeParamsPanel(obj); }catch(e){} }, 30);
+    }
   }
   freePts=[];redrawCanvas();renderInspector();updateObjCount();
 }
