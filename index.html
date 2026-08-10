@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DJ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DK ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6870,14 +6870,27 @@ function _rectPatStart(objs){
 function _rectPatStep(){ const p=_rectPat; return { sx:(p.cols>1)?(p.hx-p.base.x)/(p.cols-1):0, sy:(p.rows>1)?(p.hy-p.base.y)/(p.rows-1):0 }; }
 function drawRectPatOverlay(){
   if(!_rectPat||!pCtx)return; const p=_rectPat, bb=p.base; const {sx,sy}=_rectPatStep();
-  pCtx.save();
-  pCtx.strokeStyle='rgba(245,166,35,.85)'; pCtx.setLineDash([5,3]); pCtx.lineWidth=1.4;
-  for(let i=0;i<p.cols;i++)for(let j=0;j<p.rows;j++){ if(i===0&&j===0)continue; const q0=mmToPx(bb.x+i*sx,bb.y+j*sy),q1=mmToPx(bb.x+bb.w+i*sx,bb.y+bb.h+j*sy); pCtx.strokeRect(Math.min(q0[0],q1[0]),Math.min(q0[1],q1[1]),Math.abs(q1[0]-q0[0]),Math.abs(q1[1]-q0[1])); }
+  const objs=p.ids.map(getObj).filter(Boolean);
+  pCtx.save(); pCtx.lineJoin='round'; pCtx.lineCap='round';
+  const ghost=(o,dx,dy)=>{ try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0]+dx,s[0][1]+dy); pCtx.moveTo(q0[0],q0[1]); for(let k=1;k<s.length;k++){ const q=mmToPx(s[k][0]+dx,s[k][1]+dy); pCtx.lineTo(q[0],q[1]); } pCtx.stroke(); } }catch(e){} };
+  // 1) FORMES SOURCES (celles qui seront dupliquées) surlignées en vert
+  pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=2.6; for(const o of objs) ghost(o,0,0);
+  // 2) COPIES fantômes (vraies formes, pas des carrés) en orange pointillé
+  pCtx.strokeStyle='rgba(245,166,35,.95)'; pCtx.setLineDash([5,3]); pCtx.lineWidth=1.6;
+  for(let i=0;i<p.cols;i++)for(let j=0;j<p.rows;j++){ if(i===0&&j===0)continue; for(const o of objs) ghost(o,i*sx,j*sy); }
   pCtx.setLineDash([]);
+  // 3) ligne base->poignée + poignée
   const b0=mmToPx(bb.x,bb.y), h=mmToPx(p.hx,p.hy);
   pCtx.strokeStyle='rgba(245,166,35,.5)'; pCtx.setLineDash([4,4]); pCtx.beginPath(); pCtx.moveTo(b0[0],b0[1]); pCtx.lineTo(h[0],h[1]); pCtx.stroke(); pCtx.setLineDash([]);
-  pCtx.fillStyle='#f5a623'; pCtx.strokeStyle='#111'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(h[0],h[1],8,0,Math.PI*2); pCtx.fill(); pCtx.stroke();
-  pCtx.fillStyle='#111'; pCtx.font='bold 10px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle'; pCtx.fillText('✋',h[0],h[1]);
+  pCtx.fillStyle='#f5a623'; pCtx.strokeStyle='#111'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(h[0],h[1],9,0,Math.PI*2); pCtx.fill(); pCtx.stroke();
+  pCtx.fillStyle='#111'; pCtx.font='bold 11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle'; pCtx.fillText('✋',h[0],h[1]);
+  // 4) LIBELLÉ : de combien ça écarte (pas entre pièces) + grille
+  const txt='écart X '+sx.toFixed(1)+' mm · Y '+sy.toFixed(1)+' mm  ('+p.cols+'×'+p.rows+')';
+  pCtx.font='bold 11px sans-serif'; pCtx.textAlign='left'; pCtx.textBaseline='middle';
+  const w=pCtx.measureText(txt).width+12; let lx=h[0]+14, ly=h[1]-2;
+  if(lx+w>pCtx.canvas.width) lx=h[0]-14-w;
+  pCtx.fillStyle='rgba(0,0,0,.85)'; pCtx.fillRect(lx, ly-10, w, 20);
+  pCtx.fillStyle='#ffd24a'; pCtx.fillText(txt, lx+6, ly);
   pCtx.restore();
 }
 function _rectPatPanel(){
