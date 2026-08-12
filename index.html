@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DR ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DS ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6550,7 +6550,7 @@ function _scaleObj(o, cx, cy, k){
   else { if(o.x!=null)o.x=sx(o.x); if(o.y!=null)o.y=sy(o.y); if(o.w!=null)o.w*=k; if(o.h!=null)o.h*=k; }
 }
 function cadScale(){
-  const ids=[...getSelIds()]; if(!ids.length){ if(typeof toastHist==='function')toastHist('⚠️ Sélectionne une forme d\'abord'); return; }
+  const ids=[...getSelIds()]; if(!ids.length){ _armPickThen(cadScale,'⤢ Échelle'); return; }
   if(!ids.map(getObj).filter(Boolean).length)return;
   const snap=JSON.stringify(paintObjects);
   const apply=(k)=>{ if(!(k>0))return; paintObjects.length=0; JSON.parse(snap).forEach(o=>paintObjects.push(o)); const objs=ids.map(getObj).filter(Boolean); let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9; for(const o of objs){ const b=getObjBB(o); if(!b)continue; minX=Math.min(minX,b.x);minY=Math.min(minY,b.y);maxX=Math.max(maxX,b.x+b.w);maxY=Math.max(maxY,b.y+b.h); } const cx=(minX+maxX)/2, cy=(minY+maxY)/2; for(const o of objs)_scaleObj(o,cx,cy,k); redrawCanvasNow(); };
@@ -6569,7 +6569,7 @@ function _translateExact(o,dx,dy){
 let _align2 = null; // {objId, stage, srcA, dstA, srcB}
 function cadAlign2(){
   const ids=[...getSelIds()];
-  if(ids.length!==1){ if(typeof toastHist==='function')toastHist('⚓ Sélectionne UNE seule forme, puis relance « Accrocher 2 points »'); return; }
+  if(ids.length!==1){ if(ids.length===0){ _armPickThen(cadAlign2,'⚓ Accrocher 2 points'); return; } if(typeof toastHist==='function')toastHist('⚓ Sélectionne UNE seule forme'); return; }
   _align2={objId:ids[0], stage:'srcA', srcA:null, dstA:null, srcB:null};
   if(typeof _setToolFromPick!=='undefined'){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; } else setPTool('select');
   _cadMode=true; if(typeof _conHintShow==='function')_conHintShow('⚓ 1/4 — clique le 1er point DE TA FORME');
@@ -6593,6 +6593,12 @@ function drawAlign2Overlay(){
   pCtx.restore();
 }
 function _cadPickOp(need, fn, hint){ _setToolFromPick=true; if(typeof setPTool==='function')setPTool('select'); _setToolFromPick=false; _conPick={need, picks:[], fn, hint}; _cadMode=true; if(typeof _conHintShow==='function')_conHintShow(hint+' — clique la 1ère forme'); if(typeof redrawCanvasNow==='function')redrawCanvasNow(); }
+// OUTIL D'ABORD : si rien n'est sélectionné, on demande de cliquer la forme PUIS on lance l'opération.
+function _armPickThen(cb, hint){
+  _setToolFromPick=true; if(typeof setPTool==='function')setPTool('select'); _setToolFromPick=false;
+  _conPick={need:1, picks:[], fn:(objs)=>{ if(objs&&objs.length&&objs[0]){ selObjId=objs[0].id; if(typeof selObjIds!=='undefined')selObjIds=new Set([objs[0].id]); } cb(); }, hint};
+  _cadMode=true; if(typeof _conHintShow==='function')_conHintShow(hint+' — clique la forme'); if(typeof redrawCanvasNow==='function')redrawCanvasNow();
+}
 function _lineIntersect(A,B){ const x1=A[0],y1=A[1],x2=A[2],y2=A[3],x3=B[0],y3=B[1],x4=B[2],y4=B[3]; const d=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4); if(Math.abs(d)<1e-9)return null; const px=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/d; const py=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/d; return [px,py]; }
 function _raySegInt(P,u,S){ const x3=S[0],y3=S[1],x4=S[2],y4=S[3]; const dx=x4-x3,dy=y4-y3; const den=u[0]*dy-u[1]*dx; if(Math.abs(den)<1e-9)return null; const t=((x3-P[0])*dy-(y3-P[1])*dx)/den; const s=((x3-P[0])*u[1]-(y3-P[1])*u[0])/den; if(s<-0.001||s>1.001)return null; return {t, p:[P[0]+u[0]*t, P[1]+u[1]*t]}; }
 function _rotCenter(){ let mnx=1e9,mny=1e9,mxx=-1e9,mxy=-1e9; for(const id of _rot2.shapes){ const o=getObj(id); if(!o)continue; const b=getObjBB(o); if(!b)continue; mnx=Math.min(mnx,b.x);mny=Math.min(mny,b.y);mxx=Math.max(mxx,b.x+b.w);mxy=Math.max(mxy,b.y+b.h); } if(mnx>1e8)return [0,0]; return [(mnx+mxx)/2,(mny+mxy)/2]; }
@@ -6914,29 +6920,38 @@ function cadArraysMenu(){
 // ─── RESEAU RECTANGULAIRE DYNAMIQUE (facon Fusion : tu mets le nombre, tu tires la poignee) ───
 let _rectPat = null; // {ids, base:{x,y,w,h}, cols, rows, hx, hy, dragging}
 function cadRectPatDyn(){
-  const objs=(typeof getSelObjs==='function')?getSelObjs():[];
-  if(!objs.length){
-    // SELECT-FIRST : on demande de choisir les formes AVANT (plus clair que le clic unique)
-    if(typeof toastHist==='function')toastHist('▦ Sélectionne d\'abord tes formes (clic + Maj-clic), puis relance ❋ Réseaux → Réseau (glisser)');
-    return;
-  }
-  _rectPatStart(objs);
+  // OUTIL D'ABORD : on clique le réseau, PUIS on clique la/les forme(s) (comme les autres modificateurs).
+  const pre=(typeof getSelObjs==='function')?getSelObjs():[];
+  _rectPat={ stage:'pick', ids:pre.map(o=>o.id), base:null, cols:3, rows:2, hx:0, hy:0, dragging:false };
+  if(typeof _setToolFromPick!=='undefined'){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; } else setPTool('select');
+  _cadMode=true; _rectPatPanel();
+  if(typeof _conHintShow==='function')_conHintShow('▦ Clique la/les forme(s) à répéter, puis « ▶ Suivant »');
+  redrawCanvasNow();
 }
-function _rectPatStart(objs){
-  const bb=selBBox(objs);
-  _rectPat={ ids:objs.map(o=>o.id), base:bb, cols:3, rows:2,
-             hx: bb.x + Math.max(bb.w*3, bb.w+20), hy: bb.y + Math.max(bb.h*2, bb.h+15), dragging:false };
-  if(typeof setPTool==='function')setPTool('select'); _cadMode=true;
-  _rectPatPanel(); if(typeof _conHintShow==='function')_conHintShow('▦ Tire la poignée orange pour écarter · règle le nombre dans la fenêtre'); redrawCanvasNow();
+function _rectPatToPlace(){
+  if(!_rectPat)return; const objs=_rectPat.ids.map(getObj).filter(Boolean);
+  if(!objs.length){ if(typeof toastHist==='function')toastHist('▦ Clique au moins une forme à répéter'); return; }
+  const bb=selBBox(objs); _rectPat.base=bb; _rectPat.stage='place';
+  _rectPat.hx=bb.x+Math.max(bb.w*3, bb.w+20); _rectPat.hy=bb.y+Math.max(bb.h*2, bb.h+15);
+  _rectPatPanel(); if(typeof _conHintShow==='function')_conHintShow('▦ Tire la poignée orange ✋ pour écarter · règle le nombre'); redrawCanvasNow();
+}
+function _rectPatPickAt(xm,ym){
+  if(!_rectPat)return; const o=(typeof _pickObjForCon==='function')?_pickObjForCon(xm,ym):null;
+  if(!o){ if(typeof _conHintShow==='function')_conHintShow('▦ Clique une forme (elle passe en vert), puis « ▶ Suivant »'); return; }
+  const i=_rectPat.ids.indexOf(o.id);
+  if(i>=0) _rectPat.ids.splice(i,1); else _rectPat.ids.push(o.id);  // clic = ajoute / retire
+  _rectPatPanel(); redrawCanvasNow();
 }
 function _rectPatStep(){ const p=_rectPat; return { sx:(p.cols>1)?(p.hx-p.base.x)/(p.cols-1):0, sy:(p.rows>1)?(p.hy-p.base.y)/(p.rows-1):0 }; }
 function drawRectPatOverlay(){
-  if(!_rectPat||!pCtx)return; const p=_rectPat, bb=p.base; const {sx,sy}=_rectPatStep();
+  if(!_rectPat||!pCtx)return; const p=_rectPat;
   const objs=p.ids.map(getObj).filter(Boolean);
   pCtx.save(); pCtx.lineJoin='round'; pCtx.lineCap='round';
   const ghost=(o,dx,dy)=>{ try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0]+dx,s[0][1]+dy); pCtx.moveTo(q0[0],q0[1]); for(let k=1;k<s.length;k++){ const q=mmToPx(s[k][0]+dx,s[k][1]+dy); pCtx.lineTo(q[0],q[1]); } pCtx.stroke(); } }catch(e){} };
-  // 1) FORMES SOURCES (celles qui seront dupliquées) surlignées en vert
+  // FORMES SOURCES (choisies) surlignées en vert — toujours
   pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=2.6; for(const o of objs) ghost(o,0,0);
+  if(p.stage!=='place'||!p.base){ pCtx.restore(); return; } // phase choix des formes : rien d'autre
+  const bb=p.base; const {sx,sy}=_rectPatStep();
   // 2) COPIES fantômes (vraies formes, pas des carrés) en orange pointillé
   pCtx.strokeStyle='rgba(245,166,35,.95)'; pCtx.setLineDash([5,3]); pCtx.lineWidth=1.6;
   for(let i=0;i<p.cols;i++)for(let j=0;j<p.rows;j++){ if(i===0&&j===0)continue; for(const o of objs) ghost(o,i*sx,j*sy); }
@@ -6959,15 +6974,24 @@ function _rectPatPanel(){
   _rectPatPanelRemove();
   const d=document.createElement('div'); d.id='rectPatPanel'; d.style.cssText='position:fixed;left:16px;top:130px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:12px 13px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:210px';
   const nb=_rectPat.ids.length;
-  const title=document.createElement('div'); title.innerHTML='▦ Réseau rectangulaire<div style="font-size:10px;color:#22c55e;font-weight:600;margin-top:2px">'+nb+' forme(s) source en vert</div>'; title.style.cssText='font-weight:800;margin-bottom:2px'; d.appendChild(title);
-  const mkrow=(lbl,val,on)=>{ const r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px'; const s=document.createElement('span'); s.innerHTML=lbl; const inp=document.createElement('input'); inp.type='number'; inp.min='1'; inp.value=val; inp.style.cssText='width:64px;padding:5px;border-radius:7px;border:1px solid #6b7280;background:#0d0f14;color:#7ee787;font:15px monospace;text-align:right'; inp.addEventListener('input',()=>{ on(Math.max(1,Math.min(500,parseInt(inp.value)||1))); redrawCanvasNow(); }); inp.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){e.preventDefault();_rectPatCommit();} }); r.appendChild(s); r.appendChild(inp); return r; };
-  d.appendChild(mkrow('Nombre en X →', _rectPat.cols, v=>_rectPat.cols=v));
-  d.appendChild(mkrow('Nombre en Y ↑', _rectPat.rows, v=>_rectPat.rows=v));
-  const hint=document.createElement('div'); hint.innerHTML='Nombre <b>total</b> (l\'originale comprise).<br>Tire la poignée orange ✋ pour écarter.'; hint.style.cssText='font-size:10px;color:#9aa4b2'; d.appendChild(hint);
   const btns=document.createElement('div'); btns.style.cssText='display:flex;gap:8px;margin-top:4px';
-  const ok=document.createElement('button'); ok.textContent='✓ Valider'; ok.style.cssText='flex:1;padding:7px;border:none;border-radius:8px;background:#22c55e;color:#04240f;font-weight:800;cursor:pointer'; ok.onclick=_rectPatCommit;
   const ca=document.createElement('button'); ca.textContent='Annuler'; ca.style.cssText='padding:7px 10px;border:none;border-radius:8px;background:#374151;color:#fff;cursor:pointer'; ca.onclick=_rectPatCancel;
-  btns.appendChild(ok); btns.appendChild(ca); d.appendChild(btns);
+  if(_rectPat.stage!=='place'){
+    // PHASE 1 : choisir les formes
+    const title=document.createElement('div'); title.innerHTML='▦ Réseau rectangulaire<div style="font-size:10px;color:#9aa4b2;font-weight:600;margin-top:2px">Étape 1 : clique la/les forme(s)</div>'; title.style.cssText='font-weight:800;margin-bottom:2px'; d.appendChild(title);
+    const cnt=document.createElement('div'); cnt.innerHTML='<b style="color:#22c55e">'+nb+'</b> forme(s) choisie(s) (en vert)'; cnt.style.cssText='font-size:12px'; d.appendChild(cnt);
+    const nx=document.createElement('button'); nx.textContent='▶ Suivant'; nx.style.cssText='flex:1;padding:7px;border:none;border-radius:8px;background:#f5a623;color:#111;font-weight:800;cursor:pointer'; nx.onclick=_rectPatToPlace;
+    btns.appendChild(nx); btns.appendChild(ca); d.appendChild(btns);
+  } else {
+    // PHASE 2 : réglages + poignée
+    const title=document.createElement('div'); title.innerHTML='▦ Réseau rectangulaire<div style="font-size:10px;color:#22c55e;font-weight:600;margin-top:2px">'+nb+' forme(s) source · tire la poignée ✋</div>'; title.style.cssText='font-weight:800;margin-bottom:2px'; d.appendChild(title);
+    const mkrow=(lbl,val,on)=>{ const r=document.createElement('div'); r.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px'; const s=document.createElement('span'); s.innerHTML=lbl; const inp=document.createElement('input'); inp.type='number'; inp.min='1'; inp.value=val; inp.style.cssText='width:64px;padding:5px;border-radius:7px;border:1px solid #6b7280;background:#0d0f14;color:#7ee787;font:15px monospace;text-align:right'; inp.addEventListener('input',()=>{ on(Math.max(1,Math.min(500,parseInt(inp.value)||1))); redrawCanvasNow(); }); inp.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){e.preventDefault();_rectPatCommit();} }); r.appendChild(s); r.appendChild(inp); return r; };
+    d.appendChild(mkrow('Nombre en X →', _rectPat.cols, v=>_rectPat.cols=v));
+    d.appendChild(mkrow('Nombre en Y ↑', _rectPat.rows, v=>_rectPat.rows=v));
+    const hint=document.createElement('div'); hint.innerHTML='Nombre <b>total</b> (l\'originale comprise).'; hint.style.cssText='font-size:10px;color:#9aa4b2'; d.appendChild(hint);
+    const ok=document.createElement('button'); ok.textContent='✓ Valider'; ok.style.cssText='flex:1;padding:7px;border:none;border-radius:8px;background:#22c55e;color:#04240f;font-weight:800;cursor:pointer'; ok.onclick=_rectPatCommit;
+    btns.appendChild(ok); btns.appendChild(ca); d.appendChild(btns);
+  }
   document.body.appendChild(d);
 }
 function _rectPatPanelRemove(){ const e=document.getElementById('rectPatPanel'); if(e)e.remove(); }
@@ -7053,7 +7077,7 @@ function _selPanelShow(){
   document.body.appendChild(div); if(typeof _makePanelDraggable==='function')_makePanelDraggable(div);
 }
 function cadOffset(){
-  const ids=[...getSelIds()]; if(!ids.length){ if(typeof toastHist==='function')toastHist('⚠️ Sélectionne une forme d\'abord'); return; }
+  const ids=[...getSelIds()]; if(!ids.length){ _armPickThen(cadOffset,'⧉ Décalage'); return; }
   const snap=JSON.stringify(paintObjects);
   const apply=(d)=>{ if(!isFinite(d)||d===0)return; paintObjects.length=0; JSON.parse(snap).forEach(o=>paintObjects.push(o)); let made=0;
   for(const id of ids){ const o=getObj(id); if(!o)continue; const c=JSON.parse(JSON.stringify(o)); c.id=Date.now()+Math.random()+made*0.001;
@@ -7434,7 +7458,7 @@ function _shiftObj(o,dx,dy){
 }
 function cadDuplicate(){
   const ids=[...getSelIds()];
-  if(!ids.length){ if(typeof toastHist==='function')toastHist('⧉ Sélectionne d\'abord une forme'); return; }
+  if(!ids.length){ _armPickThen(cadDuplicate,'⧉ Dupliquer'); return; }
   const news=[];
   for(const id of ids){ const o=getObj(id); if(!o)continue; const c=JSON.parse(JSON.stringify(o)); c.id=Date.now()+Math.random(); _shiftObj(c,5,5); paintObjects.push(c); news.push(c.id); }
   if(typeof selObjIds!=='undefined'&&selObjIds.clear){ selObjIds.clear(); news.forEach(i=>selObjIds.add(i)); }
@@ -8024,7 +8048,7 @@ function handlePointerDown(cpx,cpy){
   const[xm,ym]=pxToMm(cpx,cpy);
   _log('down',{x:+xm.toFixed(1),y:+ym.toFixed(1),tool:paintTool,mode:(_conPick?'con':(_rot2?'rot':(_mirror?'mir':'')))});
   if(_align2){ _align2Click(xm,ym); return; } // outil accrocher 2 points
-  if(_rectPat){ const tol=16/(BASE_PX*vZoom); if(Math.hypot(xm-_rectPat.hx,ym-_rectPat.hy)<=tol){ _rectPat.dragging=true; } return; } // réseau dynamique : saisir la poignée
+  if(_rectPat){ if(_rectPat.stage==='pick'){ _rectPatPickAt(xm,ym); return; } const tol=16/(BASE_PX*vZoom); if(Math.hypot(xm-_rectPat.hx,ym-_rectPat.hy)<=tol){ _rectPat.dragging=true; } return; } // réseau : choisir les formes puis saisir la poignée
   if(_mirror){ _mirrorClick(xm,ym); return; } // outil miroir 2 étapes
   if(_rot2){ const piv=_rotPiv(); const hr=_rotHR(); const a=_rot2.deg*Math.PI/180; const hx=piv[0]+Math.cos(a)*hr, hy=piv[1]+Math.sin(a)*hr; const tolh=16/(BASE_PX*vZoom); if(_rot2.shapes.size && Math.hypot(xm-hx,ym-hy)<=tolh){ _rot2.dragging=true; return; } _rot2Click(xm,ym); return; } // rotation : poignée ou clic (pivot/forme)
   if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
