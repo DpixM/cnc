@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DX ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DY ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2137,7 +2137,6 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     <button class="ptool" id="gridSnapBtn" title="Accrochage sur une grille (tous les N mm)" onclick="gridSnapMM=gridSnapMM>0?0:(parseFloat(document.getElementById('gridSnapStep').value)||5); this.style.background=gridSnapMM>0?'rgba(245,166,35,.22)':''; this.style.color=gridSnapMM>0?'var(--acc)':''; redrawCanvas();" style="gap:3px;cursor:pointer;flex-shrink:0"><span style="font-size:9px">⊞ Grille</span></button>
     <input type="number" id="gridSnapStep" min="0.5" max="100" step="0.5" value="5" title="Pas de la grille (mm)" oninput="if(gridSnapMM>0)gridSnapMM=parseFloat(this.value)||5;" style="width:42px;padding:3px 5px;font-family:var(--mono);font-size:10px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:4px;color:var(--acc);outline:none">
     <span style="font-size:8px;color:var(--txt3);font-family:var(--mono)">mm</span>
-    <button class="ptool" id="alignSnapBtn" title="Lignes d'alignement : tenir la verticale/horizontale d'un point (façon SketchUp)" onclick="alignSnap=!alignSnap; this.style.background=alignSnap?'rgba(245,166,35,.22)':''; this.style.color=alignSnap?'var(--acc)':''; redrawCanvas();" style="gap:3px;cursor:pointer;flex-shrink:0"><span style="font-size:9px">⇉ Aligne</span></button>
     <button class="ptool" id="pt-bucket" onclick="startBucket()" title="Seau : remplir une zone fermée → poche" style="display:none;background:rgba(59,130,246,.22);color:#60a5fa"><svg viewBox="0 0 24 24" width="17" height="17" style="pointer-events:none"><path d="M4 7.5h16l-1.5 11.6a1.2 1.2 0 0 1-1.2 1H6.7a1.2 1.2 0 0 1-1.2-1L4 7.5z" fill="currentColor"/><rect x="2.7" y="4.3" width="18.6" height="2.6" rx="1.3" fill="currentColor"/></svg></button>
     <div class="tsep"></div>
     <span style="font-size:8px;color:var(--txt3);font-family:var(--mono);white-space:nowrap;letter-spacing:.5px">REMPLI :</span>
@@ -8262,8 +8261,8 @@ function snapPoint(xm,ym,excludeId){
     if(Math.abs(ym-org.y)<AX){ by=org.y; snapped=true; snapKind=snapKind||'axisY'; window._alignY=org.y; }
   }
   // ALIGNEMENT sur les POINTS (inference facon SketchUp) : SEULEMENT si l'utilisateur l'active (bouton ⇉ Aligne).
-  if(alignSnap && snapKind!=='point'){
-    const AL=SNAP_MM*1.1; // zone serree pour ne pas gener le placement libre
+  if(snapKind!=='point'){
+    const AL=SNAP_MM*0.85; // zone TRES serree : n'accroche que si on est vraiment sur la ligne d'alignement
     let bestX=(snapKind==='axisX')?bx:null, bxd=AL, bestY=(snapKind==='axisY')?by:null, byd=AL;
     if(paintObjects.length<=250){ for(const o of paintObjects){ if(o.id===excludeId||o.type==='dim')continue; let pts; try{pts=snapPointsOf(o);}catch(e){continue;} for(const p of pts){ const dx=Math.abs(xm-p[0]); if(dx<bxd){bxd=dx;bestX=p[0];} const dy=Math.abs(ym-p[1]); if(dy<byd){byd=dy;bestY=p[1];} } } }
     if(bestX!=null){ bx=bestX; snapped=true; snapKind=(snapKind==='axisX')?snapKind:(snapKind||'alignX'); window._alignX=bestX; }
