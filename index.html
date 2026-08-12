@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DT ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DU ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6447,7 +6447,7 @@ function drawObjPx(o){
     // Apply horizontal scale for width resize: translate to origin, scale, draw
     pCtx.translate(cx,cy);
     pCtx.scale(scaleX,1);
-    pCtx.font=`${fi} ${fw} ${ph}px ${ff}`;
+    pCtx.font=`${fi} ${fw} ${ph}px "${ff}"`;
     pCtx.textBaseline='top';
     pCtx.textAlign='left';
     const txt=(o.text||'').trimEnd();
@@ -10386,7 +10386,7 @@ function iEditText(oid){
             ${customFonts.map(f=>`<option value="${f}" ${curFont===f?'selected':''}>${f}</option>`).join('')}
             <option value="__dafont__">📥 Importer .ttf/.otf…</option>
           </select>
-          <button onclick="triggerFilePick('font')" style="display:block;width:100%;margin-top:4px;padding:5px 8px;border-radius:6px;background:var(--surf2);border:1.5px solid var(--brd2);cursor:pointer;font-size:10px;color:var(--txt2);text-align:center">📥 Importer TTF/OTF</button>
+          <button onclick="_fontImportOid=${oid};triggerFilePick('font')" style="display:block;width:100%;margin-top:4px;padding:5px 8px;border-radius:6px;background:var(--surf2);border:1.5px solid var(--brd2);cursor:pointer;font-size:10px;color:var(--txt2);text-align:center">📥 Importer TTF/OTF</button>
         </div>
         <div style="flex:1">
           <label style="font-size:10px;color:var(--txt2)">Taille mm</label>
