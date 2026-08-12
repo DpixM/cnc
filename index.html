@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DV ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DW ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6359,6 +6359,7 @@ function redrawCanvasNow(){
   if(typeof cadDrawOverlay==='function') cadDrawOverlay();
   if(typeof drawConstraintSymbols==='function') drawConstraintSymbols();
   if(typeof drawRectPatOverlay==='function') drawRectPatOverlay();
+  if(typeof drawAlignGuides==='function') drawAlignGuides();
   if(typeof drawAlign2Overlay==='function') drawAlign2Overlay();
   if(typeof _shpOverlay==='function') _shpOverlay();
   if(typeof _cadDimOverlay==='function') _cadDimOverlay();
@@ -6943,6 +6944,16 @@ function _rectPatPickAt(xm,ym){
   _rectPatPanel(); redrawCanvasNow();
 }
 function _rectPatStep(){ const p=_rectPat; return { sx:(p.cols>1)?(p.hx-p.base.x)/(p.cols-1):0, sy:(p.rows>1)?(p.hy-p.base.y)/(p.rows-1):0 }; }
+function drawAlignGuides(){
+  if(!pCtx) return;
+  const active=(typeof isDragging!=='undefined'&&isDragging)||(typeof _shp!=='undefined'&&_shp)||(typeof _cad!=='undefined'&&_cad)||(typeof dragPending!=='undefined'&&dragPending);
+  if(!active){ return; }
+  const cw=parseFloat(pCanvas.style.width)||pCanvas.width, ch=parseFloat(pCanvas.style.height)||pCanvas.height;
+  pCtx.save(); pCtx.setLineDash([6,4]); pCtx.lineWidth=1; pCtx.strokeStyle='rgba(59,130,246,.55)';
+  if(window._alignX!=null){ const q=mmToPx(window._alignX,0); pCtx.beginPath(); pCtx.moveTo(q[0],0); pCtx.lineTo(q[0],ch); pCtx.stroke(); }
+  if(window._alignY!=null){ const q=mmToPx(0,window._alignY); pCtx.beginPath(); pCtx.moveTo(0,q[1]); pCtx.lineTo(cw,q[1]); pCtx.stroke(); }
+  pCtx.restore();
+}
 function drawRectPatOverlay(){
   if(!_rectPat||!pCtx)return; const p=_rectPat;
   const objs=p.ids.map(getObj).filter(Boolean);
@@ -8241,18 +8252,23 @@ function snapPoint(xm,ym,excludeId){
   // Accroche sur les INTERSECTIONS de segments (croisements) — point discret prioritaire.
   { const _S=_allSegs(excludeId);
     if(_S.length<=160){ for(let i=0;i<_S.length;i++){ for(let j=i+1;j<_S.length;j++){ const ip=_segInt(_S[i],_S[j]); if(ip){ const d=Math.hypot(xm-ip[0],ym-ip[1]); if(d<bd){bd=d;bx=ip[0];by=ip[1];snapped=true;snapKind='point';} } } } } }
-  // Accroche sur les AXES de l'origine (lignes x=origine / y=origine) — zone d'accroche PLUS LARGE que les points.
+  // ALIGNEMENT (inférence) : on accroche X sur le X d'un point remarquable ET Y sur le Y d'un autre,
+  // INDEPENDAMMENT -> on peut glisser le long de la verticale/horizontale d'un point, même loin de lui.
   if(snapKind!=='point'){
     const AX=SNAP_MM*2.2;
-    if(Math.abs(xm-org.x) < AX){ bx=org.x; snapped=true; snapKind=snapKind||'axisX'; }
-    if(Math.abs(ym-org.y) < AX){ by=org.y; snapped=true; snapKind=snapKind||'axisY'; }
-  }
-  // Accroche sur une GRILLE tous les N mm depuis l'origine (repli — un point précis reste prioritaire).
-  if(gridSnapMM>0 && snapKind!=='point'){
+    let bestX=null,bxd=AX, bestY=null,byd=AX;
+    const consid=(px,py)=>{ const dx=Math.abs(xm-px); if(dx<bxd){bxd=dx;bestX=px;} const dy=Math.abs(ym-py); if(dy<byd){byd=dy;bestY=py;} };
+    consid(org.x,org.y); // l'origine
+    if(paintObjects.length<=250){ for(const o of paintObjects){ if(o.id===excludeId||o.type==='dim')continue; let pts; try{pts=snapPointsOf(o);}catch(e){continue;} for(const p of pts){ const dx=Math.abs(xm-p[0]); if(dx<bxd){bxd=dx;bestX=p[0];} const dy=Math.abs(ym-p[1]); if(dy<byd){byd=dy;bestY=p[1];} } } }
+    if(bestX!=null){ bx=bestX; snapped=true; snapKind=snapKind||'alignX'; window._alignX=bestX; } else window._alignX=null;
+    if(bestY!=null){ by=bestY; snapped=true; snapKind=snapKind||'alignY'; window._alignY=bestY; } else window._alignY=null;
+  } else { window._alignX=null; window._alignY=null; }
+  // GRILLE tous les N mm (repli seulement si rien n'est déjà accroché).
+  if(gridSnapMM>0 && !snapped){
     const g=gridSnapMM;
-    bx=org.x+Math.round(((snapped?bx:xm)-org.x)/g)*g;
-    by=org.y+Math.round(((snapped?by:ym)-org.y)/g)*g;
-    snapped=true; snapKind=snapKind||'grid';
+    bx=org.x+Math.round((xm-org.x)/g)*g;
+    by=org.y+Math.round((ym-org.y)/g)*g;
+    snapped=true; snapKind='grid';
   }
   // Accroche sur les SEGMENTS : UNIQUEMENT si aucun point discret (coin / milieu / centre /
   // intersection) n'est deja accroche. Ainsi coins ET milieux gardent la priorite, et le
