@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EB ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EC ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -15164,6 +15164,24 @@ function snapPointsOf(o){
   if(o.type==='line'){ const mx=(o.x1+o.x2)/2,my=(o.y1+o.y2)/2; return [[o.x1,o.y1],[o.x2,o.y2],[mx,my]]; }
   if(o._arc && o._arc.p1 && o._arc.p2){ const P=[[o._arc.p1[0],o._arc.p1[1]],[o._arc.p2[0],o._arc.p2[1]]]; if(o.pts&&o.pts.length>1){ for(let i=0;i<o.pts.length-1;i++)P.push([(o.pts[i][0]+o.pts[i+1][0])/2,(o.pts[i][1]+o.pts[i+1][1])/2]); } return P; }
   if(o.type==='free'&&o.pts&&o.pts.length>=2){ const pts=o.pts.map(p=>[p[0],p[1]]); for(let i=0;i<o.pts.length-1;i++){ pts.push([(o.pts[i][0]+o.pts[i+1][0])/2,(o.pts[i][1]+o.pts[i+1][1])/2]); } return pts; }
+  // Formes a contour reel (triangle, etoile, engrenage, polygone) : vrais sommets
+  // + milieux d'aretes + centre, PAS la boite englobante (sinon la forme se cale
+  // par sa boite et "saute", ex. le triangle).
+  const POLYT=['tri','star','gear','polygon'];
+  if((POLYT.includes(o.type)||o._poly) && !o._circle){
+    try{
+      const st=objToStrokesRaw(o);
+      if(st && st[0] && st[0].length>=3){
+        let ring=st[0].map(p=>[p[0],p[1]]);
+        // enleve le point de fermeture duplique si present
+        if(ring.length>1 && Math.hypot(ring[0][0]-ring[ring.length-1][0], ring[0][1]-ring[ring.length-1][1])<1e-6) ring.pop();
+        const pts=ring.map(p=>[p[0],p[1]]);
+        if(ring.length<=60){ for(let i=0;i<ring.length;i++){ const a=ring[i], b=ring[(i+1)%ring.length]; pts.push([(a[0]+b[0])/2,(a[1]+b[1])/2]); } }
+        const cc=getObjCenter(o); pts.push([cc.x,cc.y]);
+        return pts;
+      }
+    }catch(e){}
+  }
   const bb=getObjBB(o);
   const c=getObjCenter(o);
   return[[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h],[c.x,c.y],[bb.x+bb.w/2,bb.y],[bb.x+bb.w/2,bb.y+bb.h],[bb.x,bb.y+bb.h/2],[bb.x+bb.w,bb.y+bb.h/2]];
