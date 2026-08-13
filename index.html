@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EF ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EG ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -15219,7 +15219,8 @@ function snapPointsOf(o){
         if(ring.length>1 && Math.hypot(ring[0][0]-ring[ring.length-1][0], ring[0][1]-ring[ring.length-1][1])<1e-6) ring.pop();
         const pts=ring.map(p=>[p[0],p[1]]);
         if(ring.length<=60){ for(let i=0;i<ring.length;i++){ const a=ring[i], b=ring[(i+1)%ring.length]; pts.push([(a[0]+b[0])/2,(a[1]+b[1])/2]); } }
-        const cc=getObjCenter(o); pts.push([cc.x,cc.y]);
+        // vrai CENTRE de la forme (centroide des sommets), pas le centre de la boite
+        let _sx=0,_sy=0; for(const p of ring){ _sx+=p[0]; _sy+=p[1]; } pts.push([_sx/ring.length, _sy/ring.length]);
         return pts;
       }
     }catch(e){}
