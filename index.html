@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EC ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-ED ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -8231,7 +8231,6 @@ function snapPoint(xm,ym,excludeId){
     [W, 0],                    // coin haut-droit
     [0, H],                    // coin bas-gauche
     [W, H],                    // coin bas-droit
-    [W/2, H/2],                // centre feuille
     [org.x, 0],[org.x, H],     // alignements verticaux origine
     [0, org.y],[W, org.y],     // alignements horizontaux origine
   ];
@@ -8423,6 +8422,32 @@ function pmDragObject(xm,ym){
           for(const c of cands){ const nx=c[0]+dxMm; for(const tx of targX){ const adj=tx-nx; if(Math.abs(adj)<AX&&(bestDX==null||Math.abs(adj)<Math.abs(bestDX)))bestDX=adj; } }
           for(const c of cands){ const ny=c[1]+dyMm; for(const ty of targY){ const adj=ty-ny; if(Math.abs(adj)<AX&&(bestDY==null||Math.abs(adj)<Math.abs(bestDY)))bestDY=adj; } }
           if(bestDX!=null)dxMm+=bestDX; if(bestDY!=null)dyMm+=bestDY;
+        }
+        // SNAP AUSSI pendant le REDIMENSIONNEMENT par une poignee de coin/bord :
+        // on accroche le point de la poignee (= souvent un vrai sommet, ex. pointe
+        // du triangle) sur une cible. Permet de poser une pointe pile sur un
+        // coin/bord d'une autre forme, facon Fusion.
+        if(snapEnabled && dragObj && dragObj.type!=='dim' && dragObj.type!=='line' &&
+           ['tl','tr','bl','br','t','b','l','r'].includes(dragMode)){
+          const rb=dragOrigBB;
+          if(rb && rb.x!=null){
+            let hx,hy;
+            if(dragMode==='tl'){hx=rb.x;hy=rb.y;}
+            else if(dragMode==='tr'){hx=rb.x+rb.w;hy=rb.y;}
+            else if(dragMode==='bl'){hx=rb.x;hy=rb.y+rb.h;}
+            else if(dragMode==='br'){hx=rb.x+rb.w;hy=rb.y+rb.h;}
+            else if(dragMode==='t'){hx=rb.x+rb.w/2;hy=rb.y;}
+            else if(dragMode==='b'){hx=rb.x+rb.w/2;hy=rb.y+rb.h;}
+            else if(dragMode==='l'){hx=rb.x;hy=rb.y+rb.h/2;}
+            else{hx=rb.x+rb.w;hy=rb.y+rb.h/2;}
+            const snp=snapPoint(hx+dxMm, hy+dyMm, dragObj.id);
+            if(snp.snapped){
+              if(dragMode==='t'||dragMode==='b'){ dyMm=snp.y-hy; }
+              else if(dragMode==='l'||dragMode==='r'){ dxMm=snp.x-hx; }
+              else { dxMm=snp.x-hx; dyMm=snp.y-hy; }
+              lastSnapResult={x:snp.x,y:snp.y,snapped:true};
+            }
+          }
         }
         applyHandleDrag(dragObj,dragMode,dragOrigBB,dxMm,dyMm);
         if(typeof solveSketch==='function' && dragObj && dragObj.type!=='dim' && dragObj.type!=='constraint') solveSketch(dragObj.id);
