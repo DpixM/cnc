@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DZ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-EA ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -8279,10 +8279,10 @@ function snapPoint(xm,ym,excludeId){
   // Uniquement si rien de plus precis (point, intersection, BORD) n'est deja accroche.
   window._alignX=null; window._alignY=null;
   if(!snapped){
-    const AX=SNAP_MM*2.2;
+    const AX=SNAP_MM*1.25;
     if(Math.abs(xm-org.x)<AX){ bx=org.x; snapped=true; snapKind='axisX'; window._alignX=org.x; }
     if(Math.abs(ym-org.y)<AX){ by=org.y; snapped=true; if(snapKind!=='axisX')snapKind='axisY'; window._alignY=org.y; }
-    const AL=SNAP_MM*0.85; let bestX=(snapKind==='axisX')?bx:null,bxd=AL, bestY=(snapKind==='axisY')?by:null,byd=AL;
+    const AL=SNAP_MM*0.5; let bestX=(snapKind==='axisX')?bx:null,bxd=AL, bestY=(snapKind==='axisY')?by:null,byd=AL;
     if(paintObjects.length<=250){ for(const o of paintObjects){ if(o.id===excludeId||o.type==='dim')continue; let pts; try{pts=snapPointsOf(o);}catch(e){continue;} for(const p of pts){ const dx=Math.abs(xm-p[0]); if(dx<bxd){bxd=dx;bestX=p[0];} const dy=Math.abs(ym-p[1]); if(dy<byd){byd=dy;bestY=p[1];} } } }
     if(bestX!=null){ bx=bestX; snapped=true; if(snapKind!=='axisX')snapKind=snapKind||'alignX'; window._alignX=bestX; }
     if(bestY!=null){ by=bestY; snapped=true; if(snapKind!=='axisY')snapKind=snapKind||'alignY'; window._alignY=bestY; }
