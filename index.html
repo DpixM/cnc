@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DY ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-07-31-DZ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -8253,28 +8253,7 @@ function snapPoint(xm,ym,excludeId){
   // Accroche sur les INTERSECTIONS de segments (croisements) — point discret prioritaire.
   { const _S=_allSegs(excludeId);
     if(_S.length<=160){ for(let i=0;i<_S.length;i++){ for(let j=i+1;j<_S.length;j++){ const ip=_segInt(_S[i],_S[j]); if(ip){ const d=Math.hypot(xm-ip[0],ym-ip[1]); if(d<bd){bd=d;bx=ip[0];by=ip[1];snapped=true;snapKind='point';} } } } } }
-  window._alignX=null; window._alignY=null;
-  // AXES de l'origine : toujours actifs (zone large), un point precis reste prioritaire.
-  if(snapKind!=='point'){
-    const AX=SNAP_MM*2.2;
-    if(Math.abs(xm-org.x)<AX){ bx=org.x; snapped=true; snapKind=snapKind||'axisX'; window._alignX=org.x; }
-    if(Math.abs(ym-org.y)<AX){ by=org.y; snapped=true; snapKind=snapKind||'axisY'; window._alignY=org.y; }
-  }
-  // ALIGNEMENT sur les POINTS (inference facon SketchUp) : SEULEMENT si l'utilisateur l'active (bouton ⇉ Aligne).
-  if(snapKind!=='point'){
-    const AL=SNAP_MM*0.85; // zone TRES serree : n'accroche que si on est vraiment sur la ligne d'alignement
-    let bestX=(snapKind==='axisX')?bx:null, bxd=AL, bestY=(snapKind==='axisY')?by:null, byd=AL;
-    if(paintObjects.length<=250){ for(const o of paintObjects){ if(o.id===excludeId||o.type==='dim')continue; let pts; try{pts=snapPointsOf(o);}catch(e){continue;} for(const p of pts){ const dx=Math.abs(xm-p[0]); if(dx<bxd){bxd=dx;bestX=p[0];} const dy=Math.abs(ym-p[1]); if(dy<byd){byd=dy;bestY=p[1];} } } }
-    if(bestX!=null){ bx=bestX; snapped=true; snapKind=(snapKind==='axisX')?snapKind:(snapKind||'alignX'); window._alignX=bestX; }
-    if(bestY!=null){ by=bestY; snapped=true; snapKind=(snapKind==='axisY')?snapKind:(snapKind||'alignY'); window._alignY=bestY; }
-  }
-  // GRILLE tous les N mm (repli seulement si rien n'est déjà accroché).
-  if(gridSnapMM>0 && !snapped){
-    const g=gridSnapMM;
-    bx=org.x+Math.round((xm-org.x)/g)*g;
-    by=org.y+Math.round((ym-org.y)/g)*g;
-    snapped=true; snapKind='grid';
-  }
+
   // Accroche sur les SEGMENTS : UNIQUEMENT si aucun point discret (coin / milieu / centre /
   // intersection) n'est deja accroche. Ainsi coins ET milieux gardent la priorite, et le
   // trait ne sert que de repli quand on est loin de tout point remarquable.
@@ -8295,6 +8274,19 @@ function snapPoint(xm,ym,excludeId){
         }
       }
     }
+  }
+  // ── Repli d'ALIGNEMENT (axes origine + inference sur points + grille) ──
+  // Uniquement si rien de plus precis (point, intersection, BORD) n'est deja accroche.
+  window._alignX=null; window._alignY=null;
+  if(!snapped){
+    const AX=SNAP_MM*2.2;
+    if(Math.abs(xm-org.x)<AX){ bx=org.x; snapped=true; snapKind='axisX'; window._alignX=org.x; }
+    if(Math.abs(ym-org.y)<AX){ by=org.y; snapped=true; if(snapKind!=='axisX')snapKind='axisY'; window._alignY=org.y; }
+    const AL=SNAP_MM*0.85; let bestX=(snapKind==='axisX')?bx:null,bxd=AL, bestY=(snapKind==='axisY')?by:null,byd=AL;
+    if(paintObjects.length<=250){ for(const o of paintObjects){ if(o.id===excludeId||o.type==='dim')continue; let pts; try{pts=snapPointsOf(o);}catch(e){continue;} for(const p of pts){ const dx=Math.abs(xm-p[0]); if(dx<bxd){bxd=dx;bestX=p[0];} const dy=Math.abs(ym-p[1]); if(dy<byd){byd=dy;bestY=p[1];} } } }
+    if(bestX!=null){ bx=bestX; snapped=true; if(snapKind!=='axisX')snapKind=snapKind||'alignX'; window._alignX=bestX; }
+    if(bestY!=null){ by=bestY; snapped=true; if(snapKind!=='axisY')snapKind=snapKind||'alignY'; window._alignY=bestY; }
+    if(gridSnapMM>0 && !snapped){ const g=gridSnapMM; bx=org.x+Math.round((xm-org.x)/g)*g; by=org.y+Math.round((ym-org.y)/g)*g; snapped=true; snapKind='grid'; }
   }
   return{x:bx,y:by,snapped,kind:snapKind};
 }
