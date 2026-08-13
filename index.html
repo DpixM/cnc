@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EE ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EF ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -8407,14 +8407,13 @@ function pmDragObject(xm,ym){
     // dxMm/dyMm = displacement in mm from the original click position
         let dxMm=xm-dragStartMm.x, dyMm=ym-dragStartMm.y;
         // Snap: snap the cursor during move
+        let _strongSnap=false;
         if(snapEnabled&&(dragMode==='mv'||(typeof dragMode==='string'&&dragMode.charAt(0)==='v'))&&dragObj&&dragObj.type!=='dim'){
           const bb=dragOrigBB;
           // On accroche N'IMPORTE lequel des points d'ancrage de l'objet (coins,
           // centre, milieux) sur une cible -> permet de coller coin a coin.
           let cands;
-          const _vi=(typeof dragMode==='string'&&dragMode.charAt(0)==='v')?parseInt(dragMode.slice(1),10):-1;
-          if(_vi>=0 && bb._pts && bb._pts[_vi]){ cands=[bb._pts[_vi]]; } // pointe attrapee -> c'est ELLE qui snap
-          else if(bb._pts && bb._pts.length){ cands=bb._pts; } // sommets reels (coins de polygone, extremites, milieux...)
+          if(bb._pts && bb._pts.length){ cands=bb._pts; } // sommets reels + MILIEUX d'aretes + centre
           else if(bb.x1!=null){ cands=[[bb.x1,bb.y1],[bb.x2,bb.y2],[(bb.x1+bb.x2)/2,(bb.y1+bb.y2)/2]]; }
           else { cands=[[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h],[bb.x+bb.w/2,bb.y+bb.h/2],[bb.x+bb.w/2,bb.y],[bb.x+bb.w/2,bb.y+bb.h],[bb.x,bb.y+bb.h/2],[bb.x+bb.w,bb.y+bb.h/2]]; }
           let bestPt=null, bestSeg=null, bestWeak=null;
@@ -8426,12 +8425,12 @@ function pmDragObject(xm,ym){
               else { if(!bestWeak||d<bestWeak.d) bestWeak=rec; } } // axes/alignement/grille = faible
           }
           const bestS = bestPt || bestSeg || bestWeak;   // vrai point > bord > alignement (evite que l'alignement vole la priorite)
-          if(bestS){ dxMm=bestS.dx; dyMm=bestS.dy; lastSnapResult={x:bestS.sx,y:bestS.sy,snapped:true}; }
+          if(bestS){ dxMm=bestS.dx; dyMm=bestS.dy; lastSnapResult={x:bestS.sx,y:bestS.sy,snapped:true}; if(bestPt||bestSeg)_strongSnap=true; }
           else lastSnapResult={snapped:false};
         }
         // Snap INDÉPENDANT par axe : on peut coller X sur un axe/point ET Y sur un autre EN MÊME TEMPS
         // (aligner une forme sur l'axe X et l'axe Y à la fois, même sans coin franc / avec chanfrein).
-        if(snapEnabled && (dragMode==='mv'||(typeof dragMode==='string'&&dragMode.charAt(0)==='v')) && dragObj && dragObj.type!=='dim'){
+        if(snapEnabled && !_strongSnap && (dragMode==='mv'||(typeof dragMode==='string'&&dragMode.charAt(0)==='v')) && dragObj && dragObj.type!=='dim'){
           const bb=dragOrigBB; const AX=(SNAP_DIST*2.0)/(BASE_PX*vZoom);
           let cands; if(bb._pts&&bb._pts.length)cands=bb._pts; else if(bb.x1!=null)cands=[[bb.x1,bb.y1],[bb.x2,bb.y2]]; else cands=[[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h],[bb.x+bb.w/2,bb.y+bb.h/2]];
           // cibles = les AXES de l'origine (x=org.x et y=org.y)
