@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-ED ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EE ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -5780,6 +5780,22 @@ function getHandlesPx(o){
     const _bb=getObjBB(o); const _cc=mmToPx(_bb.x+_bb.w/2,_bb.y+_bb.h/2); H.push({id:'mv',x:_cc[0],y:_cc[1]});
     return H;
   }
+  // Triangle / etoile / engrenage / polygone : poignees SUR LES VRAIES POINTES
+  // (et non sur la boite). Attraper une pointe deplace TOUTE la forme en
+  // accrochant cette pointe -> on pose une pointe pile sur une cible (Fusion).
+  if(['tri','star','gear','polygon'].includes(o.type) && !o._circle){
+    try{
+      const st=objToStrokesRaw(o);
+      if(st && st[0] && st[0].length>=3){
+        let ring=st[0].map(p=>[p[0],p[1]]);
+        if(ring.length>1 && Math.hypot(ring[0][0]-ring[ring.length-1][0],ring[0][1]-ring[ring.length-1][1])<1e-6) ring.pop();
+        const H=[]; const seen=new Set();
+        for(let i=0;i<ring.length && i<60;i++){ const k=(+ring[i][0]).toFixed(2)+','+(+ring[i][1]).toFixed(2); if(seen.has(k))continue; seen.add(k); const q=mmToPx(ring[i][0],ring[i][1]); H.push({id:'v'+i,x:q[0],y:q[1]}); }
+        const _b=getObjBB(o); const _c=mmToPx(_b.x+_b.w/2,_b.y+_b.h/2); H.push({id:'mv',x:_c[0],y:_c[1]});
+        return H;
+      }
+    }catch(e){}
+  }
   // Formes fermees : poignees de COIN + BORD pour redimensionner a la volee, + centre pour deplacer.
   const bb=getObjBB(o); const cc=mmToPx(bb.x+bb.w/2,bb.y+bb.h/2);
   const RESIZE=['rect','oblong','tri','star','ellipse','gear','svg','text','polygon'].includes(o.type)||o._poly;
@@ -8391,12 +8407,14 @@ function pmDragObject(xm,ym){
     // dxMm/dyMm = displacement in mm from the original click position
         let dxMm=xm-dragStartMm.x, dyMm=ym-dragStartMm.y;
         // Snap: snap the cursor during move
-        if(snapEnabled&&dragMode==='mv'&&dragObj&&dragObj.type!=='dim'){
+        if(snapEnabled&&(dragMode==='mv'||(typeof dragMode==='string'&&dragMode.charAt(0)==='v'))&&dragObj&&dragObj.type!=='dim'){
           const bb=dragOrigBB;
           // On accroche N'IMPORTE lequel des points d'ancrage de l'objet (coins,
           // centre, milieux) sur une cible -> permet de coller coin a coin.
           let cands;
-          if(bb._pts && bb._pts.length){ cands=bb._pts; } // sommets reels (coins de polygone, extremites, milieux...)
+          const _vi=(typeof dragMode==='string'&&dragMode.charAt(0)==='v')?parseInt(dragMode.slice(1),10):-1;
+          if(_vi>=0 && bb._pts && bb._pts[_vi]){ cands=[bb._pts[_vi]]; } // pointe attrapee -> c'est ELLE qui snap
+          else if(bb._pts && bb._pts.length){ cands=bb._pts; } // sommets reels (coins de polygone, extremites, milieux...)
           else if(bb.x1!=null){ cands=[[bb.x1,bb.y1],[bb.x2,bb.y2],[(bb.x1+bb.x2)/2,(bb.y1+bb.y2)/2]]; }
           else { cands=[[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h],[bb.x+bb.w/2,bb.y+bb.h/2],[bb.x+bb.w/2,bb.y],[bb.x+bb.w/2,bb.y+bb.h],[bb.x,bb.y+bb.h/2],[bb.x+bb.w,bb.y+bb.h/2]]; }
           let bestPt=null, bestSeg=null, bestWeak=null;
@@ -8413,7 +8431,7 @@ function pmDragObject(xm,ym){
         }
         // Snap INDÉPENDANT par axe : on peut coller X sur un axe/point ET Y sur un autre EN MÊME TEMPS
         // (aligner une forme sur l'axe X et l'axe Y à la fois, même sans coin franc / avec chanfrein).
-        if(snapEnabled && dragMode==='mv' && dragObj && dragObj.type!=='dim'){
+        if(snapEnabled && (dragMode==='mv'||(typeof dragMode==='string'&&dragMode.charAt(0)==='v')) && dragObj && dragObj.type!=='dim'){
           const bb=dragOrigBB; const AX=(SNAP_DIST*2.0)/(BASE_PX*vZoom);
           let cands; if(bb._pts&&bb._pts.length)cands=bb._pts; else if(bb.x1!=null)cands=[[bb.x1,bb.y1],[bb.x2,bb.y2]]; else cands=[[bb.x,bb.y],[bb.x+bb.w,bb.y],[bb.x,bb.y+bb.h],[bb.x+bb.w,bb.y+bb.h],[bb.x+bb.w/2,bb.y+bb.h/2]];
           // cibles = les AXES de l'origine (x=org.x et y=org.y)
@@ -15242,7 +15260,7 @@ function applyHandleDrag(o,mode,orig,dxMm,dyMm){
   }
   // For boxes: rebuild BB from original BB + delta
   let{x,y,w,h}=orig;
-  if(mode==='mv'){
+  if(mode==='mv' || (typeof mode==='string' && mode.charAt(0)==='v')){
     x+=dxMm; y+=dyMm;
   } else {
     // Left edge moves → x shifts, w shrinks
