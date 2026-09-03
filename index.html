@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EV ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EW ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3328,10 +3328,18 @@ function buildLaserBody(){
         const mL=[(base[bkL][0]+base[(bkL+1)%nB][0])/2,(base[bkL][1]+base[(bkL+1)%nB][1])/2];
         let startPt=mL, startAfter=(bkL+1)%nB;
         const P0=(c._pole&&c._pole.pt)?c._pole.pt:null;
-        if(wasteInside && P0 && c._pole.d>Math.max(LEAD,1) && !clean(P0,mL)){
+        // Chute a l'interieur + coeur connu : demarrer PRES du coeur (arc juste a cote
+        // du percage) SI l'approche est convexe/degagee. Sinon (creux d'etoile) on garde
+        // le milieu de la plus longue arete (l'arc y est propre).
+        if(wasteInside && P0 && c._pole.d>Math.max(LEAD,1)){
           let bd=1e18,bk2=0,foot=null;
           for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((P0[0]-a[0])*dx+(P0[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy; const d=Math.hypot(P0[0]-fx,P0[1]-fy); if(d<bd){bd=d;bk2=k;foot=[fx,fy];} }
-          if(foot && clean(P0,foot)){ startPt=foot; startAfter=(bk2+1)%nB; }
+          if(foot && clean(P0,foot)){
+            const a=base[bk2],b=base[(bk2+1)%nB]; let E=[b[0]-a[0],b[1]-a[1]]; const el=Math.hypot(E[0],E[1])||1; E=[E[0]/el,E[1]/el];
+            let Ninw=[-E[1],E[0]]; if(_pointInPoly([foot[0]+Ninw[0]*0.05,foot[1]+Ninw[1]*0.05],pl)!==wasteInside)Ninw=[-Ninw[0],-Ninw[1]];
+            const vx=P0[0]-foot[0],vy=P0[1]-foot[1],vl=Math.hypot(vx,vy)||1;
+            if((vx*Ninw[0]+vy*Ninw[1])/vl > 0.5){ startPt=foot; startAfter=(bk2+1)%nB; } // approche convexe -> depart pres du coeur
+          }
         }
         const rot=[startPt]; for(let k=0;k<nB;k++) rot.push(base[(startAfter+k)%nB]); rot.push([startPt[0],startPt[1]]);
         c.poly=rot; c.start=[startPt[0],startPt[1]]; c.moves=rot.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1]));
@@ -3393,13 +3401,13 @@ function buildLaserBody(){
           head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute (loin du bord garde)\n'
               +'G1 Z0   ;redescendre sur la tole avant de percer\n'
               +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-              +'G1 X'+_lc(arc.A[0])+' Y'+_lc(arc.A[1])+'   ;chemin vers le depart de l\'arc\n'
-              +arc.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(arc.O[0]-arc.A[0])+' J'+_lc(arc.O[1]-arc.A[1])+'   ;entree en arc, tangente au contour\n';
+              +'G1 X'+_lc(arc.A[0])+' Y'+_lc(arc.A[1])+'   ;LEAD chemin vers le depart de l\'arc\n'
+              +arc.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(arc.O[0]-arc.A[0])+' J'+_lc(arc.O[1]-arc.A[1])+'   ;LEAD entree en arc, tangente au contour\n';
         } else {
           head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute (loin du bord garde)\n'
               +'G1 Z0   ;redescendre sur la tole avant de percer\n'
               +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-              +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;amorce droite -> rejoint le contour (pas la place pour un arc)\n';
+              +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;LEAD amorce droite -> rejoint le contour (pas la place pour un arc)\n';
         }
       }
     }
@@ -16124,6 +16132,7 @@ function parseGcode(gc){
     const isG2=line.startsWith('G2 ')||line==='G2';
     const isG3=line.startsWith('G3 ')||line==='G3';
     if(!isG0&&!isG1&&!isG2&&!isG3) continue;
+    const isLead=line.indexOf('LEAD')>=0;
     let nx=x,ny=y,nz=z;
     const mx=line.match(/X([\-\d.]+)/); if(mx) nx=abs?parseFloat(mx[1]):x+parseFloat(mx[1]);
     const my=line.match(/Y([\-\d.]+)/); if(my) ny=abs?parseFloat(my[1]):y+parseFloat(my[1]);
@@ -16146,6 +16155,7 @@ function parseGcode(gc){
                     y0:i===1?y:cy+r*Math.sin(isG3?(a0+da*(i-1)/N):(a0-da*(i-1)/N)),
                     z0:nz,x1:px,y1:py,z1:nz,rapid:false,line:lineIdx,laser:laserOn};
         if(i===1&&laserOn&&pierceNext){ _mv.pierce=true; pierceNext=false; }
+        if(isLead)_mv.lead=true;
         moves.push(_mv);
       }
       x=nx;y=ny;z=nz; continue;
@@ -16153,6 +16163,7 @@ function parseGcode(gc){
     if(nx!==x||ny!==y||nz!==z){
       const _mv={x0:x,y0:y,z0:z,x1:nx,y1:ny,z1:nz,rapid:isG0,line:lineIdx,laser:laserOn};
       if(laserOn&&pierceNext){ _mv.pierce=true; pierceNext=false; }
+      if(isLead)_mv.lead=true;
       moves.push(_mv);
       x=nx;y=ny;z=nz;
     }
@@ -16945,10 +16956,11 @@ function _s3dInit(moves) {
 
   // ── Lignes G-code : UN seul buffer ordonné par mouvement (révélation progressive) ──
   const _positions=[], _colors=[], _segTypes=[];
-  const _CT={rapid:[0.23,0.51,1.0], cut:[0.13,0.77,0.37], plunge:[0.94,0.27,0.27]};
+  const _CT={rapid:[0.23,0.51,1.0], cut:[0.13,0.77,0.37], plunge:[0.94,0.27,0.27], lead:[1.0,0.62,0.0]};
   for (const m of moves) {
     let type;
-    if (m.laser===true)  type = m.pierce ? 'plunge' : 'cut';   // laser : coupe=vert, perçage=rouge
+    if (m.lead) type = 'lead';                                 // amorce (ligne + arc) = orange
+    else if (m.laser===true)  type = m.pierce ? 'plunge' : 'cut';   // laser : coupe=vert, perçage=rouge
     else if (m.laser===false) type = 'rapid';                  // laser OFF = déplacement (bleu)
     else type = (m.z1 >= -0.001 && m.z0 >= -0.001) ? 'rapid'   // usinage : par le Z (comme avant)
                : (m.z0 >= -0.001) ? 'plunge' : 'cut';
@@ -17000,7 +17012,7 @@ function _s3dInit(moves) {
     radius: initRadius, tRadius: initRadius,
     initRadius,
     lines: lineObjs,
-    vis: {rapid:true,cut:true,plunge:true},
+    vis: {rapid:true,cut:true,plunge:true,lead:true},
     moves, combGeo, mark, segTypes:_segTypes, basePos:new Float32Array(_positions),
     idx: moves.length, playing:false,
     speed:(parseInt(document.getElementById('s3dSpeed')&&document.getElementById('s3dSpeed').value)||4),
@@ -17010,7 +17022,7 @@ function _s3dInit(moves) {
   };
 
   // Boutons de filtre par type VISIBLES (l'utilisateur veut cocher/decocher chaque type)
-  ['rapid','cut','plunge'].forEach(t => { const b = document.getElementById('s3d_btn_'+t); if (b) b.style.display=''; });
+  ['rapid','cut','plunge','lead'].forEach(t => { const b = document.getElementById('s3d_btn_'+t); if (b) b.style.display=''; });
   const layerBtnsDiv2 = document.getElementById('s3d_layer_btns');
   if (layerBtnsDiv2) { layerBtnsDiv2.style.display = 'none'; layerBtnsDiv2.innerHTML = ''; }
 
@@ -17293,7 +17305,8 @@ function _s3dStartRender() {
       <button class="btn btn-dim" style="padding:4px 10px;font-size:10px" id="s3d_btn_wood" onclick="s3dToggleWood()">🪵 Bois</button>
       <button class="btn btn-dim" style="padding:4px 10px;font-size:10px" id="s3d_btn_rapid" onclick="s3dToggle('rapid')">🔵 Rapides</button>
       <button class="btn btn-dim" style="padding:4px 10px;font-size:10px" id="s3d_btn_cut" onclick="s3dToggle('cut')">🟢 Usinage</button>
-      <button class="btn btn-dim" style="padding:4px 10px;font-size:10px" id="s3d_btn_plunge" onclick="s3dToggle('plunge')">🔴 Plongées</button>
+      <button class="btn btn-dim" style="padding:4px 10px;font-size:10px" id="s3d_btn_plunge" onclick="s3dToggle('plunge')">🔴 Perçages</button>
+      <button class="btn btn-dim" style="padding:4px 10px;font-size:10px" id="s3d_btn_lead" onclick="s3dToggle('lead')">🟠 Amorces</button>
       <div id="s3d_layer_btns" style="display:none;gap:4px;flex-wrap:wrap"></div>
       <div style="flex:1"></div>
       <button class="btn btn-dim" style="padding:4px 10px;font-size:10px" onclick="s3dResetView()">⌂ Reset</button>
