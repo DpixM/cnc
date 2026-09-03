@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EK ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EL ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -16646,6 +16646,14 @@ function _s3dInitInlay(layers) {
   const gMat = new THREE.MeshBasicMaterial({color:0x1e2228,wireframe:true,transparent:true,opacity:0.4});
   pivot.add(new THREE.Mesh(gGeo, gMat)).position.set(cx, cy, 0.01);
 
+  // Plan bois (MASQUÉ par défaut — bouton BOIS pour l'afficher)
+  const woodGeo = new THREE.BoxGeometry(x1-x0+2, y1-y0+2, 0.4);
+  const woodMat = new THREE.MeshLambertMaterial({color:0xb8926a, transparent:true, opacity:0.15});
+  const woodMesh = new THREE.Mesh(woodGeo, woodMat);
+  woodMesh.position.set(cx, cy, 0.2);
+  woodMesh.visible=false;
+  pivot.add(woodMesh);
+
   // Lumières
   scene.add(new THREE.AmbientLight(0xffffff, 0.55));
   const dl = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -16770,6 +16778,14 @@ function _s3dInit(moves) {
   const gMesh = new THREE.Mesh(gGeo, gMat);
   gMesh.position.set(cx, cy, 0.01);
   pivot.add(gMesh);
+
+  // ── Plan bois (MASQUÉ par défaut) ──
+  const woodGeo = new THREE.BoxGeometry(x1-x0+2, y1-y0+2, 0.4);
+  const woodMat = new THREE.MeshLambertMaterial({color:0xb8926a, transparent:true, opacity:0.15});
+  const woodMesh= new THREE.Mesh(woodGeo, woodMat);
+  woodMesh.position.set(cx, cy, 0.2);
+  woodMesh.visible=false;
+  pivot.add(woodMesh);
 
   // ── Lumières ──
   scene.add(new THREE.AmbientLight(0xffffff, 0.55));
