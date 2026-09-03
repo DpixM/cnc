@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EW ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EX ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3328,18 +3328,13 @@ function buildLaserBody(){
         const mL=[(base[bkL][0]+base[(bkL+1)%nB][0])/2,(base[bkL][1]+base[(bkL+1)%nB][1])/2];
         let startPt=mL, startAfter=(bkL+1)%nB;
         const P0=(c._pole&&c._pole.pt)?c._pole.pt:null;
-        // Chute a l'interieur + coeur connu : demarrer PRES du coeur (arc juste a cote
-        // du percage) SI l'approche est convexe/degagee. Sinon (creux d'etoile) on garde
-        // le milieu de la plus longue arete (l'arc y est propre).
+        // Chute a l'interieur + coeur connu : TOUJOURS demarrer au point du contour le
+        // plus PROCHE du coeur. Le trajet coeur->depart est un rayon du cercle inscrit,
+        // donc court et garanti dans la chute. -> percage pile au coeur, amorce courte.
         if(wasteInside && P0 && c._pole.d>Math.max(LEAD,1)){
           let bd=1e18,bk2=0,foot=null;
           for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((P0[0]-a[0])*dx+(P0[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy; const d=Math.hypot(P0[0]-fx,P0[1]-fy); if(d<bd){bd=d;bk2=k;foot=[fx,fy];} }
-          if(foot && clean(P0,foot)){
-            const a=base[bk2],b=base[(bk2+1)%nB]; let E=[b[0]-a[0],b[1]-a[1]]; const el=Math.hypot(E[0],E[1])||1; E=[E[0]/el,E[1]/el];
-            let Ninw=[-E[1],E[0]]; if(_pointInPoly([foot[0]+Ninw[0]*0.05,foot[1]+Ninw[1]*0.05],pl)!==wasteInside)Ninw=[-Ninw[0],-Ninw[1]];
-            const vx=P0[0]-foot[0],vy=P0[1]-foot[1],vl=Math.hypot(vx,vy)||1;
-            if((vx*Ninw[0]+vy*Ninw[1])/vl > 0.5){ startPt=foot; startAfter=(bk2+1)%nB; } // approche convexe -> depart pres du coeur
-          }
+          if(foot && clean(P0,foot)){ startPt=foot; startAfter=(bk2+1)%nB; }
         }
         const rot=[startPt]; for(let k=0;k<nB;k++) rot.push(base[(startAfter+k)%nB]); rot.push([startPt[0],startPt[1]]);
         c.poly=rot; c.start=[startPt[0],startPt[1]]; c.moves=rot.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1]));
