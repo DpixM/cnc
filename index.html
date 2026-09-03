@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EO ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EP ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -16806,11 +16806,20 @@ function _s3dInitInlay(layers) {
 }
 
 function s3dToggle(type) {
-  if (!_s3d) return;
+  if (!_s3d || !_s3d.combGeo || !_s3d.basePos || !_s3d.segTypes) return;
   _s3d.vis[type] = !_s3d.vis[type];
   const btn = document.getElementById('s3d_btn_' + type);
   if (btn) btn.style.opacity = _s3d.vis[type] ? '1' : '0.3';
-  if (_s3d.lines[type]) _s3d.lines[type].visible = _s3d.vis[type];
+  const pos = _s3d.combGeo.attributes.position.array;
+  const base = _s3d.basePos, st = _s3d.segTypes;
+  for (let i=0;i<st.length;i++){ const o=i*6;
+    if (_s3d.vis[st[i]]) { for(let k=0;k<6;k++) pos[o+k]=base[o+k]; }
+    else { // segment invisible : les 2 extremites au meme point (longueur nulle)
+      pos[o]=base[o]; pos[o+1]=base[o+1]; pos[o+2]=base[o+2];
+      pos[o+3]=base[o]; pos[o+4]=base[o+1]; pos[o+5]=base[o+2];
+    }
+  }
+  _s3d.combGeo.attributes.position.needsUpdate = true;
 }
 
 function s3dToggleWood(){
@@ -16888,7 +16897,7 @@ function _s3dInit(moves) {
   scene.add(dl);
 
   // ── Lignes G-code : UN seul buffer ordonné par mouvement (révélation progressive) ──
-  const _positions=[], _colors=[];
+  const _positions=[], _colors=[], _segTypes=[];
   const _CT={rapid:[0.23,0.51,1.0], cut:[0.13,0.77,0.37], plunge:[0.94,0.27,0.27]};
   for (const m of moves) {
     let type;
@@ -16897,6 +16906,7 @@ function _s3dInit(moves) {
     else type = (m.z1 >= -0.001 && m.z0 >= -0.001) ? 'rapid'   // usinage : par le Z (comme avant)
                : (m.z0 >= -0.001) ? 'plunge' : 'cut';
     _positions.push(m.x0, m.y0, m.z0,  m.x1, m.y1, m.z1);
+    _segTypes.push(type);
     const c=_CT[type]; _colors.push(c[0],c[1],c[2], c[0],c[1],c[2]);
   }
   const combGeo = new THREE.BufferGeometry();
@@ -16944,7 +16954,7 @@ function _s3dInit(moves) {
     initRadius,
     lines: lineObjs,
     vis: {rapid:true,cut:true,plunge:true},
-    moves, combGeo, mark,
+    moves, combGeo, mark, segTypes:_segTypes, basePos:new Float32Array(_positions),
     idx: moves.length, playing:false,
     speed:(parseInt(document.getElementById('s3dSpeed')&&document.getElementById('s3dSpeed').value)||4),
     drag: false, lx:0, ly:0,
