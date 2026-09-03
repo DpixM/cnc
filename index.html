@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EI ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EJ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3125,6 +3125,32 @@ function _pointInPoly(pt, poly){
 }
 // Construit tous les contours, les TRIE (intérieurs d'abord, extérieur en dernier),
 // et lève la tete en Z apres chaque forme. Renvoie {text, count}.
+// Point STRICTEMENT a l'interieur d'un polygone, FIABLE meme concave (ours, sapin).
+// On balaie plusieurs lignes horizontales et on prend le milieu du plus long
+// segment interieur. (Le centre geometrique peut tomber HORS de la forme -> c'etait
+// la cause des percages du mauvais cote et de l'ordre de coupe faux.)
+function _polyInteriorPoint(poly){
+  if(!poly||poly.length<3)return null;
+  let minY=1e9,maxY=-1e9; for(const p of poly){ if(p[1]<minY)minY=p[1]; if(p[1]>maxY)maxY=p[1]; }
+  let best=null,bestLen=-1; const N=9;
+  for(let s=1;s<=N;s++){ const y=minY+(maxY-minY)*s/(N+1);
+    const xs=[]; const n=poly.length;
+    for(let i=0,j=n-1;i<n;j=i++){ const yi=poly[i][1],yj=poly[j][1]; if((yi>y)!==(yj>y)){ const x=(poly[j][0]-poly[i][0])*(y-poly[i][1])/((yj-yi)||1e-12)+poly[i][0]; xs.push(x); } }
+    xs.sort((a,b)=>a-b);
+    for(let k=0;k+1<xs.length;k+=2){ const len=xs[k+1]-xs[k]; if(len>bestLen){ bestLen=len; best=[(xs[k]+xs[k+1])/2, y]; } }
+  }
+  return best;
+}
+// Point interieur le PLUS LOIN de tous les bords = percage le plus sur (coeur de la chute).
+function _polyPoleInside(poly){
+  if(!poly||poly.length<3)return null;
+  let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+  for(const p of poly){ if(p[0]<minX)minX=p[0]; if(p[0]>maxX)maxX=p[0]; if(p[1]<minY)minY=p[1]; if(p[1]>maxY)maxY=p[1]; }
+  const distEdge=(px,py)=>{ let d=1e9; const n=poly.length; for(let i=0,j=n-1;i<n;j=i++){ const ax=poly[j][0],ay=poly[j][1],bx=poly[i][0],by=poly[i][1]; const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy||1e-9; let t=((px-ax)*dx+(py-ay)*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=ax+t*dx,fy=ay+t*dy; d=Math.min(d,Math.hypot(px-fx,py-fy)); } return d; };
+  let best=null,bestD=-1; const G=14;
+  for(let ix=1;ix<G;ix++)for(let iy=1;iy<G;iy++){ const px=minX+(maxX-minX)*ix/G, py=minY+(maxY-minY)*iy/G; if(!_pointInPoly([px,py],poly))continue; const d=distEdge(px,py); if(d>bestD){bestD=d;best=[px,py];} }
+  return best?{pt:best,d:bestD}:null;
+}
 function buildLaserBody(){
   const flat=_exportFlatObjs();
   const _zl=parseFloat(document.getElementById('laserZlift')?.value); const ZL=isNaN(_zl)?5:_zl;
@@ -3164,10 +3190,13 @@ function buildLaserBody(){
   // ORDRE DE COUPE : profondeur d'imbrication (un contour DANS un autre = coupe avant).
   const cent=c=>{ let sx=0,sy=0; for(const q of c.poly){sx+=q[0];sy+=q[1];} const n=c.poly.length||1; return [sx/n,sy/n]; };
   const _area=poly=>{ let s=0; const n=poly.length; for(let i=0,j=n-1;i<n;j=i++){ s+=(poly[j][0]+poly[i][0])*(poly[j][1]-poly[i][1]); } return Math.abs(s/2); };
-  contours.forEach(c=>{ c._c=cent(c); c._a=_area(c.poly); });
+  // _c = point FIABLE a l'interieur (meme concave) ; _pole = point de percage le plus sur.
+  contours.forEach(c=>{ c._c=_polyInteriorPoint(c.poly)||cent(c); c._a=_area(c.poly); c._pole=_polyPoleInside(c.poly); });
   // A est "dans" B seulement si B est plus GRAND (evite le piege des formes concentriques)
   contours.forEach((c,i)=>{ let d=0; contours.forEach((o,j)=>{ if(i!==j && o.poly.length>=3 && o._a>c._a+1e-6 && _pointInPoly(c._c,o.poly)) d++; }); c._depth=d; });
-  const order=contours.map((c,i)=>[c,i]).sort((a,b)=> (b[0]._depth-a[0]._depth) || (a[1]-b[1]) ).map(x=>x[0]); // profondeur decroissante = interieurs d'abord
+  // ORDRE : profondeur decroissante (trous/ajours d'abord), PUIS petite aire d'abord
+  // (petits bouts avant gros bouts -> la piece ne bouge pas sous la pression du gaz).
+  const order=contours.map((c,i)=>[c,i]).sort((a,b)=> (b[0]._depth-a[0]._depth) || (a[0]._a-b[0]._a) || (a[1]-b[1]) ).map(x=>x[0]);
   const blocks=order.map((c,bi)=>{
     // Demarrer la coupe au MILIEU de la plus longue arete (tangente franche + place pour l'arc d'entree).
     if(LEADIN && c.poly && c.poly.length>=5 && c.moves.length>=4){
@@ -3200,9 +3229,11 @@ function buildLaserBody(){
         // Point de PERCAGE : au centre de la chute (loin du bord garde) si possible.
         let P;
         if(wasteInside){
-          const cen=c._c, mid=[(S[0]+cen[0])/2,(S[1]+cen[1])/2];
-          if(_pointInPoly(cen,poly)&&_pointInPoly(mid,poly)) P=[cen[0],cen[1]];              // milieu du trou (forme convexe)
-          else { const m=Math.min(Math.max(LEAD,1),0.4*diam||LEAD); P=[S[0]+N[0]*m,S[1]+N[1]*m]; } // forme concave -> pres du bord mais dans la chute (sur)
+          // coeur de la chute (le plus loin des bords a garder), fiable meme concave
+          if(c._pole && c._pole.d>Math.max(LEAD*0.6,0.4) && _pointInPoly(c._pole.pt,poly)===wasteInside){ P=[c._pole.pt[0],c._pole.pt[1]]; }
+          else { const cen=c._c, mid=[(S[0]+cen[0])/2,(S[1]+cen[1])/2];
+            if(_pointInPoly(cen,poly)===wasteInside&&_pointInPoly(mid,poly)===wasteInside) P=[cen[0],cen[1]];
+            else { const m=Math.min(Math.max(LEAD,1),0.4*diam||LEAD); P=[S[0]+N[0]*m,S[1]+N[1]*m]; } }
         } else {
           const m=Math.max(LEAD,3); P=[S[0]+N[0]*m,S[1]+N[1]*m];                              // chute exterieure (tole autour)
         }
