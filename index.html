@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-ES ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-ET ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3297,37 +3297,23 @@ function buildLaserBody(){
   // AUCUN autre trait (ni le contour courant, ni un ilot a garder).
   const globalWaste=(pt)=>{ const _mc=_laserClassAt(pt[0],pt[1]); if(_mc===1)return true; if(_mc===2)return false; let cnt=0; for(const oc of contours){ const p=oc.poly; if(p&&p.length>=3&&_pointInPoly(pt,p))cnt++; } let mat=(cnt%2===1); if(INV)mat=!mat; return !mat; };
   const blocks=order.map((c,bi)=>{
-    // Cote CHUTE calculee AVANT le lead-in (pour choisir le bon point de depart).
-    let wasteInside=(c._depth%2===1); if(INV) wasteInside=!wasteInside;
-    { const _mc=_laserClassAt(c._c[0],c._c[1]); if(_mc===1)wasteInside=true; else if(_mc===2)wasteInside=false; } // peinture manuelle prioritaire
-
-    // DEPART de la coupe. Chute a l'interieur + coeur de poche connu -> on part du
-    // point du contour le PLUS PROCHE du coeur : le trajet percage(coeur)->depart est
-    // alors RADIAL, garanti dans la chute meme si la poche est courbe. Sinon -> milieu
-    // de la plus longue arete (tangente franche).
-    let leadFromPole=false;
+    // Demarrer la coupe au MILIEU de la plus longue arete (tangente franche + place pour l'arc).
     if(LEADIN && c.poly && c.poly.length>=5 && c.moves.length>=4){
       const pl=c.poly, cl=Math.hypot(pl[0][0]-pl[pl.length-1][0],pl[0][1]-pl[pl.length-1][1])<1e-6;
-      if(cl){ const base=pl.slice(0,pl.length-1), nB=base.length;
-        if(wasteInside && c._pole && c._pole.pt){
-          const P0=c._pole.pt; let bk=0,bd=1e18,foot=null;
-          for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((P0[0]-a[0])*dx+(P0[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy; const d=Math.hypot(P0[0]-fx,P0[1]-fy); if(d<bd){bd=d;bk=k;foot=[fx,fy];} }
-          const rot=[foot]; for(let k=1;k<=nB;k++) rot.push(base[(bk+k)%nB]); rot.push([foot[0],foot[1]]);
-          c.poly=rot; c.start=[foot[0],foot[1]]; c.moves=rot.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1]));
-          leadFromPole=true;
-        } else {
-          let best=-1,bk=0;
-          for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB],d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d>best){best=d;bk=k;} }
-          const a=base[bk],b=base[(bk+1)%nB],mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
-          const rot=base.slice(bk+1).concat(base.slice(0,bk+1));
-          const np2=[mid].concat(rot).concat([mid]);
-          c.poly=np2; c.start=[mid[0],mid[1]]; c.moves=np2.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1]));
-        }
+      if(cl){ const base=pl.slice(0,pl.length-1), nB=base.length; let best=-1,bk=0;
+        for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB],d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d>best){best=d;bk=k;} }
+        const a=base[bk],b=base[(bk+1)%nB],mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+        const rot=base.slice(bk+1).concat(base.slice(0,bk+1));
+        const np2=[mid].concat(rot).concat([mid]);
+        c.poly=np2; c.start=[mid[0],mid[1]];
+        c.moves=np2.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1]));
       }
     }
     const S=c.start;
     const diam=(c._a>0)?2*Math.sqrt(c._a/Math.PI):0;  // taille equivalente de la region
     const Fstr=(bi===0?(' F'+_lc(FEED)+'   ;vitesse d\'avance (reste active ensuite)'):'');
+    let wasteInside=(c._depth%2===1); if(INV) wasteInside=!wasteInside;
+    { const _mc=_laserClassAt(c._c[0],c._c[1]); if(_mc===1)wasteInside=true; else if(_mc===2)wasteInside=false; }
     const poly=c.poly, np=poly?poly.length:0;
     let head=null;
     if(LEADIN && diam>0.5 && np>=3 && c._c){
@@ -3339,25 +3325,30 @@ function buildLaserBody(){
         let N=[-T[1],T[0]];
         if(_pointInPoly([S[0]+N[0]*0.05,S[1]+N[1]*0.05],poly)!==wasteInside) N=[-N[0],-N[1]];
         // Point de PERCAGE : au centre de la chute (loin du bord garde) si possible.
+        // Test CHUTE LOCAL fiable (poche courante) + peinture manuelle prioritaire.
+        const locWaste=(pt)=>{ const cl=_laserClassAt(pt[0],pt[1]); if(cl===1)return true; if(cl===2)return false; return _pointInPoly(pt,poly)===wasteInside; };
         let P;
         if(wasteInside){
-          // Percage au COEUR de la poche (le plus loin des parois a garder) : le
-          // depart a ete place face au coeur, donc le trajet est radial et propre.
-          if(leadFromPole && c._pole && c._pole.pt && _pointInPoly(c._pole.pt, poly)===wasteInside){
-            P=[c._pole.pt[0], c._pole.pt[1]];
-          } else {
+          let usedCore=false;
+          // 1) COEUR de la poche (le plus loin des parois) si le trajet coeur->depart
+          //    reste dans la chute (ligne droite) -> percage bien degage (ex: etoile).
+          if(c._pole && c._pole.pt && c._pole.d>Math.max(LEAD,1)){
+            const Pp=[c._pole.pt[0],c._pole.pt[1]]; let ok=locWaste(Pp);
+            if(ok){ const K=14; for(let t=1;t<K;t++){ const q=[Pp[0]+(S[0]-Pp[0])*t/K, Pp[1]+(S[1]-Pp[1])*t/K]; if(!locWaste(q)){ ok=false; break; } } }
+            if(ok){ P=Pp; usedCore=true; }
+          }
+          // 2) sinon : s'ecarter du bord vers l'interieur (degagement modere >=4mm), sans traverser.
+          if(!usedCore){
             const avail=(c._pole && c._pole.d>0)?c._pole.d:(0.4*diam||LEAD);
             let clr=Math.min(Math.max(LEAD*3,4), Math.max(LEAD, avail*0.9));
             let Pc=[S[0]+N[0]*clr, S[1]+N[1]*clr]; let g=0;
-            while(clr>LEAD*0.6 && g++<10 && !(globalWaste(Pc) && globalWaste([S[0]+N[0]*clr*0.5,S[1]+N[1]*clr*0.5]))){ clr*=0.7; Pc=[S[0]+N[0]*clr,S[1]+N[1]*clr]; }
+            while(clr>LEAD*0.6 && g++<10 && !(locWaste(Pc)&&locWaste([S[0]+N[0]*clr*0.5,S[1]+N[1]*clr*0.5]))){ clr*=0.7; Pc=[S[0]+N[0]*clr,S[1]+N[1]*clr]; }
             P=Pc;
           }
         } else {
           const m=Math.max(LEAD,3); P=[S[0]+N[0]*m,S[1]+N[1]*m];                              // chute exterieure (tole autour)
         }
-        // ENTREE EN ARC (tangente au contour) : on prend le PLUS GRAND rayon qui TIENT dans la chute.
-        // Test geometrique reel (pas un seuil de taille) => l'arc se fait des que la forme le permet.
-        const onWaste=(pt)=> (_laserClassAt(pt[0],pt[1])===2?false:(_laserClassAt(pt[0],pt[1])===1?true:(_pointInPoly(pt,poly)===wasteInside)));
+        const onWaste=(pt)=> locWaste(pt);
         let arc=null;
         if(ARC){
           for(const r of [LEAD, LEAD*0.6, LEAD*0.35, LEAD*0.2]){
