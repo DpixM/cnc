@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EM ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EN ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3197,6 +3197,10 @@ function buildLaserBody(){
   // ORDRE : profondeur decroissante (trous/ajours d'abord), PUIS petite aire d'abord
   // (petits bouts avant gros bouts -> la piece ne bouge pas sous la pression du gaz).
   const order=contours.map((c,i)=>[c,i]).sort((a,b)=> (b[0]._depth-a[0]._depth) || (a[0]._a-b[0]._a) || (a[1]-b[1]) ).map(x=>x[0]);
+  // CHUTE globale : un point est "chute" s'il est a l'interieur d'un nombre PAIR
+  // de contours (regle pair-impair). Sert a verifier qu'une amorce ne traverse
+  // AUCUN autre trait (ni le contour courant, ni un ilot a garder).
+  const globalWaste=(pt)=>{ let cnt=0; for(const oc of contours){ const p=oc.poly; if(p&&p.length>=3&&_pointInPoly(pt,p))cnt++; } let mat=(cnt%2===1); if(INV)mat=!mat; return !mat; };
   const blocks=order.map((c,bi)=>{
     // Demarrer la coupe au MILIEU de la plus longue arete (tangente franche + place pour l'arc d'entree).
     if(LEADIN && c.poly && c.poly.length>=5 && c.moves.length>=4){
@@ -3229,17 +3233,20 @@ function buildLaserBody(){
         // Point de PERCAGE : au centre de la chute (loin du bord garde) si possible.
         let P;
         if(wasteInside){
-          // coeur de la chute (le plus loin des bords a garder), fiable meme concave
-          if(c._pole && c._pole.d>Math.max(LEAD*0.6,0.4) && _pointInPoly(c._pole.pt,poly)===wasteInside){ P=[c._pole.pt[0],c._pole.pt[1]]; }
-          else { const cen=c._c, mid=[(S[0]+cen[0])/2,(S[1]+cen[1])/2];
-            if(_pointInPoly(cen,poly)===wasteInside&&_pointInPoly(mid,poly)===wasteInside) P=[cen[0],cen[1]];
-            else { const m=Math.min(Math.max(LEAD,1),0.4*diam||LEAD); P=[S[0]+N[0]*m,S[1]+N[1]*m]; } }
+          // Candidat = CENTRE du morceau (coeur de la chute, le plus loin des bords).
+          let Pc=(c._pole && c._pole.d>Math.max(LEAD*0.6,0.4)) ? [c._pole.pt[0],c._pole.pt[1]] : [c._c[0],c._c[1]];
+          // Faisable UNIQUEMENT si le trajet percage->contour reste dans la chute
+          // (ne coupe aucun autre trait). Sinon -> amorce courte pres du bord.
+          let ok=globalWaste(Pc);
+          if(ok){ const K=12; for(let t=1;t<K;t++){ const q=[Pc[0]+(S[0]-Pc[0])*t/K, Pc[1]+(S[1]-Pc[1])*t/K]; if(!globalWaste(q)){ ok=false; break; } } }
+          if(ok){ P=Pc; }
+          else { const m=Math.min(Math.max(LEAD,1),0.4*diam||LEAD); P=[S[0]+N[0]*m,S[1]+N[1]*m]; } // trop imbrique -> amorce courte
         } else {
           const m=Math.max(LEAD,3); P=[S[0]+N[0]*m,S[1]+N[1]*m];                              // chute exterieure (tole autour)
         }
         // ENTREE EN ARC (tangente au contour) : on prend le PLUS GRAND rayon qui TIENT dans la chute.
         // Test geometrique reel (pas un seuil de taille) => l'arc se fait des que la forme le permet.
-        const onWaste=(pt)=> _pointInPoly(pt,poly)===wasteInside;
+        const onWaste=(pt)=> globalWaste(pt);
         let arc=null;
         if(ARC){
           for(const r of [LEAD, LEAD*0.6, LEAD*0.35, LEAD*0.2]){
@@ -16864,8 +16871,8 @@ function _s3dInit(moves) {
     rafId: null
   };
 
-  // Filtres masqués (révélation progressive + couleurs suffisent)
-  ['rapid','cut','plunge'].forEach(t => { const b = document.getElementById('s3d_btn_'+t); if (b) b.style.display='none'; });
+  // Boutons de filtre par type VISIBLES (l'utilisateur veut cocher/decocher chaque type)
+  ['rapid','cut','plunge'].forEach(t => { const b = document.getElementById('s3d_btn_'+t); if (b) b.style.display=''; });
   const layerBtnsDiv2 = document.getElementById('s3d_layer_btns');
   if (layerBtnsDiv2) { layerBtnsDiv2.style.display = 'none'; layerBtnsDiv2.innerHTML = ''; }
 
