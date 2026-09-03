@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-ER ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-ES ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3343,7 +3343,7 @@ function buildLaserBody(){
         if(wasteInside){
           // Percage au COEUR de la poche (le plus loin des parois a garder) : le
           // depart a ete place face au coeur, donc le trajet est radial et propre.
-          if(leadFromPole && c._pole && c._pole.pt && globalWaste(c._pole.pt)){
+          if(leadFromPole && c._pole && c._pole.pt && _pointInPoly(c._pole.pt, poly)===wasteInside){
             P=[c._pole.pt[0], c._pole.pt[1]];
           } else {
             const avail=(c._pole && c._pole.d>0)?c._pole.d:(0.4*diam||LEAD);
@@ -3357,7 +3357,7 @@ function buildLaserBody(){
         }
         // ENTREE EN ARC (tangente au contour) : on prend le PLUS GRAND rayon qui TIENT dans la chute.
         // Test geometrique reel (pas un seuil de taille) => l'arc se fait des que la forme le permet.
-        const onWaste=(pt)=> globalWaste(pt);
+        const onWaste=(pt)=> (_laserClassAt(pt[0],pt[1])===2?false:(_laserClassAt(pt[0],pt[1])===1?true:(_pointInPoly(pt,poly)===wasteInside)));
         let arc=null;
         if(ARC){
           for(const r of [LEAD, LEAD*0.6, LEAD*0.35, LEAD*0.2]){
