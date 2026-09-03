@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EX ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EY ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3358,16 +3358,11 @@ function buildLaserBody(){
         const locWaste=(pt)=>{ const cl=_laserClassAt(pt[0],pt[1]); if(cl===1)return true; if(cl===2)return false; return _pointInPoly(pt,poly)===wasteInside; };
         let P;
         if(wasteInside){
-          let usedCore=false;
-          // 1) COEUR de la poche (le plus loin des parois) si le trajet coeur->depart
-          //    reste dans la chute (ligne droite) -> percage bien degage (ex: etoile).
-          if(c._pole && c._pole.pt && c._pole.d>Math.max(LEAD,1)){
-            const Pp=[c._pole.pt[0],c._pole.pt[1]]; let ok=locWaste(Pp);
-            if(ok){ const K=14; for(let t=1;t<K;t++){ const q=[Pp[0]+(S[0]-Pp[0])*t/K, Pp[1]+(S[1]-Pp[1])*t/K]; if(!locWaste(q)){ ok=false; break; } } }
-            if(ok){ P=Pp; usedCore=true; }
-          }
-          // 2) sinon : s'ecarter du bord vers l'interieur (degagement modere >=4mm), sans traverser.
-          if(!usedCore){
+          // PERCAGE au point le plus DEGAGE = pole (centre du plus grand cercle inscrit).
+          // Le depart a ete place face au pole -> trajet radial toujours propre.
+          if(c._pole && c._pole.pt && c._pole.d>Math.max(LEAD,0.8) && locWaste(c._pole.pt)){
+            P=[c._pole.pt[0],c._pole.pt[1]];
+          } else {
             const avail=(c._pole && c._pole.d>0)?c._pole.d:(0.4*diam||LEAD);
             let clr=Math.min(Math.max(LEAD*3,4), Math.max(LEAD, avail*0.9));
             let Pc=[S[0]+N[0]*clr, S[1]+N[1]*clr]; let g=0;
@@ -16127,7 +16122,7 @@ function parseGcode(gc){
     const isG2=line.startsWith('G2 ')||line==='G2';
     const isG3=line.startsWith('G3 ')||line==='G3';
     if(!isG0&&!isG1&&!isG2&&!isG3) continue;
-    const isLead=line.indexOf('LEAD')>=0;
+    const isLead=raw.toUpperCase().indexOf('LEAD')>=0;
     let nx=x,ny=y,nz=z;
     const mx=line.match(/X([\-\d.]+)/); if(mx) nx=abs?parseFloat(mx[1]):x+parseFloat(mx[1]);
     const my=line.match(/Y([\-\d.]+)/); if(my) ny=abs?parseFloat(my[1]):y+parseFloat(my[1]);
