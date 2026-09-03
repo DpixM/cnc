@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EL ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EM ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -11791,7 +11791,7 @@ function _s3dRenderCode(){
   el.innerHTML=lines.map((ln,i)=>'<div class="s3d-ln" data-l="'+i+'" onclick="s3dGotoLine('+i+')" style="padding:1px 8px;cursor:pointer;white-space:pre;color:#c9d1d9">'
     +String(i+1).padStart(4,' ')+'  '+String(ln).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('');
 }
-function _s3dSetSpeed(v){ if(_s3d)_s3d.speed=parseInt(v)||20; const l=document.getElementById('s3dSpeedLbl'); if(l)l.textContent='×'+v; }
+function _s3dSetSpeed(v){ if(_s3d)_s3d.speed=parseInt(v)||4; const l=document.getElementById('s3dSpeedLbl'); if(l)l.textContent='×'+v; }
 function _s3dSetIdx(idx){
   if(!_s3d||!_s3d.combGeo) return;
   const n=_s3d.moves.length;
@@ -11812,6 +11812,12 @@ function _s3dHiLine(){
   const prev=el.querySelector('.s3d-ln._on'); if(prev){ prev.classList.remove('_on'); prev.style.background=''; }
   const row=el.querySelector('.s3d-ln[data-l="'+cur+'"]');
   if(row){ row.classList.add('_on'); row.style.background='rgba(245,166,35,.28)'; try{row.scrollIntoView({block:'nearest'});}catch(e){} }
+}
+function s3dScrub(e){ if(!_s3d)return;
+  // attraper la barre = mettre en PAUSE (sinon la lecture continue sous le curseur)
+  _s3d.playing=false; const b=document.getElementById('s3dPlayBtn'); if(b)b.textContent='▶';
+  // clic N'IMPORTE OU sur la barre = sauter a cette position (pas besoin de viser le petit rond)
+  const sk=document.getElementById('s3dSeek'); if(sk){ const r=sk.getBoundingClientRect(); let pct=Math.round((e.clientX-r.left)/(r.width||1)*100); pct=Math.max(0,Math.min(100,pct)); sk.value=pct; s3dSeekTo(pct); }
 }
 function s3dSeekTo(pct){ if(!_s3d)return; _s3dSetIdx(pct/100*_s3d.moves.length); }
 function s3dTogglePlay(){
@@ -16852,7 +16858,7 @@ function _s3dInit(moves) {
     vis: {rapid:true,cut:true,plunge:true},
     moves, combGeo, mark,
     idx: moves.length, playing:false,
-    speed:(parseInt(document.getElementById('s3dSpeed')&&document.getElementById('s3dSpeed').value)||20),
+    speed:(parseInt(document.getElementById('s3dSpeed')&&document.getElementById('s3dSpeed').value)||4),
     drag: false, lx:0, ly:0,
     pinch0: 0,
     rafId: null
@@ -16948,9 +16954,9 @@ function _s3dAttachControls(canvas, spanXY) {
       const dx = e.clientX - nv.lx, dy = e.clientY - nv.ly;
       if (nv.mode === 'orbit') {
         // sens naturel : glisser a droite -> le modele tourne a droite (comme Fusion)
-        _s3d.theta += dx * 0.01;
+        _s3d.theta += dx * 0.006;
         // inclinaison bornee : jamais pile au-dessus ni a l'horizon (evite la bascule)
-        _s3d.phi = Math.max(0.15, Math.min(Math.PI - 0.15, _s3d.phi + dy * 0.01));
+        _s3d.phi = Math.max(0.15, Math.min(Math.PI - 0.15, _s3d.phi + dy * 0.006));
       } else if (nv.mode === 'pan') {
         // Pan a partir des VRAIS axes de la camera -> sens correct quel que soit l'angle.
         // "Attrape-tire" facon Fusion : le dessin suit la souris.
@@ -16983,7 +16989,7 @@ function _s3dStartRender() {
   function animate() {
     if (!document.getElementById('sim3DModal').classList.contains('open')) return;
     _s3d.rafId = requestAnimationFrame(animate);
-    if (_s3d.playing) { _s3dSetIdx(_s3d.idx + (_s3d.speed||20)); if (_s3d.idx >= _s3d.moves.length) { _s3d.playing=false; const _pb=document.getElementById('s3dPlayBtn'); if(_pb)_pb.textContent='▶'; } }
+    if (_s3d.playing) { _s3dSetIdx(_s3d.idx + (_s3d.speed||4)); if (_s3d.idx >= _s3d.moves.length) { _s3d.playing=false; const _pb=document.getElementById('s3dPlayBtn'); if(_pb)_pb.textContent='▶'; } }
     const sinPhi = Math.sin(_s3d.phi), cosPhi = Math.cos(_s3d.phi);
     camera.position.set(
       _s3d.cx + _s3d.radius * sinPhi * Math.cos(_s3d.theta),
@@ -17140,11 +17146,11 @@ function _s3dStartRender() {
     </div>
     <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surf);border-top:1px solid var(--brd);flex-shrink:0">
       <button id="s3dPlayBtn" class="btn btn-p" style="padding:6px 14px;font-size:15px" onclick="s3dTogglePlay()">▶</button>
-      <input type="range" id="s3dSeek" min="0" max="100" value="100" style="flex:1;accent-color:var(--acc)" oninput="s3dSeekTo(parseInt(this.value))">
+      <input type="range" id="s3dSeek" min="0" max="100" value="100" style="flex:1;height:22px;accent-color:var(--acc)" onpointerdown="s3dScrub(event)" oninput="s3dSeekTo(parseInt(this.value))">
       <span id="s3dProgress" style="font-family:var(--mono);font-size:11px;color:var(--txt2);min-width:40px">100%</span>
       <span style="font-size:10px;color:var(--txt2)">Vitesse</span>
-      <input type="range" id="s3dSpeed" min="1" max="300" value="20" style="width:90px;accent-color:var(--txt2)" oninput="_s3dSetSpeed(this.value)">
-      <span id="s3dSpeedLbl" style="font-family:var(--mono);font-size:11px;color:var(--txt2);min-width:34px">×20</span>
+      <input type="range" id="s3dSpeed" min="1" max="300" value="4" style="width:90px;accent-color:var(--txt2)" oninput="_s3dSetSpeed(this.value)">
+      <span id="s3dSpeedLbl" style="font-family:var(--mono);font-size:11px;color:var(--txt2);min-width:34px">×4</span>
     </div>
   </div>
 </div>
