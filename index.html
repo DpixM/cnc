@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-FB ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-FC ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3314,98 +3314,64 @@ function buildLaserBody(){
     let wasteInside=(c._depth%2===1); if(INV) wasteInside=!wasteInside;
     { const _mc=_laserClassAt(c._c[0],c._c[1]); if(_mc===1)wasteInside=true; else if(_mc===2)wasteInside=false; }
 
-    // DEPART de coupe. Defaut = milieu de la plus longue arete (arc tangent net).
-    // Mais si la chute est a l'interieur : on veut percer au COEUR de la poche. Or
-    // sur une poche en C, la ligne coeur->milieu-longue-arete SORT de la chute. Donc
-    // si ce trajet n'est pas propre, on demarre plutot au point du contour le PLUS
-    // PROCHE du coeur (partie large/convexe) -> ligne coeur->depart droite dans la chute.
-    if(LEADIN && c.poly && c.poly.length>=5 && c.moves.length>=4){
+    const diam=(c._a>0)?2*Math.sqrt(c._a/Math.PI):0;  // taille equivalente de la region
+    const Fstr=(bi===0?(' F'+_lc(FEED)+'   ;vitesse d\'avance (reste active ensuite)'):'');
+    let head=null, chosen=null;
+    // On teste PLUSIEURS points de depart (le plus proche du coeur, le milieu de la
+    // plus longue arete, + quelques points repartis). Pour chacun on cherche l'amorce
+    // en DEMI-ARC lisse la PLUS PROFONDE (percage au plus pres du coeur). On garde le
+    // meilleur -> percage au centre de la zone la plus grosse, entree douce, meme sur
+    // une etoile (ou le point le plus proche est un creux qu'on evite ainsi).
+    if(LEADIN && c.poly && c.poly.length>=5 && c.moves.length>=4 && c._c){
       const pl=c.poly, cl=Math.hypot(pl[0][0]-pl[pl.length-1][0],pl[0][1]-pl[pl.length-1][1])<1e-6;
-      if(cl){ const base=pl.slice(0,pl.length-1), nB=base.length;
+      if(cl){
+        const base=pl.slice(0,pl.length-1), nB=base.length;
         const inW=(pt)=>{ const q=_laserClassAt(pt[0],pt[1]); if(q===1)return true; if(q===2)return false; return _pointInPoly(pt,pl)===wasteInside; };
-        const clean=(A,B)=>{ const K=14; for(let t=1;t<K;t++){ const x=A[0]+(B[0]-A[0])*t/K, y=A[1]+(B[1]-A[1])*t/K; if(!inW([x,y]))return false; } return true; };
         let best=-1,bkL=0; for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB],d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d>best){best=d;bkL=k;} }
-        const mL=[(base[bkL][0]+base[(bkL+1)%nB][0])/2,(base[bkL][1]+base[(bkL+1)%nB][1])/2];
-        let startPt=mL, startAfter=(bkL+1)%nB;
-        const P0=(c._pole&&c._pole.pt)?c._pole.pt:null;
-        // Chute a l'interieur + coeur connu : TOUJOURS demarrer au point du contour le
-        // plus PROCHE du coeur. Le trajet coeur->depart est un rayon du cercle inscrit,
-        // donc court et garanti dans la chute. -> percage pile au coeur, amorce courte.
-        if(wasteInside && P0 && c._pole.d>Math.max(LEAD,1)){
-          let bd=1e18,bk2=0,foot=null;
-          for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((P0[0]-a[0])*dx+(P0[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy; const d=Math.hypot(P0[0]-fx,P0[1]-fy); if(d<bd){bd=d;bk2=k;foot=[fx,fy];} }
-          if(foot && clean(P0,foot)){ startPt=foot; startAfter=(bk2+1)%nB; }
+        const cand=[[bkL,0.5]];
+        if(c._pole&&c._pole.pt){ const P0=c._pole.pt; let bd=1e18,bk2=0,tt=0.5; for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((P0[0]-a[0])*dx+(P0[1]-a[1])*dy)/L2; t=Math.max(0.02,Math.min(0.98,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy; const d=Math.hypot(P0[0]-fx,P0[1]-fy); if(d<bd){bd=d;bk2=k;tt=t;} } cand.push([bk2,tt]); }
+        const stepC=Math.max(1,Math.floor(nB/10)); for(let k=0;k<nB;k+=stepC) cand.push([k,0.5]);
+        const Rmax=(c._pole&&c._pole.d>0)?c._pole.d:(diam*0.4||LEAD);
+        if(ARC && wasteInside && Rmax>Math.max(LEAD,1.2)){
+          for(const cc of cand){
+            const a=base[cc[0]],b=base[(cc[0]+1)%nB];
+            const S0=[a[0]+(b[0]-a[0])*cc[1], a[1]+(b[1]-a[1])*cc[1]];
+            let T=[b[0]-a[0],b[1]-a[1]]; const tl=Math.hypot(T[0],T[1])||1; T=[T[0]/tl,T[1]/tl];
+            let N=[-T[1],T[0]]; if(inW([S0[0]+N[0]*0.05,S0[1]+N[1]*0.05])!==true) N=[-N[0],-N[1]];
+            for(const h of [Rmax,Rmax*0.82,Rmax*0.66,Rmax*0.52,Rmax*0.4,Rmax*0.3].filter(v=>v>1)){
+              if(chosen && h<=chosen.h) break;
+              const r=h/2,O=[S0[0]+N[0]*r,S0[1]+N[1]*r],A=[S0[0]+N[0]*h,S0[1]+N[1]*h];
+              if(!inW(A))continue;
+              const aA=Math.atan2(A[1]-O[1],A[0]-O[0]); let g=null;
+              for(const dir of [1,-1]){ let ok=true; for(let k=1;k<12;k++){ const ang=aA+dir*Math.PI*k/12; if(!inW([O[0]+r*Math.cos(ang),O[1]+r*Math.sin(ang)])){ok=false;break;} } if(ok){ g=dir>0?'G3':'G2'; break; } }
+              if(g){ if(!chosen||h>chosen.h){ chosen={h,bk:cc[0],tp:cc[1],S:S0,A,O,g}; } break; }
+            }
+          }
         }
-        const rot=[startPt]; for(let k=0;k<nB;k++) rot.push(base[(startAfter+k)%nB]); rot.push([startPt[0],startPt[1]]);
-        c.poly=rot; c.start=[startPt[0],startPt[1]]; c.moves=rot.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1]));
+        const bk=chosen?chosen.bk:bkL, tp=chosen?chosen.tp:0.5;
+        const a=base[bk],b=base[(bk+1)%nB]; const St=chosen?chosen.S:[a[0]+(b[0]-a[0])*tp,a[1]+(b[1]-a[1])*tp];
+        const rot=[St]; for(let k=1;k<=nB;k++) rot.push(base[(bk+k)%nB]); rot.push([St[0],St[1]]);
+        c.poly=rot; c.start=[St[0],St[1]]; c.moves=rot.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1]));
       }
     }
     const S=c.start;
-    const diam=(c._a>0)?2*Math.sqrt(c._a/Math.PI):0;  // taille equivalente de la region
-    const Fstr=(bi===0?(' F'+_lc(FEED)+'   ;vitesse d\'avance (reste active ensuite)'):'');
-    const poly=c.poly, np=poly?poly.length:0;
-    let head=null;
-    if(LEADIN && diam>0.5 && np>=3 && c._c){
-      let T=[poly[1][0]-poly[0][0], poly[1][1]-poly[0][1]];
-      const tl=Math.hypot(T[0],T[1]);
-      if(tl>1e-6){
-        T=[T[0]/tl,T[1]/tl];
-        // normale pointant vers la CHUTE (on teste de quel cote on est)
-        let N=[-T[1],T[0]];
-        if(_pointInPoly([S[0]+N[0]*0.05,S[1]+N[1]*0.05],poly)!==wasteInside) N=[-N[0],-N[1]];
-        // Point de PERCAGE : au centre de la chute (loin du bord garde) si possible.
-        // Test CHUTE LOCAL fiable (poche courante) + peinture manuelle prioritaire.
-        const locWaste=(pt)=>{ const cl=_laserClassAt(pt[0],pt[1]); if(cl===1)return true; if(cl===2)return false; return _pointInPoly(pt,poly)===wasteInside; };
-        let P;
-        if(wasteInside){
-          // PERCAGE au point le plus DEGAGE = pole (centre du plus grand cercle inscrit).
-          // Le depart a ete place face au pole -> trajet radial toujours propre.
-          if(c._pole && c._pole.pt && c._pole.d>Math.max(LEAD,0.8) && locWaste(c._pole.pt)){
-            P=[c._pole.pt[0],c._pole.pt[1]];
-          } else {
-            const avail=(c._pole && c._pole.d>0)?c._pole.d:(0.4*diam||LEAD);
-            let clr=Math.min(Math.max(LEAD*3,4), Math.max(LEAD, avail*0.9));
-            let Pc=[S[0]+N[0]*clr, S[1]+N[1]*clr]; let g=0;
-            while(clr>LEAD*0.6 && g++<10 && !(locWaste(Pc)&&locWaste([S[0]+N[0]*clr*0.5,S[1]+N[1]*clr*0.5]))){ clr*=0.7; Pc=[S[0]+N[0]*clr,S[1]+N[1]*clr]; }
-            P=Pc;
-          }
-        } else {
-          const m=Math.max(LEAD,3); P=[S[0]+N[0]*m,S[1]+N[1]*m];                              // chute exterieure (tole autour)
-        }
-        const onWaste=(pt)=> locWaste(pt);
-        let arc=null;
-        // PERCAGE LE PLUS PROFOND POSSIBLE vers le coeur, le long de la normale au
-        // contour en S. Pour chaque profondeur h (du plus profond au moins profond),
-        // l'amorce est un DEMI-ARC lisse tangent au contour en S et passant par le
-        // percage (rayon = h/2). On garde la 1ere profondeur qui rentre dans la chute.
-        // -> percage au plus pres du coeur de la ZONE LA PLUS GROSSE + entree douce.
-        if(ARC && c._pole && c._pole.d>Math.max(LEAD,1.5)){
-          const hmax=c._pole.d;
-          for(const h of [hmax,hmax*0.85,hmax*0.7,hmax*0.55,hmax*0.42,hmax*0.3,hmax*0.2].filter(v=>v>1)){
-            const r=h/2, O=[S[0]+N[0]*r,S[1]+N[1]*r], A=[S[0]+N[0]*h,S[1]+N[1]*h];
-            if(!onWaste(A)) continue;
-            const aA=Math.atan2(A[1]-O[1],A[0]-O[0]);
-            let got=null;
-            for(const dir of [1,-1]){
-              let ok=true;
-              for(let k=1;k<12;k++){ const a=aA+dir*Math.PI*k/12; if(!onWaste([O[0]+r*Math.cos(a),O[1]+r*Math.sin(a)])){ok=false;break;} }
-              if(ok){ got={A,O,g:dir>0?'G3':'G2'}; break; }
-            }
-            if(got){ arc=got; break; }
-          }
-        }
-        if(arc){
-          head='G1 X'+_lc(arc.A[0])+' Y'+_lc(arc.A[1])+Fstr+'   ;percage au depart de l\'arc (loin du bord garde)\n'
-              +'G1 Z0   ;redescendre sur la tole avant de percer\n'
-              +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-              +arc.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(arc.O[0]-arc.A[0])+' J'+_lc(arc.O[1]-arc.A[1])+'   ;LEAD arc lisse, tangent au contour\n';
-        } else {
-          head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute (loin du bord garde)\n'
-              +'G1 Z0   ;redescendre sur la tole avant de percer\n'
-              +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-              +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;LEAD amorce droite (poche trop petite pour un arc)\n';
-        }
-      }
+    const locWaste=(pt)=>{ const cl=_laserClassAt(pt[0],pt[1]); if(cl===1)return true; if(cl===2)return false; return _pointInPoly(pt,c.poly)===wasteInside; };
+    if(chosen){
+      head='G1 X'+_lc(chosen.A[0])+' Y'+_lc(chosen.A[1])+Fstr+'   ;percage au coeur de la zone (loin du bord)\n'
+          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
+          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+          +chosen.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(chosen.O[0]-chosen.A[0])+' J'+_lc(chosen.O[1]-chosen.A[1])+'   ;LEAD arc lisse, tangent au contour\n';
+    } else if(LEADIN && diam>0.5 && c._c && c.poly && c.poly.length>=3){
+      // Pas d'arc : percage ecarte du bord (cote chute) + amorce droite courte.
+      let T=[c.poly[1][0]-S[0],c.poly[1][1]-S[1]]; const tl=Math.hypot(T[0],T[1])||1; T=[T[0]/tl,T[1]/tl];
+      let N=[-T[1],T[0]]; if(locWaste([S[0]+N[0]*0.05,S[1]+N[1]*0.05])!==true) N=[-N[0],-N[1]];
+      let clr = wasteInside ? Math.min(Math.max(LEAD*3,4),(c._pole&&c._pole.d>0?c._pole.d*0.85:0.4*diam||LEAD)) : Math.max(LEAD,3);
+      let P=[S[0]+N[0]*clr,S[1]+N[1]*clr]; let g=0;
+      while(clr>LEAD*0.6 && g++<10 && !(locWaste(P)&&locWaste([S[0]+N[0]*clr*0.5,S[1]+N[1]*clr*0.5]))){ clr*=0.7; P=[S[0]+N[0]*clr,S[1]+N[1]*clr]; }
+      head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute\n'
+          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
+          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+          +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;LEAD amorce droite\n';
     }
     if(head===null){
       head='G1 X'+_lc(S[0])+' Y'+_lc(S[1])+Fstr+'\n'
