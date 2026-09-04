@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EZ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-FA ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3373,19 +3373,29 @@ function buildLaserBody(){
           const m=Math.max(LEAD,3); P=[S[0]+N[0]*m,S[1]+N[1]*m];                              // chute exterieure (tole autour)
         }
         const onWaste=(pt)=> locWaste(pt);
-        // ARC LISSE dont le RAYON s'adapte a la taille de la poche. Le percage est au
-        // DEPART de l'arc (un seul arc, aucun virage). Grande poche -> grand arc (percage
-        // loin du bord). On prend le plus GRAND rayon qui reste dans la chute.
         let arc=null;
-        if(ARC){
+        // PRIORITE : arc tangent au contour en S ET passant par le COEUR (pole).
+        // rayon = pole.d/2, centre sur la normale. -> PERCAGE PILE AU CENTRE de la
+        // poche (loin du bord) + entree lisse tangente, en UN seul arc.
+        if(ARC && c._pole && c._pole.pt && c._pole.d>Math.max(LEAD,1.5)){
+          const r=c._pole.d/2, O=[S[0]+N[0]*r,S[1]+N[1]*r], A=[c._pole.pt[0],c._pole.pt[1]];
+          const aA=Math.atan2(A[1]-O[1],A[0]-O[0]);
+          for(const dir of [1,-1]){
+            let ok=true;
+            for(let k=1;k<12;k++){ const a=aA+dir*Math.PI*k/12; if(!onWaste([O[0]+r*Math.cos(a),O[1]+r*Math.sin(a)])){ok=false;break;} }
+            if(ok){ arc={A,O,g:dir>0?'G3':'G2'}; break; }
+          }
+        }
+        // REPLI : poche non ronde/etroite -> arc plus petit, percage a son depart.
+        if(!arc && ARC){
           const Rmax=(c._pole&&c._pole.d>0)?c._pole.d:(diam*0.4||LEAD);
-          const rads=[Rmax*0.8,Rmax*0.6,Rmax*0.45,Rmax*0.32,Rmax*0.22,Rmax*0.14,Math.max(LEAD,1),LEAD*0.5].filter(r=>r>0.15);
+          const rads=[Rmax*0.5,Rmax*0.38,Rmax*0.28,Rmax*0.2,Rmax*0.13,Math.max(LEAD,1),LEAD*0.5].filter(r=>r>0.15);
           for(const r of rads){
             const O=[S[0]+N[0]*r,S[1]+N[1]*r], A=[O[0]-T[0]*r,O[1]-T[1]*r];
             const aS=Math.atan2(S[1]-O[1],S[0]-O[0]), aA=Math.atan2(A[1]-O[1],A[0]-O[0]);
             let dA=aS-aA; while(dA<=-Math.PI)dA+=2*Math.PI; while(dA>Math.PI)dA-=2*Math.PI;
             let okArc=true;
-            for(let k=0;k<=8;k++){ const a=aA+dA*k/8; const px=O[0]+r*Math.cos(a),py=O[1]+r*Math.sin(a); if(!onWaste([px,py])){okArc=false;break;} }
+            for(let k=0;k<8;k++){ const a=aA+dA*k/8; if(!onWaste([O[0]+r*Math.cos(a),O[1]+r*Math.sin(a)])){okArc=false;break;} }
             if(okArc){ const cross=(A[0]-O[0])*(S[1]-O[1])-(A[1]-O[1])*(S[0]-O[0]); arc={A,O,g:cross>0?'G3':'G2'}; break; }
           }
         }
