@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EY ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-EZ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3373,31 +3373,32 @@ function buildLaserBody(){
           const m=Math.max(LEAD,3); P=[S[0]+N[0]*m,S[1]+N[1]*m];                              // chute exterieure (tole autour)
         }
         const onWaste=(pt)=> locWaste(pt);
+        // ARC LISSE dont le RAYON s'adapte a la taille de la poche. Le percage est au
+        // DEPART de l'arc (un seul arc, aucun virage). Grande poche -> grand arc (percage
+        // loin du bord). On prend le plus GRAND rayon qui reste dans la chute.
         let arc=null;
         if(ARC){
-          for(const r of [LEAD, LEAD*0.6, LEAD*0.35, LEAD*0.2]){
+          const Rmax=(c._pole&&c._pole.d>0)?c._pole.d:(diam*0.4||LEAD);
+          const rads=[Rmax*0.8,Rmax*0.6,Rmax*0.45,Rmax*0.32,Rmax*0.22,Rmax*0.14,Math.max(LEAD,1),LEAD*0.5].filter(r=>r>0.15);
+          for(const r of rads){
             const O=[S[0]+N[0]*r,S[1]+N[1]*r], A=[O[0]-T[0]*r,O[1]-T[1]*r];
-            // milieu du quart de cercle (pour verifier qu'il ne mord pas le bord garde)
-            let mvx=(A[0]-O[0])+(S[0]-O[0]), mvy=(A[1]-O[1])+(S[1]-O[1]);
-            const ml=Math.hypot(mvx,mvy)||1; const M=[O[0]+mvx/ml*r, O[1]+mvy/ml*r];
-            const midPA=[(P[0]+A[0])/2,(P[1]+A[1])/2];   // le trajet percage->arc doit rester dans la chute
-            if(onWaste(A)&&onWaste(M)&&onWaste(midPA)){
-              const cross=(A[0]-O[0])*(S[1]-O[1])-(A[1]-O[1])*(S[0]-O[0]);
-              arc={A,O,g:cross>0?'G3':'G2'}; break;
-            }
+            const aS=Math.atan2(S[1]-O[1],S[0]-O[0]), aA=Math.atan2(A[1]-O[1],A[0]-O[0]);
+            let dA=aS-aA; while(dA<=-Math.PI)dA+=2*Math.PI; while(dA>Math.PI)dA-=2*Math.PI;
+            let okArc=true;
+            for(let k=0;k<=8;k++){ const a=aA+dA*k/8; const px=O[0]+r*Math.cos(a),py=O[1]+r*Math.sin(a); if(!onWaste([px,py])){okArc=false;break;} }
+            if(okArc){ const cross=(A[0]-O[0])*(S[1]-O[1])-(A[1]-O[1])*(S[0]-O[0]); arc={A,O,g:cross>0?'G3':'G2'}; break; }
           }
         }
         if(arc){
-          head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute (loin du bord garde)\n'
+          head='G1 X'+_lc(arc.A[0])+' Y'+_lc(arc.A[1])+Fstr+'   ;percage au depart de l\'arc (loin du bord garde)\n'
               +'G1 Z0   ;redescendre sur la tole avant de percer\n'
               +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-              +'G1 X'+_lc(arc.A[0])+' Y'+_lc(arc.A[1])+'   ;LEAD chemin vers le depart de l\'arc\n'
-              +arc.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(arc.O[0]-arc.A[0])+' J'+_lc(arc.O[1]-arc.A[1])+'   ;LEAD entree en arc, tangente au contour\n';
+              +arc.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(arc.O[0]-arc.A[0])+' J'+_lc(arc.O[1]-arc.A[1])+'   ;LEAD arc lisse, tangent au contour\n';
         } else {
           head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute (loin du bord garde)\n'
               +'G1 Z0   ;redescendre sur la tole avant de percer\n'
               +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-              +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;LEAD amorce droite -> rejoint le contour (pas la place pour un arc)\n';
+              +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;LEAD amorce droite (poche trop petite pour un arc)\n';
         }
       }
     }
