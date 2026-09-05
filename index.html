@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FN ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FO ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3355,6 +3355,26 @@ function buildLaserBody(){
             const tCCW=[Nd[1],-Nd[0]]; // tangente d'arrivee en S si G3 (sens trigo)
             const g=(tCCW[0]*bT[0]+tCCW[1]*bT[1]>=0)?'G3':'G2';
             chosen={bk,tp:bt,S:bS,A:[P0[0],P0[1]],O,g};
+          }
+        }
+        else if(ARC && !wasteInside && nB>=3){
+          // CONTOUR EXTERIEUR (piece a garder) : le rebut est DEHORS. On perce un peu
+          // dehors et on entre par un PETIT arc tangent -> pas de plongee droite dans la
+          // matiere. Petit arc volontaire (Seb : "le plus petit histoire que ca rentre pas").
+          const a=base[nfBk], b=base[(nfBk+1)%nB];
+          const S0=[a[0]+(b[0]-a[0])*0.5, a[1]+(b[1]-a[1])*0.5];
+          let T=[b[0]-a[0],b[1]-a[1]]; const tl=Math.hypot(T[0],T[1])||1; T=[T[0]/tl,T[1]/tl];
+          let N=[-T[1],T[0]];
+          const wA=globalWaste([S0[0]+N[0]*0.2,S0[1]+N[1]*0.2])===true;
+          const wB=globalWaste([S0[0]-N[0]*0.2,S0[1]-N[1]*0.2])===true;
+          if(wA||wB){
+            if(!wA) N=[-N[0],-N[1]];
+            const dext=Math.max(LEAD*2,2.2);           // petite amorce
+            const P0=[S0[0]+N[0]*dext, S0[1]+N[1]*dext]; // percage DEHORS (dans le rebut)
+            const r=dext/2, O=[S0[0]+N[0]*r, S0[1]+N[1]*r];
+            const tCCW=[N[1],-N[0]];
+            const g=(tCCW[0]*T[0]+tCCW[1]*T[1]>=0)?'G3':'G2';
+            chosen={bk:nfBk,tp:0.5,S:S0,A:P0,O,g};
           }
         }
         const bk=chosen?chosen.bk:nfBk, tp=chosen?chosen.tp:nfTp;
