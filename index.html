@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FR ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FS ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3328,7 +3328,7 @@ function buildLaserBody(){
       if(Math.hypot(pl[0][0]-pl[pl.length-1][0],pl[0][1]-pl[pl.length-1][1])>1e-6) pl.push(pl[0].slice()); // fermer si besoin
       {
         const base=pl.slice(0,pl.length-1), nB=base.length;
-        const THR=Math.max(LEAD*0.5,0.35);
+        const THR=Math.max(LEAD*0.3,0.3);  // seuil bas : les petites formes faisables (>=0.6mm de large) recoivent un arc
         // depart par defaut (si pas d'arc) = milieu de la plus longue arete
         let best=-1,nfBk=0; for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB],d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d>best){best=d;nfBk=k;} }
         let nfTp=0.5;
