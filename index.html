@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-06-GD ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-06-GE ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -11412,8 +11412,9 @@ function gearPreview(){
   const cd=rp+rp2;
   document.getElementById('gRatio').textContent=`${p.t}:${p.t2} (×${(p.t/p.t2).toFixed(2)})`;
   const conjLabel = ref?`s'engrène avec ref (${ref.gearT} dents)`:'roue 2';
-  document.getElementById('gConjInfo').textContent=
-    `Distance centres: ${cd.toFixed(2)} mm · Ø ext: ${dextFromModule(m,p.t2).toFixed(1)} mm`;
+  document.getElementById('gConjInfo').innerHTML=
+    `⚙ <b>Entraxe de MONTAGE</b> (perce tes 2 axes à cette distance pour qu'elles engrènent) : <b>${cd.toFixed(2)} mm</b><br>`+
+    `Ø ext roue 2 : ${dextFromModule(m,p.t2).toFixed(1)} mm · <span style="color:var(--txt3)">les 2 roues sont posées ESPACÉES pour la découpe (1 passe)</span>`;
 
   const ra1=rp+m, ra2=rp2+m;
   const moduleInfo = ref?`<span style="color:var(--grn)">module imposé: ${m.toFixed(3)}</span>`:`module ${m.toFixed(3)}`;
@@ -16165,8 +16166,11 @@ function addConjGear(){
   let g1=null, g2=null;
   if(ref&&ref.cx!=null){
     // Ref existe → insérer seulement g2 tangent à la ref
-    const refRp=ref.gearM*ref.gearT/2, rp2=p.m*p.t/2;
-    g2=gearObjFromParams(p, ref.cx+refRp+rp2, ref.cy);
+    // POUR LA DECOUPE : on ESPACE les 2 roues (Ø ext + petit jeu) -> pas de chevauchement,
+    // coupables en une passe. (A l'entraxe de fonctionnement rp1+rp2 elles se chevauchent.)
+    const ra1=ref.gearM*(ref.gearT/2+1), ra2=p.m*(p.t/2+1);
+    const gapCut=Math.max(3, 2*p.m);
+    g2=gearObjFromParams(p, ref.cx+ra1+ra2+gapCut, ref.cy);
     // Décaler d'un demi-pas pour l'imbrication
     const hs2=Math.PI/p.t;
     g2.gearPts=g2.gearPts.map(([x,y])=>[
@@ -16186,10 +16190,12 @@ function addConjGear(){
   } else {
     // Pas de ref → créer la paire complète et grouper
     const cx1=wMm()/2, cy1=hMm()/2;
-    const rp1=p.m*p.t/2, rp2=p.m*p.t2/2;
+    // POUR LA DECOUPE : roues ESPACEES (Ø ext + petit jeu), pas de chevauchement.
+    const ra1=p.m*(p.t/2+1), ra2=p.m*(p.t2/2+1);
+    const gapCut=Math.max(3, 2*p.m);
     g1=gearObjFromParams(p, cx1, cy1);
     const p2={...p,t:p.t2};
-    g2=gearObjFromParams(p2, cx1+rp1+rp2, cy1);
+    g2=gearObjFromParams(p2, cx1+ra1+ra2+gapCut, cy1);
     // Décaler g2 d'un demi-pas pour que les dents s'imbriquent
     const halfStep2=Math.PI/p.t2;
     g2.gearPts=g2.gearPts.map(([x,y])=>[
