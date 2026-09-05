@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FX ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FY ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3462,7 +3462,19 @@ function buildLaserBody(){
       frameTxt+='M00   ;PAUSE : verifie le placement sur la tole, puis relance pour couper\n\n';
     }
   }
-  return {text:frameTxt+blocks.join('\n\n'), count:contours.length};
+  let text=frameTxt+blocks.join('\n\n');
+  // RE-ZERO : on ramene l'origine (0,0) au COIN BAS-GAUCHE du dessin (marge frame incluse).
+  // Avant, les coordonnees etaient brutes -> le zero machine tombait loin dans un coin de
+  // feuille (d'ou les longs trajets vers l'origine). Maintenant la piece est collee au zero,
+  // coordonnees positives (ce que preferent la plupart des machines). I/J (arcs, relatifs)
+  // ne sont PAS touches car le regex ne cible que les lettres X et Y.
+  let mnx=1e18,mny=1e18; for(const c of contours) for(const q of c.poly){ if(q[0]<mnx)mnx=q[0]; if(q[1]<mny)mny=q[1]; }
+  if(isFinite(mnx)){
+    if(FRAME){ mnx-=10; mny-=10; }          // le tour a vide deborde de ~1cm
+    const offX=mnx-1, offY=mny-1;            // 1mm de marge au zero
+    text=text.replace(/([XY])(-?\d*\.?\d+)/g, (mm,ax,num)=> ax+_lc(parseFloat(num)-(ax==='X'?offX:offY)) );
+  }
+  return {text, count:contours.length};
 }
 // Emballe le corps dans le squelette .LST (fourni par l'ingénieur).
 const _LST_HEADER="BD\nSET_METRIC\nC\nBEGIN_EINRICHTEPLAN_INFO\nC\nZA,MM,6\nMM,AT,1,60,1,1,,'ProgName',,'',T\nMM,AT,1,280,1,1,,'MachineViewerName',,'',T\nMM,AT,1,300,1,1,,'CheckLevel',,'',Z\nMM,AT,1,310,1,1,,'SetupSuppression',,'',Z\nMM,AT,1,320,1,1,,'SortMasterBoxSetupConfiguration',,'',Z\nMM,AT,1,330,1,1,,'LaserCutDataCalculated',,'',Z\nC\nZA,DA,1\nDA,'__PROGNAME__','Service',-1,0,-1,0\nC\nENDE_EINRICHTEPLAN_INFO\nC\nBEGIN_GLOBAL_DATASET\nC\nZA,MM,2\nMM,AT,1,10,1,1,,'DataSetType',,'',T\nMM,AT,1,20,1,1,,'DataSetName',,'',T\nC\nZA,DA,1\nDA,'LTT_STAMM','__TECHNO__'\nC\nENDE_GLOBAL_DATASET\nC\nBEGIN_LTT_CALLS\nC\nZA,MM,1\nMM,AT,1,10,1,1,,'DataSetName',,'',T\nC\nZA,DA,1\nDA,'__TECHNO__'\nC\nENDE_LTT_CALLS\nC\nBEGIN_PROGRAM_PROPERTIES\nC\nZA,MM,16\nMM,AT,1,10,1,1,,'SyncDataChangePierceToCut',,'',Z\nMM,AT,1,20,1,1,,'ProgramType',,'',Z\nMM,AT,1,30,1,1,,'ProgramedClampPositionsObligatory',,'Bool',Z\nMM,AT,1,40,1,1,,'ReentryRestriction',,'',Z\nMM,AT,1,50,1,1,,'ContourLineAdjustmentActive',,'Bool',Z\nMM,AT,1,60,1,1,,'FinishedPartSupportNumber',,'',Z\nMM,AT,1,70,1,1,,'BevelCuttingVersion',,'',Z\nMM,AT,1,80,1,1,,'FluidSprayMode',,'',Z\nMM,AT,1,90,1,1,,'RetractableClampsRequired',,'Bool',Z\nMM,AT,1,100,1,1,,'AdjustLineLevel',,'',Z\nMM,AT,1,110,1,1,,'CollisionReduced',,'',Z\nMM,AT,1,120,1,1,,'MarkingLaserTechnologyName',,'',T\nMM,AT,1,130,1,1,,'LabelEncodingTypes',,'',Z\nMM,AT,1,140,1,1,,'CodeSignature',,'',T\nMM,AT,1,150,1,1,,'ContourLineAdjustmentRequiered',,'',Z\nMM,AT,1,170,1,1,,'ScrapControlRecutActive',,'',Z\nC\nZA,DA,1\nDA,0,4,0,0,0,0,0,0,0,0,0,'',0,'CodeSignature_NONE',-1,1\nC\nENDE_PROGRAM_PROPERTIES\nC\nBEGIN_PROGRAMM\nC\nZA,MM,5\nMM,AT,1,10,1,1,,'ProgTitle',,'',T\nMM,AT,1,20,1,1,,'ProgType',,'',T\nMM,AT,1,30,1,1,,'Comment',,'',T\nMM,AT,1,60,1,1,,'IncreasingRecordNumberFlag',,'Bool',Z\nMM,AT,1,80,1,1,,'IsSubProgMacro',,'Bool',Z\nC\nZA,DA,1\nDA,'__PROGNAME__','HP','',0,0\nSTART_TEXT\n";
