@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FM ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FN ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3323,25 +3323,23 @@ function buildLaserBody(){
     // en DEMI-ARC lisse la PLUS PROFONDE (percage au plus pres du coeur). On garde le
     // meilleur -> percage au centre de la zone la plus grosse, entree douce, meme sur
     // une etoile (ou le point le plus proche est un creux qu'on evite ainsi).
-    if(LEADIN && c.poly && c.poly.length>=5 && c.moves.length>=4 && c._c){
-      const pl=c.poly, cl=Math.hypot(pl[0][0]-pl[pl.length-1][0],pl[0][1]-pl[pl.length-1][1])<1e-6;
-      if(cl){
+    if(LEADIN && c.poly && c.poly.length>=3 && c._c){
+      let pl=c.poly.slice();
+      if(Math.hypot(pl[0][0]-pl[pl.length-1][0],pl[0][1]-pl[pl.length-1][1])>1e-6) pl.push(pl[0].slice()); // fermer si besoin
+      {
         const base=pl.slice(0,pl.length-1), nB=base.length;
-        const inW=(pt)=>globalWaste(pt);
-        let best=-1,bkL=0; for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB],d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d>best){best=d;bkL=k;} }
-        const cand=[[bkL,0.5]]; let nfBk=bkL, nfTp=0.5;
-        if(c._pole&&c._pole.pt){ const P0=c._pole.pt; let bd=1e18,bk2=0,tt=0.5; for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((P0[0]-a[0])*dx+(P0[1]-a[1])*dy)/L2; t=Math.max(0.02,Math.min(0.98,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy; const d=Math.hypot(P0[0]-fx,P0[1]-fy); if(d<bd){bd=d;bk2=k;tt=t;} } cand.push([bk2,tt]); nfBk=bk2; nfTp=tt; }
-        const stepC=Math.max(1,Math.floor(nB/40)); for(let k=0;k<nB;k+=stepC){ cand.push([k,0.25]); cand.push([k,0.75]); }
-        // Pour chaque depart possible, on construit l'arc tangent au contour qui PASSE
-        // PAR LE POLE (le centre le plus degage). => percage TOUJOURS au pole. On garde
-        // le depart qui donne l'arc le plus PROPRE (plus petit balayage, sans sortir).
-        // === AMORCE ROBUSTE (demi-cercle propre, plonge vers le centre) ===
-        // S = point du contour le PLUS PROCHE du pole. Là, la normale pointe pile vers
-        // le pole : l'arc tangent devient un DEMI-CERCLE de rayon |PS|/2 centré au milieu
-        // de [S,pole]. Il part du pole (perçage), plonge vers l'intérieur (grand
-        // dégagement du bord) et rejoint le mur en S. Il reste TOUJOURS dans l'incercle
-        // (donc dans la chute) et sa taille s'adapte d'office à la zone. Jamais de droite.
-        if(ARC && wasteInside && c._pole && c._pole.pt && c._pole.d>Math.max(LEAD*0.4,0.35)){
+        const THR=Math.max(LEAD*0.5,0.35);
+        // depart par defaut (si pas d'arc) = milieu de la plus longue arete
+        let best=-1,nfBk=0; for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB],d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d>best){best=d;nfBk=k;} }
+        let nfTp=0.5;
+        // === AMORCE ROBUSTE : demi-cercle du pole vers le point du contour le plus proche ===
+        // S = point le PLUS PROCHE du pole -> la normale y pointe pile vers le pole -> l'arc
+        // tangent est un DEMI-CERCLE de rayon pole.d/2. Il est ENTIEREMENT contenu dans
+        // l'incercle (rayon pole.d) -> donc TOUJOURS dans la chute, garanti geometriquement
+        // (aucune verif necessaire, contrairement a avant ou la verif rejetait a tort de
+        // bons arcs => ligne droite moche). Percage au pole (max de degagement), taille
+        // adaptative, plonge vers l'interieur au lieu de raser le mur. Jamais de droite.
+        if(ARC && wasteInside && c._pole && c._pole.pt && c._pole.d>THR){
           const P0=c._pole.pt;
           let bd=1e18,bk=0,bt=0.5,bS=null,bT=null;
           for(let k=0;k<nB;k++){
@@ -3351,15 +3349,12 @@ function buildLaserBody(){
             const fx=a[0]+t*dx,fy=a[1]+t*dy,d=Math.hypot(P0[0]-fx,P0[1]-fy);
             if(d<bd){ bd=d;bk=k;bt=t;bS=[fx,fy]; const tl=Math.sqrt(L2); bT=[dx/tl,dy/tl]; }
           }
-          if(bS && bd>Math.max(LEAD*0.5,0.3)){
+          if(bS && bd>THR){
             let Nd=[P0[0]-bS[0],P0[1]-bS[1]]; const nl=Math.hypot(Nd[0],Nd[1])||1; Nd=[Nd[0]/nl,Nd[1]/nl];
             const r=nl/2, O=[bS[0]+Nd[0]*r,bS[1]+Nd[1]*r]; // milieu de [S,pole]
             const tCCW=[Nd[1],-Nd[0]]; // tangente d'arrivee en S si G3 (sens trigo)
-            const pref=(tCCW[0]*bT[0]+tCCW[1]*bT[1]>=0)?'G3':'G2';
-            const aP=Math.atan2(P0[1]-O[1],P0[0]-O[0]);
-            const arcOK=(g)=>{ const dir=(g==='G3')?1:-1, sw=Math.PI, NS=Math.max(8,Math.round(sw*r*3)); for(let k=1;k<NS;k++){ const ang=aP+dir*sw*k/NS; if(globalWaste([O[0]+r*Math.cos(ang),O[1]+r*Math.sin(ang)])!==true)return false; } return true; };
-            let g=arcOK(pref)?pref:(arcOK(pref==='G3'?'G2':'G3')?(pref==='G3'?'G2':'G3'):null);
-            if(g) chosen={bk,tp:bt,S:bS,A:[P0[0],P0[1]],O,g};
+            const g=(tCCW[0]*bT[0]+tCCW[1]*bT[1]>=0)?'G3':'G2';
+            chosen={bk,tp:bt,S:bS,A:[P0[0],P0[1]],O,g};
           }
         }
         const bk=chosen?chosen.bk:nfBk, tp=chosen?chosen.tp:nfTp;
@@ -3369,31 +3364,14 @@ function buildLaserBody(){
       }
     }
     const S=c.start;
-    const locWaste=(pt)=>globalWaste(pt);
     if(chosen){
       head='G1 X'+_lc(chosen.A[0])+' Y'+_lc(chosen.A[1])+Fstr+'   ;percage au coeur de la zone (loin du bord)\n'
           +'G1 Z0   ;redescendre sur la tole avant de percer\n'
           +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
           +chosen.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(chosen.O[0]-chosen.A[0])+' J'+_lc(chosen.O[1]-chosen.A[1])+'   ;LEAD arc lisse, tangent au contour\n';
-    } else if(LEADIN && diam>0.5 && c._c && c.poly && c.poly.length>=3){
-      // Pas d'arc lisse possible (forme tordue) : on PERCE QUAND MEME AU POLE
-      // (point le plus degage) puis ligne droite radiale vers le depart. Le percage
-      // reste au maximum d'espace, meme sans arc.
-      let P;
-      if(wasteInside && c._pole && c._pole.pt && c._pole.d>0.45 && locWaste(c._pole.pt)){
-        P=[c._pole.pt[0],c._pole.pt[1]];
-      } else {
-        let T=[c.poly[1][0]-S[0],c.poly[1][1]-S[1]]; const tl=Math.hypot(T[0],T[1])||1; T=[T[0]/tl,T[1]/tl];
-        let N=[-T[1],T[0]]; if(locWaste([S[0]+N[0]*0.05,S[1]+N[1]*0.05])!==true) N=[-N[0],-N[1]];
-        let clr = wasteInside ? Math.min(Math.max(LEAD*3,4),(c._pole&&c._pole.d>0?c._pole.d*0.85:0.4*diam||LEAD)) : Math.max(LEAD,3);
-        P=[S[0]+N[0]*clr,S[1]+N[1]*clr]; let g=0;
-        while(clr>LEAD*0.6 && g++<10 && !(locWaste(P)&&locWaste([S[0]+N[0]*clr*0.5,S[1]+N[1]*clr*0.5]))){ clr*=0.7; P=[S[0]+N[0]*clr,S[1]+N[1]*clr]; }
-      }
-      head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage au point le plus degage\n'
-          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
-          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
-          +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;LEAD amorce droite\n';
     }
+    // Pas de fallback ligne droite : si la forme est trop petite pour un arc propre,
+    // on perce directement sur le depart (head===null ci-dessous). Aucune diagonale moche.
     if(head===null){
       head='G1 X'+_lc(S[0])+' Y'+_lc(S[1])+Fstr+'\n'
           +'G1 Z0   ;redescendre sur la tole avant de percer\n'
