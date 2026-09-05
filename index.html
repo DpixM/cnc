@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-GB ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-06-GC ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3478,8 +3478,11 @@ function buildLaserBody(){
       const rot=[[fmx,fmy]]; for(let k=0;k<n;k++) rot.push(loop[(si+k)%n]); rot.push(loop[si].slice()); rot.push([fmx,fmy]);
       offX=fmx; offY=fmy; haveOff=true;   // (0,0) = coin bas-gauche du cadre = depart du tour
       frameTxt=';=== DELIMITATION : le programme COMMENCE ICI, tour a vide (laser eteint) ~1cm autour ===\n';
-      for(let i=0;i<rot.length;i++) frameTxt+='G0 X'+_lc(rot[i][0])+' Y'+_lc(rot[i][1])+'\n';
-      frameTxt+='M00   ;PAUSE : verifie le placement, puis relance pour couper\n\n';
+      for(let i=0;i<rot.length-1;i++) frameTxt+='G0 X'+_lc(rot[i][0])+' Y'+_lc(rot[i][1])+'\n';
+      // la tete REVIENT au point de depart (le coin/zero) AVANT la pause : si le placement
+      // ne va pas, il suffit de bouger la tole, la tete est deja pile a son point de reference.
+      frameTxt+='G0 X'+_lc(rot[rot.length-1][0])+' Y'+_lc(rot[rot.length-1][1])+'   ;RETOUR au point de depart (0,0)\n';
+      frameTxt+='M00   ;PAUSE : la tete est revenue au coin de depart. Verifie le placement, puis relance pour couper\n\n';
     }
   }
   // Sans cadre : (0,0) = coin bas-gauche du dessin.
