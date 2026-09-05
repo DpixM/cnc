@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FQ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FR ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3357,26 +3357,32 @@ function buildLaserBody(){
             // comme le grand cercle exterieur (dont le centre tombe dans le fond a decouper).
             const eps=Math.min(0.2, Math.max(0.05,bd*0.5));
             const scrapVersPole = globalWaste([bS[0]+Nd[0]*eps, bS[1]+Nd[1]*eps])===true;
-            if(scrapVersPole){
-              // TROU / CHUTE : le rebut est du cote du pole -> on perce vers l'interieur
-              // (plafonne DMAX pour pas d'arc geant), demi-cercle propre garanti dans la chute.
-              const DMAX=Math.max(LEAD*4,5); const d=Math.min(nl,DMAX);
-              const A=[bS[0]+Nd[0]*d, bS[1]+Nd[1]*d];
-              const r=d/2, O=[bS[0]+Nd[0]*r,bS[1]+Nd[1]*r];
-              const tCCW=[Nd[1],-Nd[0]];
+            // Construit un demi-cercle de profondeur d dans la direction Dir, et VERIFIE
+            // qu'il reste TOUT ENTIER dans le rebut (ne traverse AUCUN autre contour/piece).
+            // Si ca traverse, on retrecit; jamais de ligne droite. Renvoie l'objet ou null.
+            const tryLead=(Dir,d)=>{
+              const A=[bS[0]+Dir[0]*d, bS[1]+Dir[1]*d];
+              const r=d/2, O=[bS[0]+Dir[0]*r, bS[1]+Dir[1]*r];
+              const tCCW=[Dir[1],-Dir[0]];
               const g=(tCCW[0]*bT[0]+tCCW[1]*bT[1]>=0)?'G3':'G2';
-              chosen={bk,tp:bt,S:bS,A,O,g};
+              const aP=Math.atan2(A[1]-O[1],A[0]-O[0]), dir=(g==='G3')?1:-1;
+              const NS=Math.max(24,Math.round(Math.PI*r*10)); // echantillonnage fin
+              const mrg=Math.max(0.15, r*0.15); // pres de S l'arc TOUCHE son propre contour (tangence voulue) -> on ignore
+              for(let k=1;k<NS;k++){ const ang=aP+dir*Math.PI*k/NS; const px=O[0]+r*Math.cos(ang), py=O[1]+r*Math.sin(ang);
+                if(globalWaste([px,py])!==true){ if(Math.hypot(px-bS[0],py-bS[1])<mrg) continue; return null; } } // sinon = vraie traversee d'une piece
+              return {bk,tp:bt,S:bS,A,O,g};
+            };
+            if(scrapVersPole){
+              // TROU / CHUTE : rebut du cote du pole. Percage vers l'interieur (plafonne
+              // DMAX pour pas d'arc geant). On retrecit si l'arc traverserait une piece voisine.
+              const DMAX=Math.max(LEAD*4,5);
+              for(let d=Math.min(nl,DMAX); d>=THR; d*=0.72){ const c2=tryLead(Nd,d); if(c2){chosen=c2;break;} }
             } else {
-              // BORD DE PIECE (contour EXTERIEUR ou ilot a garder) : le rebut est de l'AUTRE
-              // cote. On perce DANS LA TOLE (jamais dans la piece) + petit arc tangent.
+              // BORD DE PIECE (contour EXTERIEUR ou ilot a garder) : rebut de l'AUTRE cote.
+              // Percage DANS LA TOLE (jamais dans la piece) + petit arc, retreci si besoin.
               let No=[-Nd[0],-Nd[1]];
               if(globalWaste([bS[0]+No[0]*eps, bS[1]+No[1]*eps])===true){
-                const dext=Math.max(LEAD*2,2.2);
-                const A=[bS[0]+No[0]*dext, bS[1]+No[1]*dext]; // percage DEHORS, dans le rebut
-                const r=dext/2, O=[bS[0]+No[0]*r, bS[1]+No[1]*r];
-                const tCCW=[No[1],-No[0]];
-                const g=(tCCW[0]*bT[0]+tCCW[1]*bT[1]>=0)?'G3':'G2';
-                chosen={bk,tp:bt,S:bS,A,O,g};
+                for(let d=Math.max(LEAD*2,2.2); d>=THR; d*=0.72){ const c2=tryLead(No,d); if(c2){chosen=c2;break;} }
               }
             }
           }
