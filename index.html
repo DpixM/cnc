@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-FE ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-FF ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2102,7 +2102,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <div class="tsep"></div>
 
       <!-- FICHIERS : import / retouche SVG / export / projet -->
-      <button class="ptool" title="Importer SVG / image / DXF" onclick="triggerFilePick('svg')" style="font-size:11px;gap:2px">📥<span style="font-size:9px">SVG</span></button>
+      <button class="ptool" title="Importer SVG / image / DXF" onclick="triggerFilePick('svg')" style="font-size:11px;gap:2px">📥<span style="font-size:9px">Importer</span></button>
       <button class="ptool tcat" id="cat-svgedit" onclick="openToolMenu('svgedit',this)" title="Retoucher un SVG (dissocier, nettoyer, remplir…)" style="font-size:11px;gap:2px">🩹<span style="font-size:9px">SVG</span><span class="tcar">▾</span></button>
       <button class="ptool tcat" id="cat-export" onclick="openToolMenu('export',this)" title="Exporter (SVG / DXF)" style="font-size:11px;gap:2px">📤<span style="font-size:9px">Export</span><span class="tcar">▾</span></button>
       <button class="ptool tcat" id="cat-projet" onclick="openToolMenu('projet',this)" title="Projet : enregistrer / ouvrir" style="font-size:11px;gap:2px">📁<span style="font-size:9px">Projet</span><span class="tcar">▾</span></button>
@@ -3328,34 +3328,41 @@ function buildLaserBody(){
         const base=pl.slice(0,pl.length-1), nB=base.length;
         const inW=(pt)=>{ const q=_laserClassAt(pt[0],pt[1]); if(q===1)return true; if(q===2)return false; return _pointInPoly(pt,pl)===wasteInside; };
         let best=-1,bkL=0; for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB],d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d>best){best=d;bkL=k;} }
-        const cand=[[bkL,0.5]];
-        if(c._pole&&c._pole.pt){ const P0=c._pole.pt; let bd=1e18,bk2=0,tt=0.5; for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((P0[0]-a[0])*dx+(P0[1]-a[1])*dy)/L2; t=Math.max(0.02,Math.min(0.98,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy; const d=Math.hypot(P0[0]-fx,P0[1]-fy); if(d<bd){bd=d;bk2=k;tt=t;} } cand.push([bk2,tt]); }
+        const cand=[[bkL,0.5]]; let nfBk=bkL, nfTp=0.5;
+        if(c._pole&&c._pole.pt){ const P0=c._pole.pt; let bd=1e18,bk2=0,tt=0.5; for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((P0[0]-a[0])*dx+(P0[1]-a[1])*dy)/L2; t=Math.max(0.02,Math.min(0.98,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy; const d=Math.hypot(P0[0]-fx,P0[1]-fy); if(d<bd){bd=d;bk2=k;tt=t;} } cand.push([bk2,tt]); nfBk=bk2; nfTp=tt; }
         const stepC=Math.max(1,Math.floor(nB/10)); for(let k=0;k<nB;k+=stepC) cand.push([k,0.5]);
         // Pour chaque depart possible, on construit l'arc tangent au contour qui PASSE
         // PAR LE POLE (le centre le plus degage). => percage TOUJOURS au pole. On garde
         // le depart qui donne l'arc le plus PROPRE (plus petit balayage, sans sortir).
         if(ARC && wasteInside && c._pole && c._pole.pt && c._pole.d>Math.max(LEAD,1.2)){
-          const P0=c._pole.pt; let bestSweep=1e9;
+          const P0=c._pole.pt; let bestScore=1e18;
+          const tryArc=(S0,A,r,O)=>{ // renvoie 'G2'/'G3' si l'arc A->S0 tient dans la chute
+            const aP=Math.atan2(A[1]-O[1],A[0]-O[0]), aS=Math.atan2(S0[1]-O[1],S0[0]-O[0]);
+            for(const dir of [1,-1]){ let sw=dir*(aS-aP); while(sw<=1e-6)sw+=2*Math.PI; while(sw>2*Math.PI)sw-=2*Math.PI; if(sw>Math.PI*1.25)continue; const NS=Math.max(6,Math.round(sw/0.22)); let ok=true; for(let k=1;k<NS;k++){ const ang=aP+dir*sw*k/NS; if(!inW([O[0]+r*Math.cos(ang),O[1]+r*Math.sin(ang)])){ok=false;break;} } if(ok)return dir>0?'G3':'G2'; }
+            return null;
+          };
           for(const cc of cand){
             const a=base[cc[0]],b=base[(cc[0]+1)%nB];
             const S0=[a[0]+(b[0]-a[0])*cc[1], a[1]+(b[1]-a[1])*cc[1]];
             let T=[b[0]-a[0],b[1]-a[1]]; const tl=Math.hypot(T[0],T[1])||1; T=[T[0]/tl,T[1]/tl];
             let N=[-T[1],T[0]]; if(inW([S0[0]+N[0]*0.05,S0[1]+N[1]*0.05])!==true) N=[-N[0],-N[1]];
+            // 1) arc passant PAR LE POLE (percage = pole) -> score 0 (le meilleur)
             const dx=P0[0]-S0[0], dy=P0[1]-S0[1]; const proj=dx*N[0]+dy*N[1];
-            if(proj<Math.max(LEAD,1)) continue;                 // pole pas assez du cote chute
-            const r=(dx*dx+dy*dy)/(2*proj); if(!(r>0)||r>1e5) continue;
-            const O=[S0[0]+N[0]*r, S0[1]+N[1]*r];
-            const aP=Math.atan2(P0[1]-O[1],P0[0]-O[0]), aS=Math.atan2(S0[1]-O[1],S0[0]-O[0]);
-            for(const dir of [1,-1]){
-              let sw=dir*(aS-aP); while(sw<=1e-6)sw+=2*Math.PI; while(sw>2*Math.PI)sw-=2*Math.PI;
-              if(sw>Math.PI*1.15) continue;                     // pas d'arc qui fait quasi le tour
-              const NS=Math.max(8,Math.round(sw/0.22)); let ok=true;
-              for(let k=1;k<NS;k++){ const ang=aP+dir*sw*k/NS; if(!inW([O[0]+r*Math.cos(ang),O[1]+r*Math.sin(ang)])){ok=false;break;} }
-              if(ok && sw<bestSweep){ bestSweep=sw; chosen={bk:cc[0],tp:cc[1],S:S0,A:[P0[0],P0[1]],O,g:dir>0?'G3':'G2'}; }
+            if(proj>Math.max(LEAD,1)){
+              const r=(dx*dx+dy*dy)/(2*proj);
+              if(r>0&&r<1e5&&inW(P0)){ const O=[S0[0]+N[0]*r,S0[1]+N[1]*r]; const g=tryArc(S0,P0,r,O); if(g){ if(0<bestScore){bestScore=0; chosen={bk:cc[0],tp:cc[1],S:S0,A:[P0[0],P0[1]],O,g};} continue; } }
+            }
+            // 2) sinon ARC DYNAMIQUE : demi-cercle de taille decroissante (percage = S+N*h),
+            //    on garde le percage le PLUS PROCHE du pole. => toujours un arc.
+            for(const h of [c._pole.d*0.9,c._pole.d*0.7,c._pole.d*0.5,c._pole.d*0.35,c._pole.d*0.24,Math.max(LEAD*2,3)].filter(v=>v>1)){
+              const r=h/2, O=[S0[0]+N[0]*r,S0[1]+N[1]*r], A=[S0[0]+N[0]*h,S0[1]+N[1]*h];
+              if(!inW(A))continue;
+              const g=tryArc(S0,A,r,O);
+              if(g){ const sc=Math.hypot(A[0]-P0[0],A[1]-P0[1]); if(sc<bestScore){bestScore=sc; chosen={bk:cc[0],tp:cc[1],S:S0,A,O,g};} break; }
             }
           }
         }
-        const bk=chosen?chosen.bk:bkL, tp=chosen?chosen.tp:0.5;
+        const bk=chosen?chosen.bk:nfBk, tp=chosen?chosen.tp:nfTp;
         const a=base[bk],b=base[(bk+1)%nB]; const St=chosen?chosen.S:[a[0]+(b[0]-a[0])*tp,a[1]+(b[1]-a[1])*tp];
         const rot=[St]; for(let k=1;k<=nB;k++) rot.push(base[(bk+k)%nB]); rot.push([St[0],St[1]]);
         c.poly=rot; c.start=[St[0],St[1]]; c.moves=rot.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1]));
@@ -3369,13 +3376,20 @@ function buildLaserBody(){
           +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
           +chosen.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(chosen.O[0]-chosen.A[0])+' J'+_lc(chosen.O[1]-chosen.A[1])+'   ;LEAD arc lisse, tangent au contour\n';
     } else if(LEADIN && diam>0.5 && c._c && c.poly && c.poly.length>=3){
-      // Pas d'arc : percage ecarte du bord (cote chute) + amorce droite courte.
-      let T=[c.poly[1][0]-S[0],c.poly[1][1]-S[1]]; const tl=Math.hypot(T[0],T[1])||1; T=[T[0]/tl,T[1]/tl];
-      let N=[-T[1],T[0]]; if(locWaste([S[0]+N[0]*0.05,S[1]+N[1]*0.05])!==true) N=[-N[0],-N[1]];
-      let clr = wasteInside ? Math.min(Math.max(LEAD*3,4),(c._pole&&c._pole.d>0?c._pole.d*0.85:0.4*diam||LEAD)) : Math.max(LEAD,3);
-      let P=[S[0]+N[0]*clr,S[1]+N[1]*clr]; let g=0;
-      while(clr>LEAD*0.6 && g++<10 && !(locWaste(P)&&locWaste([S[0]+N[0]*clr*0.5,S[1]+N[1]*clr*0.5]))){ clr*=0.7; P=[S[0]+N[0]*clr,S[1]+N[1]*clr]; }
-      head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage dans la chute\n'
+      // Pas d'arc lisse possible (forme tordue) : on PERCE QUAND MEME AU POLE
+      // (point le plus degage) puis ligne droite radiale vers le depart. Le percage
+      // reste au maximum d'espace, meme sans arc.
+      let P;
+      if(wasteInside && c._pole && c._pole.pt && c._pole.d>Math.max(LEAD,0.8) && locWaste(c._pole.pt)){
+        P=[c._pole.pt[0],c._pole.pt[1]];
+      } else {
+        let T=[c.poly[1][0]-S[0],c.poly[1][1]-S[1]]; const tl=Math.hypot(T[0],T[1])||1; T=[T[0]/tl,T[1]/tl];
+        let N=[-T[1],T[0]]; if(locWaste([S[0]+N[0]*0.05,S[1]+N[1]*0.05])!==true) N=[-N[0],-N[1]];
+        let clr = wasteInside ? Math.min(Math.max(LEAD*3,4),(c._pole&&c._pole.d>0?c._pole.d*0.85:0.4*diam||LEAD)) : Math.max(LEAD,3);
+        P=[S[0]+N[0]*clr,S[1]+N[1]*clr]; let g=0;
+        while(clr>LEAD*0.6 && g++<10 && !(locWaste(P)&&locWaste([S[0]+N[0]*clr*0.5,S[1]+N[1]*clr*0.5]))){ clr*=0.7; P=[S[0]+N[0]*clr,S[1]+N[1]*clr]; }
+      }
+      head='G1 X'+_lc(P[0])+' Y'+_lc(P[1])+Fstr+'   ;percage au point le plus degage\n'
           +'G1 Z0   ;redescendre sur la tole avant de percer\n'
           +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
           +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;LEAD amorce droite\n';
@@ -16097,12 +16111,13 @@ function parseGcode(gc){
   let x=0,y=0,z=5,abs=true;
   let lineIdx=-1;
   let laserOn=null, pierceNext=false;   // null = usinage (pas de laser) ; true/false = laser on/off
+  const pierces=[];
   for(const raw of lines){
     lineIdx++;
     const line=raw.split(';')[0].trim().toUpperCase();
     if(!line) continue;
     // Etat laser (pour colorer la simulation : coupe = laser ON, déplacement = laser OFF)
-    if(line.indexOf('TC_LASER_ON')>=0){ laserOn=true; pierceNext=true; continue; }
+    if(line.indexOf('TC_LASER_ON')>=0){ laserOn=true; pierceNext=true; pierces.push([x,y,z]); continue; }
     if(line.indexOf('TC_LASER_OFF')>=0){ laserOn=false; continue; }
     if(line.startsWith('G90')){abs=true;continue;}
     if(line.startsWith('G91')){abs=false;continue;}
@@ -16147,6 +16162,7 @@ function parseGcode(gc){
       x=nx;y=ny;z=nz;
     }
   }
+  moves.pierces=pierces;
   return moves;
 }
 
@@ -16847,6 +16863,7 @@ function s3dToggle(type) {
   _s3d.vis[type] = !_s3d.vis[type];
   const btn = document.getElementById('s3d_btn_' + type);
   if (btn) btn.style.opacity = _s3d.vis[type] ? '1' : '0.3';
+  if (type==='plunge' && _s3d.pierceGrp) _s3d.pierceGrp.visible = _s3d.vis[type];
   const pos = _s3d.combGeo.attributes.position.array;
   const base = _s3d.basePos, st = _s3d.segTypes;
   for (let i=0;i<st.length;i++){ const o=i*6;
@@ -16958,6 +16975,10 @@ function _s3dInit(moves) {
   const mark = new THREE.Mesh(new THREE.SphereGeometry(_mr,12,12), new THREE.MeshBasicMaterial({color:0xffd24a}));
   mark.visible=false;
   pivot.add(mark);
+  // Points de PERCAGE : petites boules ROUGES (la ou le laser s'allume).
+  const pierceGrp=new THREE.Group();
+  if(moves.pierces){ for(const p of moves.pierces){ const sp=new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.6,_mr*0.95),10,10), new THREE.MeshBasicMaterial({color:0xff3b30})); sp.position.set(p[0],p[1],(p[2]||0)-0.05); pierceGrp.add(sp); } }
+  pivot.add(pierceGrp);
 
   // ── Axes XYZ (coin bas-gauche) ──
   const axV = [
@@ -16992,7 +17013,7 @@ function _s3dInit(moves) {
     initRadius,
     lines: lineObjs,
     vis: {rapid:true,cut:true,plunge:true,lead:true},
-    moves, combGeo, mark, segTypes:_segTypes, basePos:new Float32Array(_positions),
+    moves, combGeo, mark, pierceGrp, segTypes:_segTypes, basePos:new Float32Array(_positions),
     idx: moves.length, playing:false,
     speed:(parseInt(document.getElementById('s3dSpeed')&&document.getElementById('s3dSpeed').value)||4),
     drag: false, lx:0, ly:0,
