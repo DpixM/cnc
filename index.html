@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FS ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FT ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3357,32 +3357,37 @@ function buildLaserBody(){
             // comme le grand cercle exterieur (dont le centre tombe dans le fond a decouper).
             const eps=Math.min(0.2, Math.max(0.05,bd*0.5));
             const scrapVersPole = globalWaste([bS[0]+Nd[0]*eps, bS[1]+Nd[1]*eps])===true;
-            // Construit un demi-cercle de profondeur d dans la direction Dir, et VERIFIE
-            // qu'il reste TOUT ENTIER dans le rebut (ne traverse AUCUN autre contour/piece).
-            // Si ca traverse, on retrecit; jamais de ligne droite. Renvoie l'objet ou null.
-            const tryLead=(Dir,d)=>{
-              const A=[bS[0]+Dir[0]*d, bS[1]+Dir[1]*d];
-              const r=d/2, O=[bS[0]+Dir[0]*r, bS[1]+Dir[1]*r];
+            // helper : demi-cercle depuis S0 (tangente T0) en perçant dans la direction Dir,
+            // profondeur d. VERIFIE que tout l'arc reste dans le rebut (sinon on retrecit).
+            // clr = distance mini exigee entre le PERCAGE et tout contour (percage bien degage).
+            const tryLead=(S0,T0,Dir,d,clr)=>{
+              const A=[S0[0]+Dir[0]*d, S0[1]+Dir[1]*d];
+              const r=d/2, O=[S0[0]+Dir[0]*r, S0[1]+Dir[1]*r];
               const tCCW=[Dir[1],-Dir[0]];
-              const g=(tCCW[0]*bT[0]+tCCW[1]*bT[1]>=0)?'G3':'G2';
+              const g=(tCCW[0]*T0[0]+tCCW[1]*T0[1]>=0)?'G3':'G2';
               const aP=Math.atan2(A[1]-O[1],A[0]-O[0]), dir=(g==='G3')?1:-1;
-              const NS=Math.max(24,Math.round(Math.PI*r*10)); // echantillonnage fin
-              const mrg=Math.max(0.15, r*0.15); // pres de S l'arc TOUCHE son propre contour (tangence voulue) -> on ignore
+              const NS=Math.max(24,Math.round(Math.PI*r*10));
+              const mrg=Math.max(0.15, r*0.15); // pres de S0 l'arc TOUCHE son contour (tangence voulue)
               for(let k=1;k<NS;k++){ const ang=aP+dir*Math.PI*k/NS; const px=O[0]+r*Math.cos(ang), py=O[1]+r*Math.sin(ang);
-                if(globalWaste([px,py])!==true){ if(Math.hypot(px-bS[0],py-bS[1])<mrg) continue; return null; } } // sinon = vraie traversee d'une piece
-              return {bk,tp:bt,S:bS,A,O,g};
+                if(globalWaste([px,py])!==true){ if(Math.hypot(px-S0[0],py-S0[1])<mrg) continue; return null; } }
+              if(clr>0){ // le PERCAGE ne doit pas etre colle a une ligne (contour ext epineux)
+                for(const oc of contours){ const bb=oc._bb; if(bb&&(A[0]<bb[0]-clr||A[0]>bb[2]+clr||A[1]<bb[1]-clr||A[1]>bb[3]+clr))continue; const pp=oc.poly; for(let e=0;e+1<pp.length;e++){ const ax=pp[e][0],ay=pp[e][1],bx=pp[e+1][0],by=pp[e+1][1]; const ex=bx-ax,ey=by-ay,L2=ex*ex+ey*ey||1e-9; let tt=((A[0]-ax)*ex+(A[1]-ay)*ey)/L2; tt=Math.max(0,Math.min(1,tt)); const ddx=A[0]-(ax+tt*ex),ddy=A[1]-(ay+tt*ey); if(ddx*ddx+ddy*ddy<clr*clr) return null; } } }
+              return {S:S0,A,O,g};
             };
             if(scrapVersPole){
-              // TROU / CHUTE : rebut du cote du pole. Percage vers l'interieur (plafonne
-              // DMAX pour pas d'arc geant). On retrecit si l'arc traverserait une piece voisine.
+              // TROU / CHUTE : rebut du cote du pole. Percage vers l'interieur (plafonne DMAX).
               const DMAX=Math.max(LEAD*4,5);
-              for(let d=Math.min(nl,DMAX); d>=THR; d*=0.72){ const c2=tryLead(Nd,d); if(c2){chosen=c2;break;} }
+              for(let d=Math.min(nl,DMAX); d>=THR; d*=0.72){ const c2=tryLead(bS,bT,Nd,d,0); if(c2){chosen={bk,tp:bt,...c2};break;} }
             } else {
-              // BORD DE PIECE (contour EXTERIEUR ou ilot a garder) : rebut de l'AUTRE cote.
-              // Percage DANS LA TOLE (jamais dans la piece) + petit arc, retreci si besoin.
-              let No=[-Nd[0],-Nd[1]];
-              if(globalWaste([bS[0]+No[0]*eps, bS[1]+No[1]*eps])===true){
-                for(let d=Math.max(LEAD*2,2.2); d>=THR; d*=0.72){ const c2=tryLead(No,d); if(c2){chosen=c2;break;} }
+              // BORD DE PIECE (contour EXTERIEUR ou ilot) : on perce a une POINTE EXTERIEURE
+              // (sommet le plus loin du pole) ou le dehors est franchement degage -> le percage
+              // n'est jamais colle a la ligne ni sur une epine voisine. Petit arc qui rentre.
+              let fi=0,fd=-1; for(let k=0;k<nB;k++){ const dd=Math.hypot(base[k][0]-P0[0],base[k][1]-P0[1]); if(dd>fd){fd=dd;fi=k;} }
+              const Sx=base[fi], pa=base[(fi-1+nB)%nB], pbb=base[(fi+1)%nB];
+              let Tt=[pbb[0]-pa[0],pbb[1]-pa[1]]; const tll=Math.hypot(Tt[0],Tt[1])||1; Tt=[Tt[0]/tll,Tt[1]/tll];
+              let No=[Sx[0]-P0[0],Sx[1]-P0[1]]; const nol=Math.hypot(No[0],No[1])||1; No=[No[0]/nol,No[1]/nol];
+              if(globalWaste([Sx[0]+No[0]*0.2, Sx[1]+No[1]*0.2])===true){
+                for(let d=Math.max(LEAD*3,3.2); d>=Math.max(LEAD,1); d*=0.75){ const c2=tryLead(Sx,Tt,No,d,Math.max(LEAD*0.8,0.8)); if(c2){chosen={bk:fi,tp:0,...c2};break;} }
               }
             }
           }
