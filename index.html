@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FO ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FP ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3351,10 +3351,15 @@ function buildLaserBody(){
           }
           if(bS && bd>THR){
             let Nd=[P0[0]-bS[0],P0[1]-bS[1]]; const nl=Math.hypot(Nd[0],Nd[1])||1; Nd=[Nd[0]/nl,Nd[1]/nl];
-            const r=nl/2, O=[bS[0]+Nd[0]*r,bS[1]+Nd[1]*r]; // milieu de [S,pole]
+            // PLAFOND : dans une grande zone, pas besoin d'un arc geant qui balaie tout.
+            // On plafonne la profondeur du percage (donc le rayon de l'arc). Le percage
+            // reste tres degage (>= DMAX du bord) et l'arc reste propre et raisonnable.
+            const DMAX=Math.max(LEAD*4,5); const d=Math.min(nl,DMAX);
+            const A=[bS[0]+Nd[0]*d, bS[1]+Nd[1]*d]; // = pole si petite zone, sinon plafonne
+            const r=d/2, O=[bS[0]+Nd[0]*r,bS[1]+Nd[1]*r]; // milieu de [S,A]
             const tCCW=[Nd[1],-Nd[0]]; // tangente d'arrivee en S si G3 (sens trigo)
             const g=(tCCW[0]*bT[0]+tCCW[1]*bT[1]>=0)?'G3':'G2';
-            chosen={bk,tp:bt,S:bS,A:[P0[0],P0[1]],O,g};
+            chosen={bk,tp:bt,S:bS,A,O,g};
           }
         }
         else if(ARC && !wasteInside && nB>=3){
