@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-06-GC ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-06-GD ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -7784,14 +7784,16 @@ function pickEntity(xm,ym,tol){
 }
 function cadStartDim(){ _caddim=null; _dimA=null; _dimEdgeA=null; _dimHover=null; _dimPlace=null; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
 function _polyRegen(o, n){ if(!o||!o._poly)return; const c=_polyCenter(o); const r=_polyR(o)||1; const p0=o.pts[0]; const a0=Math.atan2(p0[1]-c[1],p0[0]-c[0]); const pts=[]; for(let i=0;i<n;i++){ const a=a0+i*2*Math.PI/n; pts.push([c[0]+r*Math.cos(a), c[1]+r*Math.sin(a)]); } pts.push([pts[0][0],pts[0][1]]); o.pts=pts; o._polyN=n; }
-function _shapeParamsRemove(){ const e=document.getElementById('shapeParams'); if(e)e.remove(); }
-function _isParametricShape(o){ return !!(o && (o.type==='rect'||o.type==='oblong'||o.type==='ellipse'||o._circle||o._poly||o._arc)); }
+let _shpPanelAway=null;
+function _shapeParamsRemove(){ const e=document.getElementById('shapeParams'); if(e)e.remove(); if(_shpPanelAway){ document.removeEventListener('pointerdown',_shpPanelAway,true); _shpPanelAway=null; } }
+function _isParametricShape(o){ return !!(o && (o.type==='rect'||o.type==='oblong'||o.type==='ellipse'||o.type==='star'||o.type==='tri'||o.type==='gear'||o._circle||o._poly||o._arc)); }
 function _shapeParamsFor(o){ const P=[]; if(!o)return P;
   const isC = o._circle || (o.type==='ellipse' && Math.abs((o.rx||0)-(o.ry||0))<0.01);
   if(isC){ P.push({l:'Ø (mm)', g:()=>2*(o.rx||o.ry||0), s:v=>{o.rx=o.ry=v/2;}}); }
   else if(o.type==='ellipse'){ P.push({l:'Longueur (mm)', g:()=>2*(o.rx||0), s:v=>{o.rx=v/2;}}); P.push({l:'Largeur (mm)', g:()=>2*(o.ry||0), s:v=>{o.ry=v/2;}}); }
   else if(o.type==='rect'){ P.push({l:'Longueur (mm)', g:()=>o.w, s:v=>{o.w=v;}}); P.push({l:'Largeur (mm)', g:()=>o.h, s:v=>{o.h=v;}}); }
   else if(o.type==='oblong'){ P.push({l:'Longueur (mm)', g:()=>o.w, s:v=>{o.w=v;}}); P.push({l:'Largeur (mm)', g:()=>o.h, s:v=>{o.h=v;}}); }
+  else if(o.type==='star'){ P.push({l:'Branches', g:()=>o.branches||5, s:v=>{o.branches=Math.max(3,Math.round(v)); if(typeof currentStarBranches!=='undefined')currentStarBranches=o.branches;}, int:true}); P.push({l:'Taille Ø (mm)', g:()=>o.w, s:v=>{ const cx=o.x+(o.w||0)/2, cy=o.y+(o.h||0)/2; o.w=o.h=v; o.x=cx-v/2; o.y=cy-v/2; }}); }
   else if(o._poly){ P.push({l:'Côtés', g:()=>o._polyN||6, s:v=>_polyRegen(o,Math.max(3,Math.round(v))), int:true}); P.push({l:'Ø (mm)', g:()=>2*(_polyR(o)||0), s:v=>{ const c=_polyCenter(o), r=_polyR(o)||1, k=(v/2)/r; o.pts=o.pts.map(q=>[c[0]+(q[0]-c[0])*k, c[1]+(q[1]-c[1])*k]); }}); }
   else if(o._arc){ P.push({l:'Rayon R (mm)', g:()=>o._arc.r, s:v=>{o._arc.r=v; _arcRegen(o);}}); P.push({l:'Corde (mm)', g:()=>Math.hypot(o._arc.p2[0]-o._arc.p1[0], o._arc.p2[1]-o._arc.p1[1]), s:v=>{ const P1=o._arc.p1, P2=o._arc.p2; const dx=P2[0]-P1[0],dy=P2[1]-P1[1],L=Math.hypot(dx,dy)||1; o._arc.p2=[P1[0]+dx/L*v, P1[1]+dy/L*v]; _arcRegen(o); }}); }
   else if(o.type==='free' && o.pts && o.pts.length===2){ P.push({l:'Longueur (mm)', g:()=>{const s=segOf(o);return Math.hypot(s[2]-s[0],s[3]-s[1]);}, s:v=>{const s=segOf(o);const dx=s[2]-s[0],dy=s[3]-s[1],L=Math.hypot(dx,dy)||1;setSeg(o,[s[0],s[1],s[0]+dx/L*v,s[1]+dy/L*v]);}}); }
@@ -7819,8 +7821,18 @@ function _shapeParamsPanel(o){ _shapeParamsRemove(); if(!o)return; _placeShapeCo
     row.appendChild(inp); d.appendChild(row); }
   const ok=document.createElement('button'); ok.textContent='✓ OK'; ok.style.cssText='margin-top:3px;padding:6px 10px;border:none;border-radius:8px;background:#22c55e;color:#04240f;font-weight:800;cursor:pointer'; ok.onclick=commit; d.appendChild(ok);
   document.body.appendChild(d);
-  // drag par le titre
-  title.addEventListener('mousedown',ev=>{ ev.preventDefault(); const r=d.getBoundingClientRect(); const ox=ev.clientX-r.left, oy=ev.clientY-r.top; const mv=e=>{ d.style.left=Math.max(0,e.clientX-ox)+'px'; d.style.top=Math.max(0,e.clientY-oy)+'px'; }; const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); }; document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); });
+  // les clics DANS le panneau ne doivent pas atteindre le canvas (sinon on dessine dessous)
+  d.addEventListener('pointerdown', e=>e.stopPropagation());
+  d.addEventListener('mousedown', e=>e.stopPropagation());
+  // DRAG par le titre avec CAPTURE du pointeur : plus de blocage a 5mm, marche au tactile.
+  title.addEventListener('pointerdown',ev=>{ ev.preventDefault(); ev.stopPropagation();
+    const r=d.getBoundingClientRect(); const ox=ev.clientX-r.left, oy=ev.clientY-r.top;
+    try{ title.setPointerCapture(ev.pointerId); }catch(e){}
+    const mv=e=>{ d.style.left=Math.max(0,e.clientX-ox)+'px'; d.style.top=Math.max(0,e.clientY-oy)+'px'; };
+    const up=()=>{ try{ title.releasePointerCapture(ev.pointerId); }catch(e){} title.removeEventListener('pointermove',mv); title.removeEventListener('pointerup',up); title.removeEventListener('pointercancel',up); };
+    title.addEventListener('pointermove',mv); title.addEventListener('pointerup',up); title.addEventListener('pointercancel',up); });
+  // CLIC AILLEURS = valider + fermer (la fenetre ne reste plus ouverte pour rien).
+  setTimeout(()=>{ _shpPanelAway=(ev)=>{ if(d.contains(ev.target))return; commit(); }; document.addEventListener('pointerdown',_shpPanelAway,true); }, 60);
   setTimeout(()=>{ try{ const i0=d.querySelector('input'); if(i0){i0.focus();i0.select();} }catch(e){} },20);
 }
 function cadDimClick(xm,ym){
@@ -8943,12 +8955,10 @@ function handlePointerUp(cpx,cpy){
   else if(paintTool==='ellipse')obj={id,type:'ellipse',x:x0+w/2,y:y0+h/2,rx:w/2,ry:h/2};
   else if(paintTool==='tri')obj={id,type:'tri',x:x0,y:y0,w,h};
   else if(paintTool==='star'){
-    // Ouvrir modal pour position précise (centre) et taille
-    const cxStar=x0+Math.min(w,h)/2, cyStar=y0+Math.min(w,h)/2;
-    const rStar=(Math.min(w,h)/2).toFixed(1);
-    openStarModal(cxStar, cyStar, rStar, Math.min(w,h).toFixed(1));
-    freePts=[];redrawCanvas();renderInspector();updateObjCount();
-    return;
+    // L'etoile se cree TOUT DE SUITE (comme les autres formes) et ouvre la meme petite
+    // fenetre draggable (branches + taille). Plus de modal separe, plus de disparition.
+    let sz=Math.min(w,h); if(!(sz>1)) sz=20; const cxS=x0+sz/2, cyS=y0+sz/2;
+    obj={id,type:'star',x:cxS-sz/2,y:cyS-sz/2,w:sz,h:sz,branches:(currentStarBranches||5)};
   }
   else if(paintTool==='oblong')obj={id,type:'oblong',x:x0,y:y0,w,h};
   if(obj){
