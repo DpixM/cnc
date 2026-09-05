@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FZ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-GA ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3480,8 +3480,7 @@ function buildLaserBody(){
   // ne sont PAS touches car le regex ne cible que les lettres X et Y.
   let mnx=1e18,mny=1e18; for(const c of contours) for(const q of c.poly){ if(q[0]<mnx)mnx=q[0]; if(q[1]<mny)mny=q[1]; }
   if(isFinite(mnx)){
-    if(FRAME){ mnx-=10; mny-=10; }          // le tour a vide deborde de ~1cm
-    const offX=mnx-1, offY=mny-1;            // 1mm de marge au zero
+    const offX=mnx, offY=mny;                 // (0,0) = COIN du dessin (au plus pres du contour)
     text=text.replace(/([XY])(-?\d*\.?\d+)/g, (mm,ax,num)=> ax+_lc(parseFloat(num)-(ax==='X'?offX:offY)) );
   }
   return {text, count:contours.length};
@@ -17068,16 +17067,16 @@ function _s3dInit(moves) {
   const pierceGrp=new THREE.Group();
   const _pr=Math.min(0.09,Math.max(0.03,spanXY*0.0002)); if(moves.pierces){ for(const p of moves.pierces){ const sp=new THREE.Mesh(new THREE.SphereGeometry(_pr,10,10), new THREE.MeshBasicMaterial({color:0xff3b30})); sp.position.set(p[0],p[1],(p[2]||0)-0.05); pierceGrp.add(sp); } }
   pivot.add(pierceGrp);
-  // ── Reperes MAUVES : DEPART de la decoupe (1er percage) + ZERO machine (0,0) ──
+  // ── DEPART de la decoupe (1er percage) = boule CYAN ──
   const _mv=Math.max(0.6, spanXY*0.02);
   if(moves.pierces && moves.pierces.length){ const p0=moves.pierces[0];
-    const startBall=new THREE.Mesh(new THREE.SphereGeometry(_mv,16,16), new THREE.MeshBasicMaterial({color:0xc23bff}));
+    const startBall=new THREE.Mesh(new THREE.SphereGeometry(_mv,16,16), new THREE.MeshBasicMaterial({color:0x00e5ff}));
     startBall.position.set(p0[0],p0[1],(p0[2]||0)); pivot.add(startBall); }
-  // Zero machine (0,0) : croix mauve (la ou la machine prend son origine)
-  { const zc=[ -_mv,0,0, _mv,0,0,  0,-_mv,0, 0,_mv,0 ];
+  // ── ZERO machine (0,0) = croix + boule MAUVES (au coin du dessin apres re-zero) ──
+  { const zc=[ -_mv*1.6,0,0, _mv*1.6,0,0,  0,-_mv*1.6,0, 0,_mv*1.6,0 ];
     const zg=new THREE.BufferGeometry(); zg.setAttribute('position',new THREE.Float32BufferAttribute(zc,3));
     pivot.add(new THREE.LineSegments(zg, new THREE.LineBasicMaterial({color:0xc23bff})));
-    const zb=new THREE.Mesh(new THREE.SphereGeometry(_mv*0.5,12,12), new THREE.MeshBasicMaterial({color:0xc23bff})); zb.position.set(0,0,0); pivot.add(zb); }
+    const zb=new THREE.Mesh(new THREE.SphereGeometry(_mv*0.55,12,12), new THREE.MeshBasicMaterial({color:0xc23bff})); zb.position.set(0,0,0); pivot.add(zb); }
 
   // ── Axes XYZ (coin bas-gauche) ──
   const axV = [
@@ -17093,8 +17092,8 @@ function _s3dInit(moves) {
 
   // ── Info ──
   const infoEl = document.getElementById('sim3DInfo');
-  if (infoEl) infoEl.textContent =
-    `${moves.length} mvts · X[${x0.toFixed(1)}→${x1.toFixed(1)}] Y[${y0.toFixed(1)}→${y1.toFixed(1)}] Z[${z0.toFixed(1)}→0]`;
+  if (infoEl) infoEl.innerHTML =
+    `${moves.length} mvts · X[${x0.toFixed(1)}→${x1.toFixed(1)}] Y[${y0.toFixed(1)}→${y1.toFixed(1)}]  ·  <span style="color:#00e5ff">⬤ départ</span>  <span style="color:#c23bff">✛ zéro (0,0)</span>`;
 
   // ── Orbit state ──
   // theta = angle horizontal (autour de Z)
