@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-FL ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FM ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3335,34 +3335,31 @@ function buildLaserBody(){
         // Pour chaque depart possible, on construit l'arc tangent au contour qui PASSE
         // PAR LE POLE (le centre le plus degage). => percage TOUJOURS au pole. On garde
         // le depart qui donne l'arc le plus PROPRE (plus petit balayage, sans sortir).
-        if(ARC && wasteInside && c._pole && c._pole.pt && c._pole.d>0.45){
-          const P0=c._pole.pt; let bestScore=1e18;
-          const tryArc=(S0,A,r,O)=>{ // renvoie 'G2'/'G3' si l'arc A->S0 tient dans la chute
-            const aP=Math.atan2(A[1]-O[1],A[0]-O[0]), aS=Math.atan2(S0[1]-O[1],S0[0]-O[0]);
-            for(const dir of [1,-1]){ let sw=dir*(aS-aP); while(sw<=1e-6)sw+=2*Math.PI; while(sw>2*Math.PI)sw-=2*Math.PI; if(sw>Math.PI*1.25)continue; const NS=Math.max(6,Math.round(sw/0.22)); let ok=true; for(let k=1;k<NS;k++){ const ang=aP+dir*sw*k/NS; if(!inW([O[0]+r*Math.cos(ang),O[1]+r*Math.sin(ang)])){ok=false;break;} } if(ok)return dir>0?'G3':'G2'; }
-            return null;
-          };
-          for(const cc of cand){
-            const a=base[cc[0]],b=base[(cc[0]+1)%nB];
-            const S0=[a[0]+(b[0]-a[0])*cc[1], a[1]+(b[1]-a[1])*cc[1]];
-            let T=[b[0]-a[0],b[1]-a[1]]; const tl=Math.hypot(T[0],T[1])||1; T=[T[0]/tl,T[1]/tl];
-            let N=[-T[1],T[0]]; if(inW([S0[0]+N[0]*0.05,S0[1]+N[1]*0.05])!==true) N=[-N[0],-N[1]];
-            // 1) arc passant PAR LE POLE (percage = pole). Parmi tous ceux qui marchent,
-            //    on garde le PLUS PETIT RAYON = la belle courbe serree (pas un grand arc plat).
-            const dx=P0[0]-S0[0], dy=P0[1]-S0[1]; const proj=dx*N[0]+dy*N[1];
-            if(proj>Math.max(LEAD,1)){
-              const r=(dx*dx+dy*dy)/(2*proj);
-              if(r>0 && r<c._pole.d*3.0 && inW(P0)){ const O=[S0[0]+N[0]*r,S0[1]+N[1]*r]; const g=tryArc(S0,P0,r,O); if(g){ if(r<bestScore){bestScore=r; chosen={bk:cc[0],tp:cc[1],S:S0,A:[P0[0],P0[1]],O,g};} continue; } }
-            }
-            // 2) sinon ARC DYNAMIQUE (percage un peu decale, mais toujours un arc). Score
-            //    volontairement > tous les arcs-pole (1e6) : on ne l'utilise que si aucun
-            //    arc-pole n'existe. On garde le percage le PLUS PROCHE du pole.
-            for(const h of [c._pole.d*0.9,c._pole.d*0.72,c._pole.d*0.56,c._pole.d*0.42,c._pole.d*0.3,c._pole.d*0.2,c._pole.d*0.12].filter(v=>v>0.2)){
-              const r=h/2, O=[S0[0]+N[0]*r,S0[1]+N[1]*r], A=[S0[0]+N[0]*h,S0[1]+N[1]*h];
-              if(!inW(A))continue;
-              const g=tryArc(S0,A,r,O);
-              if(g){ const sc=1e6+Math.hypot(A[0]-P0[0],A[1]-P0[1]); if(sc<bestScore){bestScore=sc; chosen={bk:cc[0],tp:cc[1],S:S0,A,O,g};} break; }
-            }
+        // === AMORCE ROBUSTE (demi-cercle propre, plonge vers le centre) ===
+        // S = point du contour le PLUS PROCHE du pole. Là, la normale pointe pile vers
+        // le pole : l'arc tangent devient un DEMI-CERCLE de rayon |PS|/2 centré au milieu
+        // de [S,pole]. Il part du pole (perçage), plonge vers l'intérieur (grand
+        // dégagement du bord) et rejoint le mur en S. Il reste TOUJOURS dans l'incercle
+        // (donc dans la chute) et sa taille s'adapte d'office à la zone. Jamais de droite.
+        if(ARC && wasteInside && c._pole && c._pole.pt && c._pole.d>Math.max(LEAD*0.4,0.35)){
+          const P0=c._pole.pt;
+          let bd=1e18,bk=0,bt=0.5,bS=null,bT=null;
+          for(let k=0;k<nB;k++){
+            const a=base[k],b=base[(k+1)%nB];
+            const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9;
+            let t=((P0[0]-a[0])*dx+(P0[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t));
+            const fx=a[0]+t*dx,fy=a[1]+t*dy,d=Math.hypot(P0[0]-fx,P0[1]-fy);
+            if(d<bd){ bd=d;bk=k;bt=t;bS=[fx,fy]; const tl=Math.sqrt(L2); bT=[dx/tl,dy/tl]; }
+          }
+          if(bS && bd>Math.max(LEAD*0.5,0.3)){
+            let Nd=[P0[0]-bS[0],P0[1]-bS[1]]; const nl=Math.hypot(Nd[0],Nd[1])||1; Nd=[Nd[0]/nl,Nd[1]/nl];
+            const r=nl/2, O=[bS[0]+Nd[0]*r,bS[1]+Nd[1]*r]; // milieu de [S,pole]
+            const tCCW=[Nd[1],-Nd[0]]; // tangente d'arrivee en S si G3 (sens trigo)
+            const pref=(tCCW[0]*bT[0]+tCCW[1]*bT[1]>=0)?'G3':'G2';
+            const aP=Math.atan2(P0[1]-O[1],P0[0]-O[0]);
+            const arcOK=(g)=>{ const dir=(g==='G3')?1:-1, sw=Math.PI, NS=Math.max(8,Math.round(sw*r*3)); for(let k=1;k<NS;k++){ const ang=aP+dir*sw*k/NS; if(globalWaste([O[0]+r*Math.cos(ang),O[1]+r*Math.sin(ang)])!==true)return false; } return true; };
+            let g=arcOK(pref)?pref:(arcOK(pref==='G3'?'G2':'G3')?(pref==='G3'?'G2':'G3'):null);
+            if(g) chosen={bk,tp:bt,S:bS,A:[P0[0],P0[1]],O,g};
           }
         }
         const bk=chosen?chosen.bk:nfBk, tp=chosen?chosen.tp:nfTp;
@@ -16980,7 +16977,7 @@ function _s3dInit(moves) {
   pivot.add(mark);
   // Points de PERCAGE : petites boules ROUGES (la ou le laser s'allume).
   const pierceGrp=new THREE.Group();
-  const _pr=Math.min(0.3,Math.max(0.12,spanXY*0.0006)); if(moves.pierces){ for(const p of moves.pierces){ const sp=new THREE.Mesh(new THREE.SphereGeometry(_pr,10,10), new THREE.MeshBasicMaterial({color:0xff3b30})); sp.position.set(p[0],p[1],(p[2]||0)-0.05); pierceGrp.add(sp); } }
+  const _pr=Math.min(0.09,Math.max(0.03,spanXY*0.0002)); if(moves.pierces){ for(const p of moves.pierces){ const sp=new THREE.Mesh(new THREE.SphereGeometry(_pr,10,10), new THREE.MeshBasicMaterial({color:0xff3b30})); sp.position.set(p[0],p[1],(p[2]||0)-0.05); pierceGrp.add(sp); } }
   pivot.add(pierceGrp);
 
   // ── Axes XYZ (coin bas-gauche) ──
