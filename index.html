@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FT ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FU ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3270,31 +3270,36 @@ function buildLaserBody(){
   const ARC=document.getElementById('laserArc')?.checked!==false;   // entree en arc
   const INV=document.getElementById('laserInvert')?.checked||false; // inverser plein/vide
   const contours=[]; // {poly, start, moves}
-  const add=(poly,start,moves)=>{ if(moves&&moves.length) contours.push({poly,start,moves}); };
+  const add=(poly,start,moves,closed)=>{ if(moves&&moves.length) contours.push({poly,start,moves,_closed:!!closed}); };
   for(const o of flat){
     if(!o || o.type==='dim' || o.type==='point') continue;
     // Cercle -> un seul G2 (tour complet)
     if((o.type==='ellipse' && Math.abs((o.rx||0)-(o.ry||0))<0.01) || o._circle){
       const r=o._circle?(o.rx||o.ry||o.r||0):o.rx, cx=o.x, cy=o.y;
       if(r>0){ const poly=[]; for(let k=0;k<24;k++){ const a=k/24*2*Math.PI; poly.push([cx+r*Math.cos(a), cy+r*Math.sin(a)]); }
-        add(poly, [cx+r,cy], ['G2 X'+_lc(cx+r)+' Y'+_lc(cy)+' I'+_lc(-r)+' J0']); }
+        add(poly, [cx+r,cy], ['G2 X'+_lc(cx+r)+' Y'+_lc(cy)+' I'+_lc(-r)+' J0'], true); }
       continue;
     }
     // Ligne
-    if(o.type==='line'){ add([[o.x1,o.y1],[o.x2,o.y2]], [o.x1,o.y1], ['G1 X'+_lc(o.x2)+' Y'+_lc(o.y2)]); continue; }
+    if(o.type==='line'){ add([[o.x1,o.y1],[o.x2,o.y2]], [o.x1,o.y1], ['G1 X'+_lc(o.x2)+' Y'+_lc(o.y2)], false); continue; }
     // Arc 3 points -> G2/G3
     if(o._arc){ try{ const C=_arcCenter(o), ap=_arcApexPt(o); const P1=o._arc.p1, P2=o._arc.p2;
-      if(C&&ap){ add([P1,ap,P2], [P1[0],P1[1]], [_laserArc(C,P1,P2,ap)]); continue; } }catch(e){} }
+      if(C&&ap){ add([P1,ap,P2], [P1[0],P1[1]], [_laserArc(C,P1,P2,ap)], false); continue; } }catch(e){} }
     // Sinon : polyligne FIDELE (meme logique que l'export DXF).
     const _CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon'];
     const _isClosed=_CLOSEDT.includes(o.type)||o._poly;
     let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; }
     for(let s of st){ if(!s||s.length<2) continue;
-      let closed=false;
-      if(_isClosed){ const a=s[0],b=s[s.length-1]; if(Math.hypot(a[0]-b[0],a[1]-b[1])>1e-6) s=s.concat([[a[0],a[1]]]); closed=true; }
-      else { closed=(s.length>2 && Math.hypot(s[0][0]-s[s.length-1][0],s[0][1]-s[s.length-1][1])<1e-6); }
+      // Un TAB (pont) efface un bout du contour -> l'objet reste _poly (ferme) mais le
+      // stroke devient un ARC OUVERT. On ne referme QUE si les extremites se rejoignent
+      // vraiment (petit ecart). Un ecart >= tol = vrai trou (tab) -> on laisse OUVERT,
+      // sinon on tracerait une longue arete parasite en travers du dessin.
+      let closed=false; const a=s[0],b=s[s.length-1], egap=Math.hypot(a[0]-b[0],a[1]-b[1]);
+      const _tol=Math.min(0.3,(typeof _tabW!=='undefined'&&_tabW>0?_tabW:0.8)*0.5);
+      if(_isClosed && egap<=_tol){ if(egap>1e-6) s=s.concat([[a[0],a[1]]]); closed=true; }
+      else { closed=(s.length>2 && egap<1e-6); }
       const moves=[]; for(let i=1;i<s.length;i++) moves.push('G1 X'+_lc(s[i][0])+' Y'+_lc(s[i][1]));
-      add(s.slice(), [s[0][0],s[0][1]], moves);
+      add(s.slice(), [s[0][0],s[0][1]], moves, closed);
     }
   }
   // ORDRE DE COUPE : profondeur d'imbrication (un contour DANS un autre = coupe avant).
@@ -3323,7 +3328,7 @@ function buildLaserBody(){
     // en DEMI-ARC lisse la PLUS PROFONDE (percage au plus pres du coeur). On garde le
     // meilleur -> percage au centre de la zone la plus grosse, entree douce, meme sur
     // une etoile (ou le point le plus proche est un creux qu'on evite ainsi).
-    if(LEADIN && c.poly && c.poly.length>=3 && c._c){
+    if(LEADIN && c._closed && c.poly && c.poly.length>=3 && c._c){
       let pl=c.poly.slice();
       if(Math.hypot(pl[0][0]-pl[pl.length-1][0],pl[0][1]-pl[pl.length-1][1])>1e-6) pl.push(pl[0].slice()); // fermer si besoin
       {
