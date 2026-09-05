@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FU ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FV ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -10368,7 +10368,15 @@ function _doVectorize(img,file,mode,killLoader){
           lum[i]=l; sum+=l;
         }
         const mean=sum/(W*H);
-        const thr=Math.max(60,Math.min(200,mean));
+        // SEUIL D'OTSU : le vrai "creux" entre matiere (sombre) et fond (clair). Bien
+        // meilleur que la moyenne — qui, sur fond blanc, remontait a ~200 et incluait plein
+        // de pixels gris d'anti-aliasing => traits gras qui fusionnent => details perdus.
+        const _hist=new Float64Array(256);
+        for(let i=0;i<W*H;i++){ let v=lum[i]|0; if(v<0)v=0; else if(v>255)v=255; _hist[v]++; }
+        const _tot=W*H; let _sa=0; for(let t=0;t<256;t++)_sa+=t*_hist[t];
+        let _sb=0,_wb=0,_mx=-1,_ot=Math.round(mean);
+        for(let t=0;t<256;t++){ _wb+=_hist[t]; if(_wb===0)continue; const _wf=_tot-_wb; if(_wf===0)break; _sb+=t*_hist[t]; const _mb=_sb/_wb,_mf=(_sa-_sb)/_wf; const _bt=_wb*_wf*(_mb-_mf)*(_mb-_mf); if(_bt>_mx){_mx=_bt;_ot=t;} }
+        const thr=Math.max(40,Math.min(220,_ot));  // Otsu (garde-fou large)
         const GW=W+2, GH=H+2;
         const bin=new Uint8Array(GW*GH);
         for(let y=0;y<H;y++)for(let x=0;x<W;x++){
