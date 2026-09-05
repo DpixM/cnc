@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-GA ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-GB ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3460,29 +3460,33 @@ function buildLaserBody(){
   });
   // DELIMITATION : avant de couper, tour du rectangle englobant A VIDE (laser off) + M00.
   // Permet de verifier le placement sur la tole avant de valider la decoupe.
-  let frameTxt='';
+  // DELIMITATION + RE-ZERO unifies. IDEE : l'operateur pose sa tole, met la tete dans LE
+  // COIN (= son zero), lance le prog -> la 1re chose faite est le TOUR A VIDE autour de la
+  // piece, DEPUIS ce coin. Pas de grand deplacement au debut. Donc : (0,0) = coin bas-gauche
+  // du cadre, et le tour demarre a ce coin. Tout le reste est en coordonnees POSITIVES.
+  let frameTxt='', offX=0, offY=0, haveOff=false;
   const FRAME=document.getElementById('laserFrame')?.checked;
   if(FRAME && contours.length){
     const allp=[]; for(const c of contours) for(const q of c.poly) allp.push(q);
     let loop=_frameHullOffset(allp, 10);   // ~1cm autour, grossier (enveloppe convexe)
     if(loop && loop.length>=4){
-      frameTxt=';=== DELIMITATION : tour a vide (laser eteint) ~1cm autour du dessin ===\n';
-      frameTxt+='G0 X'+_lc(loop[0][0])+' Y'+_lc(loop[0][1])+'\n';
-      for(let i=1;i<loop.length;i++) frameTxt+='G0 X'+_lc(loop[i][0])+' Y'+_lc(loop[i][1])+'\n';
-      frameTxt+='M00   ;PAUSE : verifie le placement sur la tole, puis relance pour couper\n\n';
+      const n=loop.length-1;
+      let fmx=1e18,fmy=1e18; for(let i=0;i<n;i++){ if(loop[i][0]<fmx)fmx=loop[i][0]; if(loop[i][1]<fmy)fmy=loop[i][1]; }
+      // demarrer le tour au sommet le PLUS PROCHE du coin (fmx,fmy) -> trajet initial ~nul
+      let si=0,sd=1e18; for(let i=0;i<n;i++){ const d=(loop[i][0]-fmx)**2+(loop[i][1]-fmy)**2; if(d<sd){sd=d;si=i;} }
+      // le tour PART du coin (fmx,fmy) = le zero (la ou tu poses la tete), fait le tour, revient au coin
+      const rot=[[fmx,fmy]]; for(let k=0;k<n;k++) rot.push(loop[(si+k)%n]); rot.push(loop[si].slice()); rot.push([fmx,fmy]);
+      offX=fmx; offY=fmy; haveOff=true;   // (0,0) = coin bas-gauche du cadre = depart du tour
+      frameTxt=';=== DELIMITATION : le programme COMMENCE ICI, tour a vide (laser eteint) ~1cm autour ===\n';
+      for(let i=0;i<rot.length;i++) frameTxt+='G0 X'+_lc(rot[i][0])+' Y'+_lc(rot[i][1])+'\n';
+      frameTxt+='M00   ;PAUSE : verifie le placement, puis relance pour couper\n\n';
     }
   }
+  // Sans cadre : (0,0) = coin bas-gauche du dessin.
+  if(!haveOff){ let mnx=1e18,mny=1e18; for(const c of contours) for(const q of c.poly){ if(q[0]<mnx)mnx=q[0]; if(q[1]<mny)mny=q[1]; } if(isFinite(mnx)){ offX=mnx; offY=mny; haveOff=true; } }
   let text=frameTxt+blocks.join('\n\n');
-  // RE-ZERO : on ramene l'origine (0,0) au COIN BAS-GAUCHE du dessin (marge frame incluse).
-  // Avant, les coordonnees etaient brutes -> le zero machine tombait loin dans un coin de
-  // feuille (d'ou les longs trajets vers l'origine). Maintenant la piece est collee au zero,
-  // coordonnees positives (ce que preferent la plupart des machines). I/J (arcs, relatifs)
-  // ne sont PAS touches car le regex ne cible que les lettres X et Y.
-  let mnx=1e18,mny=1e18; for(const c of contours) for(const q of c.poly){ if(q[0]<mnx)mnx=q[0]; if(q[1]<mny)mny=q[1]; }
-  if(isFinite(mnx)){
-    const offX=mnx, offY=mny;                 // (0,0) = COIN du dessin (au plus pres du contour)
-    text=text.replace(/([XY])(-?\d*\.?\d+)/g, (mm,ax,num)=> ax+_lc(parseFloat(num)-(ax==='X'?offX:offY)) );
-  }
+  // RE-ZERO : coordonnees ramenees au coin (tout positif). I/J (arcs, relatifs) NON touches.
+  if(haveOff){ text=text.replace(/([XY])(-?\d*\.?\d+)/g, (mm,ax,num)=> ax+_lc(parseFloat(num)-(ax==='X'?offX:offY)) ); }
   return {text, count:contours.length};
 }
 // Emballe le corps dans le squelette .LST (fourni par l'ingénieur).
