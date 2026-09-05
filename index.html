@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-FK ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-FL ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3335,7 +3335,7 @@ function buildLaserBody(){
         // Pour chaque depart possible, on construit l'arc tangent au contour qui PASSE
         // PAR LE POLE (le centre le plus degage). => percage TOUJOURS au pole. On garde
         // le depart qui donne l'arc le plus PROPRE (plus petit balayage, sans sortir).
-        if(ARC && wasteInside && c._pole && c._pole.pt && c._pole.d>Math.max(LEAD,0.8)){
+        if(ARC && wasteInside && c._pole && c._pole.pt && c._pole.d>0.45){
           const P0=c._pole.pt; let bestScore=1e18;
           const tryArc=(S0,A,r,O)=>{ // renvoie 'G2'/'G3' si l'arc A->S0 tient dans la chute
             const aP=Math.atan2(A[1]-O[1],A[0]-O[0]), aS=Math.atan2(S0[1]-O[1],S0[0]-O[0]);
@@ -3357,7 +3357,7 @@ function buildLaserBody(){
             // 2) sinon ARC DYNAMIQUE (percage un peu decale, mais toujours un arc). Score
             //    volontairement > tous les arcs-pole (1e6) : on ne l'utilise que si aucun
             //    arc-pole n'existe. On garde le percage le PLUS PROCHE du pole.
-            for(const h of [c._pole.d*0.9,c._pole.d*0.72,c._pole.d*0.56,c._pole.d*0.42,c._pole.d*0.3,c._pole.d*0.2,Math.max(LEAD*2,2.5),Math.max(LEAD*1.2,1.4),LEAD*0.8].filter(v=>v>0.5)){
+            for(const h of [c._pole.d*0.9,c._pole.d*0.72,c._pole.d*0.56,c._pole.d*0.42,c._pole.d*0.3,c._pole.d*0.2,c._pole.d*0.12].filter(v=>v>0.2)){
               const r=h/2, O=[S0[0]+N[0]*r,S0[1]+N[1]*r], A=[S0[0]+N[0]*h,S0[1]+N[1]*h];
               if(!inW(A))continue;
               const g=tryArc(S0,A,r,O);
@@ -3383,7 +3383,7 @@ function buildLaserBody(){
       // (point le plus degage) puis ligne droite radiale vers le depart. Le percage
       // reste au maximum d'espace, meme sans arc.
       let P;
-      if(wasteInside && c._pole && c._pole.pt && c._pole.d>Math.max(LEAD,0.8) && locWaste(c._pole.pt)){
+      if(wasteInside && c._pole && c._pole.pt && c._pole.d>0.45 && locWaste(c._pole.pt)){
         P=[c._pole.pt[0],c._pole.pt[1]];
       } else {
         let T=[c.poly[1][0]-S[0],c.poly[1][1]-S[1]]; const tl=Math.hypot(T[0],T[1])||1; T=[T[0]/tl,T[1]/tl];
