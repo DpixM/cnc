@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FV ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-05-FW ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -1956,6 +1956,10 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
       <input type="checkbox" id="laserInvert" onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
       <span><b>Inverser plein/vide</b> — coche si c'est l'inverse qui doit tomber (ex : tu gardes la petite pièce au lieu du tour).</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
+      <input type="checkbox" id="laserFrame" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
+      <span><b>Délimitation (contour à vide + pause)</b> — avant de couper, la tête fait le tour du rectangle du dessin <b>sans laser</b>, puis s'arrête (M00). Tu vérifies le placement sur la tôle, tu valides sur la machine, et ça repart couper.</span>
     </label>
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
       <input type="checkbox" id="laserFullFile" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
@@ -3421,7 +3425,24 @@ function buildLaserBody(){
       +'TC_LASER_OFF(2)\n'
       +'G1 Z'+_lc(ZL)+'   ;lever la tete pour degager la piece coupee';
   });
-  return {text:blocks.join('\n\n'), count:contours.length};
+  // DELIMITATION : avant de couper, tour du rectangle englobant A VIDE (laser off) + M00.
+  // Permet de verifier le placement sur la tole avant de valider la decoupe.
+  let frameTxt='';
+  const FRAME=document.getElementById('laserFrame')?.checked;
+  if(FRAME && contours.length){
+    let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18;
+    for(const c of contours){ for(const q of c.poly){ if(q[0]<x0)x0=q[0]; if(q[0]>x1)x1=q[0]; if(q[1]<y0)y0=q[1]; if(q[1]>y1)y1=q[1]; } }
+    if(x1>x0 && y1>y0){
+      frameTxt=';=== DELIMITATION : tour a vide (laser eteint) pour verifier le placement ===\n'
+        +'G0 X'+_lc(x0)+' Y'+_lc(y0)+'\n'
+        +'G0 X'+_lc(x1)+' Y'+_lc(y0)+'\n'
+        +'G0 X'+_lc(x1)+' Y'+_lc(y1)+'\n'
+        +'G0 X'+_lc(x0)+' Y'+_lc(y1)+'\n'
+        +'G0 X'+_lc(x0)+' Y'+_lc(y0)+'\n'
+        +'M00   ;PAUSE : verifie le placement sur la tole, puis relance pour couper\n\n';
+    }
+  }
+  return {text:frameTxt+blocks.join('\n\n'), count:contours.length};
 }
 // Emballe le corps dans le squelette .LST (fourni par l'ingénieur).
 const _LST_HEADER="BD\nSET_METRIC\nC\nBEGIN_EINRICHTEPLAN_INFO\nC\nZA,MM,6\nMM,AT,1,60,1,1,,'ProgName',,'',T\nMM,AT,1,280,1,1,,'MachineViewerName',,'',T\nMM,AT,1,300,1,1,,'CheckLevel',,'',Z\nMM,AT,1,310,1,1,,'SetupSuppression',,'',Z\nMM,AT,1,320,1,1,,'SortMasterBoxSetupConfiguration',,'',Z\nMM,AT,1,330,1,1,,'LaserCutDataCalculated',,'',Z\nC\nZA,DA,1\nDA,'__PROGNAME__','Service',-1,0,-1,0\nC\nENDE_EINRICHTEPLAN_INFO\nC\nBEGIN_GLOBAL_DATASET\nC\nZA,MM,2\nMM,AT,1,10,1,1,,'DataSetType',,'',T\nMM,AT,1,20,1,1,,'DataSetName',,'',T\nC\nZA,DA,1\nDA,'LTT_STAMM','__TECHNO__'\nC\nENDE_GLOBAL_DATASET\nC\nBEGIN_LTT_CALLS\nC\nZA,MM,1\nMM,AT,1,10,1,1,,'DataSetName',,'',T\nC\nZA,DA,1\nDA,'__TECHNO__'\nC\nENDE_LTT_CALLS\nC\nBEGIN_PROGRAM_PROPERTIES\nC\nZA,MM,16\nMM,AT,1,10,1,1,,'SyncDataChangePierceToCut',,'',Z\nMM,AT,1,20,1,1,,'ProgramType',,'',Z\nMM,AT,1,30,1,1,,'ProgramedClampPositionsObligatory',,'Bool',Z\nMM,AT,1,40,1,1,,'ReentryRestriction',,'',Z\nMM,AT,1,50,1,1,,'ContourLineAdjustmentActive',,'Bool',Z\nMM,AT,1,60,1,1,,'FinishedPartSupportNumber',,'',Z\nMM,AT,1,70,1,1,,'BevelCuttingVersion',,'',Z\nMM,AT,1,80,1,1,,'FluidSprayMode',,'',Z\nMM,AT,1,90,1,1,,'RetractableClampsRequired',,'Bool',Z\nMM,AT,1,100,1,1,,'AdjustLineLevel',,'',Z\nMM,AT,1,110,1,1,,'CollisionReduced',,'',Z\nMM,AT,1,120,1,1,,'MarkingLaserTechnologyName',,'',T\nMM,AT,1,130,1,1,,'LabelEncodingTypes',,'',Z\nMM,AT,1,140,1,1,,'CodeSignature',,'',T\nMM,AT,1,150,1,1,,'ContourLineAdjustmentRequiered',,'',Z\nMM,AT,1,170,1,1,,'ScrapControlRecutActive',,'',Z\nC\nZA,DA,1\nDA,0,4,0,0,0,0,0,0,0,0,0,'',0,'CodeSignature_NONE',-1,1\nC\nENDE_PROGRAM_PROPERTIES\nC\nBEGIN_PROGRAMM\nC\nZA,MM,5\nMM,AT,1,10,1,1,,'ProgTitle',,'',T\nMM,AT,1,20,1,1,,'ProgType',,'',T\nMM,AT,1,30,1,1,,'Comment',,'',T\nMM,AT,1,60,1,1,,'IncreasingRecordNumberFlag',,'Bool',Z\nMM,AT,1,80,1,1,,'IsSubProgMacro',,'Bool',Z\nC\nZA,DA,1\nDA,'__PROGNAME__','HP','',0,0\nSTART_TEXT\n";
@@ -17005,6 +17026,16 @@ function _s3dInit(moves) {
   const pierceGrp=new THREE.Group();
   const _pr=Math.min(0.09,Math.max(0.03,spanXY*0.0002)); if(moves.pierces){ for(const p of moves.pierces){ const sp=new THREE.Mesh(new THREE.SphereGeometry(_pr,10,10), new THREE.MeshBasicMaterial({color:0xff3b30})); sp.position.set(p[0],p[1],(p[2]||0)-0.05); pierceGrp.add(sp); } }
   pivot.add(pierceGrp);
+  // ── Reperes MAUVES : DEPART de la decoupe (1er percage) + ZERO machine (0,0) ──
+  const _mv=Math.max(0.6, spanXY*0.02);
+  if(moves.pierces && moves.pierces.length){ const p0=moves.pierces[0];
+    const startBall=new THREE.Mesh(new THREE.SphereGeometry(_mv,16,16), new THREE.MeshBasicMaterial({color:0xc23bff}));
+    startBall.position.set(p0[0],p0[1],(p0[2]||0)); pivot.add(startBall); }
+  // Zero machine (0,0) : croix mauve (la ou la machine prend son origine)
+  { const zc=[ -_mv,0,0, _mv,0,0,  0,-_mv,0, 0,_mv,0 ];
+    const zg=new THREE.BufferGeometry(); zg.setAttribute('position',new THREE.Float32BufferAttribute(zc,3));
+    pivot.add(new THREE.LineSegments(zg, new THREE.LineBasicMaterial({color:0xc23bff})));
+    const zb=new THREE.Mesh(new THREE.SphereGeometry(_mv*0.5,12,12), new THREE.MeshBasicMaterial({color:0xc23bff})); zb.position.set(0,0,0); pivot.add(zb); }
 
   // ── Axes XYZ (coin bas-gauche) ──
   const axV = [
