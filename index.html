@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-FJ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-08-13-FK ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3343,24 +3343,25 @@ function buildLaserBody(){
             return null;
           };
           for(const cc of cand){
-            if(bestScore===0) break;   // deja l'ideal (percage au pole) -> on arrete
             const a=base[cc[0]],b=base[(cc[0]+1)%nB];
             const S0=[a[0]+(b[0]-a[0])*cc[1], a[1]+(b[1]-a[1])*cc[1]];
             let T=[b[0]-a[0],b[1]-a[1]]; const tl=Math.hypot(T[0],T[1])||1; T=[T[0]/tl,T[1]/tl];
             let N=[-T[1],T[0]]; if(inW([S0[0]+N[0]*0.05,S0[1]+N[1]*0.05])!==true) N=[-N[0],-N[1]];
-            // 1) arc passant PAR LE POLE (percage = pole) -> score 0 (le meilleur)
+            // 1) arc passant PAR LE POLE (percage = pole). Parmi tous ceux qui marchent,
+            //    on garde le PLUS PETIT RAYON = la belle courbe serree (pas un grand arc plat).
             const dx=P0[0]-S0[0], dy=P0[1]-S0[1]; const proj=dx*N[0]+dy*N[1];
             if(proj>Math.max(LEAD,1)){
               const r=(dx*dx+dy*dy)/(2*proj);
-              if(r>0&&r<1e5&&inW(P0)){ const O=[S0[0]+N[0]*r,S0[1]+N[1]*r]; const g=tryArc(S0,P0,r,O); if(g){ if(0<bestScore){bestScore=0; chosen={bk:cc[0],tp:cc[1],S:S0,A:[P0[0],P0[1]],O,g};} continue; } }
+              if(r>0 && r<c._pole.d*3.0 && inW(P0)){ const O=[S0[0]+N[0]*r,S0[1]+N[1]*r]; const g=tryArc(S0,P0,r,O); if(g){ if(r<bestScore){bestScore=r; chosen={bk:cc[0],tp:cc[1],S:S0,A:[P0[0],P0[1]],O,g};} continue; } }
             }
-            // 2) sinon ARC DYNAMIQUE : demi-cercle de taille decroissante (percage = S+N*h),
-            //    on garde le percage le PLUS PROCHE du pole. => toujours un arc.
+            // 2) sinon ARC DYNAMIQUE (percage un peu decale, mais toujours un arc). Score
+            //    volontairement > tous les arcs-pole (1e6) : on ne l'utilise que si aucun
+            //    arc-pole n'existe. On garde le percage le PLUS PROCHE du pole.
             for(const h of [c._pole.d*0.9,c._pole.d*0.72,c._pole.d*0.56,c._pole.d*0.42,c._pole.d*0.3,c._pole.d*0.2,Math.max(LEAD*2,2.5),Math.max(LEAD*1.2,1.4),LEAD*0.8].filter(v=>v>0.5)){
               const r=h/2, O=[S0[0]+N[0]*r,S0[1]+N[1]*r], A=[S0[0]+N[0]*h,S0[1]+N[1]*h];
               if(!inW(A))continue;
               const g=tryArc(S0,A,r,O);
-              if(g){ const sc=Math.hypot(A[0]-P0[0],A[1]-P0[1]); if(sc<bestScore){bestScore=sc; chosen={bk:cc[0],tp:cc[1],S:S0,A,O,g};} break; }
+              if(g){ const sc=1e6+Math.hypot(A[0]-P0[0],A[1]-P0[1]); if(sc<bestScore){bestScore=sc; chosen={bk:cc[0],tp:cc[1],S:S0,A,O,g};} break; }
             }
           }
         }
