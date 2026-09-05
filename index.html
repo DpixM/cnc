@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-06-GE ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-06-GF ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -11431,14 +11431,16 @@ function gearPreview(){
   cv.width=W; cv.height=H;
   ctx.fillStyle='#0a0c0e';ctx.fillRect(0,0,W,H);
 
-  // --- positionner g1 à gauche, g2 à droite, tangents au contact ---
+  // --- APERCU = ce qui sera INSERE : les 2 roues ESPACEES pour la decoupe (WYSIWYG) ---
   const margin=8;
-  const totalDia = (ra1+ra2)*2;
-  const scale = Math.min((W-2*margin)/totalDia, (H-2*margin)/(Math.max(ra1,ra2)*2+margin));
-
-  const g1x = W/2 - rp2*scale;   // centre g1
+  const gapCut=Math.max(3, 2*p.m);
+  const cdCut = ra1+ra2+gapCut;         // entraxe de decoupe (espacees)
+  const spanW = ra1 + cdCut + ra2;      // largeur totale du duo
+  const scale = Math.min((W-2*margin)/spanW, (H-2*margin)/(Math.max(ra1,ra2)*2));
+  const startX = (W - spanW*scale)/2;
+  const g1x = startX + ra1*scale;       // centre g1
   const g1y = H/2;
-  const g2x = W/2 + rp*scale;    // centre g2  (distance = rp+rp2)
+  const g2x = g1x + cdCut*scale;        // centre g2 (espace, pas de chevauchement)
   const g2y = H/2;
 
   function drawOneGear(cx, cy, teeth, rExt, col, rotAngle=0){
