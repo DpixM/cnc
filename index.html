@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-07-GH ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-07-GI ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -4641,6 +4641,7 @@ let paintTool = 'select';
 // Drag state
 let isDragging = false;
 let dragMode = null;   // 'mv' | handle id | 'pan'
+let _dragMultiSnap = null; // Map id->copie de depart, pour deplacer TOUTE la selection multiple
 let dragObj = null;
 let dragStart = {cpx:0,cpy:0};
 let dragOrigBB = null;
@@ -5984,18 +5985,10 @@ function applyBB(o,bb){
   if(o.type==='group'){
     const dx=bb.x-o.x, dy=bb.y-o.y;
     o.x=bb.x; o.y=bb.y; o.w=w; o.h=h;
-    if(o.children) o.children.forEach(ch=>{
-      if(ch.type==='gear'){
-        ch.x+=dx; ch.y+=dy;
-        if(ch.cx!=null){ch.cx+=dx; ch.cy+=dy;}
-      } else if(ch.type==='line'){
-        ch.x1+=dx; ch.y1+=dy; ch.x2+=dx; ch.y2+=dy;
-      } else if(ch.type==='ellipse'){
-        ch.x+=dx; ch.y+=dy;
-      } else {
-        ch.x+=dx; ch.y+=dy;
-      }
-    });
+    // On translate CHAQUE enfant via translateObj -> gere TOUS les types, y compris
+    // 'free'/'_poly' (geometrie dans .pts, pas .x/.y) comme les imports DXF. Avant, on
+    // faisait ch.x+=dx -> les traces libres/DXF ne suivaient pas le groupe.
+    if(o.children) o.children.forEach(ch=>{ try{ translateObj(ch, dx, dy); }catch(e){ ch.x=(ch.x||0)+dx; ch.y=(ch.y||0)+dy; } });
     return;
   }
   if(o.type==='gear'){
@@ -8684,6 +8677,14 @@ function pmActivatePendingDrag(cpx,cpy){
           dragStartMm=dragPending.startMm;  // original click mm
           dragOrigBB=dragPending.origBB;
           dragPending=null;
+          // SELECTION MULTIPLE : si on deplace (mv) et que plusieurs objets sont selectionnes,
+          // on memorise une copie de depart de CHACUN -> ils bougeront tous ensemble du meme
+          // delta (voir pmDragObject). L'objet clique sert d'ancre pour le snap.
+          _dragMultiSnap=null;
+          if(dragMode==='mv' && typeof selObjIds!=='undefined' && selObjIds.size>1 && selObjIds.has(dragObj.id)){
+            _dragMultiSnap=new Map();
+            for(const id of selObjIds){ const oo=getObj(id); if(oo && !oo.fixed) _dragMultiSnap.set(id, JSON.parse(JSON.stringify(oo))); }
+          }
         } else { return; }
       }
 }
@@ -8759,7 +8760,12 @@ function pmDragObject(xm,ym){
             }
           }
         }
-        applyHandleDrag(dragObj,dragMode,dragOrigBB,dxMm,dyMm);
+        if(_dragMultiSnap && dragMode==='mv'){
+          // deplacer TOUTE la selection : chaque objet repart de sa copie de depart + le meme delta
+          for(const [id,snap] of _dragMultiSnap){ const o=getObj(id); if(!o||o.fixed)continue; Object.assign(o, JSON.parse(JSON.stringify(snap))); translateObj(o, dxMm, dyMm); }
+        } else {
+          applyHandleDrag(dragObj,dragMode,dragOrigBB,dxMm,dyMm);
+        }
         if(typeof solveSketch==='function' && dragObj && dragObj.type!=='dim' && dragObj.type!=='constraint') solveSketch(dragObj.id);
         if(typeof updateLinkedCopies==='function')updateLinkedCopies();
         redrawCanvas();updateInspectorLive();return;
@@ -8956,6 +8962,7 @@ function handlePointerUp(cpx,cpy){
   if(paintTool==='select'&&isDragging){
     // On a bougé/redimensionné un objet -> ça compte pour l'historique
     if(dragMode==='mv'||dragMode==='rs') markDirty();
+    if(_dragMultiSnap){ if(typeof pushHistory==='function')pushHistory(); _dragMultiSnap=null; } // fin du deplacement multiple
     isDragging=false;dragMode=null;dragObj=null;dragOrigBB=null;renderInspector();return;}
   isDragging=false;
   if(!isDrawing)return;isDrawing=false;
