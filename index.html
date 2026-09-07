@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-06-GF ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-07-GG ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2447,6 +2447,30 @@ window.__PARSED_FONTS__={};
 // ════════════════════════════════════════════════════════════
 // WIZARD + PERSISTANCE + 3D
 // ════════════════════════════════════════════════════════════
+//
+// ┌───────────────────────────────────────────────────────────────────────────┐
+// │ SOMMAIRE (Ctrl+F sur un nom de fonction pour sauter à la bonne section)     │
+// ├───────────────────────────────────────────────────────────────────────────┤
+// │ MODÈLE / DONNÉES ...... paintObjects, getObj, _exportFlatObjs, objCnt        │
+// │ RENDU CANVAS .......... redrawCanvas, redrawCanvasNow, drawObjPx,            │
+// │                         objToStrokesRaw, mmToPx, pxToMm                      │
+// │ CRÉATION DE FORMES .... handlePointerUp (branches rect/ellipse/star/…),      │
+// │                         _shapeParamsPanel (petite fenêtre de cotes)          │
+// │ ENGRENAGES ............ generateInvolute, generateGearPts, gearParams,       │
+// │                         addConjGear (paire), gearPreview                     │
+// │ SNAP / CONTRAINTES .... snapPoint, snapPointsOf, constraints                 │
+// │ HISTORIQUE ............ pushHistory, undoAction, redoAction                  │
+// │ IMPORT ................ importSVG, importImage/_doVectorize (image→vecteur),  │
+// │                         importDXF/parseDXF                                   │
+// │ VECTORISATION IMAGE ... _doVectorize (seuil Otsu), traceBitmap, simplifyRDP  │
+// │ EXPORT DESSIN ......... exportDrawing (SVG/DXF), buildSVG                    │
+// │ LASER / G-CODE ....... buildLaserBody (amorces+ordre+re-zéro+délimitation),  │
+// │                         _frameHullOffset (tour à vide), _buildLST (.LST),    │
+// │                         parseGcode                                           │
+// │ ORIGINE (0,0) ........ getOriginMm, originKey                                │
+// │ SIMU 3D .............. openGcSim, _s3dInit (repères cyan=départ/mauve=zéro)  │
+// │ TABS (ponts) ......... cadTabs, _placeTab                                    │
+// └───────────────────────────────────────────────────────────────────────────┘
 
 // ════════════════════════════════════════════════════════════
 // WIZARD
@@ -14754,22 +14778,8 @@ function openCircleModal(cx,cy,rSuggested){
   positionBubble('circleModal',cx,cy);
 }
 
-function openStarModal(cx,cy,r,size){
-  _pendingStar={cx,cy};
-  const m=document.getElementById('starModal');
-  if(!m) return;
-  const org=getOriginMm();
-  document.getElementById('starPosX').value=(cx-org.x).toFixed(1);
-  document.getElementById('starPosY').value=(cy-org.y).toFixed(1);
-  document.getElementById('starSize').value=parseFloat(size||r*2).toFixed(1);
-  document.getElementById('starBranches').value=currentStarBranches||5;
-  ['starPosX','starPosY'].forEach(function(id){
-    const el=document.getElementById(id);
-    if(el){el.dataset.userEdited='0'; el.oninput=function(){this.dataset.userEdited='1';};}
-  });
-  m.classList.add('open');
-  positionBubble('starModal',cx,cy);
-}
+// [Retiré] openStarModal : l'étoile utilise désormais la fenêtre de cotes draggable
+// commune (_shapeParamsPanel), comme les autres formes.
 
 function setStrokeW(mm){
   currentStrokeW=mm;
@@ -15477,22 +15487,8 @@ function confirmCircle(){
   document.getElementById('circleModal').classList.remove('open');
 }
 
-function confirmStar(){
-  const nb=Math.max(3,parseInt(document.getElementById('starBranches').value)||5);
-  const sz=parseFloat(document.getElementById('starSize').value)||10;
-  const gcX=parseFloat(document.getElementById('starPosX').value)||0;
-  const gcY=parseFloat(document.getElementById('starPosY').value)||0;
-  const org=getOriginMm();
-  const cx=gcX+org.x, cy=gcY+org.y;
-  const id=objCnt++;
-  const obj={id,type:'star',x:cx-sz/2,y:cy-sz/2,w:sz,h:sz,
-    branches:nb,strokeW:currentStrokeW,fill:currentFill};
-  if(selToolId)obj.toolId=selToolId;
-  paintObjects.push(obj);selObjId=obj.id;
-  {const _cm=_cadMode;setPTool('select');_cadMode=_cm;}
-  redrawCanvas();renderInspector();updateObjCount();
-  document.getElementById('starModal').classList.remove('open');
-}
+// [Retiré] confirmStar : ancien modal étoile remplacé par la fenêtre de cotes commune.
+
 
 function snapPointsOf(o){
   // Lignes / traces libres : vraie geometrie (extremites + milieux exacts), pas la
@@ -17324,40 +17320,8 @@ function _s3dStartRender() {
 </div>
 
 
-<div class="modal-bg modal-bubble" id="starModal" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-width:320px;width:95%">
-    <div class="modal-bar"></div>
-    <div class="modal-title">★ Étoile</div>
-    <div class="g2">
-      <div class="fld">
-        <label>Nombre de branches</label>
-        <input type="number" id="starBranches" value="5" min="3" max="50" step="1"
-          style="font-size:18px;font-weight:700;text-align:center">
-      </div>
-      <div class="fld">
-        <label>Taille (mm)</label>
-        <input type="number" id="starSize" value="20" min="1" step="0.5" inputmode="decimal"
-          style="font-size:18px;font-weight:700;text-align:center">
-      </div>
-    </div>
-    <button type="button" onclick="document.getElementById('starPosX').value=0;document.getElementById('starPosY').value=0"
-      style="width:100%;margin-bottom:6px;padding:8px;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.4);border-radius:6px;color:#818cf8;font-size:11px;cursor:pointer;font-weight:700">
-      ⊕ Centrer sur G0 (0,0)
-    </button>
-    <div class="g2" style="margin-top:4px">
-      <div class="fld"><label>Centre X G-code (mm)</label>
-        <input type="number" id="starPosX" value="0" step="0.5" inputmode="decimal">
-      </div>
-      <div class="fld"><label>Centre Y G-code (mm)</label>
-        <input type="number" id="starPosY" value="0" step="0.5" inputmode="decimal">
-      </div>
-    </div>
-    <div class="btn-row" style="margin-top:12px">
-      <button class="btn btn-p" style="flex:1" onclick="confirmStar()">✅ Créer</button>
-      <button class="btn btn-dim" onclick="document.getElementById('starModal').classList.remove('open')">Annuler</button>
-    </div>
-  </div>
-</div>
+<!-- [Retiré] modal Étoile : remplacé par la fenêtre de cotes draggable commune (branches + taille). -->
+
 
 
 <div class="modal-bg" id="gcSimModal" onclick="if(event.target===this)closeGcSim()" style="align-items:flex-end;padding:0">
