@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-07-GG ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-07-GH ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -14714,6 +14714,11 @@ function initCanvas(){
   }
   });
   document.addEventListener('keyup',e=>{ if(e.key==='Shift')window._shiftHeld=false; if(e.key===' '||e.code==='Space'){ window._spaceHeld=false; if(pCanvas)pCanvas.style.cursor='default'; } });
+  // SECURITE : si la fenetre perd le focus (Alt+Tab, clic ailleurs...), le keyup d'Espace/Shift
+  // peut etre rate -> la touche reste "collee" et chaque glisser devient un PAN (toute la vue
+  // glisse comme une capture d'ecran decalee). On relache donc ces touches des qu'on perd le focus.
+  window.addEventListener('blur',()=>{ window._spaceHeld=false; window._shiftHeld=false; if(pCanvas)pCanvas.style.cursor='default'; });
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden){ window._spaceHeld=false; window._shiftHeld=false; if(pCanvas)pCanvas.style.cursor='default'; } });
   window.addEventListener('resize',()=>{if(pInited)resizeCanvas();});
   // Bloquer le scroll natif du navigateur sur tout le document quand on dessine
   // Bloquer ABSOLUMENT tout scroll natif sur toute la page
