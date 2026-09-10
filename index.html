@@ -1445,7 +1445,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-07-GI ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-10-GJ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6603,10 +6603,25 @@ function redrawCanvasNow(){
     for(const id of selObjIds){
       if(id===selObjId)continue;
       const mo=getObj(id);if(!mo)continue;
+      if(mo.type==='dim')continue; // cotes : pas de déco bleue
       const bb=getObjBB(mo);
       const[bx,by]=mmToPx(bb.x,bb.y);const[ex,ey]=mmToPx(bb.x+bb.w,bb.y+bb.h);
-      pCtx.strokeStyle='rgba(66,165,245,.6)';pCtx.lineWidth=1.5;pCtx.setLineDash([4,3]);
-      pCtx.strokeRect(bx-4,by-4,(ex-bx)+8,(ey-by)+8);pCtx.setLineDash([]);
+      if(mo.type==='text'){
+        // Texte : cadre pointillé bleu (on ne redessine PAS les lettres -> évite le double tracé décalé)
+        pCtx.save(); pCtx.setLineDash([6,4]);
+        pCtx.strokeStyle='rgba(59,130,246,.95)'; pCtx.lineWidth=1.8;
+        const rx=Math.min(bx,ex), ry=Math.min(by,ey), rw=Math.abs(ex-bx), rh=Math.abs(ey-by);
+        pCtx.strokeRect(rx-3, ry-3, rw+6, rh+6);
+        pCtx.restore();
+      } else {
+        // Multi-sélection : on redessine le TRAIT de chaque objet en bleu (comme l'objet-ancre),
+        // pour qu'un segment fin sélectionné soit visible et pas seulement un cadre pointillé.
+        pCtx.save(); pCtx.setLineDash([]);
+        pCtx.strokeStyle='rgba(59,130,246,.95)'; pCtx.lineWidth=2.2; pCtx.lineJoin='round'; pCtx.lineCap='round';
+        const _closed=['rect','oblong','tri','star','gear','polygon'].includes(mo.type)||mo._poly;
+        try{ for(const s of objToStrokesRaw(mo)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} if(_closed)pCtx.closePath(); pCtx.stroke(); } }catch(e){}
+        pCtx.restore();
+      }
     }
   }
 
