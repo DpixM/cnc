@@ -33,8 +33,14 @@
        exit 0 = full auto OK. Sinon : redemander le token, ou repli push manuel.
     d. Base de travail = ce clone $HOME/cnc_auto (à jour). PAS une vieille copie locale.
 
+  ++ RÈGLE RAPPORT À SEB ++
+    À CHAQUE mise à jour, mettre le LIEN du logiciel
+      https://dpixm.github.io/cnc/?v=XX
+    EN GROS, TOUT EN HAUT du rapport à Seb (avant tout le reste). Il veut son lien
+    en premier, systématiquement.
+
   DÉPLOYER UNE MAJ : modif minimale -> tests (node test-*.js) -> bump badge
-    (chercher ⚡auto, ex v2026-09-18-GK -> lettre suivante + date du jour) -> git commit
+    (chercher ⚡auto, ex v2026-09-18-GL -> lettre suivante + date du jour) -> git commit
     -> git push "https://x-access-token:<TOKEN>@github.com/DpixM/cnc.git" HEAD:main
     -> donner le lien https://dpixm.github.io/cnc/?v=XX  (le ?v= force le rechargement)
     Un test rouge = ON NE POUSSE PAS.
@@ -1476,7 +1482,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-18-GK ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-18-GL ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
