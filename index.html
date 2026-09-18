@@ -40,7 +40,7 @@
     en premier, systématiquement.
 
   DÉPLOYER UNE MAJ : modif minimale -> tests (node test-*.js) -> bump badge
-    (chercher ⚡auto, ex v2026-09-18-GL -> lettre suivante + date du jour) -> git commit
+    (chercher ⚡auto, ex v2026-09-18-GM -> lettre suivante + date du jour) -> git commit
     -> git push "https://x-access-token:<TOKEN>@github.com/DpixM/cnc.git" HEAD:main
     -> donner le lien https://dpixm.github.io/cnc/?v=XX  (le ?v= force le rechargement)
     Un test rouge = ON NE POUSSE PAS.
@@ -1482,7 +1482,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-18-GL ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-18-GM ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -7691,6 +7691,7 @@ function _applyConstraintNow(type, objs){
   else if(type==='coincident'){ if(lines.length>=2)_add('coincident',_rid(lines[0]),_rid(lines[1])); else if(pts.length>=2)_add('coincident',_rid(pts[0]),_rid(pts[1])); }
   else if(type==='midpoint'){ if(pts.length&&lines.length)_add('midpoint',_rid(pts[0]),_rid(lines[0])); }
   else if(type==='tangent'){ if(circs.length&&lines.length){ const _ln=lines[0]; const _bref=_ln.__eh?(_ln.o.id+'#'+_ln.i):_ln.id; if(_bref!=null)_add('tangent',_rid(circs[0]),_bref); } }
+  else if(type==='symmetry'){ const _A=objs[0],_B=objs[1],_ax=objs[2]; const _aid=_rid(_A),_bid=_rid(_B),_axid=_rid(_ax); if(_aid!=null&&_bid!=null&&_axid!=null && !_constraints.some(c=>c.ct==='symmetry'&&String(c.a)===String(_aid)&&String(c.b)===String(_bid)&&String(c.axis)===String(_axid))) _constraints.push({ct:'symmetry',a:_aid,b:_bid,axis:_axid}); }
   if(typeof pushHistory==='function')pushHistory(); if(typeof redrawCanvasNow==='function')redrawCanvasNow();
   T('✅ Contrainte appliquée (persistante)');
 }
@@ -7730,13 +7731,22 @@ function _applyConstraintStep(c, anchorId){
         if(typeof _arcRegen==='function')_arcRegen(circ);
       } else { const d=(circ.x-s[0])*nx+(circ.y-s[1])*ny,sg=(c.side||(c.side=(d>=0?1:-1))),r=(circ.rx||circ.ry),fx=circ.x-nx*d,fy=circ.y-ny*d; circ.x=fx+nx*sg*r; circ.y=fy+ny*sg*r; }
       break; }
+    case 'symmetry': { if(!A||!B)return; const ax=(c.axis!=null?getObj(c.axis):null); const s=ax?L(ax):null; if(!s)return;
+      const [ref,mov]=pickMove(A,B); if(_isAnchor(mov,anchorId))return;
+      const refl=(pt)=>{ const dx=s[2]-s[0],dy=s[3]-s[1],L2=dx*dx+dy*dy||1; const t=((pt[0]-s[0])*dx+(pt[1]-s[1])*dy)/L2; const fx=s[0]+t*dx,fy=s[1]+t*dy; return [2*fx-pt[0],2*fy-pt[1]]; };
+      const src=JSON.parse(JSON.stringify(ref));
+      if(L(src)){ const g=L(src); const q1=refl([g[0],g[1]]),q2=refl([g[2],g[3]]); setL(mov,[q1[0],q1[1],q2[0],q2[1]]); }
+      else if(src.pts){ mov.pts=src.pts.map(refl); mov.type='free'; if(src._poly){mov._poly=true;mov._polyN=src._polyN;} if(src._arc){ mov._arc={p1:refl(src._arc.p1),p2:refl(src._arc.p2),r:src._arc.r,sgn:-src._arc.sgn}; if(typeof _arcRegen==='function')_arcRegen(mov);} }
+      else if(src._circle||src.type==='ellipse'){ const cc=refl([src.x,src.y]); mov.x=cc[0];mov.y=cc[1];mov.rx=src.rx;mov.ry=src.ry;mov._circle=src._circle;mov.type=src.type; }
+      else if(src.type==='point'){ const cc=refl([src.x,src.y]); mov.x=cc[0];mov.y=cc[1]; }
+      break; }
   }
 }
 function solveSketch(anchorId){
   _log('solve',{anchor:anchorId, cons:_constraints.length});
   if(!_constraints.length)return;
   // nettoyer les contraintes dont un objet a disparu
-  _constraints=_constraints.filter(c=>getObj(c.a)&&(c.b==null||getObj(c.b)||(typeof c.b==='string'&&paintObjects.some(x=>String(x.id)===String(c.b).split('#')[0]))));
+  _constraints=_constraints.filter(c=>getObj(c.a)&&(c.b==null||getObj(c.b)||(typeof c.b==='string'&&paintObjects.some(x=>String(x.id)===String(c.b).split('#')[0])))&&(c.ct!=='symmetry'||getObj(c.axis)));
   for(let it=0; it<40; it++){ for(const c of _constraints) _applyConstraintStep(c, anchorId); }
 }
 function _mirrorX(o,cx){ const f=x=>2*cx-x;
