@@ -40,7 +40,7 @@
     en premier, systématiquement.
 
   DÉPLOYER UNE MAJ : modif minimale -> tests (node test-*.js) -> bump badge
-    (chercher ⚡auto, ex v2026-09-19-GP -> lettre suivante + date du jour) -> git commit
+    (chercher ⚡auto, ex v2026-09-19-GQ -> lettre suivante + date du jour) -> git commit
     -> git push "https://x-access-token:<TOKEN>@github.com/DpixM/cnc.git" HEAD:main
     -> donner le lien https://dpixm.github.io/cnc/?v=XX  (le ?v= force le rechargement)
     Un test rouge = ON NE POUSSE PAS.
@@ -1482,7 +1482,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-19-GP ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-19-GQ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -7767,7 +7767,7 @@ function _mirrorY(o,cy){ const f=y=>2*cy-y;
 let _mirror=null;
 function cadMirrorTool(){ _setToolFromPick=true; if(typeof setPTool==='function')setPTool('select'); _setToolFromPick=false; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; _mirror={shapes:new Set(), stage:'shapes'}; _mirrorPanel(); if(typeof _conHintShow==='function')_conHintShow('🪞 Miroir — clique les formes, puis « Axe » et la ligne axe'); redrawCanvasNow(); }
 function _mirrorPanelRemove(){ const e=document.getElementById('mirrorPanel'); if(e)e.remove(); }
-function _mirrorPanel(){ _mirrorPanelRemove(); if(!_mirror)return; const d=document.createElement('div'); d.id='mirrorPanel'; d.style.cssText='position:fixed;left:16px;top:118px;z-index:100002;background:#1f2430;border:1px solid #4a5568;border-radius:10px;padding:8px 10px;font:13px sans-serif;color:#e5e9f0;display:flex;gap:6px;align-items:center;box-shadow:0 6px 18px rgba(0,0,0,.55)';
+function _mirrorPanel(){ _mirrorPanelRemove(); if(!_mirror)return; const d=document.createElement('div'); d.id='mirrorPanel'; d.style.cssText='position:fixed;left:16px;top:165px;z-index:100002;background:#1f2430;border:1px solid #4a5568;border-radius:10px;padding:8px 10px;font:13px sans-serif;color:#e5e9f0;display:flex;gap:6px;align-items:center;box-shadow:0 6px 18px rgba(0,0,0,.55)';
   const mk=(txt,active,cb)=>{ const b=document.createElement('button'); b.textContent=txt; b.style.cssText='padding:5px 9px;border-radius:7px;border:1px solid '+(active?'#3b82f6':'#4a5568')+';background:'+(active?'#3b82f6':'#0e1116')+';color:'+(active?'#fff':'#cfd4dc')+';cursor:pointer;font-weight:600'; b.onclick=cb; return b; };
   const t=document.createElement('span'); t.textContent='🪞'; d.appendChild(t);
   d.appendChild(mk('① Formes ('+_mirror.shapes.size+')', _mirror.stage==='shapes', ()=>{ _mirror.stage='shapes'; _mirrorPanel(); _conHintShow('🪞 Clique les formes à refléter'); }));
