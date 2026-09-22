@@ -130,6 +130,21 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-09-22 — GR : PROLONGER 2 côtés jusqu'au croisement (droites imaginaires) --
+ [NOUVEAU] Outil « Prolonger (2 côtés → croisement) » = cadExtend2 / _ext.
+   Clic segment 1 -> droite imaginaire MAUVE quasi infinie (aperçu pointillé).
+   Clic segment 2 -> 2e droite mauve + point de croisement marqué.
+   * Si les 2 droites se CROISENT : chaque segment se prolonge (l'extrémité la
+     plus proche du croisement -> le croisement) et devient "dur". Ils se
+     rejoignent. Marche sur type 'line' et bord de polyligne 'free' (imports DXF).
+   * Si PARALLÈLES (jamais de croisement) : petit panneau « Garder / Supprimer ».
+     Garder = matérialise les 2 longues droites en lignes dures ; Supprimer = rien.
+   Diffère de l'ancien ⊬ « Prolonger (jusqu'au 1er obstacle) » (=cadExtend, gardé)
+   qui n'étend qu'UNE ligne jusqu'à la 1ère géométrie physiquement sur son chemin.
+   Ajouts : _ext state, _extClick (dispatch après _mirror), _extResolve,
+   _extApplyEnd, _extParallelPanel/_extMaterializeParallel, _extViewSeg, overlay
+   mauve dans _cadDimOverlay, nettoyage au changement d'outil. Tests: audit_ext.cjs.
+
 -- 2026-07-20 — Cotes DEPLACABLES + plus de bleu a l'edition ----------------------
  - EDITION cote : openDimInput vide la selection (plus de trait bleu de la forme
    sous la cote pendant qu'on edite).
@@ -1482,7 +1497,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-19-GQ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-22-GR 🧪TEST</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -4993,7 +5008,8 @@ const TOOL_MENUS = {
     {i:'⧉', l:'Décalage (offset)', fn:"cadOffset()"},
     {i:'✂️', l:'Ajuster (trim)',   fn:"cadTrim()"},
     {i:'🔗', l:'Tab (pont de maintien)', fn:"cadTabs()"},
-    {i:'⊢', l:'Prolonger',         fn:"cadExtend()"},
+    {i:'⊢', l:'Prolonger (2 côtés → croisement)', fn:"cadExtend2()"},
+    {i:'⊬', l:'Prolonger (jusqu\'au 1er obstacle)', fn:"cadExtend()"},
     {i:'⟳', l:'Rotation',          fn:"cadRotate()"},
     {i:'🔓', l:'Déverrouiller',      fn:"cadUnlock()"},
     {i:'⧉', l:'Dupliquer (+5 mm)',  fn:"cadDuplicate()"},
@@ -7222,7 +7238,75 @@ function _placeTab(click){
   if(typeof toastHist==='function')toastHist('🔗 Pont posé ('+tw+' mm)');
 }
 function _doExtend(objs, click){ const L=objs.find(o=>segOf(o)); if(!L){ if(typeof toastHist==='function')toastHist('⚠️ Clique une ligne'); return; } const s=segOf(L).slice(); const e0=[s[0],s[1]],e1=[s[2],s[3]]; const near=(Math.hypot(e1[0]-click[0],e1[1]-click[1])<Math.hypot(e0[0]-click[0],e0[1]-click[1]))?1:0; const P=near?e1:e0, other=near?e0:e1; const dir=[P[0]-other[0],P[1]-other[1]]; const dl=Math.hypot(dir[0],dir[1])||1; const u=[dir[0]/dl,dir[1]/dl]; let best=null; for(const o of paintObjects){ if(o.id===L.id||o.type==='dim'||o.type==='constraint'||o.type==='group')continue; let segs; try{segs=objToStrokesRaw(o)||[];}catch(e){continue;} for(const poly of segs){ for(let i=0;i<poly.length-1;i++){ const ip=_raySegInt(P,u,[poly[i][0],poly[i][1],poly[i+1][0],poly[i+1][1]]); if(ip&&ip.t>0.001){ if(!best||ip.t<best.t)best={t:ip.t,p:ip.p}; } } } } if(!best){ if(typeof toastHist==='function')toastHist('⊢ Rien à atteindre dans cette direction'); return; } if(near){s[2]=best.p[0];s[3]=best.p[1];}else{s[0]=best.p[0];s[1]=best.p[1];} setSeg(L,s); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('⊢ Prolongé jusqu\'à l\'intersection'); }
-function cadExtend(){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={need:1, picks:[], pickCon:true, fn:(objs,click)=>_doExtend(objs,click), hint:'⊢ Prolonger'}; _cadMode=true; _conHintShow('⊢ Prolonger — clique près du bout du côté à étendre'); redrawCanvasNow(); }
+function cadExtend(){ _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={need:1, picks:[], pickCon:true, fn:(objs,click)=>_doExtend(objs,click), hint:'⊢ Prolonger'}; _cadMode=true; _conHintShow('⊬ Prolonger — clique près du bout du côté à étendre'); redrawCanvasNow(); }
+
+// ── Prolonger 2 côtés jusqu'au CROISEMENT de leurs droites imaginaires ──────────
+// Clique 1 segment -> droite imaginaire mauve (quasi infinie). Clique un 2e segment.
+// Si les 2 droites se croisent : les 2 segments se prolongent jusqu'au croisement
+// (ils deviennent "durs"). Si elles sont paralleles : choix garder / supprimer.
+let _ext=null;
+function cadExtend2(){ _setToolFromPick=true; if(typeof setPTool==='function')setPTool('select'); _setToolFromPick=false; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; _ext={picks:[], parallel:false}; if(typeof _conHintShow==='function')_conHintShow('⊢ Prolonger — clique le 1er segment (une droite mauve apparait)'); redrawCanvasNow(); }
+function _extPanelRemove(){ const e=document.getElementById('extPanel'); if(e)e.remove(); }
+function _extCancel(){ _ext=null; _extPanelRemove(); if(typeof _conHintHide==='function')_conHintHide(); redrawCanvasNow(); }
+function _extViewSeg(s){ // droite (quasi infinie) du segment, longueur ~ vue courante
+  let cw=800,ch=600; try{ if(typeof pCanvas!=='undefined'&&pCanvas){ cw=pCanvas.clientWidth||cw; ch=pCanvas.clientHeight||ch; } }catch(e){}
+  const c0=pxToMm(0,0), c1=pxToMm(cw,ch);
+  const spanV=(Math.abs(c1[0]-c0[0])+Math.abs(c1[1]-c0[1]))*2+200;
+  const dx=s[2]-s[0],dy=s[3]-s[1]; const L=Math.hypot(dx,dy)||1; const ux=dx/L,uy=dy/L;
+  const mx=(s[0]+s[2])/2,my=(s[1]+s[3])/2;
+  return [mx-ux*spanV,my-uy*spanV,mx+ux*spanV,my+uy*spanV];
+}
+function _extClick(xm,ym){ if(!_ext||_ext.parallel)return;
+  const e=(typeof _pickEdgeAt==='function')?_pickEdgeAt(xm,ym):null;
+  if(!e){ if(typeof _conHintShow==='function')_conHintShow('⊢ Clique un segment (une ligne ou un cote)'); return; }
+  const seg=(typeof _edgeSeg==='function')?_edgeSeg(e):null; if(!seg){ if(typeof _conHintShow==='function')_conHintShow('⊢ Segment illisible, reessaie'); return; }
+  if(_ext.picks.length===1){ const p0=_ext.picks[0].ref; if(p0.obj===e.obj && p0.edge===e.edge)return; }
+  _ext.picks.push({ref:e, seg:seg.slice()}); redrawCanvasNow();
+  if(_ext.picks.length<2){ if(typeof _conHintShow==='function')_conHintShow('⊢ Clique le 2e segment a prolonger'); return; }
+  _extResolve();
+}
+function _extApplyEnd(pick, I){ // deplace l'extremite (du segment cliqué) la plus proche de I -> I
+  const o=pick.ref.obj;
+  if(o.type==='line'){ const s=segOf(o); if(!s)return false; const s2=s.slice(); const d0=Math.hypot(s2[0]-I[0],s2[1]-I[1]), d1=Math.hypot(s2[2]-I[0],s2[3]-I[1]); if(d1<=d0){s2[2]=I[0];s2[3]=I[1];}else{s2[0]=I[0];s2[1]=I[1];} setSeg(o,s2); return true; }
+  if(o.type==='free' && o.pts && o.pts.length>=2){ const i=pick.ref.edge; if(i<0||i+1>=o.pts.length)return false; const a=o.pts[i],b=o.pts[i+1]; const da=Math.hypot(a[0]-I[0],a[1]-I[1]), db=Math.hypot(b[0]-I[0],b[1]-I[1]); const idx=(db<=da)?i+1:i; const n=o.pts.length; const closed=n>2 && Math.hypot(o.pts[0][0]-o.pts[n-1][0],o.pts[0][1]-o.pts[n-1][1])<1e-6; o.pts[idx]=[I[0],I[1]]; if(closed){ if(idx===0)o.pts[n-1]=[I[0],I[1]]; else if(idx===n-1)o.pts[0]=[I[0],I[1]]; } return true; }
+  return false;
+}
+function _extResolve(){ if(!_ext||_ext.picks.length<2)return; const A=_ext.picks[0], B=_ext.picks[1];
+  const I=(typeof _lineIntersect==='function')?_lineIntersect(A.seg,B.seg):null;
+  if(I && isFinite(I[0]) && isFinite(I[1])){
+    const snap=JSON.stringify(paintObjects);
+    if(_extApplyEnd(A,I) && _extApplyEnd(B,I)){
+      if(typeof pushHistory==='function')pushHistory();
+      if(typeof toastHist==='function')toastHist('⊢ Les 2 segments se rejoignent au croisement');
+      _ext.picks=[]; redrawCanvasNow();
+      if(typeof _conHintShow==='function')_conHintShow('⊢ Encore ? clique un 1er segment (ou change d\'outil pour finir)');
+    } else {
+      paintObjects.length=0; JSON.parse(snap).forEach(o=>paintObjects.push(o));
+      if(typeof toastHist==='function')toastHist('⚠️ Ces elements ne se prolongent pas (garde des lignes / cotes libres)');
+      _ext.picks=[]; redrawCanvasNow();
+    }
+  } else {
+    _ext.parallel=true; _extParallelPanel();
+    if(typeof _conHintShow==='function')_conHintShow('⊢ Les 2 droites sont paralleles (jamais de croisement)');
+    redrawCanvasNow();
+  }
+}
+function _extParallelPanel(){ _extPanelRemove(); if(!_ext)return; const d=document.createElement('div'); d.id='extPanel';
+  d.style.cssText='position:fixed;left:16px;top:165px;z-index:100002;background:#1f2430;border:1px solid #4a5568;border-radius:10px;padding:8px 10px;font:13px sans-serif;color:#e5e9f0;display:flex;gap:6px;align-items:center;box-shadow:0 6px 18px rgba(0,0,0,.55)';
+  const info=document.createElement('span'); info.textContent='⊢ Paralleles — garder les 2 droites ?'; info.style.marginRight='2px'; d.appendChild(info);
+  const mkb=(txt,bg,fg,fn)=>{ const b=document.createElement('button'); b.textContent=txt; b.style.cssText='padding:6px 10px;border-radius:7px;border:none;background:'+bg+';color:'+fg+';font-weight:700;cursor:pointer'; b.onclick=fn; return b; };
+  d.appendChild(mkb('✓ Garder','#22c55e','#04240f',_extMaterializeParallel));
+  d.appendChild(mkb('🗑 Supprimer','#ef4444','#fff',()=>{ if(!_ext)return; _ext.parallel=false; _ext.picks=[]; _extPanelRemove(); if(typeof _conHintShow==='function')_conHintShow('⊢ Annule — clique un 1er segment'); redrawCanvasNow(); }));
+  d.appendChild(mkb('✕','#374151','#fff',_extCancel));
+  document.body.appendChild(d);
+}
+function _extMaterializeParallel(){ if(!_ext||_ext.picks.length<2){ _extCancel(); return; }
+  for(const p of _ext.picks){ const vs=_extViewSeg(p.seg); paintObjects.push({id:(typeof objCnt!=='undefined'?objCnt++:Date.now()+Math.random()),type:'line',x1:vs[0],y1:vs[1],x2:vs[2],y2:vs[3],strokeW:(typeof currentStrokeW!=='undefined'?currentStrokeW:0.2)||0.2}); }
+  if(typeof pushHistory==='function')pushHistory();
+  if(typeof toastHist==='function')toastHist('⊢ 2 droites gardees (durcies)');
+  _ext.parallel=false; _ext.picks=[]; _extPanelRemove(); redrawCanvasNow();
+  if(typeof _conHintShow==='function')_conHintShow('⊢ Encore ? clique un 1er segment (ou change d\'outil)');
+}
 function cadUnlock(){ const ids=[...getSelIds()]; if(!ids.length){ if(typeof toastHist==='function')toastHist('🔓 Sélectionne une forme (ou la base d\'un réseau) à déverrouiller'); return; } let n=0; for(const id of ids){ const o=getObj(id); if(!o)continue; if(o.fixed){o.fixed=false;n++;} for(const c of paintObjects){ if(c._link&&String(c._link.src)===String(id)){ delete c._link; c.fixed=false; n++; } } } if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); if(typeof toastHist==='function')toastHist('🔓 Déverrouillé ('+n+' forme(s)) — le réseau devient modifiable'); }
 function _rotateObj(o,cx,cy,a){ const co=Math.cos(a),si=Math.sin(a); const R=(x,y)=>[cx+(x-cx)*co-(y-cy)*si, cy+(x-cx)*si+(y-cy)*co];
   if(o.x1!=null){ const p1=R(o.x1,o.y1),p2=R(o.x2,o.y2); o.x1=p1[0];o.y1=p1[1];o.x2=p2[0];o.y2=p2[1]; }
@@ -8215,6 +8299,14 @@ function _cadDimOverlay(){
     pCtx.restore(); }
   // Contrainte en cours : surligner les elements deja cliques (vert)
   if(pCtx && _mirror && _mirror.shapes.size){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=2.4; for(const _id of _mirror.shapes){ const _o=getObj(_id); if(!_o)continue; const _cl=['rect','oblong','tri','star','gear','polygon','ellipse'].includes(_o.type)||_o._poly||_o._circle; try{ for(const _s of objToStrokesRaw(_o)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} if(_cl)pCtx.closePath(); pCtx.stroke(); } }catch(e){} } pCtx.restore(); }
+  // Prolonger 2 côtés : droites imaginaires mauve + segment(s) choisi(s) + croisement
+  if(pCtx && _ext && _ext.picks && _ext.picks.length){ pCtx.save();
+    for(const p of _ext.picks){ const vs=_extViewSeg(p.seg); const a=mmToPx(vs[0],vs[1]),b=mmToPx(vs[2],vs[3]);
+      pCtx.setLineDash([9,6]); pCtx.lineWidth=1.6; pCtx.strokeStyle='rgba(168,85,247,.8)'; pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke();
+      pCtx.setLineDash([]); pCtx.lineWidth=3; pCtx.strokeStyle='#a855f7'; const c=mmToPx(p.seg[0],p.seg[1]),e2=mmToPx(p.seg[2],p.seg[3]); pCtx.beginPath(); pCtx.moveTo(c[0],c[1]); pCtx.lineTo(e2[0],e2[1]); pCtx.stroke();
+    }
+    if(_ext.picks.length===2){ const I=(typeof _lineIntersect==='function')?_lineIntersect(_ext.picks[0].seg,_ext.picks[1].seg):null; if(I&&isFinite(I[0])&&isFinite(I[1])){ const q=mmToPx(I[0],I[1]); pCtx.setLineDash([]); pCtx.fillStyle='#a855f7'; pCtx.strokeStyle='#fff'; pCtx.lineWidth=1.5; pCtx.beginPath(); pCtx.arc(q[0],q[1],5,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); } }
+    pCtx.restore(); }
   if(pCtx && _rot2){ const piv=_rotPiv(); const _pc=mmToPx(piv[0],piv[1]); pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='rgba(34,197,94,.9)'; pCtx.lineWidth=2.4; for(const _id of _rot2.shapes){ const _o=getObj(_id); if(!_o)continue; try{ for(const _s of objToStrokesRaw(_o)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} pCtx.stroke(); } }catch(e){} } pCtx.strokeStyle='#e11d48'; pCtx.fillStyle='#e11d48'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(_pc[0],_pc[1],7,0,2*Math.PI); pCtx.stroke(); pCtx.beginPath(); pCtx.moveTo(_pc[0]-11,_pc[1]); pCtx.lineTo(_pc[0]+11,_pc[1]); pCtx.moveTo(_pc[0],_pc[1]-11); pCtx.lineTo(_pc[0],_pc[1]+11); pCtx.stroke(); if(_rot2.shapes.size){ const hr=_rotHR(); const _ha=_rot2.deg*Math.PI/180; const _hmm=[piv[0]+Math.cos(_ha)*hr, piv[1]+Math.sin(_ha)*hr]; const _hp=mmToPx(_hmm[0],_hmm[1]); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='#3b82f6'; pCtx.lineWidth=2; pCtx.setLineDash([4,3]); pCtx.beginPath(); pCtx.moveTo(_pc[0],_pc[1]); pCtx.lineTo(_hp[0],_hp[1]); pCtx.stroke(); pCtx.setLineDash([]); pCtx.beginPath(); pCtx.arc(_hp[0],_hp[1],8,0,2*Math.PI); pCtx.fill(); } pCtx.restore(); }
   if(pCtx){ for(const o of paintObjects){ if(o._fillets){ for(const f of o._fillets){ if(!f||f.cx==null)continue; const c=mmToPx(f.cx,f.cy); pCtx.save(); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='rgba(59,130,246,.18)'; pCtx.lineWidth=1.4; pCtx.beginPath(); pCtx.arc(c[0],c[1],4.5,0,2*Math.PI); pCtx.fill(); pCtx.stroke(); pCtx.restore(); } } } }
     if(pCtx && _conPick && _conPick.picks.length){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3;
@@ -8419,6 +8511,7 @@ function handlePointerDown(cpx,cpy){
   if(_align2){ _align2Click(xm,ym); return; } // outil accrocher 2 points
   if(_rectPat){ if(_rectPat.stage==='pick'){ _rectPatPickAt(xm,ym); return; } const tol=16/(BASE_PX*vZoom); if(Math.hypot(xm-_rectPat.hx,ym-_rectPat.hy)<=tol){ _rectPat.dragging=true; } return; } // réseau : choisir les formes puis saisir la poignée
   if(_mirror){ _mirrorClick(xm,ym); return; } // outil miroir 2 étapes
+  if(_ext){ _extClick(xm,ym); return; } // outil prolonger 2 côtés
   if(_rot2){ const piv=_rotPiv(); const hr=_rotHR(); const a=_rot2.deg*Math.PI/180; const hx=piv[0]+Math.cos(a)*hr, hy=piv[1]+Math.sin(a)*hr; const tolh=16/(BASE_PX*vZoom); if(_rot2.shapes.size && Math.hypot(xm-hx,ym-hy)<=tolh){ _rot2.dragging=true; return; } _rot2Click(xm,ym); return; } // rotation : poignée ou clic (pivot/forme)
   if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
   if(_arrayPick){ if(_arrayPick.stage==='obj'){ const o=_pickObjForCon(xm,ym); if(o){ _arrayPick.objs=[o.id]; if(_arrayPick.kind==='rect'||_arrayPick.kind==='rectdyn'){ const _k=_arrayPick.kind; _arrayPick=null; _arrayCursor=null; if(typeof _conHintHide==='function')_conHintHide(); selObjId=o.id; selObjIds=new Set([o.id]); if(_k==='rectdyn'){ _rectPatStart([o]); } else { openPatternRect(); } redrawCanvasNow(); return; } _arrayPick.stage='pivot'; _conHintShow('✳️ Clique le point de PIVOT (centre)'); redrawCanvasNow(); } else _conHintShow('✳️ Clique une forme à répéter'); return; } const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _conHintHide(); _arrayDoPolar(sp.x,sp.y); return; } // reseau : etape forme puis pivot (rect: forme puis fenetre)
@@ -9263,6 +9356,7 @@ function setPTool(t){
     }catch(e){}
   }
   if(typeof _conPick!=='undefined' && _conPick && !_setToolFromPick){ _conPick=null; if(typeof _conHintHide==='function')_conHintHide(); }
+  if(typeof _ext!=='undefined' && _ext && !_setToolFromPick){ _ext=null; const _ep=document.getElementById('extPanel'); if(_ep)_ep.remove(); if(typeof _conHintHide==='function')_conHintHide(); }
   _cadMode=false;
   paintTool=t;
   document.querySelectorAll('.ptool').forEach(b=>b.classList.remove('active'));
