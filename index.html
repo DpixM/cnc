@@ -130,6 +130,25 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-09-23 — GU : DXF centré + GOMME réparée (validés Seb, en ligne) ------------
+ Regroupe sur le vrai site les 2 correctifs testés et validés par Seb :
+ [FIX] GOMME : ne touche plus JAMAIS les cotes/points/contraintes/groupes/texte
+   (avant : elle transformait les cotes en "grosses barres"). N'agit que sur la
+   géométrie. + rectangle/forme fermée : recolle la couture (1 seul trou, plus de
+   coin cassé). + étoile/oblong enfin gommables (repli objContourSample). Tests:
+   audit_gomme.cjs.
+ [FIX] IMPORT DXF : pièce centrée dans la feuille (détail ci-dessous). Tests OK.
+
+-- 2026-09-23 — GT (TEST) : IMPORT DXF — placement corrigé (plus de décalage) ------
+ [FIX] importDXF plaçait le COIN de la pièce sur le point d'origine. Avec l'origine
+   au CENTRE (défaut), la pièce partait donc du milieu de la feuille et débordait à
+   moitié dehors en bas à droite = "tout décalé / n'importe quoi". Vérifié sur le DXF
+   de l'inge (22 lignes, 19 arcs, 2 cercles) : parseDXF donnait le bon cadre
+   (-32.5..32.5 / -30..30) mais le placement le sortait de la feuille.
+   Correctif : on CENTRE la pièce dans la feuille (TX/TY autour du centre feuille),
+   et on ajuste la vue sur TOUTE la pièce (fitView) au lieu de la dernière entité.
+   parseDXF inchangé. À VALIDER PAR SEB avant passage sur main.
+
 -- 2026-09-22 — GR : PROLONGER 2 côtés jusqu'au croisement (droites imaginaires) --
  [NOUVEAU] Outil « Prolonger (2 côtés → croisement) » = cadExtend2 / _ext.
    Clic segment 1 -> droite imaginaire MAUVE quasi infinie (aperçu pointillé).
@@ -1497,7 +1516,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-22-GR ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GU ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6233,6 +6252,19 @@ function objContourSample(o,N=60){
     const cx=o.cx??o.x+o.w/2,cy=o.cy??o.y+o.h/2;
     return o.gearPts.map(([gx,gy])=>[cx+gx,cy+gy]);
   }
+  // Repli universel : formes non gérées ci-dessus (étoile, oblong, polygone, engrenage
+  // paramétré, etc.) -> on ré-échantillonne N points réguliers sur le contour réel
+  // (objToStrokesRaw), sinon la gomme ne les touchait pas du tout.
+  if(pts.length===0){
+    let raw=null; try{ const st=objToStrokesRaw(o); if(st&&st[0]&&st[0].length>=2) raw=st[0]; }catch(e){}
+    if(raw){
+      let R=raw.slice(); const n=R.length;
+      if(Math.hypot(R[0][0]-R[n-1][0],R[0][1]-R[n-1][1])>1e-6) R.push([R[0][0],R[0][1]]);
+      const segL=[]; let tot=0;
+      for(let i=1;i<R.length;i++){ const d=Math.hypot(R[i][0]-R[i-1][0],R[i][1]-R[i-1][1]); segL.push(d); tot+=d; }
+      if(tot>0){ for(let i=0;i<N;i++){ let t=(i/N)*tot,k=0; while(k<segL.length && t>segL[k]){ t-=segL[k]; k++; } if(k>=segL.length)k=segL.length-1; const a=R[k],b=R[k+1]||R[k],f=segL[k]>0?t/segL[k]:0; pts.push([a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f]); } }
+    }
+  }
   return pts;
 }
 
@@ -8971,6 +9003,9 @@ function pmErase(xm,ym){
         const toAdd=[]; // new split objects to add
 
         for(const o of paintObjects){
+          // La gomme ne touche JAMAIS les cotes, points, contraintes, groupes, texte
+          // (sinon elle les transforme en grosses barres). Elle n'agit que sur la géométrie.
+          if(o.type==='dim'||o.type==='point'||o.type==='constraint'||o.type==='group'||o.type==='text'){continue;}
           if(o.type==='free'&&o.pts&&o.pts.length>0){
             // Split free path at erased points
             const segments=[];let seg=[];
@@ -9030,6 +9065,16 @@ function pmErase(xm,ym){
                 else{if(seg.length>1)segs.push(seg);seg=[];}
               }
               if(seg.length>1)segs.push(seg);
+              // FORME FERMÉE : le contour échantillonné est une boucle. S'il n'a été
+              // coupé qu'ailleurs (pas sur la couture début/fin), il ne faut pas laisser
+              // un trou en trop au point de départ -> on recolle le dernier morceau au
+              // premier (sinon un rectangle gommé se retrouve "cassé" à un coin).
+              const _closedShape=['rect','tri','star','oblong','gear','ellipse','polygon'].includes(o.type)||o._poly;
+              if(_closedShape && segs.length>1){
+                const _firstIn=Math.hypot(samplePts[0][0]-xm,samplePts[0][1]-ym)<ER;
+                const _lastIn=Math.hypot(samplePts[samplePts.length-1][0]-xm,samplePts[samplePts.length-1][1]-ym)<ER;
+                if(!_firstIn && !_lastIn){ const _last=segs.pop(); segs[0]=_last.concat(segs[0]); }
+              }
               if(segs.length>0){
                 // Replace original object with free paths
                 o.type='free';o.pts=segs[0];
@@ -10127,10 +10172,13 @@ function importDXF(file){
       let mnx=Infinity,mny=Infinity,mxx=-Infinity,mxy=-Infinity;
       for(const p of paths)for(const [x,y] of p){ if(x<mnx)mnx=x; if(x>mxx)mxx=x; if(y<mny)mny=y; if(y>mxy)mxy=y; }
       if(!isFinite(mnx)){alert('❌ DXF illisible.');return;}
-      const org=getOriginMm();
       // 1:1 (vraie taille mm). DXF Y vers le haut -> on inverse Y (canvas Y vers le bas).
-      const TX=(x)=> (x-mnx)+org.x;
-      const TY=(y)=> (mxy-y)+org.y;
+      // On CENTRE la pièce dans la feuille (avant : coin collé à l'origine -> avec
+      // l'origine au centre, la pièce partait à moitié hors feuille = "tout décalé").
+      const _W=(typeof wMm==='function'?wMm():100), _H=(typeof hMm==='function'?hMm():80);
+      const _cxD=(mnx+mxx)/2, _cyD=(mny+mxy)/2;   // centre de la pièce (coord DXF)
+      const TX=(x)=> (x-_cxD)+_W/2;                // centrer en X dans la feuille
+      const TY=(y)=> (_cyD-y)+_H/2;                // inverser Y + centrer en Y
       const made=[];
       if(typeof _syncObjCnt==='function')_syncObjCnt();
       for(const p of paths){
@@ -10152,7 +10200,9 @@ function importDXF(file){
       if(typeof selObjIds!=='undefined'){ selObjIds=new Set(made); }
       selObjId = made.length?made[made.length-1]:null;
       redrawCanvas(); if(typeof renderInspector==='function')renderInspector();
-      const b=getObj(selObjId); if(b&&typeof centerViewOnObj==='function')centerViewOnObj(b);
+      // Ajuster la vue sur TOUTE la pièce (avant : on centrait sur la dernière petite
+      // entité -> on voyait un coin, d'où l'impression de "n'importe quoi").
+      if(typeof fitView==='function')fitView(); else { const b=getObj(selObjId); if(b&&typeof centerViewOnObj==='function')centerViewOnObj(b); }
       const toast=document.createElement('div');
       toast.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--grn);color:#000;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.4)';
       toast.textContent='✅ '+file.name+' — '+made.length+' entité(s) DXF éditables (vraie taille)';
