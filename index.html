@@ -130,17 +130,6 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
--- 2026-09-23 — GX : LASER (validé Seb, en ligne) — vrais cercles en G2/G3 (fini les facettes) ------
- [FIX LASER] Un cercle sortait en ~24 G01 (facettes) — visible sur machine perfo (Keyence).
-   Cause : le lead-in (buildLaserBody) reconstruisait TOUJOURS le corps en G1, même pour un
-   vrai cercle. Correctif : détecteur _fitCircle (fit algébrique + tolérance serrée 0.02mm +
-   tour complet) ; si le contour est prouvé circulaire, le corps devient UN SEUL G2/G3 (arc
-   parfait), avec le SENS conservé (produit vectoriel -> kerf du bon côté). I,J = St->centre.
-   Ne touche QUE les contours prouvés cercles : dragon/courbes bézier = G1 identique à avant.
-   AUCUN paramètre machine du .LST modifié (entêtes, LASER_ON/OFF, techno, vitesses, Z : intacts).
-   Cercle avec TAB (pont) = reste ouvert donc G1 (le pont est préservé). Vérifié : vrai cercle
-   + cercle importé -> 1 G2 ; dragon 1060 pts -> reste G1. À VALIDER PAR SEB (comparer au .LST).
-
 -- 2026-09-23 — GV : finitions (validé Seb, en ligne) (côté rouge, fenêtres, symétrie) -------------
  [FIX] Côté rouge sur les formes fermées : appliqué le closePath (comme le miroir)
    aussi à l'aperçu ROTATION et au survol d'une COTE -> plus de côté ouvert/rouge.
@@ -1536,7 +1525,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GX ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GV ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3403,30 +3392,6 @@ function _frameHullOffset(pts, m){
   out.push(out[0].slice());
   return out;
 }
-// Détecte si un contour (liste de points) est un VRAI CERCLE : fit algébrique (Kåsa) d'un
-// cercle, puis vérifie que TOUS les points sont sur ce cercle à une tolérance serrée.
-// Renvoie {cx,cy,r} si oui, sinon null. Sert à ré-émettre les cercles facettés en 1 seul G2.
-function _fitCircle(pts){
-  if(!pts||pts.length<8)return null;
-  let P=pts.slice(); if(P.length>2 && Math.hypot(P[0][0]-P[P.length-1][0],P[0][1]-P[P.length-1][1])<1e-6)P=P.slice(0,-1);
-  const n=P.length; if(n<8)return null;
-  let Sx=0,Sy=0,Sxx=0,Syy=0,Sxy=0,Sxz=0,Syz=0,Sz=0;
-  for(const p of P){ const x=p[0],y=p[1],z=x*x+y*y; Sx+=x;Sy+=y;Sxx+=x*x;Syy+=y*y;Sxy+=x*y;Sxz+=x*z;Syz+=y*z;Sz+=z; }
-  const A=[[Sxx,Sxy,Sx],[Sxy,Syy,Sy],[Sx,Sy,n]], B=[-Sxz,-Syz,-Sz];
-  const det3=m=>m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1])-m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0])+m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);
-  const d0=det3(A); if(Math.abs(d0)<1e-9)return null;
-  const colr=(m,c)=>m.map((row,i)=>row.map((v,j)=>j===c?B[i]:v));
-  const D=det3(colr(A,0))/d0, E=det3(colr(A,1))/d0, F=det3(colr(A,2))/d0;
-  const cx=-D/2, cy=-E/2, r2=cx*cx+cy*cy-F; if(r2<=0)return null; const r=Math.sqrt(r2);
-  if(r<0.5)return null;
-  let maxdev=0; for(const p of P){ maxdev=Math.max(maxdev, Math.abs(Math.hypot(p[0]-cx,p[1]-cy)-r)); }
-  const tol=Math.max(0.02, r*0.004); // 0.02 mm ou 0.4 % du rayon : très serré
-  if(maxdev>tol)return null;
-  // il faut aussi que le contour fasse quasiment le tour complet (périmètre ~ 2πr)
-  let per=0; for(let i=1;i<P.length;i++)per+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]); per+=Math.hypot(P[0][0]-P[P.length-1][0],P[0][1]-P[P.length-1][1]);
-  if(per < 2*Math.PI*r*0.9)return null;
-  return {cx,cy,r};
-}
 function buildLaserBody(){
   const flat=_exportFlatObjs();
   const _zl=parseFloat(document.getElementById('laserZlift')?.value); const ZL=isNaN(_zl)?5:_zl;
@@ -3576,22 +3541,7 @@ function buildLaserBody(){
         const bk=chosen?chosen.bk:nfBk, tp=chosen?chosen.tp:nfTp;
         const a=base[bk],b=base[(bk+1)%nB]; const St=chosen?chosen.S:[a[0]+(b[0]-a[0])*tp,a[1]+(b[1]-a[1])*tp];
         const rot=[St]; for(let k=1;k<=nB;k++) rot.push(base[(bk+k)%nB]); rot.push([St[0],St[1]]);
-        c.poly=rot; c.start=[St[0],St[1]];
-        // VRAI CERCLE (dessiné, importé ou converti) -> UN SEUL G2 parfait au lieu des facettes.
-        // Ne touche QUE les contours prouvés circulaires (tolérance serrée) ; tout le reste (dragon,
-        // courbes) reste en G1 identique. L'arc part de St, fait le tour complet et revient à St
-        // (I,J = vecteur de St vers le centre). Aucun paramètre machine modifié.
-        const _fcC=_fitCircle(base);
-        if(_fcC){
-          // Sens de l'arc = MÊME sens que le contour d'origine (sinon le kerf change de côté).
-          // On regarde si le contour tourne dans le sens antihoraire (G3) ou horaire (G2) autour
-          // du centre, via le produit vectoriel (St->centre) x (point suivant->centre).
-          const _nx=rot[1]||base[(bk+1)%nB];
-          const _cr=(St[0]-_fcC.cx)*(_nx[1]-_fcC.cy)-(St[1]-_fcC.cy)*(_nx[0]-_fcC.cx);
-          const _g=(_cr>=0)?'G3':'G2';
-          c.moves=[_g+' X'+_lc(St[0])+' Y'+_lc(St[1])+' I'+_lc(_fcC.cx-St[0])+' J'+_lc(_fcC.cy-St[1])+'   ;cercle: arc parfait (sens conservé)'];
-        }
-        else { c.moves=rot.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1])); }
+        c.poly=rot; c.start=[St[0],St[1]]; c.moves=rot.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1]));
       }
     }
     const S=c.start;
@@ -7682,7 +7632,11 @@ function _shpFinalize(){
 function _shpKey(e){
   if(!_shp)return false;
   if(e.key==='Escape'){ _shp=null; if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); return true; }
-  if(e.key==='Enter'){ if(_shp.tool==='parc'){ if(_shp.pts.length>=2)_arcFinalize(); } else if(_shp.cx!=null)_shpFinalize(); return true; }
+  if(e.key==='Enter'){ if(_shp.tool==='parc'){ if(_shp.pts.length>=2)_arcFinalize(); }
+    else { // Entrée valide TOUJOURS : si pas de centre cliqué, on place au curseur (ou centre de la vue)
+      if(_shp.cx==null){ let c=_shp.cursor; if(!c){ try{ c=pxToMm(pCanvas.width/2,pCanvas.height/2); }catch(_){ c=[0,0]; } } _shp.cx=c[0]; _shp.cy=c[1]; }
+      if(_shp.cx!=null && (_shp.typed||(typeof _shpRadius==='function'&&_shpRadius()>0))) _shpFinalize();
+    } return true; }
   if(e.key==='Backspace'){ _shp.typed=_shp.typed.slice(0,-1); redrawCanvasNow(); return true; }
   if(_shp.tool==='ppoly' && (e.key==='['||e.key==='ArrowDown')){ _shp.sides=Math.max(3,_shp.sides-1); redrawCanvasNow(); return true; }
   if(_shp.tool==='ppoly' && (e.key===']'||e.key==='ArrowUp')){ _shp.sides=Math.min(64,_shp.sides+1); redrawCanvasNow(); return true; }
