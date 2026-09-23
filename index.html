@@ -142,6 +142,7 @@
    + petite étiquette « ⟳ 45° / 10° / 5° / libre » près de la poignée pendant qu'on tourne.
  [COTE] Zone cliquable d'une cote élargie (thr 7px→13px) : plus facile à attraper pour
    la modifier (le chiffre est maintenant dans la zone, pas que le trait fin).
+ [MAJ GW2] Cotes accrochées tournent AVEC la pièce (étiquette mv+placement). Snap distance resserré (libre arrive vite : >hr*1.85). À VALIDER par Seb.
  À VALIDER PAR SEB avant passage sur main.
 
 -- 2026-09-23 — GV : finitions (validé Seb, en ligne) (côté rouge, fenêtres, symétrie) -------------
@@ -151,6 +152,7 @@
    ne cachent plus la barre d'outils (comme la fenêtre miroir).
  [CLARTÉ] "Symétrie" (menu Contraintes) renommé "Symétrie (miroir)" : c'est un
    miroir one-shot, pas une contrainte vivante -> le nom ne trompe plus.
+ [MAJ GW2] Cotes accrochées tournent AVEC la pièce (étiquette mv+placement). Snap distance resserré (libre arrive vite : >hr*1.85). À VALIDER par Seb.
  À VALIDER PAR SEB avant passage sur main.
 
 -- 2026-09-23 — GU : DXF centré + GOMME réparée (validés Seb, en ligne) ------------
@@ -1539,7 +1541,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GW 🧪TEST</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GW2 🧪TEST</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -7016,7 +7018,10 @@ function _raySegInt(P,u,S){ const x3=S[0],y3=S[1],x4=S[2],y4=S[3]; const dx=x4-x
 function _rotCenter(){ let mnx=1e9,mny=1e9,mxx=-1e9,mxy=-1e9; for(const id of _rot2.shapes){ const o=getObj(id); if(!o)continue; const b=getObjBB(o); if(!b)continue; mnx=Math.min(mnx,b.x);mny=Math.min(mny,b.y);mxx=Math.max(mxx,b.x+b.w);mxy=Math.max(mxy,b.y+b.h); } if(mnx>1e8)return [0,0]; return [(mnx+mxx)/2,(mny+mxy)/2]; }
 function _rotPiv(){ return (_rot2&&_rot2.pivot)?_rot2.pivot:_rotCenter(); }
 function _rotHR(){ let m=30; for(const id of _rot2.shapes){ const b=getObjBB(getObj(id)); if(b)m=Math.max(m, Math.max(b.w,b.h)/2+12); } return m; }
-function _rotApply(deg){ if(!_rot2)return; _rot2.deg=deg; paintObjects.length=0; JSON.parse(_rot2.snap).forEach(x=>paintObjects.push(x)); const piv=_rotPiv(); const a=deg*Math.PI/180; for(const id of _rot2.shapes){ let t=getObj(id); if(!t)continue; if(['rect','oblong','tri','star','gear','text','svg'].indexOf(t.type)>=0 && !t._circle){ try{ const s2=objToStrokesRaw(t); let pts=(s2&&s2[0])?s2[0].map(pt=>[pt[0],pt[1]]):null; if(pts&&pts.length>2){ if(Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])>1e-6)pts.push([pts[0][0],pts[0][1]]); const idx=paintObjects.indexOf(t); const free={id:t.id,type:'free',pts,strokeW:t.strokeW||currentStrokeW}; if(t.toolId!==undefined)free.toolId=t.toolId; if(t._fillets)free._fillets=JSON.parse(JSON.stringify(t._fillets)); paintObjects[idx]=free; t=free; } }catch(e){} } _rotateObj(t,piv[0],piv[1],a); if(t._arc)_arcRegen(t); if(t._fillets){ const _rp=(P)=>{ const dx=P[0]-piv[0],dy=P[1]-piv[1]; return [piv[0]+dx*Math.cos(a)-dy*Math.sin(a), piv[1]+dx*Math.sin(a)+dy*Math.cos(a)]; }; t._fillets=t._fillets.map(f=>{ const c2=_rp([f.cx,f.cy]); return Object.assign({},f,{cx:c2[0],cy:c2[1],apex:_rp(f.apex),ta:_rp(f.ta),tb:_rp(f.tb),V:_rp(f.V),u1:[Math.cos(a)*f.u1[0]-Math.sin(a)*f.u1[1],Math.sin(a)*f.u1[0]+Math.cos(a)*f.u1[1]],u2:[Math.cos(a)*f.u2[0]-Math.sin(a)*f.u2[1],Math.sin(a)*f.u2[0]+Math.cos(a)*f.u2[1]]}); }); } } redrawCanvasNow(); }
+function _rotApply(deg){ if(!_rot2)return; _rot2.deg=deg; paintObjects.length=0; JSON.parse(_rot2.snap).forEach(x=>paintObjects.push(x)); const piv=_rotPiv(); const a=deg*Math.PI/180; for(const id of _rot2.shapes){ let t=getObj(id); if(!t)continue; if(['rect','oblong','tri','star','gear','text','svg'].indexOf(t.type)>=0 && !t._circle){ try{ const s2=objToStrokesRaw(t); let pts=(s2&&s2[0])?s2[0].map(pt=>[pt[0],pt[1]]):null; if(pts&&pts.length>2){ if(Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])>1e-6)pts.push([pts[0][0],pts[0][1]]); const idx=paintObjects.indexOf(t); const free={id:t.id,type:'free',pts,strokeW:t.strokeW||currentStrokeW}; if(t.toolId!==undefined)free.toolId=t.toolId; if(t._fillets)free._fillets=JSON.parse(JSON.stringify(t._fillets)); paintObjects[idx]=free; t=free; } }catch(e){} } _rotateObj(t,piv[0],piv[1],a); if(t._arc)_arcRegen(t); if(t._fillets){ const _rp=(P)=>{ const dx=P[0]-piv[0],dy=P[1]-piv[1]; return [piv[0]+dx*Math.cos(a)-dy*Math.sin(a), piv[1]+dx*Math.sin(a)+dy*Math.cos(a)]; }; t._fillets=t._fillets.map(f=>{ const c2=_rp([f.cx,f.cy]); return Object.assign({},f,{cx:c2[0],cy:c2[1],apex:_rp(f.apex),ta:_rp(f.ta),tb:_rp(f.tb),V:_rp(f.V),u1:[Math.cos(a)*f.u1[0]-Math.sin(a)*f.u1[1],Math.sin(a)*f.u1[0]+Math.cos(a)*f.u1[1]],u2:[Math.cos(a)*f.u2[0]-Math.sin(a)*f.u2[1],Math.sin(a)*f.u2[0]+Math.cos(a)*f.u2[1]]}); }); } }
+  // Les COTES accrochées aux formes tournées tournent AVEC la pièce (étiquette mv + placement)
+  { const _ca=Math.cos(a),_sa=Math.sin(a); const _idOf=(v)=>parseInt(String(v).replace(/@/g,''),10); for(const _d of paintObjects){ if(_d.type!=='dim')continue; const _i1=_idOf(_d.ref), _i2=(_d.ref2!=null)?_idOf(_d.ref2):NaN; if(!(_rot2.shapes.has(_i1)||_rot2.shapes.has(_i2)))continue; if(Array.isArray(_d.mv)){ const mx=_d.mv[0],my=_d.mv[1]; _d.mv=[mx*_ca-my*_sa, mx*_sa+my*_ca]; } if(Array.isArray(_d.place)){ const px=_d.place[0]-piv[0],py=_d.place[1]-piv[1]; _d.place=[piv[0]+px*_ca-py*_sa, piv[1]+px*_sa+py*_ca]; } } }
+  redrawCanvasNow(); }
 function _rotPanelRemove(){ const e=document.getElementById('rotPanel'); if(e)e.remove(); }
 function _rotPanel(){ _rotPanelRemove(); if(!_rot2)return; const d=document.createElement('div'); d.id='rotPanel'; d.style.cssText='position:fixed;left:16px;top:165px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:10px 12px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:190px';
   const t=document.createElement('div'); t.textContent='⟳ Rotation'; t.style.cssText='font-weight:800;margin-bottom:2px'; d.appendChild(t);
@@ -8814,10 +8819,10 @@ function handlePointerMove(cpx,cpy){
   if(_rot2 && _rot2.dragging){ const[xm,ym]=pxToMm(cpx,cpy); const piv=_rotPiv(); let deg=Math.atan2(ym-piv[1], xm-piv[0])*180/Math.PI; const hr=_rotHR(); const _distmm=Math.hypot(xm-piv[0], ym-piv[1]);
     // Snap par DISTANCE au pivot : près de la pièce = gros pas, loin = libre.
     let _inc=0;
-    if(_distmm < hr*1.4) _inc=45;
-    else if(_distmm < hr*2.1) _inc=10;
-    else if(_distmm < hr*3.0) _inc=5;
-    else _inc=0; // loin = rotation LIBRE (pas de snap)
+    if(_distmm < hr*1.15) _inc=45;
+    else if(_distmm < hr*1.5) _inc=10;
+    else if(_distmm < hr*1.85) _inc=5;
+    else _inc=0; // au-delà = rotation LIBRE (pas de snap) — arrive vite maintenant
     if(_inc>0) deg=Math.round(deg/_inc)*_inc;
     deg=Math.round(deg*10)/10; _rot2._snapInc=_inc;
     _rotApply(deg); const _di=document.getElementById('rotAngleInp'); if(_di)_di.value=deg.toFixed(1); redrawCanvasNow(); return; }
