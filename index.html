@@ -1508,7 +1508,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-22-GS 🧪TEST</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GS2 🧪TEST</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -8995,6 +8995,9 @@ function pmErase(xm,ym){
         const toAdd=[]; // new split objects to add
 
         for(const o of paintObjects){
+          // La gomme ne touche JAMAIS les cotes, points, contraintes, groupes, texte
+          // (sinon elle les transforme en grosses barres). Elle n'agit que sur la géométrie.
+          if(o.type==='dim'||o.type==='point'||o.type==='constraint'||o.type==='group'||o.type==='text'){continue;}
           if(o.type==='free'&&o.pts&&o.pts.length>0){
             // Split free path at erased points
             const segments=[];let seg=[];
