@@ -130,6 +130,15 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-09-23 — GV (TEST) : finitions (côté rouge, fenêtres, symétrie) -------------
+ [FIX] Côté rouge sur les formes fermées : appliqué le closePath (comme le miroir)
+   aussi à l'aperçu ROTATION et au survol d'une COTE -> plus de côté ouvert/rouge.
+ [UI] Fenêtres ROTATION et PARAMÈTRES DE FORME descendues (top:70 -> 165) : elles
+   ne cachent plus la barre d'outils (comme la fenêtre miroir).
+ [CLARTÉ] "Symétrie" (menu Contraintes) renommé "Symétrie (miroir)" : c'est un
+   miroir one-shot, pas une contrainte vivante -> le nom ne trompe plus.
+ À VALIDER PAR SEB avant passage sur main.
+
 -- 2026-09-23 — GU : DXF centré + GOMME réparée (validés Seb, en ligne) ------------
  Regroupe sur le vrai site les 2 correctifs testés et validés par Seb :
  [FIX] GOMME : ne touche plus JAMAIS les cotes/points/contraintes/groupes/texte
@@ -1516,7 +1525,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GU ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GV 🧪TEST</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -5047,7 +5056,7 @@ const TOOL_MENUS = {
     {i:'⊙', l:'Coïncident',       fn:"cadConstraint('coincident')"},
     {i:'△', l:'Milieu',           fn:"cadConstraint('midpoint')"},
     {i:'◡', l:'Tangente',         fn:"cadConstraint('tangent')"},
-    {i:'⋰', l:'Symétrie',         fn:"cadMirrorTool()"},
+    {i:'⋰', l:'Symétrie (miroir)', fn:"cadMirrorTool()"},
     {i:'🔒', l:'Fixe / Verrouiller', fn:"cadConstraint('fix')"},
   ]
 };
@@ -6995,7 +7004,7 @@ function _rotPiv(){ return (_rot2&&_rot2.pivot)?_rot2.pivot:_rotCenter(); }
 function _rotHR(){ let m=30; for(const id of _rot2.shapes){ const b=getObjBB(getObj(id)); if(b)m=Math.max(m, Math.max(b.w,b.h)/2+12); } return m; }
 function _rotApply(deg){ if(!_rot2)return; _rot2.deg=deg; paintObjects.length=0; JSON.parse(_rot2.snap).forEach(x=>paintObjects.push(x)); const piv=_rotPiv(); const a=deg*Math.PI/180; for(const id of _rot2.shapes){ let t=getObj(id); if(!t)continue; if(['rect','oblong','tri','star','gear','text','svg'].indexOf(t.type)>=0 && !t._circle){ try{ const s2=objToStrokesRaw(t); let pts=(s2&&s2[0])?s2[0].map(pt=>[pt[0],pt[1]]):null; if(pts&&pts.length>2){ if(Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])>1e-6)pts.push([pts[0][0],pts[0][1]]); const idx=paintObjects.indexOf(t); const free={id:t.id,type:'free',pts,strokeW:t.strokeW||currentStrokeW}; if(t.toolId!==undefined)free.toolId=t.toolId; if(t._fillets)free._fillets=JSON.parse(JSON.stringify(t._fillets)); paintObjects[idx]=free; t=free; } }catch(e){} } _rotateObj(t,piv[0],piv[1],a); if(t._arc)_arcRegen(t); if(t._fillets){ const _rp=(P)=>{ const dx=P[0]-piv[0],dy=P[1]-piv[1]; return [piv[0]+dx*Math.cos(a)-dy*Math.sin(a), piv[1]+dx*Math.sin(a)+dy*Math.cos(a)]; }; t._fillets=t._fillets.map(f=>{ const c2=_rp([f.cx,f.cy]); return Object.assign({},f,{cx:c2[0],cy:c2[1],apex:_rp(f.apex),ta:_rp(f.ta),tb:_rp(f.tb),V:_rp(f.V),u1:[Math.cos(a)*f.u1[0]-Math.sin(a)*f.u1[1],Math.sin(a)*f.u1[0]+Math.cos(a)*f.u1[1]],u2:[Math.cos(a)*f.u2[0]-Math.sin(a)*f.u2[1],Math.sin(a)*f.u2[0]+Math.cos(a)*f.u2[1]]}); }); } } redrawCanvasNow(); }
 function _rotPanelRemove(){ const e=document.getElementById('rotPanel'); if(e)e.remove(); }
-function _rotPanel(){ _rotPanelRemove(); if(!_rot2)return; const d=document.createElement('div'); d.id='rotPanel'; d.style.cssText='position:fixed;left:16px;top:70px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:10px 12px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:190px';
+function _rotPanel(){ _rotPanelRemove(); if(!_rot2)return; const d=document.createElement('div'); d.id='rotPanel'; d.style.cssText='position:fixed;left:16px;top:165px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:10px 12px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:190px';
   const t=document.createElement('div'); t.textContent='⟳ Rotation'; t.style.cssText='font-weight:800;margin-bottom:2px'; d.appendChild(t);
   const mk=(txt,active,cb)=>{ const b=document.createElement('button'); b.textContent=txt; b.style.cssText='padding:6px 9px;border-radius:8px;border:1px solid '+(active?'#3b82f6':'#4a5568')+';background:'+(active?'#3b82f6':'#0e1116')+';color:'+(active?'#fff':'#cfd4dc')+';cursor:pointer;font-weight:600;text-align:left'; b.onclick=cb; return b; };
   d.appendChild(mk('① Forme(s) ('+_rot2.shapes.size+')', _rot2.stage==='shapes', ()=>{ _rot2.stage='shapes'; _rotPanel(); _conHintShow('⟳ Clique la/les forme(s) à tourner'); }));
@@ -8001,7 +8010,7 @@ function _placeShapeCotes(o){ if(!o||typeof objCnt==='undefined')return; const m
   if(typeof updateObjCount==='function')updateObjCount(); }
 function _shapeParamsPanel(o){ _shapeParamsRemove(); if(!o)return; _placeShapeCotes(o); const params=_shapeParamsFor(o); if(!params.length){ if(typeof toastHist==='function')toastHist('Forme non paramétrable'); return; }
   const nm=(typeof OBJ_NAMES!=='undefined'&&OBJ_NAMES[o.type])?OBJ_NAMES[o.type]:(o._poly?'Polygone':(o._arc?'Arc':(o._circle?'Cercle':'Forme')));
-  const d=document.createElement('div'); d.id='shapeParams'; d.style.cssText='position:fixed;left:16px;top:70px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:11px 13px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:180px';
+  const d=document.createElement('div'); d.id='shapeParams'; d.style.cssText='position:fixed;left:16px;top:165px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:11px 13px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:180px';
   const title=document.createElement('div'); title.textContent='📏 '+nm; title.style.cssText='font-weight:800;cursor:move;user-select:none;margin-bottom:2px'; d.appendChild(title);
   const commit=()=>{ _shapeParamsRemove(); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); };
   for(const pr of params){ const row=document.createElement('div'); row.style.cssText='display:flex;gap:10px;align-items:center;justify-content:space-between';
@@ -8330,7 +8339,7 @@ function drawDim(dim){
   pCtx.restore();
 }
 function _cadDimOverlay(){
-  if(pCtx && paintTool==='caddim' && _dimHovId!=null){ const _ho=getObj(_dimHovId); if(_ho){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='rgba(34,197,94,.9)'; pCtx.lineWidth=2.5; try{ for(const _s of objToStrokesRaw(_ho)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} pCtx.stroke(); } }catch(e){} pCtx.restore(); } }
+  if(pCtx && paintTool==='caddim' && _dimHovId!=null){ const _ho=getObj(_dimHovId); if(_ho){ const _cl=['rect','oblong','tri','star','gear','polygon','ellipse'].includes(_ho.type)||_ho._poly||_ho._circle; pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='rgba(34,197,94,.9)'; pCtx.lineWidth=2.5; try{ for(const _s of objToStrokesRaw(_ho)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} if(_cl)pCtx.closePath(); pCtx.stroke(); } }catch(e){} pCtx.restore(); } }
   // Réseau circulaire : formes à répéter surlignées + croix du pivot sous le curseur
   if(pCtx && _arrayPick){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=2.4;
     for(const id of _arrayPick.objs){ const o=getObj(id); if(!o)continue; try{ for(const s of objToStrokesRaw(o)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]);pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } }catch(e){} }
@@ -8346,7 +8355,7 @@ function _cadDimOverlay(){
     }
     if(_ext.picks.length===2){ const I=(typeof _lineIntersect==='function')?_lineIntersect(_ext.picks[0].seg,_ext.picks[1].seg):null; if(I&&isFinite(I[0])&&isFinite(I[1])){ const q=mmToPx(I[0],I[1]); pCtx.setLineDash([]); pCtx.fillStyle='#a855f7'; pCtx.strokeStyle='#fff'; pCtx.lineWidth=1.5; pCtx.beginPath(); pCtx.arc(q[0],q[1],5,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); } }
     pCtx.restore(); }
-  if(pCtx && _rot2){ const piv=_rotPiv(); const _pc=mmToPx(piv[0],piv[1]); pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='rgba(34,197,94,.9)'; pCtx.lineWidth=2.4; for(const _id of _rot2.shapes){ const _o=getObj(_id); if(!_o)continue; try{ for(const _s of objToStrokesRaw(_o)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} pCtx.stroke(); } }catch(e){} } pCtx.strokeStyle='#e11d48'; pCtx.fillStyle='#e11d48'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(_pc[0],_pc[1],7,0,2*Math.PI); pCtx.stroke(); pCtx.beginPath(); pCtx.moveTo(_pc[0]-11,_pc[1]); pCtx.lineTo(_pc[0]+11,_pc[1]); pCtx.moveTo(_pc[0],_pc[1]-11); pCtx.lineTo(_pc[0],_pc[1]+11); pCtx.stroke(); if(_rot2.shapes.size){ const hr=_rotHR(); const _ha=_rot2.deg*Math.PI/180; const _hmm=[piv[0]+Math.cos(_ha)*hr, piv[1]+Math.sin(_ha)*hr]; const _hp=mmToPx(_hmm[0],_hmm[1]); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='#3b82f6'; pCtx.lineWidth=2; pCtx.setLineDash([4,3]); pCtx.beginPath(); pCtx.moveTo(_pc[0],_pc[1]); pCtx.lineTo(_hp[0],_hp[1]); pCtx.stroke(); pCtx.setLineDash([]); pCtx.beginPath(); pCtx.arc(_hp[0],_hp[1],8,0,2*Math.PI); pCtx.fill(); } pCtx.restore(); }
+  if(pCtx && _rot2){ const piv=_rotPiv(); const _pc=mmToPx(piv[0],piv[1]); pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='rgba(34,197,94,.9)'; pCtx.lineWidth=2.4; for(const _id of _rot2.shapes){ const _o=getObj(_id); if(!_o)continue; const _cl=['rect','oblong','tri','star','gear','polygon','ellipse'].includes(_o.type)||_o._poly||_o._circle; try{ for(const _s of objToStrokesRaw(_o)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} if(_cl)pCtx.closePath(); pCtx.stroke(); } }catch(e){} } pCtx.strokeStyle='#e11d48'; pCtx.fillStyle='#e11d48'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(_pc[0],_pc[1],7,0,2*Math.PI); pCtx.stroke(); pCtx.beginPath(); pCtx.moveTo(_pc[0]-11,_pc[1]); pCtx.lineTo(_pc[0]+11,_pc[1]); pCtx.moveTo(_pc[0],_pc[1]-11); pCtx.lineTo(_pc[0],_pc[1]+11); pCtx.stroke(); if(_rot2.shapes.size){ const hr=_rotHR(); const _ha=_rot2.deg*Math.PI/180; const _hmm=[piv[0]+Math.cos(_ha)*hr, piv[1]+Math.sin(_ha)*hr]; const _hp=mmToPx(_hmm[0],_hmm[1]); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='#3b82f6'; pCtx.lineWidth=2; pCtx.setLineDash([4,3]); pCtx.beginPath(); pCtx.moveTo(_pc[0],_pc[1]); pCtx.lineTo(_hp[0],_hp[1]); pCtx.stroke(); pCtx.setLineDash([]); pCtx.beginPath(); pCtx.arc(_hp[0],_hp[1],8,0,2*Math.PI); pCtx.fill(); } pCtx.restore(); }
   if(pCtx){ for(const o of paintObjects){ if(o._fillets){ for(const f of o._fillets){ if(!f||f.cx==null)continue; const c=mmToPx(f.cx,f.cy); pCtx.save(); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='rgba(59,130,246,.18)'; pCtx.lineWidth=1.4; pCtx.beginPath(); pCtx.arc(c[0],c[1],4.5,0,2*Math.PI); pCtx.fill(); pCtx.stroke(); pCtx.restore(); } } } }
     if(pCtx && _conPick && _conPick.picks.length){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3;
     for(const pk of _conPick.picks){ try{ if(pk && pk.obj && typeof pk.edge==='number'){ const sg=_edgeSeg(pk); if(sg){ const a=mmToPx(sg[0],sg[1]),b=mmToPx(sg[2],sg[3]); pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke(); } } else { const _tgt=pk&&pk.obj?pk.obj:pk; for(const s of objToStrokesRaw(_tgt)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } } }catch(e){} }
