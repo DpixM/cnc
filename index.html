@@ -130,6 +130,20 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-09-23 — GW (TEST) : démarrage sans flash + rotation améliorée + cote cliquable
+ [UI] Plus de FLASH « Dimensions du brut » à chaque F5 : la page brut (wzp0) n'a plus
+   wz-on au chargement, c'est l'écran des MODES (wzp1) qui s'affiche direct. Le brut
+   reste dans le flow CNC normal ([1,0,2,...]) et incrustation → il n'apparaît QUE si
+   on choisit CNC 3018 (normal ou Vcarve), pas en laser. Rien perdu.
+ [ROTATION] Snap par DISTANCE au pivot revu (avant : proche=5°/loin=45°, jamais libre) :
+   proche pièce (<hr*1.4)=45°, un peu plus loin (<hr*2.1)=10°, encore plus loin
+   (<hr*3.0)=5°, LOIN=libre (pas de snap). Saisie manuelle d'angle toujours possible.
+   + poignée en SURBRILLANCE + curseur « main » quand on la survole (on sait où elle est)
+   + petite étiquette « ⟳ 45° / 10° / 5° / libre » près de la poignée pendant qu'on tourne.
+ [COTE] Zone cliquable d'une cote élargie (thr 7px→13px) : plus facile à attraper pour
+   la modifier (le chiffre est maintenant dans la zone, pas que le trait fin).
+ À VALIDER PAR SEB avant passage sur main.
+
 -- 2026-09-23 — GV : finitions (validé Seb, en ligne) (côté rouge, fenêtres, symétrie) -------------
  [FIX] Côté rouge sur les formes fermées : appliqué le closePath (comme le miroir)
    aussi à l'aperçu ROTATION et au survol d'une COTE -> plus de côté ouvert/rouge.
@@ -1525,7 +1539,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GV ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GW 🧪TEST</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -1536,7 +1550,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
   <!-- SHELL WIZARD (pages 0,1,3-9) -->
   <div id="wzShell">
 <!-- PAGE 0 : BRUT -->
-<div class="wz-wrap wz-on" id="wzp0">
+<div class="wz-wrap" id="wzp0">
   <div class="wz-h1">📐 Dimensions du brut</div>
   <div class="wz-sub">Taille de la pièce à usiner</div>
   <div class="g2">
@@ -1577,7 +1591,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 </div>
 
 <!-- PAGE 1 : MODE -->
-<div class="wz-wrap" id="wzp1">
+<div class="wz-wrap wz-on" id="wzp1">
   <div class="wz-h1">⚙️ Mode d'usinage</div>
   <div class="wz-sub">Que veux-tu usiner ?</div>
   <div class="bc">
@@ -6216,7 +6230,7 @@ function hitTest(o,xm,ym){
   if(o.type==='point'){ return Math.hypot(xm-o.x,ym-o.y) < 5/(BASE_PX*vZoom); }
   if(o.type==='dim'){
     const g=(typeof dimGeom==='function')?dimGeom(o):null; if(!g) return false;
-    const thr=7/(BASE_PX*vZoom), dx=g.bx-g.ax, dy=g.by-g.ay, L2=dx*dx+dy*dy;
+    const thr=13/(BASE_PX*vZoom), dx=g.bx-g.ax, dy=g.by-g.ay, L2=dx*dx+dy*dy;
     if(L2<1e-6) return Math.hypot(xm-g.ax,ym-g.ay)<thr;
     const t=Math.max(0,Math.min(1,((xm-g.ax)*dx+(ym-g.ay)*dy)/L2));
     return Math.hypot(xm-(g.ax+t*dx),ym-(g.ay+t*dy))<thr;
@@ -8355,7 +8369,7 @@ function _cadDimOverlay(){
     }
     if(_ext.picks.length===2){ const I=(typeof _lineIntersect==='function')?_lineIntersect(_ext.picks[0].seg,_ext.picks[1].seg):null; if(I&&isFinite(I[0])&&isFinite(I[1])){ const q=mmToPx(I[0],I[1]); pCtx.setLineDash([]); pCtx.fillStyle='#a855f7'; pCtx.strokeStyle='#fff'; pCtx.lineWidth=1.5; pCtx.beginPath(); pCtx.arc(q[0],q[1],5,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); } }
     pCtx.restore(); }
-  if(pCtx && _rot2){ const piv=_rotPiv(); const _pc=mmToPx(piv[0],piv[1]); pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='rgba(34,197,94,.9)'; pCtx.lineWidth=2.4; for(const _id of _rot2.shapes){ const _o=getObj(_id); if(!_o)continue; const _cl=['rect','oblong','tri','star','gear','polygon','ellipse'].includes(_o.type)||_o._poly||_o._circle; try{ for(const _s of objToStrokesRaw(_o)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} if(_cl)pCtx.closePath(); pCtx.stroke(); } }catch(e){} } pCtx.strokeStyle='#e11d48'; pCtx.fillStyle='#e11d48'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(_pc[0],_pc[1],7,0,2*Math.PI); pCtx.stroke(); pCtx.beginPath(); pCtx.moveTo(_pc[0]-11,_pc[1]); pCtx.lineTo(_pc[0]+11,_pc[1]); pCtx.moveTo(_pc[0],_pc[1]-11); pCtx.lineTo(_pc[0],_pc[1]+11); pCtx.stroke(); if(_rot2.shapes.size){ const hr=_rotHR(); const _ha=_rot2.deg*Math.PI/180; const _hmm=[piv[0]+Math.cos(_ha)*hr, piv[1]+Math.sin(_ha)*hr]; const _hp=mmToPx(_hmm[0],_hmm[1]); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='#3b82f6'; pCtx.lineWidth=2; pCtx.setLineDash([4,3]); pCtx.beginPath(); pCtx.moveTo(_pc[0],_pc[1]); pCtx.lineTo(_hp[0],_hp[1]); pCtx.stroke(); pCtx.setLineDash([]); pCtx.beginPath(); pCtx.arc(_hp[0],_hp[1],8,0,2*Math.PI); pCtx.fill(); } pCtx.restore(); }
+  if(pCtx && _rot2){ const piv=_rotPiv(); const _pc=mmToPx(piv[0],piv[1]); pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='rgba(34,197,94,.9)'; pCtx.lineWidth=2.4; for(const _id of _rot2.shapes){ const _o=getObj(_id); if(!_o)continue; const _cl=['rect','oblong','tri','star','gear','polygon','ellipse'].includes(_o.type)||_o._poly||_o._circle; try{ for(const _s of objToStrokesRaw(_o)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} if(_cl)pCtx.closePath(); pCtx.stroke(); } }catch(e){} } pCtx.strokeStyle='#e11d48'; pCtx.fillStyle='#e11d48'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(_pc[0],_pc[1],7,0,2*Math.PI); pCtx.stroke(); pCtx.beginPath(); pCtx.moveTo(_pc[0]-11,_pc[1]); pCtx.lineTo(_pc[0]+11,_pc[1]); pCtx.moveTo(_pc[0],_pc[1]-11); pCtx.lineTo(_pc[0],_pc[1]+11); pCtx.stroke(); if(_rot2.shapes.size){ const hr=_rotHR(); const _ha=_rot2.deg*Math.PI/180; const _hmm=[piv[0]+Math.cos(_ha)*hr, piv[1]+Math.sin(_ha)*hr]; const _hp=mmToPx(_hmm[0],_hmm[1]); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='#3b82f6'; pCtx.lineWidth=2; pCtx.setLineDash([4,3]); pCtx.beginPath(); pCtx.moveTo(_pc[0],_pc[1]); pCtx.lineTo(_hp[0],_hp[1]); pCtx.stroke(); pCtx.setLineDash([]); const _hov=_rot2._hover; const _hrad=_hov?11:8; pCtx.beginPath(); pCtx.arc(_hp[0],_hp[1],_hrad,0,2*Math.PI); pCtx.fill(); if(_hov){ pCtx.strokeStyle='#fff'; pCtx.lineWidth=2.5; pCtx.beginPath(); pCtx.arc(_hp[0],_hp[1],_hrad+3,0,2*Math.PI); pCtx.stroke(); } if(_rot2.dragging){ const _lbl=(_rot2._snapInc>0)?('⟳ '+_rot2._snapInc+'°'):'⟳ libre'; pCtx.font='bold 12px sans-serif'; pCtx.textAlign='left'; const _tw=pCtx.measureText(_lbl).width; pCtx.fillStyle='#1f2430'; pCtx.fillRect(_hp[0]+12,_hp[1]-21,_tw+10,18); pCtx.fillStyle=(_rot2._snapInc>0)?'#7ee787':'#ffd08a'; pCtx.fillText(_lbl,_hp[0]+17,_hp[1]-8); } } pCtx.restore(); }
   if(pCtx){ for(const o of paintObjects){ if(o._fillets){ for(const f of o._fillets){ if(!f||f.cx==null)continue; const c=mmToPx(f.cx,f.cy); pCtx.save(); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='rgba(59,130,246,.18)'; pCtx.lineWidth=1.4; pCtx.beginPath(); pCtx.arc(c[0],c[1],4.5,0,2*Math.PI); pCtx.fill(); pCtx.stroke(); pCtx.restore(); } } } }
     if(pCtx && _conPick && _conPick.picks.length){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3;
     for(const pk of _conPick.picks){ try{ if(pk && pk.obj && typeof pk.edge==='number'){ const sg=_edgeSeg(pk); if(sg){ const a=mmToPx(sg[0],sg[1]),b=mmToPx(sg[2],sg[3]); pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke(); } } else { const _tgt=pk&&pk.obj?pk.obj:pk; for(const s of objToStrokesRaw(_tgt)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } } }catch(e){} }
@@ -8797,7 +8811,18 @@ function renderSnapBtn(){
 
 function handlePointerMove(cpx,cpy){
   if(_rectPat && _rectPat.dragging){ const[xm,ym]=pxToMm(cpx,cpy); const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _rectPat.hx=sp.x; _rectPat.hy=sp.y; redrawCanvasNow(); return; }
-  if(_rot2 && _rot2.dragging){ const[xm,ym]=pxToMm(cpx,cpy); const piv=_rotPiv(); let deg=Math.atan2(ym-piv[1], xm-piv[0])*180/Math.PI; const hr=_rotHR(); const _distmm=Math.hypot(xm-piv[0], ym-piv[1]); const _inc=(_distmm < hr*1.5)?5:45; const _near=Math.round(deg/_inc)*_inc; if(Math.abs(deg-_near)<_inc*0.5)deg=_near; deg=Math.round(deg*10)/10; _rotApply(deg); const _di=document.getElementById('rotAngleInp'); if(_di)_di.value=deg.toFixed(1); redrawCanvasNow(); return; }
+  if(_rot2 && _rot2.dragging){ const[xm,ym]=pxToMm(cpx,cpy); const piv=_rotPiv(); let deg=Math.atan2(ym-piv[1], xm-piv[0])*180/Math.PI; const hr=_rotHR(); const _distmm=Math.hypot(xm-piv[0], ym-piv[1]);
+    // Snap par DISTANCE au pivot : près de la pièce = gros pas, loin = libre.
+    let _inc=0;
+    if(_distmm < hr*1.4) _inc=45;
+    else if(_distmm < hr*2.1) _inc=10;
+    else if(_distmm < hr*3.0) _inc=5;
+    else _inc=0; // loin = rotation LIBRE (pas de snap)
+    if(_inc>0) deg=Math.round(deg/_inc)*_inc;
+    deg=Math.round(deg*10)/10; _rot2._snapInc=_inc;
+    _rotApply(deg); const _di=document.getElementById('rotAngleInp'); if(_di)_di.value=deg.toFixed(1); redrawCanvasNow(); return; }
+  // Survol de la poignée de rotation (pas en train de tourner) : curseur "main" + surbrillance
+  if(_rot2 && !_rot2.dragging && !(isDragging&&dragMode==='pan')){ const[xm,ym]=pxToMm(cpx,cpy); const piv=_rotPiv(); const hr=_rotHR(); const a=_rot2.deg*Math.PI/180; const hx=piv[0]+Math.cos(a)*hr, hy=piv[1]+Math.sin(a)*hr; const tol=16/(BASE_PX*vZoom); const over=(_rot2.shapes.size>0 && Math.hypot(xm-hx,ym-hy)<=tol); if(pCanvas)pCanvas.style.cursor=over?'grab':'default'; if(_rot2._hover!==over){ _rot2._hover=over; redrawCanvasNow(); } return; }
   if(isDragging && dragMode==='pan'){ pmPanView(cpx,cpy); return; } // pan molette : marche dans TOUS les outils
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
   if(paintTool==='pshape'){ if(_shp){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _shp.cursor=[sp.x,sp.y]; _shp._snapped=sp.snapped; if(_shp.cx!=null && !_shp.typed && typeof _shpRadius==='function'){ const _di=document.querySelector('#shpInputs input:last-of-type'); if(_di && document.activeElement!==_di) _di.value=(_shpRadius()*2).toFixed(1); } redrawCanvasNow(); } return; }
