@@ -7632,11 +7632,13 @@ function _shpFinalize(){
 function _shpKey(e){
   if(!_shp)return false;
   if(e.key==='Escape'){ _shp=null; if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); return true; }
-  if(e.key==='Enter'){ if(_shp.tool==='parc'){ if(_shp.pts.length>=2){ _arcFinalize(); _shpExit(); } }
-    else { // Entrée valide UNE forme puis SORT (retour sélection) — plus de spam de cercles
-      if(_shp.cx==null){ let c=_shp.cursor; if(!c){ try{ c=pxToMm(pCanvas.width/2,pCanvas.height/2); }catch(_){ c=[0,0]; } } _shp.cx=c[0]; _shp.cy=c[1]; }
-      if(_shp.cx!=null && (_shp.typed||(typeof _shpRadius==='function'&&_shpRadius()>0))){ _shpFinalize(); _shpExit(); }
-    } return true; }
+  if(e.key==='Enter'){ const _cur=_shp.cursor;
+    // Entrée = exactement COMME UN CLIC à la position du curseur (pose le centre, puis pose
+    // la forme au clic suivant) -> pas de fenêtre, pas de spam, comportement identique à la souris.
+    if(_shp.tool==='parc'){ if(_cur)_shpDown(_cur[0],_cur[1]); }
+    else if(_cur){ _shpDown(_cur[0],_cur[1]); }
+    else if(_shp.cx!=null && (_shp.typed||(typeof _shpRadius==='function'&&_shpRadius()>0))){ _shpFinalize(); } // pas de curseur mais centre + Ø tapé
+    return true; }
   if(e.key==='Backspace'){ _shp.typed=_shp.typed.slice(0,-1); redrawCanvasNow(); return true; }
   if(_shp.tool==='ppoly' && (e.key==='['||e.key==='ArrowDown')){ _shp.sides=Math.max(3,_shp.sides-1); redrawCanvasNow(); return true; }
   if(_shp.tool==='ppoly' && (e.key===']'||e.key==='ArrowUp')){ _shp.sides=Math.min(64,_shp.sides+1); redrawCanvasNow(); return true; }
@@ -7648,6 +7650,10 @@ function _shpInputsRemove(){ const e=document.getElementById('shpInputs'); if(e)
 // en SÉLECTION. Évite le spam (chaque Entrée re-créait une forme) et la fenêtre qui reste.
 function _shpExit(){ _shp=null; if(typeof _shpInputsRemove==='function')_shpInputsRemove(); if(typeof setPTool==='function')setPTool('select'); if(typeof redrawCanvasNow==='function')redrawCanvasNow(); }
 function _shpShowInputs(){
+  // PANNEAU FLOTTANT RETIRÉ (demande Seb) : le diamètre / la taille s'affichent déjà
+  // directement sur le canvas à côté de la forme (voir _shpOverlay). On tape le Ø au clavier
+  // (chiffres gérés par _shpKey) ou on dimensionne à la souris ; clic ou Entrée = pose.
+  _shpInputsRemove(); return;
   if(!_shp || typeof pCanvas==='undefined' || !pCanvas || !pCanvas.getBoundingClientRect) return;
   _shpInputsRemove();
   const rect=pCanvas.getBoundingClientRect();
