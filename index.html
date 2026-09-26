@@ -130,6 +130,14 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-09-26 — GZ (TEST) : Entrée + clic-ailleurs ferment les petits panneaux -----
+ [FIX] Avant, la petite fenêtre (cote / paramètres de forme) ne se fermait qu'avec
+   Échap. Maintenant Entrée la VALIDE et un clic AILLEURS la ferme aussi, même si le
+   curseur n'est plus dans le champ (handler clavier global, indépendant du focus).
+ [FIX] La fenêtre de saisie de COTE (dimInput) n'avait pas de "clic-ailleurs" -> ajouté.
+ [+]   Échap devient global lui aussi pour ces 2 panneaux (marche hors focus).
+ [OK]  Tests : test-enter (6), gomme (9), ext (9), text-to-cnc -> tout vert.
+
 -- 2026-09-23 — GV : finitions (validé Seb, en ligne) (côté rouge, fenêtres, symétrie) -------------
  [FIX] Côté rouge sur les formes fermées : appliqué le closePath (comme le miroir)
    aussi à l'aperçu ROTATION et au survol d'une COTE -> plus de côté ouvert/rouge.
@@ -1525,7 +1533,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GV ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-26-GZ 🧪TEST</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -8002,7 +8010,7 @@ function pickEntity(xm,ym,tol){
 function cadStartDim(){ _caddim=null; _dimA=null; _dimEdgeA=null; _dimHover=null; _dimPlace=null; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null; setPTool('caddim'); _cadMode=true; if(typeof toastHist==='function')toastHist('📏 Cote : clique une forme (ou 2 lignes pour la distance entre elles)'); redrawCanvasNow(); }
 function _polyRegen(o, n){ if(!o||!o._poly)return; const c=_polyCenter(o); const r=_polyR(o)||1; const p0=o.pts[0]; const a0=Math.atan2(p0[1]-c[1],p0[0]-c[0]); const pts=[]; for(let i=0;i<n;i++){ const a=a0+i*2*Math.PI/n; pts.push([c[0]+r*Math.cos(a), c[1]+r*Math.sin(a)]); } pts.push([pts[0][0],pts[0][1]]); o.pts=pts; o._polyN=n; }
 let _shpPanelAway=null;
-function _shapeParamsRemove(){ const e=document.getElementById('shapeParams'); if(e)e.remove(); if(_shpPanelAway){ document.removeEventListener('pointerdown',_shpPanelAway,true); _shpPanelAway=null; } }
+function _shapeParamsRemove(){ const e=document.getElementById('shapeParams'); if(e)e.remove(); if(_shpPanelAway){ document.removeEventListener('pointerdown',_shpPanelAway,true); _shpPanelAway=null; } window._shapeParamsCommit=null; }
 function _isParametricShape(o){ return !!(o && (o.type==='rect'||o.type==='oblong'||o.type==='ellipse'||o.type==='star'||o.type==='tri'||o.type==='gear'||o._circle||o._poly||o._arc)); }
 function _shapeParamsFor(o){ const P=[]; if(!o)return P;
   const isC = o._circle || (o.type==='ellipse' && Math.abs((o.rx||0)-(o.ry||0))<0.01);
@@ -8026,6 +8034,7 @@ function _shapeParamsPanel(o){ _shapeParamsRemove(); if(!o)return; _placeShapeCo
   const d=document.createElement('div'); d.id='shapeParams'; d.style.cssText='position:fixed;left:16px;top:165px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:11px 13px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:180px';
   const title=document.createElement('div'); title.textContent='📏 '+nm; title.style.cssText='font-weight:800;cursor:move;user-select:none;margin-bottom:2px'; d.appendChild(title);
   const commit=()=>{ _shapeParamsRemove(); if(typeof pushHistory==='function')pushHistory(); redrawCanvasNow(); };
+  window._shapeParamsCommit=commit; // exposé pour la validation globale (Entrée même sans focus dans le champ)
   for(const pr of params){ const row=document.createElement('div'); row.style.cssText='display:flex;gap:10px;align-items:center;justify-content:space-between';
     const lab=document.createElement('span'); lab.textContent=pr.l; lab.style.opacity=.9; row.appendChild(lab);
     const inp=document.createElement('input'); inp.type='text'; inp.value=(+pr.g()).toFixed(pr.int?0:1); inp.style.cssText='width:72px;padding:5px 7px;border-radius:7px;border:1px solid #6b7280;background:#0d0f14;color:#7ee787;font:14px monospace;text-align:right';
@@ -8301,12 +8310,15 @@ function openDimInput(dim){
   const ok=document.createElement('button'); ok.textContent='✓'; ok.style.cssText='padding:4px 9px;border:none;border-radius:5px;background:#22c55e;color:#04240f;font-weight:800;cursor:pointer';
   wrap.appendChild(inp); wrap.appendChild(ok); document.body.appendChild(wrap);
   wrap.style.left=Math.max(6,rect.left+mid[0]-56)+'px'; wrap.style.top=Math.max(6,rect.top+mid[1]-16)+'px';
-  let done=false;
-  const apply=()=>{ if(done)return; done=true; const v=parseFloat(String(inp.value||'').replace(',','.')); if(v>0){ applyDimValue(dim,v); if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); } wrap.remove(); redrawCanvas(); };
-  const cancel=()=>{ if(done)return; done=true; wrap.remove(); redrawCanvas(); };
+  let done=false, _dimAway=null;
+  const _cleanAway=()=>{ if(_dimAway){ document.removeEventListener('pointerdown',_dimAway,true); _dimAway=null; } };
+  const apply=()=>{ if(done)return; done=true; _cleanAway(); const v=parseFloat(String(inp.value||'').replace(',','.')); if(v>0){ applyDimValue(dim,v); if(typeof markDirty==='function')markDirty(); if(typeof pushHistory==='function')pushHistory(); } wrap.remove(); redrawCanvas(); };
+  const cancel=()=>{ if(done)return; done=true; _cleanAway(); wrap.remove(); redrawCanvas(); };
   inp.onkeydown=e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); apply(); } else if(e.key==='Escape'){ e.preventDefault(); cancel(); } };
   ok.onclick=apply;
   window._dimInputApply=apply; window._dimInputCancel=cancel;
+  // CLIC AILLEURS = valider + fermer (comme le panneau des formes). Sinon la petite fenêtre de cote restait ouverte.
+  setTimeout(()=>{ _dimAway=(ev)=>{ if(wrap.contains(ev.target))return; apply(); }; document.addEventListener('pointerdown',_dimAway,true); }, 60);
   setTimeout(()=>{ try{inp.focus();inp.select();}catch(e){} },20);
 }
 function _dimArrow(x,y,ang){ const s=6; pCtx.beginPath(); pCtx.moveTo(x,y); pCtx.lineTo(x+Math.cos(ang+0.38)*s, y+Math.sin(ang+0.38)*s); pCtx.lineTo(x+Math.cos(ang-0.38)*s, y+Math.sin(ang-0.38)*s); pCtx.closePath(); pCtx.fill(); }
@@ -14932,7 +14944,23 @@ function initCanvas(){
        &&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
       e.preventDefault();deleteSel();
     }
-    if(e.key==='Escape'){selObjIds.clear();selObjId=null;redrawCanvas();renderInspector();}
+    // ENTRÉE GLOBALE : valide n'importe quel petit panneau flottant ouvert (cote, paramètres de
+    // forme...) MÊME si le focus n'est plus dans le champ. Avant, Entrée ne marchait que si le
+    // champ gardait le focus ; du coup la fenêtre ne se fermait qu'avec Échap. (demande Seb)
+    if(e.key==='Enter'){
+      const _ae=document.activeElement;
+      // Si le focus est déjà dans un champ de saisie, son propre handler (stopPropagation) gère —
+      // on n'intervient QUE quand le focus est ailleurs (canvas, body...).
+      if(!_ae || (_ae.tagName!=='INPUT' && _ae.tagName!=='TEXTAREA')){
+        if(document.getElementById('dimInputWrap') && typeof window._dimInputApply==='function'){ e.preventDefault(); window._dimInputApply(); return; }
+        if(document.getElementById('shapeParams') && typeof window._shapeParamsCommit==='function'){ e.preventDefault(); window._shapeParamsCommit(); return; }
+      }
+    }
+    if(e.key==='Escape'){
+      // Échap ferme aussi les petits panneaux flottants (cote / paramètres) où qu'aille le focus.
+      if(document.getElementById('dimInputWrap') && typeof window._dimInputCancel==='function'){ e.preventDefault(); window._dimInputCancel(); return; }
+      if(document.getElementById('shapeParams')){ _shapeParamsRemove(); redrawCanvasNow(); e.preventDefault(); return; }
+      selObjIds.clear();selObjId=null;redrawCanvas();renderInspector();}
     // Annuler / Rétablir
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z' && !e.shiftKey){
       e.preventDefault(); undoAction(); return;
