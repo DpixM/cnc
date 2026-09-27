@@ -130,6 +130,57 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-09-27 — HJ : ROTATION complète (validée Seb, en ligne) — la ligne suit la souris
+ [FIX] Pendant qu'on tire une poignée, la LIGNE + les poignées suivent la souris (effet "grabe
+   et tourne", retour visuel direct). Au relâchement elles reviennent à l'horizontale à droite
+   -> toujours pas de fuite entre deux rotations. Rotation relative depuis le grab (pas de saut).
+
+-- 2026-09-27 — HI (TEST) : ROTATION — trait vert d'angle retiré (barre en trop)
+ [FIX] Le petit trait vert "indicateur d'angle" ressemblait à une barre parasite sur la pièce.
+   Retiré. L'angle reste lisible via la fenêtre Rotation + la pièce tournée. Poignées fixes OK.
+
+-- 2026-09-27 — HH (TEST) : ROTATION — poignées FIXES (elles ne fuient plus)
+ [FIX] Les poignées tournaient AVEC la pièce -> après une rotation elles étaient ailleurs, on
+   devait les courir. Maintenant elles restent FIXES à droite du pivot. On tourne en RELATIF
+   depuis le point où on attrape (offset) -> pas de saut. Un petit trait vert montre l'angle
+   courant de la pièce (séparé des poignées). La pièce tourne bien autour du pivot fixe.
+
+-- 2026-09-27 — HG (TEST) : ROTATION — étiquettes au-dessus (fini le paquet illisible) --
+ [FIX] Les 3 étiquettes (45°/5°/libre) étaient collées à DROITE des points et se chevauchaient
+   en un gros bloc illisible. Remises AU-DESSUS de chaque point (centrées), espacement un peu
+   plus large (46/86/126 px) -> chaque poignée est bien lisible et attrapable distinctement.
+
+-- 2026-09-27 — HF (TEST) : ROTATION — gizmo compact (taille écran fixe) --
+ [TAILLE] Les 3 poignées étaient en mm -> énormes (le "libre" partait à l'autre bout de l'écran).
+   Passées en distance ÉCRAN FIXE (42 / 74 / 106 px du pivot) : petit gizmo compact, toujours
+   la même taille quels que soient le zoom et la forme.
+
+-- 2026-09-27 — HE (TEST) : ROTATION — 3 poignées fixes (45° / 5° / libre) --
+ [POIGNÉES] Axe de rotation FIXE (la poignée ne suit plus le curseur). 3 poignées distinctes
+   sur le rayon, chacune son pas : 45° (bleu, près), 5° (vert, milieu), LIBRE (orange, loin).
+   On attrape celle qu'on veut = ce pas-là. Survol/drag = surbrillance + étiquette.
+ [i]   Pivot avec aperçu snap (HD) validé par Seb. Cotes qui suivent (HC) toujours là.
+
+-- 2026-09-27 — HD (TEST) : ROTATION — pivot qui s'accroche + poignée dans chaque zone --
+ [PIVOT] Choix du point de pivot : APERÇU VIVANT du snap sous le curseur (rond vert + croix
+   quand on est sur un coin / milieu d'arête / centre / extrémité). Le snap marchait déjà mais
+   sans retour visuel -> on croyait qu'il n'y en avait pas. Maintenant on VOIT où ça s'accroche.
+ [POIGNÉE] La poignée suit le curseur pendant qu'on tourne : il y a donc un grip dans CHAQUE
+   zone de snap (avant, la seule poignée était au niveau du 45°, les zones 10°/5° n'avaient
+   pas de prise). Zones de distance élargies aussi (45° / 10° / 5° / libre plus faciles à viser).
+ [i]   Reste sur HC : cotes qui suivent la pièce + étiquette de zone + cote cliquable.
+
+-- 2026-09-27 — HC (TEST) : ROTATION améliorée (cotes qui suivent + snap par distance) --
+ [ROTATION] Les COTES accrochées à une pièce tournent maintenant AVEC elle (étiquette +
+   placement pivotés). Fini les cotes plantées qui restaient droites quand la pièce tournait.
+ [ROTATION] Snap d'angle par DISTANCE au pivot, dans le bon sens : poignée près de la pièce =
+   45°, un peu plus loin = 10°, encore plus loin = 5°, LOIN = libre (aucun snap). La saisie
+   d'angle à la main reste toujours possible. (Avant c'était l'inverse : 5° près, jamais libre.)
+ [ROTATION] Poignée en SURBRILLANCE + curseur « main » au survol (on voit enfin où elle est),
+   et petite étiquette « ⟳ 45°/10°/5°/libre » près de la poignée pendant qu'on tourne.
+ [COTE] Zone cliquable d'une cote élargie (7px → 13px) : plus facile à attraper pour l'éditer.
+ [i]   Aucun paramètre machine touché. Cercle (HB) + laser G2/G3 (GX) toujours dedans.
+
 -- 2026-09-27 — HB : fenêtre Ø du cercle — nickel (validé Seb, en ligne) --------------
  [FIX] Le cercle posé était sélectionné -> l'éditeur de sélection (selPanel, un Ø aussi, MÊME
    position que la fenêtre de saisie) réapparaissait aussitôt : on croyait "la fenêtre ne se
@@ -1546,7 +1597,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-27-HB ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-27-HJ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6276,7 +6327,7 @@ function hitTest(o,xm,ym){
   if(o.type==='point'){ return Math.hypot(xm-o.x,ym-o.y) < 5/(BASE_PX*vZoom); }
   if(o.type==='dim'){
     const g=(typeof dimGeom==='function')?dimGeom(o):null; if(!g) return false;
-    const thr=7/(BASE_PX*vZoom), dx=g.bx-g.ax, dy=g.by-g.ay, L2=dx*dx+dy*dy;
+    const thr=13/(BASE_PX*vZoom), dx=g.bx-g.ax, dy=g.by-g.ay, L2=dx*dx+dy*dy;
     if(L2<1e-6) return Math.hypot(xm-g.ax,ym-g.ay)<thr;
     const t=Math.max(0,Math.min(1,((xm-g.ax)*dx+(ym-g.ay)*dy)/L2));
     return Math.hypot(xm-(g.ax+t*dx),ym-(g.ay+t*dy))<thr;
@@ -7062,7 +7113,17 @@ function _raySegInt(P,u,S){ const x3=S[0],y3=S[1],x4=S[2],y4=S[3]; const dx=x4-x
 function _rotCenter(){ let mnx=1e9,mny=1e9,mxx=-1e9,mxy=-1e9; for(const id of _rot2.shapes){ const o=getObj(id); if(!o)continue; const b=getObjBB(o); if(!b)continue; mnx=Math.min(mnx,b.x);mny=Math.min(mny,b.y);mxx=Math.max(mxx,b.x+b.w);mxy=Math.max(mxy,b.y+b.h); } if(mnx>1e8)return [0,0]; return [(mnx+mxx)/2,(mny+mxy)/2]; }
 function _rotPiv(){ return (_rot2&&_rot2.pivot)?_rot2.pivot:_rotCenter(); }
 function _rotHR(){ let m=30; for(const id of _rot2.shapes){ const b=getObjBB(getObj(id)); if(b)m=Math.max(m, Math.max(b.w,b.h)/2+12); } return m; }
-function _rotApply(deg){ if(!_rot2)return; _rot2.deg=deg; paintObjects.length=0; JSON.parse(_rot2.snap).forEach(x=>paintObjects.push(x)); const piv=_rotPiv(); const a=deg*Math.PI/180; for(const id of _rot2.shapes){ let t=getObj(id); if(!t)continue; if(['rect','oblong','tri','star','gear','text','svg'].indexOf(t.type)>=0 && !t._circle){ try{ const s2=objToStrokesRaw(t); let pts=(s2&&s2[0])?s2[0].map(pt=>[pt[0],pt[1]]):null; if(pts&&pts.length>2){ if(Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])>1e-6)pts.push([pts[0][0],pts[0][1]]); const idx=paintObjects.indexOf(t); const free={id:t.id,type:'free',pts,strokeW:t.strokeW||currentStrokeW}; if(t.toolId!==undefined)free.toolId=t.toolId; if(t._fillets)free._fillets=JSON.parse(JSON.stringify(t._fillets)); paintObjects[idx]=free; t=free; } }catch(e){} } _rotateObj(t,piv[0],piv[1],a); if(t._arc)_arcRegen(t); if(t._fillets){ const _rp=(P)=>{ const dx=P[0]-piv[0],dy=P[1]-piv[1]; return [piv[0]+dx*Math.cos(a)-dy*Math.sin(a), piv[1]+dx*Math.sin(a)+dy*Math.cos(a)]; }; t._fillets=t._fillets.map(f=>{ const c2=_rp([f.cx,f.cy]); return Object.assign({},f,{cx:c2[0],cy:c2[1],apex:_rp(f.apex),ta:_rp(f.ta),tb:_rp(f.tb),V:_rp(f.V),u1:[Math.cos(a)*f.u1[0]-Math.sin(a)*f.u1[1],Math.sin(a)*f.u1[0]+Math.cos(a)*f.u1[1]],u2:[Math.cos(a)*f.u2[0]-Math.sin(a)*f.u2[1],Math.sin(a)*f.u2[0]+Math.cos(a)*f.u2[1]]}); }); } } redrawCanvasNow(); }
+// Les POIGNÉES de rotation : 3 grips à distance ÉCRAN FIXE (px), pas en mm -> le gizmo garde
+// la MÊME petite taille quels que soient le zoom et la forme (avant : ça partait à l'autre bout).
+// Chacun a son pas de snap. On grabe celui qu'on veut : 45° (près), 5° (milieu), libre (loin).
+function _rotHandles(){ const ppm=(typeof BASE_PX!=='undefined'&&typeof vZoom!=='undefined'&&BASE_PX*vZoom)?BASE_PX*vZoom:6; const _mm=(px)=>px/ppm;
+  return [ {r:_mm(46), inc:45, label:'45°',   color:'#3b82f6'},
+           {r:_mm(86), inc:5,  label:'5°',    color:'#22c55e'},
+           {r:_mm(126),inc:0,  label:'libre', color:'#f59e0b'} ]; }
+function _rotApply(deg){ if(!_rot2)return; _rot2.deg=deg; paintObjects.length=0; JSON.parse(_rot2.snap).forEach(x=>paintObjects.push(x)); const piv=_rotPiv(); const a=deg*Math.PI/180; for(const id of _rot2.shapes){ let t=getObj(id); if(!t)continue; if(['rect','oblong','tri','star','gear','text','svg'].indexOf(t.type)>=0 && !t._circle){ try{ const s2=objToStrokesRaw(t); let pts=(s2&&s2[0])?s2[0].map(pt=>[pt[0],pt[1]]):null; if(pts&&pts.length>2){ if(Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])>1e-6)pts.push([pts[0][0],pts[0][1]]); const idx=paintObjects.indexOf(t); const free={id:t.id,type:'free',pts,strokeW:t.strokeW||currentStrokeW}; if(t.toolId!==undefined)free.toolId=t.toolId; if(t._fillets)free._fillets=JSON.parse(JSON.stringify(t._fillets)); paintObjects[idx]=free; t=free; } }catch(e){} } _rotateObj(t,piv[0],piv[1],a); if(t._arc)_arcRegen(t); if(t._fillets){ const _rp=(P)=>{ const dx=P[0]-piv[0],dy=P[1]-piv[1]; return [piv[0]+dx*Math.cos(a)-dy*Math.sin(a), piv[1]+dx*Math.sin(a)+dy*Math.cos(a)]; }; t._fillets=t._fillets.map(f=>{ const c2=_rp([f.cx,f.cy]); return Object.assign({},f,{cx:c2[0],cy:c2[1],apex:_rp(f.apex),ta:_rp(f.ta),tb:_rp(f.tb),V:_rp(f.V),u1:[Math.cos(a)*f.u1[0]-Math.sin(a)*f.u1[1],Math.sin(a)*f.u1[0]+Math.cos(a)*f.u1[1]],u2:[Math.cos(a)*f.u2[0]-Math.sin(a)*f.u2[1],Math.sin(a)*f.u2[0]+Math.cos(a)*f.u2[1]]}); }); } }
+  // Les COTES accrochées aux formes tournées tournent AVEC la pièce (étiquette mv + placement)
+  { const _ca=Math.cos(a),_sa=Math.sin(a); const _idOf=(v)=>parseInt(String(v).replace(/@/g,''),10); for(const _d of paintObjects){ if(_d.type!=='dim')continue; const _i1=_idOf(_d.ref), _i2=(_d.ref2!=null)?_idOf(_d.ref2):NaN; if(!(_rot2.shapes.has(_i1)||_rot2.shapes.has(_i2)))continue; if(Array.isArray(_d.mv)){ const mx=_d.mv[0],my=_d.mv[1]; _d.mv=[mx*_ca-my*_sa, mx*_sa+my*_ca]; } if(Array.isArray(_d.place)){ const px=_d.place[0]-piv[0],py=_d.place[1]-piv[1]; _d.place=[piv[0]+px*_ca-py*_sa, piv[1]+px*_sa+py*_ca]; } } }
+  redrawCanvasNow(); }
 function _rotPanelRemove(){ const e=document.getElementById('rotPanel'); if(e)e.remove(); }
 function _rotPanel(){ _rotPanelRemove(); if(!_rot2)return; const d=document.createElement('div'); d.id='rotPanel'; d.style.cssText='position:fixed;left:16px;top:165px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:10px 12px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px;min-width:190px';
   const t=document.createElement('div'); t.textContent='⟳ Rotation'; t.style.cssText='font-weight:800;margin-bottom:2px'; d.appendChild(t);
@@ -7081,7 +7142,7 @@ function _rotPanel(){ _rotPanelRemove(); if(!_rot2)return; const d=document.crea
 function _rotCommit(){ if(!_rot2)return; if(typeof pushHistory==='function')pushHistory(); if(typeof toastHist==='function')toastHist('⟳ Rotation '+(+_rot2.deg).toFixed(1)+'°'); _rot2=null; _rotPanelRemove(); if(typeof _conHintHide==='function')_conHintHide(); redrawCanvasNow(); }
 function _rotCancel(){ if(!_rot2)return; paintObjects.length=0; JSON.parse(_rot2.snap).forEach(x=>paintObjects.push(x)); _rot2=null; _rotPanelRemove(); if(typeof _conHintHide==='function')_conHintHide(); redrawCanvasNow(); }
 function _rot2Click(xm,ym){ if(!_rot2)return;
-  if(_rot2.stage==='pivot'){ const sp=snapPoint(xm,ym,null); _rot2.pivot=[sp.x,sp.y]; _rot2.stage='shapes'; _rotPanel(); _rotApply(_rot2.deg); if(typeof _conHintShow==='function')_conHintShow('⟳ Pivot placé — clique les formes, puis tourne la poignée'); return; }
+  if(_rot2.stage==='pivot'){ const sp=snapPoint(xm,ym,null); _rot2.pivot=[sp.x,sp.y]; _rot2._pivPrev=null; _rot2.stage='shapes'; _rotPanel(); _rotApply(_rot2.deg); if(typeof _conHintShow==='function')_conHintShow('⟳ Pivot placé — clique les formes, puis tourne la poignée'); return; }
   const o=_pickObjForCon(xm,ym); if(o){ if(_rot2.shapes.has(o.id))_rot2.shapes.delete(o.id); else _rot2.shapes.add(o.id); _rot2.snap=JSON.stringify(paintObjects); _rot2.deg=0; _rotPanel(); redrawCanvasNow(); }
 }
 function cadRotate(){ _setToolFromPick=true; if(typeof setPTool==='function')setPTool('select'); _setToolFromPick=false; if(typeof selObjIds!=='undefined'&&selObjIds.clear)selObjIds.clear(); selObjId=null;
@@ -8437,7 +8498,24 @@ function _cadDimOverlay(){
     }
     if(_ext.picks.length===2){ const I=(typeof _lineIntersect==='function')?_lineIntersect(_ext.picks[0].seg,_ext.picks[1].seg):null; if(I&&isFinite(I[0])&&isFinite(I[1])){ const q=mmToPx(I[0],I[1]); pCtx.setLineDash([]); pCtx.fillStyle='#a855f7'; pCtx.strokeStyle='#fff'; pCtx.lineWidth=1.5; pCtx.beginPath(); pCtx.arc(q[0],q[1],5,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); } }
     pCtx.restore(); }
-  if(pCtx && _rot2){ const piv=_rotPiv(); const _pc=mmToPx(piv[0],piv[1]); pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='rgba(34,197,94,.9)'; pCtx.lineWidth=2.4; for(const _id of _rot2.shapes){ const _o=getObj(_id); if(!_o)continue; const _cl=['rect','oblong','tri','star','gear','polygon','ellipse'].includes(_o.type)||_o._poly||_o._circle; try{ for(const _s of objToStrokesRaw(_o)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} if(_cl)pCtx.closePath(); pCtx.stroke(); } }catch(e){} } pCtx.strokeStyle='#e11d48'; pCtx.fillStyle='#e11d48'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(_pc[0],_pc[1],7,0,2*Math.PI); pCtx.stroke(); pCtx.beginPath(); pCtx.moveTo(_pc[0]-11,_pc[1]); pCtx.lineTo(_pc[0]+11,_pc[1]); pCtx.moveTo(_pc[0],_pc[1]-11); pCtx.lineTo(_pc[0],_pc[1]+11); pCtx.stroke(); if(_rot2.shapes.size){ const hr=_rotHR(); const _ha=_rot2.deg*Math.PI/180; const _hmm=[piv[0]+Math.cos(_ha)*hr, piv[1]+Math.sin(_ha)*hr]; const _hp=mmToPx(_hmm[0],_hmm[1]); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='#3b82f6'; pCtx.lineWidth=2; pCtx.setLineDash([4,3]); pCtx.beginPath(); pCtx.moveTo(_pc[0],_pc[1]); pCtx.lineTo(_hp[0],_hp[1]); pCtx.stroke(); pCtx.setLineDash([]); pCtx.beginPath(); pCtx.arc(_hp[0],_hp[1],8,0,2*Math.PI); pCtx.fill(); } pCtx.restore(); }
+  if(pCtx && _rot2){ const piv=_rotPiv(); const _pc=mmToPx(piv[0],piv[1]); pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='rgba(34,197,94,.9)'; pCtx.lineWidth=2.4; for(const _id of _rot2.shapes){ const _o=getObj(_id); if(!_o)continue; const _cl=['rect','oblong','tri','star','gear','polygon','ellipse'].includes(_o.type)||_o._poly||_o._circle; try{ for(const _s of objToStrokesRaw(_o)){ if(!_s||_s.length<2)continue; pCtx.beginPath(); const _q0=mmToPx(_s[0][0],_s[0][1]); pCtx.moveTo(_q0[0],_q0[1]); for(let _i=1;_i<_s.length;_i++){const _q=mmToPx(_s[_i][0],_s[_i][1]); pCtx.lineTo(_q[0],_q[1]);} if(_cl)pCtx.closePath(); pCtx.stroke(); } }catch(e){} } pCtx.strokeStyle='#e11d48'; pCtx.fillStyle='#e11d48'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(_pc[0],_pc[1],7,0,2*Math.PI); pCtx.stroke(); pCtx.beginPath(); pCtx.moveTo(_pc[0]-11,_pc[1]); pCtx.lineTo(_pc[0]+11,_pc[1]); pCtx.moveTo(_pc[0],_pc[1]-11); pCtx.lineTo(_pc[0],_pc[1]+11); pCtx.stroke(); if(_rot2.shapes.size && _rot2.stage!=='pivot'){ const _hs=_rotHandles(); const _far=_hs[_hs.length-1];
+      // PENDANT le drag : la ligne + les poignées SUIVENT la souris (effet "je grabe et je fais
+      // tourner"). AU REPOS : elles reviennent à l'horizontale à droite (donc pas de fuite entre
+      // deux rotations). C'est le compromis que Seb voulait.
+      const _ha=(_rot2.dragging && _rot2._dragMouseAng!=null)?(_rot2._dragMouseAng*Math.PI/180):0;
+      const _fp=mmToPx(piv[0]+Math.cos(_ha)*_far.r, piv[1]+Math.sin(_ha)*_far.r);
+      pCtx.strokeStyle='#64748b'; pCtx.lineWidth=1.6; pCtx.setLineDash([4,3]); pCtx.beginPath(); pCtx.moveTo(_pc[0],_pc[1]); pCtx.lineTo(_fp[0],_fp[1]); pCtx.stroke(); pCtx.setLineDash([]);
+      // 3 POIGNÉES distinctes : 45° (bleu), 5° (vert), libre (orange). Étiquette AU-DESSUS de
+      // chaque point (centrée) -> plus de chevauchement. La poignée visée est mise en avant.
+      pCtx.textAlign='center'; pCtx.textBaseline='alphabetic';
+      for(const _h of _hs){ const _hp=mmToPx(piv[0]+Math.cos(_ha)*_h.r, piv[1]+Math.sin(_ha)*_h.r);
+        const _act=(_rot2.dragging && _rot2._dragInc===_h.inc); const _hov=(!_rot2.dragging && _rot2._hoverInc===_h.inc); const _big=_act||_hov; const _hrad=_big?10:7;
+        pCtx.fillStyle=_h.color; pCtx.beginPath(); pCtx.arc(_hp[0],_hp[1],_hrad,0,2*Math.PI); pCtx.fill();
+        if(_big){ pCtx.strokeStyle='#fff'; pCtx.lineWidth=2.5; pCtx.beginPath(); pCtx.arc(_hp[0],_hp[1],_hrad+3,0,2*Math.PI); pCtx.stroke(); }
+        const _lbl=_h.label; pCtx.font=(_big?'bold 12px':'11px')+' sans-serif'; const _tw=pCtx.measureText(_lbl).width; const _ly=_hp[1]-_hrad-11; pCtx.fillStyle=_big?'rgba(17,20,28,.95)':'rgba(17,20,28,.7)'; pCtx.fillRect(_hp[0]-_tw/2-5,_ly-12,_tw+10,16); pCtx.fillStyle=_h.color; pCtx.fillText(_lbl,_hp[0],_ly+1);
+      }
+      pCtx.textAlign='left';
+    } if(_rot2.stage==='pivot' && _rot2._pivPrev){ const _pp=mmToPx(_rot2._pivPrev[0],_rot2._pivPrev[1]); const _snp=_rot2._pivPrev[2]; pCtx.save(); pCtx.setLineDash([]); pCtx.lineWidth=2; pCtx.strokeStyle=_snp?'#22c55e':'#94a3b8'; pCtx.fillStyle=_snp?'rgba(34,197,94,.30)':'rgba(148,163,184,.18)'; pCtx.beginPath(); pCtx.arc(_pp[0],_pp[1],_snp?8:6,0,2*Math.PI); pCtx.fill(); pCtx.stroke(); if(_snp){ pCtx.beginPath(); pCtx.moveTo(_pp[0]-12,_pp[1]); pCtx.lineTo(_pp[0]+12,_pp[1]); pCtx.moveTo(_pp[0],_pp[1]-12); pCtx.lineTo(_pp[0],_pp[1]+12); pCtx.stroke(); } pCtx.restore(); } pCtx.restore(); }
   if(pCtx){ for(const o of paintObjects){ if(o._fillets){ for(const f of o._fillets){ if(!f||f.cx==null)continue; const c=mmToPx(f.cx,f.cy); pCtx.save(); pCtx.strokeStyle='#3b82f6'; pCtx.fillStyle='rgba(59,130,246,.18)'; pCtx.lineWidth=1.4; pCtx.beginPath(); pCtx.arc(c[0],c[1],4.5,0,2*Math.PI); pCtx.fill(); pCtx.stroke(); pCtx.restore(); } } } }
     if(pCtx && _conPick && _conPick.picks.length){ pCtx.save(); pCtx.setLineDash([]); pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=3;
     for(const pk of _conPick.picks){ try{ if(pk && pk.obj && typeof pk.edge==='number'){ const sg=_edgeSeg(pk); if(sg){ const a=mmToPx(sg[0],sg[1]),b=mmToPx(sg[2],sg[3]); pCtx.beginPath(); pCtx.moveTo(a[0],a[1]); pCtx.lineTo(b[0],b[1]); pCtx.stroke(); } } else { const _tgt=pk&&pk.obj?pk.obj:pk; for(const s of objToStrokesRaw(_tgt)){ if(!s||s.length<2)continue; pCtx.beginPath(); const q0=mmToPx(s[0][0],s[0][1]); pCtx.moveTo(q0[0],q0[1]); for(let i=1;i<s.length;i++){const q=mmToPx(s[i][0],s[i][1]); pCtx.lineTo(q[0],q[1]);} pCtx.stroke(); } } }catch(e){} }
@@ -8642,7 +8720,7 @@ function handlePointerDown(cpx,cpy){
   if(_rectPat){ if(_rectPat.stage==='pick'){ _rectPatPickAt(xm,ym); return; } const tol=16/(BASE_PX*vZoom); if(Math.hypot(xm-_rectPat.hx,ym-_rectPat.hy)<=tol){ _rectPat.dragging=true; } return; } // réseau : choisir les formes puis saisir la poignée
   if(_mirror){ _mirrorClick(xm,ym); return; } // outil miroir 2 étapes
   if(_ext){ _extClick(xm,ym); return; } // outil prolonger 2 côtés
-  if(_rot2){ const piv=_rotPiv(); const hr=_rotHR(); const a=_rot2.deg*Math.PI/180; const hx=piv[0]+Math.cos(a)*hr, hy=piv[1]+Math.sin(a)*hr; const tolh=16/(BASE_PX*vZoom); if(_rot2.shapes.size && Math.hypot(xm-hx,ym-hy)<=tolh){ _rot2.dragging=true; return; } _rot2Click(xm,ym); return; } // rotation : poignée ou clic (pivot/forme)
+  if(_rot2){ const piv=_rotPiv(); const tolh=16/(BASE_PX*vZoom); if(_rot2.shapes.size && _rot2.stage!=='pivot'){ for(const h of _rotHandles()){ const hx=piv[0]+h.r, hy=piv[1]; /* poignées FIXES à droite du pivot (angle écran 0), elles ne tournent plus avec la pièce */ if(Math.hypot(xm-hx,ym-hy)<=tolh){ _rot2.dragging=true; _rot2._dragInc=h.inc; const _m0=Math.atan2(ym-piv[1],xm-piv[0])*180/Math.PI; _rot2._dragStartMouse=_m0; _rot2._dragStartDeg=_rot2.deg; _rot2._dragMouseAng=_m0; /* rotation RELATIVE depuis le grab (pas de saut) + la ligne suivra la souris */ return; } } } _rot2Click(xm,ym); return; } // rotation : poignée (45°/5°/libre) ou clic (pivot/forme)
   if(_conPick){ _conPickClick(xm,ym); return; } // selection guidee d'une contrainte
   if(_arrayPick){ if(_arrayPick.stage==='obj'){ const o=_pickObjForCon(xm,ym); if(o){ _arrayPick.objs=[o.id]; if(_arrayPick.kind==='rect'||_arrayPick.kind==='rectdyn'){ const _k=_arrayPick.kind; _arrayPick=null; _arrayCursor=null; if(typeof _conHintHide==='function')_conHintHide(); selObjId=o.id; selObjIds=new Set([o.id]); if(_k==='rectdyn'){ _rectPatStart([o]); } else { openPatternRect(); } redrawCanvasNow(); return; } _arrayPick.stage='pivot'; _conHintShow('✳️ Clique le point de PIVOT (centre)'); redrawCanvasNow(); } else _conHintShow('✳️ Clique une forme à répéter'); return; } const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _conHintHide(); _arrayDoPolar(sp.x,sp.y); return; } // reseau : etape forme puis pivot (rect: forme puis fenetre)
   if(paintTool==='cadline'){ cadAddPoint(xm,ym); return; } // outil ligne CAD
@@ -8879,7 +8957,21 @@ function renderSnapBtn(){
 
 function handlePointerMove(cpx,cpy){
   if(_rectPat && _rectPat.dragging){ const[xm,ym]=pxToMm(cpx,cpy); const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym}; _rectPat.hx=sp.x; _rectPat.hy=sp.y; redrawCanvasNow(); return; }
-  if(_rot2 && _rot2.dragging){ const[xm,ym]=pxToMm(cpx,cpy); const piv=_rotPiv(); let deg=Math.atan2(ym-piv[1], xm-piv[0])*180/Math.PI; const hr=_rotHR(); const _distmm=Math.hypot(xm-piv[0], ym-piv[1]); const _inc=(_distmm < hr*1.5)?5:45; const _near=Math.round(deg/_inc)*_inc; if(Math.abs(deg-_near)<_inc*0.5)deg=_near; deg=Math.round(deg*10)/10; _rotApply(deg); const _di=document.getElementById('rotAngleInp'); if(_di)_di.value=deg.toFixed(1); redrawCanvasNow(); return; }
+  if(_rot2 && _rot2.dragging){ const[xm,ym]=pxToMm(cpx,cpy); const piv=_rotPiv();
+    // La LIGNE suit la souris (mAng) ; la pièce tourne en RELATIF depuis le grab (pas de saut).
+    // Le pas de snap dépend de la poignée attrapée (45° / 5° / libre).
+    const mAng=Math.atan2(ym-piv[1], xm-piv[0])*180/Math.PI; _rot2._dragMouseAng=mAng;
+    let deg=(_rot2._dragStartDeg||0) + (mAng - (_rot2._dragStartMouse||0));
+    const _inc=(_rot2._dragInc!=null)?_rot2._dragInc:45;
+    if(_inc>0) deg=Math.round(deg/_inc)*_inc;
+    deg=Math.round(deg*10)/10; _rot2._snapInc=_inc;
+    _rotApply(deg); const _di=document.getElementById('rotAngleInp'); if(_di)_di.value=deg.toFixed(1); redrawCanvasNow(); return; }
+  // CHOIX DU PIVOT : aperçu VIVANT du point d'accroche sous le curseur (coin, milieu d'arête,
+  // centre, extrémité...). Le snap marchait déjà mais sans retour visuel -> on ne le voyait pas.
+  if(_rot2 && _rot2.stage==='pivot' && !(isDragging&&dragMode==='pan')){ const[xm,ym]=pxToMm(cpx,cpy); const sp=(typeof snapPoint==='function')?snapPoint(xm,ym,null):{x:xm,y:ym,snapped:false}; _rot2._pivPrev=[sp.x,sp.y,!!sp.snapped]; if(pCanvas)pCanvas.style.cursor='crosshair'; redrawCanvasNow(); return; }
+  // Survol des poignées de rotation (pas en train de tourner) : curseur "main" + surbrillance
+  // de la poignée visée (45° / 5° / libre).
+  if(_rot2 && !_rot2.dragging && !(isDragging&&dragMode==='pan')){ const[xm,ym]=pxToMm(cpx,cpy); const piv=_rotPiv(); const tol=16/(BASE_PX*vZoom); let overInc=null; if(_rot2.shapes.size>0){ for(const h of _rotHandles()){ const hx=piv[0]+h.r, hy=piv[1]; /* poignées fixes à droite */ if(Math.hypot(xm-hx,ym-hy)<=tol){ overInc=h.inc; break; } } } if(pCanvas)pCanvas.style.cursor=(overInc!=null)?'grab':'default'; if(_rot2._hoverInc!==overInc){ _rot2._hoverInc=overInc; redrawCanvasNow(); } return; }
   if(isDragging && dragMode==='pan'){ pmPanView(cpx,cpy); return; } // pan molette : marche dans TOUS les outils
   if(paintTool==='cadline'){ if(_cad){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _cad.cursor=[sp.x,sp.y]; _cad._snapped=sp.snapped; redrawCanvasNow(); } return; }
   if(paintTool==='pshape'){ if(_shp){ const[xm,ym]=pxToMm(cpx,cpy); const sp=snapPoint(xm,ym,null); _shp.cursor=[sp.x,sp.y]; _shp._snapped=sp.snapped; if(_shp.cx!=null && !_shp.typed && typeof _shpRadius==='function'){ const _di=document.querySelector('#shpInputs input:last-of-type'); if(_di && document.activeElement!==_di) _di.value=(_shpRadius()*2).toFixed(1); } redrawCanvasNow(); } return; }
@@ -9245,7 +9337,7 @@ function pmDrawInProgress(xm,ym){
 
 function handlePointerUp(cpx,cpy){
   if(_rectPat && _rectPat.dragging){ _rectPat.dragging=false; return; }
-  if(_rot2 && _rot2.dragging){ _rot2.dragging=false; return; }
+  if(_rot2 && _rot2.dragging){ _rot2.dragging=false; _rot2._dragMouseAng=null; /* la ligne+poignées reviennent à droite */ if(typeof redrawCanvasNow==='function')redrawCanvasNow(); return; }
   const[xm,ym]=pxToMm(cpx,cpy);
   if(isDragging&&dragMode==='marquee'){ isDragging=false;dragMode=null; if(pCanvas)pCanvas.style.cursor='default'; finishMarquee(); return; }
   if(isDragging&&dragMode==='pan'){isDragging=false;dragMode=null;if(pCanvas)pCanvas.style.cursor='default';return;}
