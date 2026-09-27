@@ -130,6 +130,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-09-27 — HB : fenêtre Ø du cercle — nickel (validé Seb, en ligne) --------------
+ [FIX] Le cercle posé était sélectionné -> l'éditeur de sélection (selPanel, un Ø aussi, MÊME
+   position que la fenêtre de saisie) réapparaissait aussitôt : on croyait "la fenêtre ne se
+   ferme pas". Corrigé : pendant qu'on dessine des formes (cercle/polygone) l'éditeur de
+   sélection ne s'affiche plus. Il reste dispo avec l'outil SÉLECTION pour éditer un Ø.
+ [FIX] (HA) La fenêtre Ø n'apparaît plus QUE pendant qu'on dimensionne (après le clic de centre)
+   et disparaît à la pose (clic OU Entrée). Glisser réparé : capture du pointeur -> elle ne
+   "se lâche" plus toute seule, position mémorisée. Aucun paramètre machine touché.
+ [OK]  Vérifié en vrai dans un navigateur + tests cercle(10)/gomme(9)/ext(9)/text-to-cnc.
+
 -- 2026-09-23 — GX : LASER (validé Seb, en ligne) — vrais cercles en G2/G3 (fini les facettes) ------
  [FIX LASER] Un cercle sortait en ~24 G01 (facettes) — visible sur machine perfo (Keyence).
    Cause : le lead-in (buildLaserBody) reconstruisait TOUJOURS le corps en G1, même pour un
@@ -1536,7 +1546,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-23-GX ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-27-HB ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -7559,17 +7569,27 @@ function _panelPos(){ try{ const s=localStorage.getItem('cncPanelPos'); if(s){ c
 function _panelSavePos(l,t){ try{ localStorage.setItem('cncPanelPos', JSON.stringify({left:l, top:t})); }catch(e){} }
 function _panelGrip(){ const g=document.createElement('span'); g.textContent='⠿'; g.title='Glisser pour déplacer (position mémorisée)'; g.style.cssText='cursor:move;opacity:.55;padding:0 4px 0 0;user-select:none;font-size:14px'; return g; }
 function _makePanelDraggable(div){
-  div.addEventListener('mousedown',e=>{ const tg=e.target; if(tg&&(tg.tagName==='INPUT'||tg.tagName==='BUTTON'))return; e.preventDefault();
-    const sx=e.clientX,sy=e.clientY, ol=parseFloat(div.style.left)||0, ot=parseFloat(div.style.top)||0;
-    const mv=ev=>{ let nl=ol+(ev.clientX-sx), nt=ot+(ev.clientY-sy); nl=Math.max(2,Math.min(nl,(window.innerWidth||1200)-60)); nt=Math.max(2,Math.min(nt,(window.innerHeight||800)-30)); div.style.left=nl+'px'; div.style.top=nt+'px'; };
-    const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); _panelSavePos(parseFloat(div.style.left)||0, parseFloat(div.style.top)||0); };
-    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+  // GLISSER ROBUSTE : on capture le pointeur sur le panneau lui-même. Avant, les écouteurs étaient
+  // posés sur "document" et un re-rendu du panneau (recréation du div) coupait le mousemove/up ->
+  // "la fenêtre se lâche toute seule". Avec setPointerCapture, tous les évènements vont au panneau
+  // jusqu'au relâchement, quoi qu'il arrive sous le curseur. stopPropagation évite de dessiner dessous.
+  div.addEventListener('pointerdown',e=>{ const tg=e.target; if(tg&&(tg.tagName==='INPUT'||tg.tagName==='BUTTON'))return; e.preventDefault(); e.stopPropagation();
+    const sx=e.clientX,sy=e.clientY, ol=parseFloat(div.style.left)||0, ot=parseFloat(div.style.top)||0; let moved=false;
+    try{ div.setPointerCapture(e.pointerId); }catch(_){}
+    const mv=ev=>{ moved=true; let nl=ol+(ev.clientX-sx), nt=ot+(ev.clientY-sy); nl=Math.max(2,Math.min(nl,(window.innerWidth||1200)-60)); nt=Math.max(2,Math.min(nt,(window.innerHeight||800)-30)); div.style.left=nl+'px'; div.style.top=nt+'px'; };
+    const up=()=>{ div.removeEventListener('pointermove',mv); div.removeEventListener('pointerup',up); div.removeEventListener('pointercancel',up); try{ div.releasePointerCapture(e.pointerId); }catch(_){} if(moved && typeof _panelSavePos==='function')_panelSavePos(parseFloat(div.style.left)||0, parseFloat(div.style.top)||0); };
+    div.addEventListener('pointermove',mv); div.addEventListener('pointerup',up); div.addEventListener('pointercancel',up);
   });
 }
 function _selPanelRemove(){ const e=document.getElementById('selPanel'); if(e)e.remove(); _selPanel=null; }
 function _selPanelShow(){
   if(typeof pCanvas==='undefined'||!pCanvas){ return; }
-  const ids=(typeof getSelIds==='function')?[...getSelIds()]:[]; 
+  // Pendant qu'on DESSINE des formes (outil cercle/polygone), on ne montre PAS l'éditeur de
+  // sélection : sinon, à peine le cercle posé, il est sélectionné et ce panneau Ø (même position,
+  // même look que la fenêtre de saisie) réapparaît -> Seb croit que "la fenêtre ne se ferme pas".
+  // L'éditeur de sélection reste dispo normalement avec l'outil SÉLECTION.
+  if((typeof paintTool!=='undefined' && paintTool==='pshape') || (typeof _shp!=='undefined' && _shp)){ _selPanelRemove(); return; }
+  const ids=(typeof getSelIds==='function')?[...getSelIds()]:[];
   if(ids.length!==1){ _selPanelRemove(); return; }
   const o=paintObjects.find(x=>x.id===ids[0]);
   const editable = o && !o._link && (o._poly||o._circle||o.type==='ellipse'||o.type==='rect'||o.type==='oblong');
@@ -7691,18 +7711,30 @@ function _shpKey(e){
 }
 function _shpInputsRemove(){ const e=document.getElementById('shpInputs'); if(e)e.remove(); }
 function _shpShowInputs(){
-  if(!_shp || typeof pCanvas==='undefined' || !pCanvas || !pCanvas.getBoundingClientRect) return;
-  _shpInputsRemove();
-  const rect=pCanvas.getBoundingClientRect();
+  // Le panneau Ø n'existe QUE pendant qu'on dimensionne (centre déjà posé). Avant le clic de
+  // centre : pas de panneau. Après la pose (cx repasse à null dans _shpFinalize) : il disparaît.
+  // -> répond à "quand je clique/Entrée pour créer le cercle, la fenêtre disparait".
+  const isPoly=_shp && _shp.tool==='ppoly';
+  if(!_shp || (_shp.cx==null && !isPoly) || typeof pCanvas==='undefined' || !pCanvas || !pCanvas.getBoundingClientRect){ _shpInputsRemove(); return; }
+  // MISE À JOUR EN PLACE si le panneau existe déjà : on ne le détruit/recrée PAS (sinon le glisser
+  // "lâche tout seul" et le focus saute). On rafraîchit juste les valeurs des champs non-focus.
+  const ex=document.getElementById('shpInputs');
+  if(ex){
+    const dI0=ex.querySelector('input[data-role="diam"]');
+    if(dI0 && document.activeElement!==dI0){ dI0.value = _shp.typed || ((_shp.cx!=null?(_shpRadius()*2):0).toFixed(1)); }
+    const sI0=ex.querySelector('input[data-role="sides"]');
+    if(sI0 && document.activeElement!==sI0){ sI0.value=_shp.sides; }
+    return;
+  }
   const div=document.createElement('div'); div.id='shpInputs';
   div.style.cssText='position:fixed;z-index:100000;display:flex;gap:8px;align-items:center;background:#1f2430;border:1px solid #4a5568;border-radius:8px;padding:7px 10px;box-shadow:0 6px 18px rgba(0,0,0,.5);font:13px sans-serif;color:#e5e9f0';
   const _pp=_panelPos(); div.style.left=_pp.left+'px'; div.style.top=_pp.top+'px'; div.appendChild(_panelGrip());
-  const inp=(w,v,num)=>{const i=document.createElement('input'); if(num){i.type='number'; i.min='3'; i.max='64'; i.step='1';} i.style.cssText='width:'+w+'px;background:#0e1116;border:1px solid #4a5568;border-radius:5px;color:#fff;padding:3px 5px;font:13px monospace;text-align:center'; i.value=v; return i;};
+  const inp=(w,v,num,role)=>{const i=document.createElement('input'); if(num){i.type='number'; i.min='3'; i.max='64'; i.step='1';} if(role)i.dataset.role=role; i.style.cssText='width:'+w+'px;background:#0e1116;border:1px solid #4a5568;border-radius:5px;color:#fff;padding:3px 5px;font:13px monospace;text-align:center'; i.value=v; return i;};
   const lab=(t)=>{const s=document.createElement('span'); s.textContent=t; s.style.opacity=.8; return s;};
   const curD = _shp.cx!=null ? (_shpRadius()*2).toFixed(1) : '';
   let sidesI=null, dI=null;
-  if(_shp.tool==='ppoly'){ div.appendChild(lab('Côtés')); sidesI=inp(46,_shp.sides,true); div.appendChild(sidesI); }
-  div.appendChild(lab('Ø')); dI=inp(64,_shp.typed||curD); div.appendChild(dI);
+  if(_shp.tool==='ppoly'){ div.appendChild(lab('Côtés')); sidesI=inp(46,_shp.sides,true,'sides'); div.appendChild(sidesI); }
+  div.appendChild(lab('Ø')); dI=inp(64,_shp.typed||curD,false,'diam'); div.appendChild(dI);
   document.body.appendChild(div); if(typeof _makePanelDraggable==='function')_makePanelDraggable(div);
   const finish=(e)=>{ if(e.key==='Enter'){ if(_shp){ if(_shp.cx==null){ let c=_shp.cursor; if(!c){ try{ c=pxToMm(pCanvas.width/2, pCanvas.height/2); }catch(_){ c=[0,0]; } } _shp.cx=c[0]; _shp.cy=c[1]; } if(_shp.cx!=null && (_shp.typed||_shpRadius()>0)) _shpFinalize(); } e.preventDefault(); } else if(e.key==='Escape'){ _shp=null; _shpInputsRemove(); if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); } };
   if(sidesI){ sidesI.oninput=()=>{ const n=parseInt(sidesI.value); if(n>=3&&_shp)_shp.sides=Math.min(64,n); redrawCanvasNow(); }; sidesI.onkeydown=finish; }
