@@ -130,6 +130,26 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-09-30 — HM : ARC INTELLIGENT (validé Seb, en ligne) — 2 bugs corrigés (ellipse à la refermeture + poignées après gomme)
+ [FIX] Refermer un arc faisait une ELLIPSE : au moment où l'arc se transformait en cercle EN
+   PLEIN glisser, le drag continuait et tombait dans le redim par boîte -> il étirait le cercle
+   en ellipse. Garde ajoutée : dès que l'arc est refermé, le glisser de bout ne fait plus rien.
+ [FIX] Après avoir gommé un cercle, l'arc obtenu est maintenant SÉLECTIONNÉ direct -> ses 2
+   poignées s'affichent tout de suite (avant il fallait le déplacer/re-cliquer pour les voir).
+
+-- 2026-09-30 — HL : (validé Seb, en ligne) ARC INTELLIGENT (suite) — gomme cercle→arc + refermeture --
+ [CAO] GOMME sur un CERCLE = donne maintenant un vrai ARC (centre + rayon gardés) au lieu
+   d'une polyligne bête -> il a ses poignées de bout, et ses tangentes restent calculables.
+ [FIX] Refermer un arc (rejoindre les 2 bouts) crée un VRAI CERCLE (rx=ry) plus tôt/plus sûr
+   (seuil ~343°) -> fini le rendu "ellipse" quand l'arc était presque complet.
+
+-- 2026-09-30 — HK : (validé Seb, en ligne) ARC INTELLIGENT (brique 1 CAO) --
+ [CAO] Un arc garde son intelligence : 2 poignées vertes AUX BOUTS -> on les glisse et l'arc
+   coulisse le long de SON cercle (centre + rayon FIGÉS), il se prolonge/raccourcit. Tiré tout
+   autour (~360°) il referme un CERCLE PLEIN. Plus de poignée par point (qui le cassait en
+   polyligne bête). Poignée du milieu = déplacer l'arc. Vérifié : centre+rayon restent figés.
+   But = brique 1 de la vraie CAO (garder les entités "intelligentes" même quand on les édite).
+
 -- 2026-09-27 — HJ : ROTATION complète (validée Seb, en ligne) — la ligne suit la souris
  [FIX] Pendant qu'on tire une poignée, la LIGNE + les poignées suivent la souris (effet "grabe
    et tourne", retour visuel direct). Au relâchement elles reviennent à l'horizontale à droite
@@ -1597,7 +1617,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-27-HJ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-30-HM ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -6223,7 +6243,19 @@ function getHandlesPx(o){
     const[bx,by]=mmToPx(o.x2,o.y2);
     return[{id:'p1',x:ax,y:ay},{id:'p2',x:bx,y:by},{id:'mv',x:(ax+bx)/2,y:(ay+by)/2}];
   }
-  // Formes à POINTS (tracé libre, polygone, arc) : une poignée par point -> étirer un bout sans bouger le reste.
+  // ARC « intelligent » (CAO) : 2 poignées AUX EXTRÉMITÉS -> glisser = prolonger/raccourcir
+  // l'arc le long de SON cercle (centre + rayon figés), jusqu'à refermer le cercle. + 1 poignée
+  // au milieu pour déplacer. On NE met PAS une poignée par point, sinon on déforme l'arc en
+  // polyligne bête et il perd son centre/rayon (c'est ça qu'on veut éviter : garder l'arc "intelligent").
+  if(o._arc && o._arc.p1 && o._arc.p2){
+    const a=mmToPx(o._arc.p1[0],o._arc.p1[1]); const b=mmToPx(o._arc.p2[0],o._arc.p2[1]);
+    const H=[{id:'ap1',x:a[0],y:a[1]},{id:'ap2',x:b[0],y:b[1]}];
+    const ap=(typeof _arcApexPt==='function')?_arcApexPt(o):null;
+    if(ap){ const m=mmToPx(ap[0],ap[1]); H.push({id:'mv',x:m[0],y:m[1]}); }
+    else { const _bb=getObjBB(o); const _cc=mmToPx(_bb.x+_bb.w/2,_bb.y+_bb.h/2); H.push({id:'mv',x:_cc[0],y:_cc[1]}); }
+    return H;
+  }
+  // Formes à POINTS (tracé libre, polygone) : une poignée par point -> étirer un bout sans bouger le reste.
   if((o.type==='free'||o._poly) && o.pts && o.pts.length>=2 && o.pts.length<=60){
     const H=[]; const seen=new Set();
     for(let i=0;i<o.pts.length;i++){ const k=(+o.pts[i][0]).toFixed(2)+','+(+o.pts[i][1]).toFixed(2); if(seen.has(k))continue; seen.add(k); const q=mmToPx(o.pts[i][0],o.pts[i][1]); H.push({id:'n'+i,x:q[0],y:q[1]}); }
@@ -6778,7 +6810,8 @@ function redrawCanvasNow(){
       if(o.type!=='line'){
         for(const h of getHandlesPx(o)){ if(h.id==='mv')continue;
           pCtx.save();
-          if(String(h.id).charAt(0)==='n'){ pCtx.fillStyle='#fff'; pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(h.x,h.y,4,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); }
+          if(String(h.id).indexOf('ap')===0){ pCtx.fillStyle='#22c55e'; pCtx.strokeStyle='#fff'; pCtx.lineWidth=2; pCtx.beginPath(); pCtx.arc(h.x,h.y,5.5,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); } // bout d'arc = glisser pour prolonger
+          else if(String(h.id).charAt(0)==='n'){ pCtx.fillStyle='#fff'; pCtx.strokeStyle='#22c55e'; pCtx.lineWidth=1.6; pCtx.beginPath(); pCtx.arc(h.x,h.y,4,0,Math.PI*2); pCtx.fill(); pCtx.stroke(); }
           else { pCtx.fillStyle='#fff'; pCtx.strokeStyle='#3b82f6'; pCtx.lineWidth=1.6; pCtx.fillRect(h.x-4.5,h.y-4.5,9,9); pCtx.strokeRect(h.x-4.5,h.y-4.5,9,9); }
           pCtx.restore();
         }
@@ -7728,6 +7761,18 @@ function _arcApexFromR(P1,P2,R,side){
 }
 function _arcApexSgn(P1,P2,R,sgn,big){ const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2, dx=P2[0]-P1[0],dy=P2[1]-P1[1], L=Math.hypot(dx,dy)||1, half=L/2; R=Math.max(R,half+0.01); const nx=-dy/L, ny=dx/L; const k=Math.sqrt(Math.max(0,R*R-half*half)); const s=big?(R+k):(R-k); return [mx+sgn*nx*s, my+sgn*ny*s]; }
 function _arcRegen(o){ if(!o||!o._arc)return; const A=o._arc; const apex=_arcApexSgn(A.p1,A.p2,A.r,A.sgn,A.big); o.pts=_arcPolyline(A.p1,A.p2,apex); }
+// Transforme un MORCEAU de contour (points survivants) en vrai ARC (centre+rayon connus),
+// pour que couper un cercle donne un arc "intelligent" au lieu d'une polyligne bête.
+function _segToArc(seg, C, R){
+  const p1=seg[0], p2=seg[seg.length-1], mid=seg[Math.floor(seg.length/2)];
+  const mx=(p1[0]+p2[0])/2, my=(p1[1]+p2[1])/2, ndx=-(p2[1]-p1[1]), ndy=(p2[0]-p1[0]);
+  const sgn=((mid[0]-mx)*ndx+(mid[1]-my)*ndy)>=0?1:-1;
+  const TAU=2*Math.PI, nrm=v=>((v%TAU)+TAU)%TAU;
+  const a1=Math.atan2(p1[1]-C[1],p1[0]-C[0]), a2=Math.atan2(p2[1]-C[1],p2[0]-C[0]), am=Math.atan2(mid[1]-C[1],mid[0]-C[0]);
+  const dir=(nrm(am-a1)<=nrm(a2-a1)+1e-9)?1:-1;
+  const sweep=(dir>0)?nrm(a2-a1):nrm(a1-a2);
+  return {p1:[p1[0],p1[1]], p2:[p2[0],p2[1]], r:R, sgn, big:sweep>Math.PI};
+}
 function _arcCenter(o){ if(!o||!o._arc)return null; const A=o._arc,P1=A.p1,P2=A.p2; const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2,dx=P2[0]-P1[0],dy=P2[1]-P1[1],L=Math.hypot(dx,dy)||1,half=L/2,R=Math.max(A.r,half+0.01),nx=-dy/L,ny=dx/L,hh=Math.sqrt(Math.max(0,R*R-half*half)); const _dir=(A.big?1:-1); return [mx+_dir*A.sgn*nx*hh, my+_dir*A.sgn*ny*hh]; }
 function _arcApexPt(o){ if(!o||!o._arc)return null; const A=o._arc; return _arcApexSgn(A.p1,A.p2,A.r,A.sgn,A.big); }
 function _arcP3(){ // 3e point effectif (apex si un rayon est tape)
@@ -8762,6 +8807,8 @@ function handlePointerDown(cpx,cpy){
               b:{x:bb.x+bb.w/2,y:bb.y+bb.h}, bl:{x:bb.x,y:bb.y+bb.h},
               l:{x:bb.x,y:bb.y+bb.h/2},
               p1:{x:o.x1,y:o.y1}, p2:{x:o.x2,y:o.y2},
+              ap1:{x:(o._arc?o._arc.p1[0]:xm),y:(o._arc?o._arc.p1[1]:ym)},
+              ap2:{x:(o._arc?o._arc.p2[0]:xm),y:(o._arc?o._arc.p2[1]:ym)},
             }[h]||{x:xm,y:ym};
           }
           dragPending={mode:h,obj:o,cpx,cpy,origBB,startMm:handleMm};
@@ -9183,6 +9230,7 @@ function pmErase(xm,ym){
   
         const ER=eraserRadius;
         let changed=false;
+        let _arcFromCircle=null; // id de l'arc issu d'un cercle coupé -> on le sélectionne à la fin
         const toAdd=[]; // new split objects to add
 
         for(const o of paintObjects){
@@ -9259,10 +9307,18 @@ function pmErase(xm,ym){
                 if(!_firstIn && !_lastIn){ const _last=segs.pop(); segs[0]=_last.concat(segs[0]); }
               }
               if(segs.length>0){
-                // Replace original object with free paths
-                o.type='free';o.pts=segs[0];
-                for(let s=1;s<segs.length;s++){
-                  toAdd.push({...o,id:objCnt++,type:'free',pts:segs[s]});
+                if(o._circle){
+                  // COUPER UN CERCLE = garder un vrai ARC (centre + rayon connus) -> il garde
+                  // ses poignées de bout et ses tangentes restent calculables. (brique CAO)
+                  const C=[o.x,o.y], Rr=o.rx||o.ry;
+                  delete o._circle; delete o.rx; delete o.ry; o.type='free'; o._arc=_segToArc(segs[0],C,Rr); _arcRegen(o); _arcFromCircle=o.id;
+                  for(let s=1;s<segs.length;s++){ const no={id:objCnt++,type:'free',strokeW:o.strokeW,_arc:_segToArc(segs[s],C,Rr)}; _arcRegen(no); toAdd.push(no); }
+                } else {
+                  // Replace original object with free paths
+                  o.type='free';o.pts=segs[0];
+                  for(let s=1;s<segs.length;s++){
+                    toAdd.push({...o,id:objCnt++,type:'free',pts:segs[s]});
+                  }
                 }
                 changed=true;
               } else {
@@ -9282,7 +9338,12 @@ function pmErase(xm,ym){
           if(o.type==='svg')return o.paths&&o.paths.length>0;
           return true;
         });
-        if(changed)selObjId=null;
+        if(changed){
+          // Cercle coupé -> on SÉLECTIONNE l'arc obtenu tout de suite (sinon ses 2 poignées
+          // ne s'affichent qu'après qu'on l'ait re-sélectionné/déplacé). Sinon : on désélectionne.
+          if(_arcFromCircle!=null && getObj(_arcFromCircle)){ selObjId=_arcFromCircle; if(typeof selObjIds!=='undefined'){ selObjIds.clear&&selObjIds.clear(); selObjIds.add&&selObjIds.add(_arcFromCircle); } }
+          else selObjId=null;
+        }
         redrawCanvas();
         // Draw eraser circle on top
         const[epx,epy]=mmToPx(xm,ym);
@@ -15923,6 +15984,10 @@ function snapPointsOf(o){
 
 function applyHandleDrag(o,mode,orig,dxMm,dyMm){
   if(o&&o.fixed&&o.type!=='dim'){ return; } // forme verrouillee : pas de deplacement/redim
+  // Poignées de BOUT d'arc (ap1/ap2) : si l'arc s'est déjà refermé en CERCLE pendant le glisser
+  // (o._arc supprimé), on NE FAIT RIEN -> sinon le drag continue et tombe dans le redim par boîte
+  // en bas, qui étire le cercle en ELLIPSE (avec la boîte large de l'ancien arc). Bug corrigé.
+  if((mode==='ap1'||mode==='ap2') && !(o&&o._arc)){ return; }
   // NŒUD : on déplace UN point sans bouger le reste (étirer un bout)
   if(o && typeof mode==='string' && mode.charAt(0)==='n' && o.pts && orig && orig._origPts){
     const i=orig._nodeI, op=orig._origPts, n=op.length;
@@ -15931,6 +15996,37 @@ function applyHandleDrag(o,mode,orig,dxMm,dyMm){
       if(closed){ if(i===0) o.pts[n-1]=[o.pts[0][0],o.pts[0][1]]; else if(i===n-1) o.pts[0]=[o.pts[n-1][0],o.pts[n-1][1]]; }
       if(o._arc) delete o._arc; // un arc édité au point devient une polyligne libre
     }
+    return;
+  }
+  // ARC INTELLIGENT : glisser une EXTRÉMITÉ -> elle coulisse le long du cercle (centre + rayon
+  // FIGÉS), l'arc se prolonge/raccourcit. Tout au bout = referme le cercle plein.
+  if(o && o._arc && orig && orig._arc && (mode==='ap1'||mode==='ap2')){
+    const A0=orig._arc; const C=_arcCenter({_arc:A0}); if(!C){ return; }
+    const R=Math.hypot(A0.p1[0]-C[0],A0.p1[1]-C[1]);
+    const apex0=_arcApexSgn(A0.p1,A0.p2,A0.r,A0.sgn,A0.big);
+    const TAU=2*Math.PI, nrm=v=>((v%TAU)+TAU)%TAU;
+    const fixIsP2=(mode==='ap1'); // on tire p1 -> p2 est fixe (et inversement)
+    const pFix=fixIsP2?A0.p2:A0.p1, pMov0=fixIsP2?A0.p1:A0.p2;
+    const aFix=Math.atan2(pFix[1]-C[1],pFix[0]-C[0]);
+    const aAp=Math.atan2(apex0[1]-C[1],apex0[0]-C[0]);
+    const aMov0=Math.atan2(pMov0[1]-C[1],pMov0[0]-C[0]);
+    // Sens de parcours (fixe -> apex -> mobile) : on le conserve pour prolonger en continu.
+    const dir=(nrm(aAp-aFix) <= nrm(aMov0-aFix)+1e-9) ? 1 : -1;
+    const cur=[pMov0[0]+dxMm, pMov0[1]+dyMm];
+    const aMov=Math.atan2(cur[1]-C[1], cur[0]-C[0]);
+    let sweep=(dir>0)?nrm(aMov-aFix):nrm(aFix-aMov);
+    if(sweep<0.02)sweep=0.02;
+    if(sweep>TAU-0.30){ // ~343°+ : on referme le CERCLE PLEIN (rx=ry, vrai cercle, pas ellipse)
+      delete o._arc; o.type='ellipse'; o._circle=true; o.x=C[0]; o.y=C[1]; o.rx=o.ry=R; delete o.pts; return;
+    }
+    const aMid=aFix+dir*sweep/2;
+    const apex=[C[0]+R*Math.cos(aMid), C[1]+R*Math.sin(aMid)];
+    const pMov=[C[0]+R*Math.cos(aMov), C[1]+R*Math.sin(aMov)];
+    const P1=fixIsP2?pMov:pFix, P2=fixIsP2?pFix:pMov;
+    const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2, ndx=-(P2[1]-P1[1]),ndy=(P2[0]-P1[0]);
+    const sgn=((apex[0]-mx)*ndx+(apex[1]-my)*ndy)>=0?1:-1;
+    const big=sweep>Math.PI;
+    o._arc={p1:[P1[0],P1[1]], p2:[P2[0],P2[1]], r:R, sgn, big}; _arcRegen(o);
     return;
   }
   if(o&&o._fillets&&orig&&orig._fillets&&mode==='mv'){ o._fillets=orig._fillets.map(f=>({...f, cx:f.cx+dxMm, cy:f.cy+dyMm, apex:[f.apex[0]+dxMm,f.apex[1]+dyMm], ta:[f.ta[0]+dxMm,f.ta[1]+dyMm], tb:[f.tb[0]+dxMm,f.tb[1]+dyMm], V:[f.V[0]+dxMm,f.V[1]+dyMm]})); } // le point du congé suit la forme
