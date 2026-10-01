@@ -1830,6 +1830,9 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     <div class="cipW" id="cipWork" style="display:none">
       <div id="cipView">
         <div class="cipHud" id="cipHud">Chargement…</div>
+        <div id="cipCubeBox" style="position:absolute;left:6px;bottom:6px;width:84px;height:84px">
+          <button class="cipBtn" id="cipHome" title="Vue d'ensemble" onclick="cip_ui('home')" style="position:absolute;left:86px;bottom:2px;padding:3px 5px;line-height:0"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 3l9 8v10h-6v-6H9v6H3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+        </div>
         <div class="cipLeg" id="cipLeg"></div>
       </div>
       <div class="cipSide">
@@ -3111,7 +3114,7 @@ const ctl={target:new THREE.Vector3(),r:330,th:0.62,ph:1.05,update(){const s=Mat
  el.addEventListener('contextmenu',e=>e.preventDefault());
  const rc=new THREE.Raycaster();let drag=null;
  const rayAt=e=>{const b=el.getBoundingClientRect();rc.setFromCamera(new THREE.Vector2((e.clientX-b.left)/b.width*2-1,-(e.clientY-b.top)/b.height*2+1),cam);return rc.ray;};
- el.addEventListener('pointerdown',e=>{
+ el.addEventListener('pointerdown',e=>{anim=null;
    if(e.button===0&&!e.shiftKey&&pts.size===0&&S.part&&partG.children.length){scene.updateMatrixWorld(true);const ray=rayAt(e);rc.ray.copy(ray);const hit=rc.intersectObjects(partG.children,true)[0];
      if(hit){const ax=new THREE.Vector3(0,1,0).applyMatrix4(new THREE.Matrix4().extractRotation(root.matrix)).normalize();
        const cd=new THREE.Vector3();cam.getWorldDirection(cd);const n=cd.clone().sub(ax.clone().multiplyScalar(cd.dot(ax)));if(n.lengthSq()<1e-6)n.copy(cd);n.normalize();
@@ -3127,6 +3130,32 @@ const ctl={target:new THREE.Vector3(),r:330,th:0.62,ph:1.05,update(){const s=Mat
  const end=e=>{pts.delete(e.pointerId);if(!pts.size){if(mode==='part'){drag=null;pathG.visible=true;computeProgram();}mode=null;el.style.cursor='grab';}};
  el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
  el.addEventListener('wheel',e=>{e.preventDefault();ctl.r=Math.min(2500,Math.max(40,ctl.r*Math.exp(e.deltaY*0.0012)));},{passive:false});}
+// ---------- cube de vue (façon Fusion) ----------
+const cubeBox=$('cipCubeBox');const cr=new THREE.WebGLRenderer({antialias:true,alpha:true});cr.setPixelRatio(Math.min(2,window.devicePixelRatio||1));cr.setSize(84,84);
+cr.domElement.style.cursor='pointer';cubeBox.appendChild(cr.domElement);
+const cScene=new THREE.Scene();const cCam=new THREE.PerspectiveCamera(30,1,0.1,100);
+cScene.add(new THREE.AmbientLight(0xffffff,0.85));const cdl=new THREE.DirectionalLight(0xffffff,0.4);cdl.position.set(2,3,4);cScene.add(cdl);
+const FACES=[['DROITE',Math.PI/2,Math.PI/2],['GAUCHE',-Math.PI/2,Math.PI/2],['DESSUS',0,0.03],['DESSOUS',0,Math.PI-0.03],['AVANT',0,Math.PI/2],['ARRIÈRE',Math.PI,Math.PI/2]];
+function faceTex(t,hl){const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');g.fillStyle=hl?'#f5a623':'#3a434c';g.fillRect(0,0,128,128);
+  g.strokeStyle='#8b97a2';g.lineWidth=6;g.strokeRect(3,3,122,122);g.fillStyle=hl?'#111':'#e8edf1';g.font='bold '+(t.length>6?20:24)+'px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(t,64,66);
+  const tx=new THREE.CanvasTexture(c);tx.anisotropy=4;return tx;}
+const cMats=FACES.map(f=>new THREE.MeshLambertMaterial({map:faceTex(f[0],false)}));const cMatsH=FACES.map(f=>new THREE.MeshLambertMaterial({map:faceTex(f[0],true)}));
+const cube=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.6,1.6),cMats.slice());cScene.add(cube);
+// petit trièdre : X rouge (axe du tube), Y vert, Z bleu (vers le haut)
+[[0xff4444,[1,0,0]],[0x44dd44,[0,0,1]],[0x4488ff,[0,1,0]]].forEach(([col,d])=>{const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.8,-0.8,-0.8),new THREE.Vector3(-0.8+d[0]*1.9,-0.8+d[1]*1.9,-0.8+d[2]*1.9)]);cScene.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:col})));});
+const cRc=new THREE.Raycaster();let cHover=-1;
+const cPick=e=>{const b=cr.domElement.getBoundingClientRect();cRc.setFromCamera(new THREE.Vector2((e.clientX-b.left)/b.width*2-1,-(e.clientY-b.top)/b.height*2+1),cCam);const h=cRc.intersectObject(cube)[0];return h?Math.floor(h.faceIndex/2):-1;};
+cr.domElement.addEventListener('pointermove',e=>{const f=cPick(e);if(f!==cHover){cHover=f;cube.material=cMats.map((m,i)=>i===f?cMatsH[i]:m);}});
+cr.domElement.addEventListener('pointerleave',()=>{cHover=-1;cube.material=cMats.slice();});
+cr.domElement.addEventListener('click',e=>{const f=cPick(e);if(f>=0)flyTo(FACES[f][1],FACES[f][2]);});
+function sceneFit(){scene.updateMatrixWorld(true);const box=new THREE.Box3();box.expandByObject(statG);if(partG.children.length)box.expandByObject(partG);
+  const c=box.getCenter(new THREE.Vector3()),sz=box.getSize(new THREE.Vector3());const R=sz.length()/2;return {c,r:R/Math.sin(cam.fov*DEG/2)*1.05};}
+let anim=null;
+function flyTo(th,ph,rMul){const fit=sceneFit();let dth=th-ctl.th;dth=((dth%(2*Math.PI))+3*Math.PI)%(2*Math.PI)-Math.PI;
+  anim={t0:performance.now(),th0:ctl.th,ph0:ctl.ph,r0:ctl.r,c0:ctl.target.clone(),th1:ctl.th+dth,ph1:ph,r1:fit.r*(rMul||1),c1:fit.c};}
+function stepAnim(now){if(!anim)return;let t=Math.min(1,(now-anim.t0)/450);const e=t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+  ctl.th=anim.th0+(anim.th1-anim.th0)*e;ctl.ph=anim.ph0+(anim.ph1-anim.ph0)*e;ctl.r=anim.r0+(anim.r1-anim.r0)*e;ctl.target.lerpVectors(anim.c0,anim.c1,e);if(t>=1)anim=null;}
+function renderCube(){const d=cam.position.clone().sub(ctl.target).normalize();cCam.position.copy(d.multiplyScalar(6.2));cCam.up.copy(cam.up);cCam.lookAt(0,0,0);cr.render(cScene,cCam);}
 function setMapping(){const m=new THREE.Matrix4();
   if(S.cfg.chuck==='vertical')m.set(0,1,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,1);   // tube couché : axe tube -> X écran, tête en haut
   else m.set(0,0,1,0, 0,1,0,0, -1,0,0,0, 0,0,0,1);                          // tube debout : axe tube -> haut, tête sur le côté
@@ -3134,6 +3163,7 @@ function setMapping(){const m=new THREE.Matrix4();
   const L=S.cfg.L;const c=new THREE.Vector3(0,L*0.35,0).applyMatrix4(m);ctl.target.copy(c);
   if(S.cfg.chuck==='vertical'){ctl.th=0.62;ctl.ph=1.05;}else{ctl.th=1.0;ctl.ph=1.2;}
   ctl.r=S.cfg.chuck==='vertical'?Math.max(260,L*1.9):Math.max(420,L*2.2+180);
+  try{const fit=sceneFit();ctl.target.copy(fit.c);ctl.r=fit.r*1.05;}catch(e){}
   $('cipChTxt').textContent=S.cfg.chuck==='vertical'?'à 90° (vertical, tube couché)':'à plat (horizontal, tube debout)';
   $('cipCardV').classList.toggle('cipOn',S.cfg.chuck==='vertical');$('cipCardH').classList.toggle('cipOn',S.cfg.chuck==='horizontal');}
 // ---------- tube + mandrin ----------
@@ -3323,7 +3353,7 @@ new ResizeObserver(size).observe(view);
 function visible(){const w=document.getElementById('wzpCIP');return !!(w&&w.classList.contains('wz-on')&&$('cipWork').style.display!=='none');}
 function loop(t){if(!visible()){S.looping=false;playing=false;return;}const dt=Math.min(0.1,(t-last)/1000);last=t;
   if(playing&&TOTAL){pos+= +$('cipSpeed').value*dt;if(pos>=TOTAL){pos=TOTAL;playing=false;}upd();}
-  ctl.update();renderer.render(scene,cam);requestAnimationFrame(loop);}
+  stepAnim(t);ctl.update();renderer.render(scene,cam);renderCube();requestAnimationFrame(loop);}
 syncForm();buildHead();buildStatic();setMapping();rebuildPaths();
 S.api={
   frames(){return F;}, // pour les tests
@@ -3348,6 +3378,7 @@ S.api={
     else if(a==='fit'){if(S.part&&S.part.det){S.cfg.prof='rond';S.cfg.d=S.part.det.d;S.cfg.ep=S.part.det.ep;syncForm();rebuildAll(true);}return;}
     else if(a==='step'){const f=$('cipStepFile').files[0];if(f)readStep(f);$('cipStepFile').value='';return;}
     else if(a==='demo'){loadDemo();return;}
+    else if(a==='home'){flyTo(0.62,1.05,1.05);return;}
     else if(a==='goto'){if(!TOTAL)return;pos=Math.max(0,Math.min(100,+$('cipGoto').value||0))/100*TOTAL;playing=false;}
     else if(a==='snap'){playing=false;upd();const f=frameAt(pos);const R=x=>Array.isArray(x)?x.map(R):(typeof x==='number'?+x.toFixed(3):x);
       let k=0;for(let i=0;i<F.length;i++)if(F[i].s<=pos)k=i;
