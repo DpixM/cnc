@@ -3093,7 +3093,8 @@ const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(
 view.appendChild(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color(css('--bg')||'#0e1012');
 const cam=new THREE.PerspectiveCamera(38,1,1,6000);
-scene.add(new THREE.HemisphereLight(0xffffff,0x445566,0.8));
+scene.add(new THREE.HemisphereLight(0xffffff,0x445566,0.95));
+const dl2=new THREE.DirectionalLight(0xfff4e0,0.55);dl2.position.set(-160,90,-120);scene.add(dl2);
 const dl=new THREE.DirectionalLight(0xffffff,0.75);dl.position.set(80,220,140);scene.add(dl);
 const root=new THREE.Group();root.matrixAutoUpdate=false;scene.add(root);
 const rotG=new THREE.Group();root.add(rotG);
@@ -3133,7 +3134,8 @@ function setMapping(){const m=new THREE.Matrix4();
   $('cipCardV').classList.toggle('cipOn',S.cfg.chuck==='vertical');$('cipCardH').classList.toggle('cipOn',S.cfg.chuck==='horizontal');}
 // ---------- tube + mandrin ----------
 const mStock=new THREE.MeshStandardMaterial({color:0x9aa5ae,metalness:0.45,roughness:0.55,side:THREE.DoubleSide,transparent:true,opacity:0.5,depthWrite:false});
-const mChuck=new THREE.MeshStandardMaterial({color:0x4a545c,metalness:0.6,roughness:0.4});
+const mChuck=new THREE.MeshStandardMaterial({color:0xd3d9de,metalness:0.55,roughness:0.28}); // alu
+const mJaw=new THREE.MeshStandardMaterial({color:0xa9b1b8,metalness:0.6,roughness:0.32});
 const mPart=new THREE.MeshStandardMaterial({color:0xc4ccd3,metalness:0.55,roughness:0.42,side:THREE.DoubleSide});
 function profNow(){const c=S.cfg;return G.profile({type:c.prof,d:c.d,w:c.w,h:c.h,r:c.r,ep:c.ep});}
 function buildStatic(){statG.clear();const pr=profNow();S.profile=pr;const L=S.cfg.L,back=90;
@@ -3142,12 +3144,13 @@ function buildStatic(){statG.clear();const pr=profNow();S.profile=pr;const L=S.c
   S.tubeMesh=new THREE.Mesh(geo,mStock);statG.add(S.tubeMesh);
   const Rc=Math.max(95,pr.rmax+55);S.chuckR=Rc;
   const plate=new THREE.CylinderGeometry(Rc,Rc,60,48);const pm=new THREE.Mesh(plate,mChuck);pm.position.y=-60;statG.add(pm);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(Rc-6,3,10,64),mJaw);ring.rotation.x=Math.PI/2;ring.position.y=-30;statG.add(ring);
   for(let k=0;k<3;k++){const a=(90+120*k)*DEG;const dx=Math.cos(a),dz=Math.sin(a);let s=0;for(const q of pr.out)s=Math.max(s,q[0]*dx+q[1]*dz);
-    const j=new THREE.Mesh(new THREE.BoxGeometry(24,30,20),mChuck);j.position.set(dx*(s+12),-15,dz*(s+12));j.rotation.y=-a;statG.add(j);}
+    const j=new THREE.Mesh(new THREE.BoxGeometry(24,30,20),mJaw);j.position.set(dx*(s+12),-15,dz*(s+12));j.rotation.y=-a;statG.add(j);}
 }
 // ---------- tête ----------
 const headG=new THREE.Group();root.add(headG);
-const mHead=new THREE.MeshStandardMaterial({color:0xd8dde1,metalness:0.3,roughness:0.5,transparent:true,opacity:0.42,depthWrite:false,side:THREE.DoubleSide});
+const mHead=new THREE.MeshStandardMaterial({color:0xd9a93a,emissive:0x3a2600,metalness:0.6,roughness:0.3,transparent:true,opacity:0.78,depthWrite:false,side:THREE.DoubleSide}); // doré
 function hp(){return {len:+$('cipHLen').value||180,ang:(+$('cipHAng').value||20)*DEG,gap:+$('cipHGap').value||0};}
 function buildHead(){headG.clear();const h=hp();const R=h.len*Math.tan(h.ang);
   const g=new THREE.ConeGeometry(R,h.len,40,1,true);g.rotateX(Math.PI);g.translate(0,h.len/2+h.gap,0);headG.add(new THREE.Mesh(g,mHead));
@@ -3320,6 +3323,8 @@ function loop(t){if(!visible()){S.looping=false;playing=false;return;}const dt=M
 syncForm();buildHead();buildStatic();setMapping();rebuildPaths();
 S.api={
   frames(){return F;}, // pour les tests
+  cam(th,ph,r){ctl.th=th;ctl.ph=ph;if(r)ctl.r=r;}, // pour les tests
+  goto(v){pos=v*TOTAL;playing=false;upd();}, // pour les tests
   start(){$('cipStart').style.display='';$('cipWork').style.display='none';},
   run(){size();upd();if(!S.looping){S.looping=true;last=performance.now();requestAnimationFrame(loop);}},
   ui(a,v){
