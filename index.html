@@ -3297,7 +3297,7 @@ function loadMeshes(meshes,name){const g=G.weld(meshes);G.triInfo(g);const f=G.f
   else info+='Profil non rond : choisis le profil et ses cotes à la main.';
   S.part.info=info;$('cipFitBtn').disabled=!S.part.det;
   if(S.part.det){S.cfg.prof='rond';S.cfg.d=S.part.det.d;S.cfg.ep=S.part.det.ep;syncForm();}
-  $('cipPRot').value=0;$('cipPOff').value=20;rebuildAll(true);}
+  $('cipPRot').value=0;$('cipPOff').value=20;rebuildAll(true);setMapping();}
 // ---------- démo ----------
 function loadDemo(){const D=cip_demo();S.cfg.prof='rond';S.cfg.d=54;S.cfg.ep=2;S.cfg.L=Math.max(S.cfg.L,140);syncForm();buildStatic();
   const shift=S.cfg.L-120;S.part=null;$('cipFitBtn').disabled=true;partG.clear();
