@@ -1888,11 +1888,11 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
         </div>
         <div class="cipBox">
           <h3>Affichage</h3>
-          <label class="cipChk"><input type="checkbox" id="cipRot" checked onchange="cip_ui('upd')"> Le mandrin tourne le tube (tête fixe)</label>
+          <div class="cipNote" style="margin-top:0">Cinématique : tête en X/Y/Z + inclinaison gauche/droite seulement (vers le mandrin ou vers le bout du tube). Le mandrin tourne pour le reste.</div>
           <label class="cipChk"><input type="checkbox" id="cipVec" onchange="cip_ui('upd')"> Vecteurs faisceau</label>
           <label class="cipChk"><input type="checkbox" id="cipBw" checked onchange="cip_ui('upd')"> Impacts paroi opposée</label>
           <label class="cipChk"><input type="checkbox" id="cipParts" checked onchange="cip_ui('upd')"> Pièce</label>
-          <div class="cipNote">Souris : glisser = tourner, molette = zoom, clic droit ou Maj+glisser = déplacer. Axes affichés = repère de démo, pas encore les vrais axes machine.</div>
+          <div class="cipNote">Souris : glisser = tourner, molette = zoom, clic droit ou Maj+glisser = déplacer. Les noms d'axes réels de la machine seront calés sur ton .LST.</div>
         </div>
       </div>
     </div>
@@ -3205,6 +3205,10 @@ function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;pla
   const Rs=S.profile.rmax+60;
   C.forEach((c,ci)=>{if(ci>0)rapid(F[F.length-1],c,ci,push,Rs);c.s0=null;c.P.forEach((p,j)=>{push(p,c.D[j],c.TH[j],ci,j);if(c.s0===null)c.s0=s;});c.s1=s;});
   TOTAL=s;
+  // CINÉMATIQUE RÉELLE : la tête ne penche que dans le plan (axe du tube, vertical).
+  // Le mandrin doit donc tourner pour que le faisceau n'ait AUCUNE composante avant/arrière :
+  // A = atan2(-dx,-dz)  (faisceau ramené dans le plan vertical qui contient l'axe du tube)
+  let prevTh=null;F.forEach(fr=>{let t=Math.atan2(-fr.d[0],-fr.d[2])/DEG;if(prevTh!==null){while(t-prevTh>180)t-=360;while(t-prevTh<-180)t+=360;}fr.th=t;prevTh=t;});
   // lignes
   C.forEach((c,ci)=>{const col=new THREE.Color(COL[(c.step-1)%4]);
     const pts=c.P.map(p=>{const r=Math.hypot(p[0],p[2])||1;const f=(r+0.15)/r;return new THREE.Vector3(p[0]*f,p[1],p[2]*f);});
@@ -3247,7 +3251,7 @@ function frameAt(s){if(!F.length)return null;let lo=0,hi=F.length-1;while(hi-lo>
 const fmt=(v,n=2)=>(v>=0?' ':'−')+Math.abs(v).toFixed(n);
 function upd(){const pr=S.profile;let f=frameAt(pos);
   if(!f){const top=pr.type==='rond'?pr.R:(()=>{let m=0;for(const q of pr.out)m=Math.max(m,q[1]);return m;})();f={p:[0,S.cfg.L*0.55,top],d:[0,0,-1],th:0,ci:-1,j:0,rapid:false};}
-  const rot=$('cipRot').checked;const th=rot?f.th:0;rotG.rotation.y=-th*DEG;
+  const rot=true;const th=f.th;rotG.rotation.y=-th*DEG;
   if(S.prog){const C=S.prog.C;C.forEach((c,ci)=>{const L=lines[ci];let n=0;if(pos>=c.s1)n=L.n;else if(pos>=c.s0&&ci===f.ci&&f.j>=0)n=f.j+1;L.cut.geometry.setDrawRange(0,n);L.vec.visible=$('cipVec').checked;
     if(ctBtns[ci]){ctBtns[ci].classList.toggle('cipCur',ci===f.ci);ctBtns[ci].classList.toggle('cipDone',pos>=c.s1);}});}
   partG.visible=$('cipParts').checked;if(bwPts)bwPts.visible=$('cipBw').checked;
@@ -3259,11 +3263,11 @@ function upd(){const pr=S.profile;let f=frameAt(pos);
   const bp=beam.geometry.attributes.position;bp.setXYZ(0,top.x,top.y,top.z);bp.setXYZ(1,P.x,P.y,P.z);bp.needsUpdate=true;
   const bo=beamOut.geometry.attributes.position;bo.setXYZ(0,P.x,P.y,P.z);bo.setXYZ(1,exitP.x,exitP.y,exitP.z);bo.needsUpdate=true;beamOut.computeLineDistances();
   beam.visible=beamOut.visible=!f.rapid&&!!S.prog;
-  const tilt=Math.acos(Math.min(1,Math.max(-1,-dr[2])))/DEG;
+  const tilt=Math.atan2(dr[1],-dr[2])/DEG;const side=Math.abs(dr[0]);
   const cl=clearance(f.p,f.d);const A=((th%360)+540)%360-180;
   const name=S.prog&&f.ci>=0?(f.rapid?'déplacement rapide':S.prog.C[f.ci].name):'tête au repos (0°)';
   $('cipReadout').innerHTML=[['Contour',name],['X (travers)',fmt(pr2[0])],['Y (le long du tube)',fmt(pr2[1])],['Z (vers la tête)',fmt(pr2[2])],
-    ['Mandrin A',rot?fmt(A,1)+'°':'fixe'],['Tête vs perpendiculaire',tilt.toFixed(1)+'°'],['Garde tête mini',cl>900?'—':cl.toFixed(1)+' mm'],['Paroi opposée',S.prog?hitTxt:'—']]
+    ['Mandrin (rotation)',fmt(A,1)+'°'],['Tête (inclinaison G/D)',fmt(tilt,1)+'°'+(side>0.02?' ⚠':'')],['Garde tête mini',cl>900?'—':cl.toFixed(1)+' mm'],['Paroi opposée',S.prog?hitTxt:'—']]
     .map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('');
   const al=$('cipAlert');if(cl<0){al.className='cipAl cipBad';al.textContent='Collision tête / tube ou mandrin avec ces cotes de tête.';}else{al.className='cipAl cipOk';al.textContent='Pas de collision détectée.';}
   $('cipHud').innerHTML=S.prog?`<b>${(pos/TOTAL*100).toFixed(0)}%</b> · ${pos.toFixed(0)} / ${TOTAL.toFixed(0)} mm de trajet`:`Mandrin ${S.cfg.chuck==='vertical'?'vertical':'horizontal'} · tube ${profTxt()}`;
@@ -3315,6 +3319,7 @@ function loop(t){if(!visible()){S.looping=false;playing=false;return;}const dt=M
   ctl.update();renderer.render(scene,cam);requestAnimationFrame(loop);}
 syncForm();buildHead();buildStatic();setMapping();rebuildPaths();
 S.api={
+  frames(){return F;}, // pour les tests
   start(){$('cipStart').style.display='';$('cipWork').style.display='none';},
   run(){size();upd();if(!S.looping){S.looping=true;last=performance.now();requestAnimationFrame(loop);}},
   ui(a,v){
