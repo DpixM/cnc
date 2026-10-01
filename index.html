@@ -1759,8 +1759,9 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
   <div id="cipBody" style="flex:1;margin-top:10px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:10px;padding:16px;overflow:auto">
     <!-- ▼▼▼ L'AUTRE IA CONSTRUIT SON SOFT CIP ICI (et SEULEMENT ici) ▼▼▼ -->
     <style>
-    #cipBody .cipW{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;height:100%;min-height:560px}
-    @media (max-width:900px){#cipBody .cipW{grid-template-columns:1fr;height:auto}#cipBody #cipView{height:58vh}}
+    #cipBody .cipW{display:grid;grid-template-columns:340px minmax(0,1fr);gap:12px;height:100%;min-height:560px}
+    #cipBody .cipW > #cipView{order:2} #cipBody .cipW > .cipSide{order:1}
+    @media (max-width:900px){#cipBody .cipW{grid-template-columns:1fr;height:auto}#cipBody #cipView{height:58vh;order:1}#cipBody .cipW > .cipSide{order:2}}
     #cipBody #cipView{position:relative;background:var(--bg);border:1px solid var(--brd2);border-radius:8px;overflow:hidden;min-height:320px;touch-action:none}
     #cipBody #cipView canvas{display:block;width:100%;height:100%;cursor:grab}
     #cipBody .cipHud{position:absolute;left:8px;top:8px;font:12px var(--mono);color:var(--txt);background:rgba(14,16,18,.85);border:1px solid var(--brd2);border-radius:5px;padding:5px 8px;pointer-events:none;max-width:calc(100% - 16px)}
@@ -1801,8 +1802,32 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     #cipBody .cipStat{font-size:12px;line-height:1.45;margin-top:6px;color:var(--txt)}
     #cipBody .cipErr{color:var(--red);padding:20px;font-weight:600}
     #cipBody .cipFile{display:none}
+    #cipBody #cipStart{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;min-height:480px;padding:20px 0}
+    #cipBody #cipStart h2{font:600 20px var(--sans);color:var(--txt);text-align:center}
+    #cipBody #cipStart p{color:var(--txt2);font-size:13px;text-align:center;max-width:60ch;line-height:1.5}
+    #cipBody .cipCards{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+    #cipBody .cipCard{width:260px;max-width:100%;background:var(--surf);border:1.5px solid var(--brd2);border-radius:10px;padding:16px;cursor:pointer;color:var(--txt);text-align:center;font:inherit;display:flex;flex-direction:column;align-items:center;gap:10px}
+    #cipBody .cipCard:hover,#cipBody .cipCard:focus-visible{border-color:var(--acc);outline:none}
+    #cipBody .cipCard b{font:600 16px var(--sans)}
+    #cipBody .cipCard span{font-size:12px;color:var(--txt2);line-height:1.4}
+    #cipBody .cipCard svg{width:200px;height:130px}
+    #cipBody .cipCard.cipOn{border-color:var(--acc);box-shadow:0 0 0 2px rgba(245,166,35,.25)}
     </style>
-    <div class="cipW">
+    <div id="cipStart">
+      <h2>Position du mandrin</h2>
+      <p>Choisis comment le mandrin est monté sur la machine aujourd'hui. Tu pourras changer plus tard avec le bouton « Changer » dans les réglages.</p>
+      <div class="cipCards">
+        <button class="cipCard" id="cipCardH" onclick="cip_ui('choose','horizontal')">
+          <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="40" y="96" width="120" height="22" rx="3" fill="#4a545c"/><rect x="60" y="84" width="14" height="14" fill="#5d6870"/><rect x="126" y="84" width="14" height="14" fill="#5d6870"/><rect x="84" y="20" width="32" height="78" rx="2" fill="#9aa5ae"/><rect x="92" y="20" width="16" height="78" fill="#7d8890"/><path d="M160 48 L196 34 L196 62 Z" fill="#d8dde1" opacity=".7"/><line x1="116" y1="48" x2="160" y2="48" stroke="#ff2a2a" stroke-width="1.5"/></svg>
+          <b>Mandrin à plat (horizontal)</b><span>Plateau couché sur la table, le tube pointe vers le haut.</span>
+        </button>
+        <button class="cipCard" id="cipCardV" onclick="cip_ui('choose','vertical')">
+          <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="14" y="30" width="22" height="90" rx="3" fill="#4a545c"/><rect x="34" y="52" width="14" height="12" fill="#5d6870"/><rect x="34" y="86" width="14" height="12" fill="#5d6870"/><rect x="36" y="62" width="150" height="26" rx="2" fill="#9aa5ae"/><rect x="36" y="68" width="150" height="14" fill="#7d8890"/><path d="M110 62 L94 4 L126 4 Z" fill="#d8dde1" opacity=".7"/><line x1="110" y1="4" x2="110" y2="62" stroke="#ff2a2a" stroke-width="1.5"/></svg>
+          <b>Mandrin à 90° (vertical)</b><span>Plateau debout, le tube est couché.</span>
+        </button>
+      </div>
+    </div>
+    <div class="cipW" id="cipWork" style="display:none">
       <div id="cipView">
         <div class="cipHud" id="cipHud">Chargement…</div>
         <div class="cipLeg" id="cipLeg"></div>
@@ -1810,11 +1835,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <div class="cipSide">
         <div class="cipBox">
           <h3><i>1</i>Machine</h3>
-          <div style="font-size:13px;margin-bottom:4px">Position du mandrin</div>
-          <div class="cipSeg">
-            <button class="cipBtn" id="cipChV" onclick="cip_ui('chuck','vertical')" title="Plateau debout, tube couché">Vertical (tube couché)</button>
-            <button class="cipBtn" id="cipChH" onclick="cip_ui('chuck','horizontal')" title="Plateau à plat, tube debout">Horizontal (tube debout)</button>
-          </div>
+          <div class="cipRow" style="justify-content:space-between"><span style="font-size:13px">Mandrin : <b id="cipChTxt">—</b></span><button class="cipBtn" onclick="cip_ui('startscreen')">Changer</button></div>
           <div class="cipNum"><span>Tête : longueur du cône (focale, mm)</span><input type="number" id="cipHLen" value="180" min="40" max="400" onchange="cip_ui('head')"></div>
           <div class="cipNum"><span>Tête : demi-angle du cône (°)</span><input type="number" id="cipHAng" value="20" min="3" max="45" step="0.5" onchange="cip_ui('head')"></div>
           <div class="cipNum"><span>Distance buse / tube (mm)</span><input type="number" id="cipHGap" value="1" min="0" max="10" step="0.1" onchange="cip_ui('head')"></div>
@@ -1842,7 +1863,8 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
             <button class="cipBtn" onclick="cip_ui('demo')">Démo tuiles Ø54</button>
             <input type="file" id="cipStepFile" class="cipFile" accept=".step,.stp,.STEP,.STP" onchange="cip_ui('step')">
           </div>
-          <div class="cipNum"><span>Tourner autour du tube (°)</span><input type="number" id="cipPRot" value="0" step="5" onchange="cip_ui('place')"></div>
+          <div class="cipNote" style="margin-top:0">Astuce : attrape la pièce à la souris et fais-la glisser le long du tube.</div>
+          <div class="cipNum"><span>Tourner autour du tube (°)</span><span class="cipRow" style="margin:0;gap:4px"><button class="cipBtn" style="padding:3px 8px" onclick="cip_ui('rotstep',-15)">−15</button><input type="number" id="cipPRot" value="0" step="5" style="width:60px" onchange="cip_ui('place')"><button class="cipBtn" style="padding:3px 8px" onclick="cip_ui('rotstep',15)">+15</button></span></div>
           <div class="cipNum"><span>Distance au bout du tube (mm)</span><input type="number" id="cipPOff" value="20" step="1" onchange="cip_ui('place')"></div>
           <div class="cipRow"><button class="cipBtn" onclick="cip_ui('flip')">Retourner la pièce</button><button class="cipBtn" id="cipFitBtn" onclick="cip_ui('fit')" disabled>Adapter le tube à la pièce</button></div>
           <div class="cipStat" id="cipPartStat">Aucune pièce. Importe ton STEP : le tube et l'axe sont détectés tout seuls.</div>
@@ -3082,13 +3104,22 @@ const pathG=new THREE.Group();rotG.add(pathG);    // trajectoires
 const ctl={target:new THREE.Vector3(),r:330,th:0.62,ph:1.05,update(){const s=Math.sin(this.ph);cam.position.set(this.target.x+this.r*s*Math.sin(this.th),this.target.y+this.r*Math.cos(this.ph),this.target.z+this.r*s*Math.cos(this.th));cam.lookAt(this.target);}};
 {const el=renderer.domElement;const pts=new Map();let mode=null,lx=0,ly=0,pd=0;
  el.addEventListener('contextmenu',e=>e.preventDefault());
- el.addEventListener('pointerdown',e=>{el.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);mode=(e.button===2||e.shiftKey||pts.size===2)?'pan':'rot';lx=e.clientX;ly=e.clientY;if(pts.size===2){const a=[...pts.values()];pd=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);}el.style.cursor='grabbing';});
+ const rc=new THREE.Raycaster();let drag=null;
+ const rayAt=e=>{const b=el.getBoundingClientRect();rc.setFromCamera(new THREE.Vector2((e.clientX-b.left)/b.width*2-1,-(e.clientY-b.top)/b.height*2+1),cam);return rc.ray;};
+ el.addEventListener('pointerdown',e=>{
+   if(e.button===0&&!e.shiftKey&&pts.size===0&&S.part&&partG.children.length){scene.updateMatrixWorld(true);const ray=rayAt(e);rc.ray.copy(ray);const hit=rc.intersectObjects(partG.children,true)[0];
+     if(hit){const ax=new THREE.Vector3(0,1,0).applyMatrix4(new THREE.Matrix4().extractRotation(root.matrix)).normalize();
+       const cd=new THREE.Vector3();cam.getWorldDirection(cd);const n=cd.clone().sub(ax.clone().multiplyScalar(cd.dot(ax)));if(n.lengthSq()<1e-6)n.copy(cd);n.normalize();
+       drag={ax,plane:new THREE.Plane().setFromNormalAndCoplanarPoint(n,hit.point),p0:hit.point.clone(),off0:+$('cipPOff').value||0};
+       el.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);mode='part';pathG.visible=false;el.style.cursor='ew-resize';return;}}
+   el.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);mode=(e.button===2||e.shiftKey||pts.size===2)?'pan':'rot';lx=e.clientX;ly=e.clientY;if(pts.size===2){const a=[...pts.values()];pd=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);}el.style.cursor='grabbing';});
  el.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,[e.clientX,e.clientY]);
    if(pts.size===2){const a=[...pts.values()];const d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(pd>0)ctl.r=Math.min(2500,Math.max(40,ctl.r*pd/d));pd=d;return;}
+   if(mode==='part'&&drag){const q=new THREE.Vector3();if(rayAt(e).intersectPlane(drag.plane,q)){const d=q.sub(drag.p0).dot(drag.ax);$('cipPOff').value=+(drag.off0-d).toFixed(1);placeAndShow();}return;}
    const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;
    if(mode==='rot'){ctl.th-=dx*0.008;ctl.ph=Math.min(3.1,Math.max(0.05,ctl.ph-dy*0.008));}
    else{const k=ctl.r*0.0016;const right=new THREE.Vector3().setFromMatrixColumn(cam.matrix,0),up=new THREE.Vector3().setFromMatrixColumn(cam.matrix,1);ctl.target.addScaledVector(right,-dx*k).addScaledVector(up,dy*k);}});
- const end=e=>{pts.delete(e.pointerId);if(!pts.size){mode=null;el.style.cursor='grab';}};
+ const end=e=>{pts.delete(e.pointerId);if(!pts.size){if(mode==='part'){drag=null;pathG.visible=true;computeProgram();}mode=null;el.style.cursor='grab';}};
  el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
  el.addEventListener('wheel',e=>{e.preventDefault();ctl.r=Math.min(2500,Math.max(40,ctl.r*Math.exp(e.deltaY*0.0012)));},{passive:false});}
 function setMapping(){const m=new THREE.Matrix4();
@@ -3098,7 +3129,8 @@ function setMapping(){const m=new THREE.Matrix4();
   const L=S.cfg.L;const c=new THREE.Vector3(0,L*0.35,0).applyMatrix4(m);ctl.target.copy(c);
   if(S.cfg.chuck==='vertical'){ctl.th=0.62;ctl.ph=1.05;}else{ctl.th=1.0;ctl.ph=1.2;}
   ctl.r=S.cfg.chuck==='vertical'?Math.max(260,L*1.9):Math.max(420,L*2.2+180);
-  $('cipChV').classList.toggle('cipOn',S.cfg.chuck==='vertical');$('cipChH').classList.toggle('cipOn',S.cfg.chuck==='horizontal');}
+  $('cipChTxt').textContent=S.cfg.chuck==='vertical'?'à 90° (vertical, tube couché)':'à plat (horizontal, tube debout)';
+  $('cipCardV').classList.toggle('cipOn',S.cfg.chuck==='vertical');$('cipCardH').classList.toggle('cipOn',S.cfg.chuck==='horizontal');}
 // ---------- tube + mandrin ----------
 const mStock=new THREE.MeshStandardMaterial({color:0x9aa5ae,metalness:0.45,roughness:0.55,side:THREE.DoubleSide,transparent:true,opacity:0.5,depthWrite:false});
 const mChuck=new THREE.MeshStandardMaterial({color:0x4a545c,metalness:0.6,roughness:0.4});
@@ -3138,26 +3170,31 @@ function clearance(p,d){const h=hp(),pr=S.profile,L=S.cfg.L;const ref=Math.abs(d
   return m;}
 // ---------- pièce ----------
 function partMeshFromTris(pos){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();return new THREE.Mesh(g,mPart);}
-function placeAndShow(){if(!S.part)return;const P=S.part;const rho=+$('cipPRot').value||0,off=+$('cipPOff').value||0;const L=S.cfg.L;
-  let ymax=-1e9;for(const p of P.base)ymax=Math.max(ymax,S.flip?-p[1]:p[1]);
+const JAW=3; // marge mini entre la pièce et l'avant des mors (mm)
+function partSpan(){let a=1e9,b=-1e9;for(const p of S.part.base){const y=S.flip?-p[1]:p[1];a=Math.min(a,y);b=Math.max(b,y);}return [a,b];}
+function placeAndShow(){if(!S.part)return;const P=S.part;const rho=+$('cipPRot').value||0;let off=Math.max(0,+$('cipPOff').value||0);
+  const [ymin,ymax]=partSpan();const len=ymax-ymin;
+  // la pièce reste TOUJOURS hors des mors : on rallonge le tube si besoin
+  if(len+off+JAW>S.cfg.L){S.cfg.L=Math.ceil(len+off+JAW+10);syncForm();buildStatic();P.note='Tube rallongé à '+S.cfg.L+' mm pour que la pièce reste hors des mors.';}
+  const L=S.cfg.L;off=Math.min(off,L-len-JAW);$('cipPOff').value=+off.toFixed(1);
   const dy=(L-off)-ymax;
   P.g.M=P.base.map(p=>{let q=S.flip?[-p[0],-p[1],p[2]]:p;q=rotM(q,rho);return [q[0],q[1]+dy,q[2]];});
   const pos=new Float32Array(P.g.T.length*9);P.g.T.forEach((t,i)=>{for(let k=0;k<3;k++){const v=P.g.M[t[k]];pos[i*9+k*3]=v[0];pos[i*9+k*3+1]=v[1];pos[i*9+k*3+2]=v[2];}});
-  partG.clear();partG.add(partMeshFromTris(pos));}
+  partG.clear();partG.add(partMeshFromTris(pos));P.len=len;}
 function computeProgram(){if(!S.part){S.prog=null;rebuildPaths();return;}
   $('cipPartStat').innerHTML=S.part.info+'<br><span class="cipWarn">Calcul des trajectoires…</span>';
   setTimeout(()=>{try{const g=S.part.g;
     // recalcul des infos triangles en coordonnées modèle
     g.NM=[];g.CM=[];const r=G.program(g,S.profile,0.5);
-    if(r.error){S.prog=null;$('cipPartStat').innerHTML=S.part.info+'<br><span class="cipBad">'+r.error+'</span>';}
+    const extra=(S.part.len?'<br>Longueur pièce : '+S.part.len.toFixed(1)+' mm':'')+(S.part.note?'<br><span class="cipWarn">'+S.part.note+'</span>':'');S.part.note='';
+    if(r.error){S.prog=null;$('cipPartStat').innerHTML=S.part.info+extra+'<br><span class="cipBad">'+r.error+'</span>';}
     else{const C=r.C.map(c=>({name:c.name,step:c.step,P:c.P,D:c.D,mode:c.mode,A:c.A}));S.prog={C,steps:{1:['Contours intérieurs','Trous et découpes fermées, faits en premier tant que tout est rigide.'],2:['Détourage','Le contour qui libère la pièce, en dernier.']}};
-      $('cipPartStat').innerHTML=S.part.info+'<br><span class="cipOk">'+C.length+' contour(s) trouvés.</span>'+(r.totalBad?' <span class="cipWarn">'+r.totalBad+' point(s) sans orientation sûre (repli sur la normale).</span>':'');}
+      $('cipPartStat').innerHTML=S.part.info+extra+'<br><span class="cipOk">'+C.length+' contour(s) trouvés.</span>'+(r.totalBad?' <span class="cipWarn">'+r.totalBad+' point(s) sans orientation sûre (repli sur la normale).</span>':'');}
     rebuildPaths();}catch(e){console.error('[CIP] programme',e);$('cipPartStat').innerHTML=S.part.info+'<br><span class="cipBad">Erreur de calcul : '+e.message+'</span>';}},30);}
 // ---------- trajectoires + timeline ----------
 let F=[],TOTAL=0,lines=[],bwPts=null,pos=0,playing=false,last=performance.now(),ctBtns=[];
 function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;playing=false;ctBtns=[];const box=$('cipSteps');box.innerHTML='';
   const leg=$('cipLeg');
-  leg.style.display=S.prog?'':'none';
   if(!S.prog){box.innerHTML='<div class="cipStD">Pas encore de programme : importe un STEP ou charge la démo.</div>';leg.innerHTML='';upd();return;}
   const C=S.prog.C;
   // thetas continus
@@ -3272,13 +3309,14 @@ function loadDemo(){const D=cip_demo();S.cfg.prof='rond';S.cfg.d=54;S.cfg.ep=2;S
 // ---------- boucle ----------
 function size(){const w=view.clientWidth,h=view.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();}
 new ResizeObserver(size).observe(view);
-function visible(){const w=document.getElementById('wzpCIP');return !!(w&&w.classList.contains('wz-on'));}
+function visible(){const w=document.getElementById('wzpCIP');return !!(w&&w.classList.contains('wz-on')&&$('cipWork').style.display!=='none');}
 function loop(t){if(!visible()){S.looping=false;playing=false;return;}const dt=Math.min(0.1,(t-last)/1000);last=t;
   if(playing&&TOTAL){pos+= +$('cipSpeed').value*dt;if(pos>=TOTAL){pos=TOTAL;playing=false;}upd();}
   ctl.update();renderer.render(scene,cam);requestAnimationFrame(loop);}
 syncForm();buildHead();buildStatic();setMapping();rebuildPaths();
 S.api={
-  start(){size();upd();if(!S.looping){S.looping=true;last=performance.now();requestAnimationFrame(loop);}},
+  start(){$('cipStart').style.display='';$('cipWork').style.display='none';},
+  run(){size();upd();if(!S.looping){S.looping=true;last=performance.now();requestAnimationFrame(loop);}},
   ui(a,v){
     if(a==='play'){if(!S.prog)return;if(pos>=TOTAL)pos=0;playing=!playing;}
     else if(a==='restart'){pos=0;playing=false;}
@@ -3286,6 +3324,9 @@ S.api={
     else if(a==='scrub'){pos=$('cipScrub').value/1000*TOTAL;playing=false;}
     else if(a==='head'){buildHead();}
     else if(a==='chuck'){S.cfg.chuck=v;setMapping();}
+    else if(a==='choose'){S.cfg.chuck=v;$('cipStart').style.display='none';$('cipWork').style.display='';setMapping();S.api.run();requestAnimationFrame(()=>{size();upd();});}
+    else if(a==='startscreen'){playing=false;S.api.start();return;}
+    else if(a==='rotstep'){$('cipPRot').value=((+$('cipPRot').value||0)+v);placeAndShow();computeProgram();return;}
     else if(a==='prof'){S.cfg.prof=v;syncForm();readForm();rebuildAll(true);return;}
     else if(a==='tube'){readForm();syncForm();rebuildAll(true);return;}
     else if(a==='place'){placeAndShow();computeProgram();return;}
