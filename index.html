@@ -130,6 +130,52 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-01 — HN (suite) : 🧪TEST — COQUILLE onglet "CIP Trumpf" (soft à part, isolé)
+ [AJOUT] 4e carte "CIP Trumpf (5 axes)" sur l'écran Mode d'usinage -> ouvre un écran INDÉPENDANT
+   (#wzpCIP) via cip_open()/cip_back(). Zéro lien avec le canvas / paintObjects / laser .LST.
+   Tout est préfixé cip_ / cipState. Un autre dev (ou une autre conversation IA) remplit SON soft
+   UNIQUEMENT entre les marqueurs « ZONE CIP TRUMPF » (HTML #cipBody + bloc JS cip_*), sans rien
+   toucher d'autre. Coquille vide pour l'instant. Voir le doc CONSIGNES-onglet-CIP-trumpf.md.
+
+-- 2026-09-30 — HN : 🧪TEST — TANGENTE qui ROULE le long du contour + gomme arc + clic + 2 segments
+ [CAO ★] TANGENTE À UN CONTOUR (polyligne) : le cercle ROULE le long de TOUTE la ligne. Avant,
+   tangent à un segment = collé à sa DROITE INFINIE -> en déplaçant le cercle, arrivé au coin il
+   continuait tout droit et TRAVERSAIT le segment suivant comme s'il n'existait pas. Maintenant,
+   quand on le glisse, il reste tangent au point du contour le PLUS PROCHE -> au coin il enchaîne
+   tout seul sur le segment d'après (comme une bille contre un mur plié), sans jamais rentrer
+   dans la matière. (Tangente à une seule ligne droite = comportement classique, inchangé.)
+ [UI] Petite FENÊTRE de mode à l'activation de la tangente : « ◡ 1 segment » (collé à un seul
+   segment, façon classique) ou « ◠ Contour (roule) » (roule le long de toute la ligne — les
+   segments doivent être reliés). Le choix est mémorisé et taggé sur la contrainte. Défaut = Contour.
+ [CAO] TANGENTE sur un CERCLE DESSINÉ EN PETITS SEGMENTS (boucle fermée ronde, plein de points) :
+   avant, la tangente ne marchait QUE sur un vrai cercle -> sur une boucle en segments elle ne
+   s'ajoutait même pas (rien). Maintenant une boucle fermée ~ronde est reconnue comme un cercle
+   (_looksLikeCircle : centre = barycentre, rayon moyen) et on déplace TOUTE la boucle pour qu'elle
+   vienne « embrasser » la ligne / rouler le long du contour. Marche aussi au glisser. (_tanBody
+   unifie cercle vrai / arc / boucle-cercle.)
+ [UI] Action « ◯ Rendre rond (→ vrai cercle) » (menu Modifier) : sélectionne un cercle dessiné en
+   petits segments (boucle fermée ~ronde) -> il devient un VRAI cercle (une seule poignée au centre,
+   plus de nœuds). Garde le même id, rayon = rayon moyen, centre = barycentre. (Rappel : l'outil
+   « ◯ Cercle (depuis le centre) » crée déjà un vrai cercle rond ; cette action sert à récupérer
+   une boucle déjà en segments.)
+ [FIX 1] La gomme sur un ARC (déjà découpé d'un cercle, ou tangent à un segment) le transformait
+   en POLYLIGNE bête -> les 2 poignées de bout disparaissaient et il fallait recommencer.
+   Maintenant chaque morceau survivant redevient un VRAI ARC (centre + rayon gardés via _segToArc)
+   -> poignées de bout OK du 1er coup, tangentes restent calculables. Le 1er morceau garde le
+   MÊME id -> une tangente qui pointait dessus continue de le suivre. Marche aussi en swipe
+   (drag de gomme). Le gommage d'un CERCLE plein -> arc reste inchangé (régression verte).
+ [FIX 2] TANGENTE sur un 2e segment non parallèle ne marchait PAS : l'application immédiate ne
+   satisfaisait que la NOUVELLE tangente et abandonnait la 1re -> le cercle ne tenait plus sur
+   les 2. Désormais, après CHAQUE ajout de contrainte, on re-résout tout le système (solveSketch)
+   comme le ferait un glisser -> le cercle converge direct vers le congé (fillet) tangent aux 2,
+   sans avoir à déplacer quoi que ce soit. Les segments ne bougent pas, seul le cercle/arc bouge.
+ [FIX 3] **LE VRAI BLOCAGE** du clic : en mode contrainte, _conEntityPick renvoyait le CERCLE dès
+   qu'il était dans la tolérance, AVANT même de regarder les arêtes. Or pour une tangente le cercle
+   touche déjà le segment -> cliquer SUR le segment attrapait le cercle au lieu du trait, donc la
+   tangente ne se posait jamais (rien ne se passait). Maintenant on prend l'entité la PLUS PROCHE
+   du clic (trait cercle / arc / arête confondus) -> cliquer sur un segment qui frôle le cercle
+   sélectionne bien le SEGMENT. (Clic sur le trait du cercle ou dans son ventre = cercle, inchangé.)
+
 -- 2026-09-30 — HM : ARC INTELLIGENT (validé Seb, en ligne) — 2 bugs corrigés (ellipse à la refermeture + poignées après gomme)
  [FIX] Refermer un arc faisait une ELLIPSE : au moment où l'arc se transformait en cercle EN
    PLEIN glisser, le drag continuait et tombait dans le redim par boîte -> il étirait le cercle
@@ -1617,7 +1663,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-30-HM ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-09-30-HN 🧪TEST</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -1688,9 +1734,37 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       Incrustation bois (V-Carve Inlay)
       <span class="bc-desc">Mâle ♂ + Femelle ♀ — noyer &amp; érable — 4 fichiers G-code</span>
     </button>
+    <!-- ╔═══ CARTE CIP TRUMPF (onglet isolé) — ouvre un écran à part, rien de lié au reste ═══╗ -->
+    <button class="bc-btn" id="modeCIP" onclick="cip_open()">
+      <span class="bc-icon"><svg viewBox="0 0 24 24" width="30" height="30" style="vertical-align:middle"><rect x="4" y="5" width="16" height="11" rx="1.5" fill="none" stroke="#22d3ee" stroke-width="1.8"/><path d="M7 9h4M7 12h7" stroke="#22d3ee" stroke-width="1.6"/><path d="M12 18.5l2.5 2.5M12 18.5l-2.5 2.5M12 16v5" stroke="#67e8f9" stroke-width="1.4"/></svg></span>
+      CIP Trumpf (5 axes)
+      <span class="bc-desc">Générateur de programmes CIP — machine TRUMPF (soft à part)</span>
+    </button>
+    <!-- ╚═══ FIN CARTE CIP TRUMPF ═══╝ -->
   </div>
   <div id="modeHint" class="al al-w" style="display:none"></div>
 </div>
+
+<!-- ╔══════════════════ ZONE CIP TRUMPF — ÉCRAN ISOLÉ ══════════════════╗
+     Écran 100% indépendant du reste du soft : AUCUN canvas, AUCUN paintObjects,
+     AUCUN paramètre laser .LST, rien de partagé. L'autre IA construit son petit
+     générateur de CIP UNIQUEMENT à l'intérieur de #cipBody (HTML) et des fonctions
+     cip_* plus bas (JS). Elle ne modifie RIEN en dehors de ces deux marqueurs. -->
+<div class="wz-wrap" id="wzpCIP">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+    <button class="btn btn-dim" onclick="cip_back()">← Retour</button>
+    <div class="wz-h1" style="margin:0">🔧 CIP Trumpf (5 axes)</div>
+  </div>
+  <div class="wz-sub">Générateur de programmes CIP pour la machine TRUMPF — soft indépendant du reste.</div>
+  <div id="cipBody" style="flex:1;margin-top:10px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:10px;padding:16px;overflow:auto">
+    <!-- ▼▼▼ L'AUTRE IA CONSTRUIT SON SOFT CIP ICI (et SEULEMENT ici) ▼▼▼ -->
+    <div style="text-align:center;color:var(--txt2);padding:40px 10px;line-height:1.6">
+      🚧 Emplacement prêt.<br>Le générateur de CIP (Trumpf, 5 axes) sera construit ici — c'est un soft à part, il ne touche à rien du reste du programme.
+    </div>
+    <!-- ▲▲▲ FIN de la zone à remplir ▲▲▲ -->
+  </div>
+</div>
+<!-- ╚══════════════════ FIN ZONE CIP TRUMPF (écran) ══════════════════╝ -->
 
 <!-- PAGE 2 : DESSIN (plein écran géré séparément) -->
 <!-- La page dessin est affichée en overlay plein écran par wzShowDraw() -->
@@ -2699,6 +2773,22 @@ function wzGo(step){
   wzUpdateBar();
   wzOnEnter(step);
 }
+
+/* ╔══════════════════ ZONE CIP TRUMPF (JS) — ONGLET ISOLÉ ══════════════════╗
+   Soft indépendant : tout est préfixé cip_ / cipState pour ne RIEN partager avec
+   le reste (pas de canvas, pas de paintObjects, pas de laser). L'autre IA AJOUTE
+   ses fonctions cip_* entre les marqueurs ▼▼▼ / ▲▲▲ et NE TOUCHE À RIEN d'autre.
+   - cip_open()  : ouvre l'onglet (affiche #wzpCIP), appelé par la carte "CIP Trumpf".
+   - cip_back()  : revient à l'écran "Mode d'usinage" (#wzp1).
+   - cip_init()  : appelé à chaque ouverture — l'autre IA y met l'init de son soft.   */
+var cipState = {}; // état privé du soft CIP (à remplir par l'autre IA)
+function cip_open(){ try{ document.querySelectorAll('.wz-wrap').forEach(function(p){ p.classList.remove('wz-on'); }); var el=document.getElementById('wzpCIP'); if(el) el.classList.add('wz-on'); if(typeof cip_init==='function') cip_init(); }catch(e){ console.error('[CIP] open', e); } }
+function cip_back(){ try{ document.querySelectorAll('.wz-wrap').forEach(function(p){ p.classList.remove('wz-on'); }); var el=document.getElementById('wzp1'); if(el) el.classList.add('wz-on'); }catch(e){ console.error('[CIP] back', e); } }
+function cip_init(){ /* l'autre IA : init de son soft CIP ici (appelé à chaque ouverture de l'onglet) */ }
+/* ▼▼▼ L'AUTRE IA AJOUTE SES FONCTIONS cip_* ICI ▼▼▼ */
+
+/* ▲▲▲ FIN des fonctions CIP ▲▲▲ */
+/* ╚══════════════════ FIN ZONE CIP TRUMPF (JS) ══════════════════╝ */
 
 
 function inlayPopulateToolSelects(){
@@ -5164,6 +5254,7 @@ const TOOL_MENUS = {
   cadModify: [
     {i:'⌒', l:'Congé (arrondi)',   fn:"cadFillet()"},
     {i:'◣', l:'Chanfrein',         fn:"cadChamfer()"},
+    {i:'◯', l:'Rendre rond (→ vrai cercle)', fn:"cadToTrueCircle()"},
     {i:'⧉', l:'Décalage (offset)', fn:"cadOffset()"},
     {i:'✂️', l:'Ajuster (trim)',   fn:"cadTrim()"},
     {i:'🔗', l:'Tab (pont de maintien)', fn:"cadTabs()"},
@@ -7226,20 +7317,28 @@ function _ensureFreePoly(o){
 }
 // Picker pour contraintes : renvoie un point, un cercle, OU une arête de forme
 function _conEntityPick(xm,ym){
-  const tol=16/(BASE_PX*vZoom); let best=null;
-  for(const o of paintObjects){ if(o.type==='point'){ const d=Math.hypot(xm-o.x,ym-o.y); if(d<=tol&&(!best||d<best.d))best={d,obj:o,edge:null,kind:'point'}; } }
-  if(best)return best;
-  for(const o of paintObjects){ if(o._circle||o.type==='ellipse'){ const r=((o.rx||0)+(o.ry||0))/2; const dc=Math.hypot(xm-o.x,ym-o.y); const d=Math.min(Math.abs(dc-r),dc); if(d<=tol&&(!best||d<best.d))best={d,obj:o,edge:null,kind:'circle'}; } }
-  if(best)return best;
-  // arcs (3 points) et congés : entité 'arc' avec un centre (pour concentrique/coïncidence/tangente)
-  let barc=null;
+  const tol=16/(BASE_PX*vZoom);
+  // 1) POINTS : petite cible intentionnelle -> priorité absolue (inchangé)
+  let bp=null;
+  for(const o of paintObjects){ if(o.type==='point'){ const d=Math.hypot(xm-o.x,ym-o.y); if(d<=tol&&(!bp||d<bp.d))bp={d,obj:o,edge:null,kind:'point'}; } }
+  if(bp)return bp;
+  // 2) CERCLE / ARC / ARÊTE : on prend le PLUS PROCHE (distance au TRAIT), au lieu de laisser le
+  //    cercle masquer systématiquement l'arête. AVANT : un cercle dans la tolérance était renvoyé
+  //    d'office -> impossible de cliquer un segment qui frôle le cercle (ex : rendre un cercle
+  //    tangent à un 2e segment : le cercle touche déjà le segment, donc le clic attrapait le
+  //    cercle au lieu du trait, et la tangente ne se posait jamais). Maintenant on compare.
+  const cands=[];
+  for(const o of paintObjects){ if(o._circle||o.type==='ellipse'){ const r=((o.rx||0)+(o.ry||0))/2; const dStroke=Math.abs(Math.hypot(xm-o.x,ym-o.y)-r); if(dStroke<=tol)cands.push({d:dStroke,obj:o,edge:null,kind:'circle'}); } }
   for(const o of paintObjects){
-    if(o._arc){ let d=Infinity; try{d=distToObjStroke(o,xm,ym);}catch(e){} if(d<=tol){ const c=_arcCenter(o); if(c&&(!barc||d<barc.d))barc={d,obj:o,edge:null,kind:'arc',center:c,r:o._arc.r}; } }
-    if(o._fillets){ for(let fi=0;fi<o._fillets.length;fi++){ const f=o._fillets[fi]; if(!f||f.cx==null)continue; const dr=Math.abs(Math.hypot(xm-f.cx,ym-f.cy)-f.r); if(dr<=tol && (!barc||dr<barc.d))barc={d:dr,obj:o,edge:null,kind:'arc',center:[f.cx,f.cy],r:f.r,fi}; } }
+    if(o._arc){ let d=Infinity; try{d=distToObjStroke(o,xm,ym);}catch(e){} if(d<=tol){ const c=_arcCenter(o); if(c)cands.push({d,obj:o,edge:null,kind:'arc',center:c,r:o._arc.r}); } }
+    if(o._fillets){ for(let fi=0;fi<o._fillets.length;fi++){ const f=o._fillets[fi]; if(!f||f.cx==null)continue; const dr=Math.abs(Math.hypot(xm-f.cx,ym-f.cy)-f.r); if(dr<=tol)cands.push({d:dr,obj:o,edge:null,kind:'arc',center:[f.cx,f.cy],r:f.r,fi}); } }
   }
-  if(barc)return barc;
-  const e=_pickEdgeAt(xm,ym); if(e)return {d:e.d,obj:e.obj,edge:e.edge,kind:'edge'};
-  return null;
+  const e=_pickEdgeAt(xm,ym); if(e)cands.push({d:e.d,obj:e.obj,edge:e.edge,kind:'edge'});
+  if(cands.length){ cands.sort((a,b)=>a.d-b.d); return cands[0]; }
+  // 3) rien sur un trait : rattrape un clic DANS le ventre d'un cercle (sélection par l'intérieur)
+  let bi=null;
+  for(const o of paintObjects){ if(o._circle||o.type==='ellipse'){ const r=((o.rx||0)+(o.ry||0))/2; const dc=Math.hypot(xm-o.x,ym-o.y); if(dc<r&&(!bi||dc<bi.d))bi={d:dc,obj:o,edge:null,kind:'circle'}; } }
+  return bi;
 }
 // Transforme un pick en objet manipulable par segOf/setSeg (poignée d'arête si besoin)
 function _resolvePickToObj(pick){
@@ -7874,7 +7973,21 @@ function _shpOverlay(){
 let _conPick = null; let _rotActive=null; let _rot2=null; let _setToolFromPick=false; // {type, need, picks:[]} : selection guidee des elements d'une contrainte
 const _CON_LABEL={horiz:'Horizontale',vert:'Verticale',parallel:'Parallèle',perp:'Perpendiculaire',equal:'Égal',concentric:'Concentrique',collinear:'Colinéaire',coincident:'Coïncident',midpoint:'Milieu',tangent:'Tangente',fix:'Fixer',symmetry:'Symétrie'};
 function _conHintShow(t){ let e=document.getElementById('cadHint'); if(!e){ e=document.createElement('div'); e.id='cadHint'; e.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:100001;background:#1f2430;border:1px solid #4a5568;border-radius:9px;padding:8px 16px;font:13px sans-serif;color:#ffd08a;box-shadow:0 4px 14px rgba(0,0,0,.5)'; document.body.appendChild(e);} e.textContent=t; }
-function _conHintHide(){ const e=document.getElementById('cadHint'); if(e)e.remove(); }
+function _conHintHide(){ const e=document.getElementById('cadHint'); if(e)e.remove(); _tangentPanelRemove(); }
+// ── TANGENTE : petite fenêtre pour choisir le mode (1 segment / contour qui roule) ──
+let _tangentMode='contour'; // 'seg' = collé à 1 seul segment | 'contour' = roule le long de toute la ligne
+function _tangentPanelRemove(){ const e=document.getElementById('tanModePanel'); if(e)e.remove(); }
+function _tangentPanel(){ _tangentPanelRemove();
+  const d=document.createElement('div'); d.id='tanModePanel'; d.style.cssText='position:fixed;left:16px;top:165px;z-index:100004;background:#1f2430;border:1px solid #4a5568;border-radius:11px;padding:10px 12px;font:13px sans-serif;color:#e5e9f0;box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:7px;min-width:210px';
+  const t=document.createElement('div'); t.textContent='◡ Tangente — mode'; t.style.cssText='font-weight:800;margin-bottom:2px'; d.appendChild(t);
+  const mk=(txt,active,cb)=>{ const b=document.createElement('button'); b.textContent=txt; b.style.cssText='padding:6px 9px;border-radius:8px;border:1px solid '+(active?'#3b82f6':'#4a5568')+';background:'+(active?'#3b82f6':'#0e1116')+';color:'+(active?'#fff':'#cfd4dc')+';cursor:pointer;font-weight:600;text-align:left'; b.onclick=cb; return b; };
+  d.appendChild(mk('◡ 1 segment', _tangentMode==='seg', ()=>{ _tangentMode='seg'; _tangentPanel(); }));
+  d.appendChild(mk('◠ Contour (roule)', _tangentMode==='contour', ()=>{ _tangentMode='contour'; _tangentPanel(); }));
+  const hint=document.createElement('div'); hint.style.cssText='font-size:11px;color:#8b93a1;line-height:1.35';
+  hint.textContent=(_tangentMode==='contour')?'Le cercle roule le long de toute la ligne (segments reliés).':'Le cercle reste collé à ce seul segment.';
+  d.appendChild(hint);
+  document.body.appendChild(d);
+}
 // ── Affichage des CONTRAINTES : un petit symbole près des éléments concernés ──
 const _CON_SYM={horiz:'—',vert:'|',parallel:'∥',perp:'⟂',equal:'=',concentric:'◎',collinear:'∥',coincident:'⊙',midpoint:'▲',tangent:'○',symmetry:'⋈',fix:'🔒'};
 function _conElemPos(ref){
@@ -7912,8 +8025,10 @@ function drawConstraintSymbols(){
 }
 function cadConstraint(type){
   // TOUJOURS tool-first : on choisit la contrainte PUIS on clique les formes (facon Fusion)
+  _tangentPanelRemove(); // enlève une éventuelle vieille fenêtre de mode
   const need=(type==='horiz'||type==='vert'||type==='fix')?1:(type==='symmetry'?3:2);
   _setToolFromPick=true; setPTool('select'); _setToolFromPick=false; _conPick={type, need, picks:[], pickCon:true}; _cadMode=true;
+  if(type==='tangent') _tangentPanel(); // petite fenêtre : 1 segment / contour (roule)
   _conHintShow('🔧 '+(_CON_LABEL[type]||type)+' — clique '+(need===1?'la forme':'la 1ʳᵉ forme'));
   if(typeof redrawCanvasNow==='function')redrawCanvasNow();
 }
@@ -7944,9 +8059,38 @@ function _conPickClick(xm,ym){
 }
 function _rotateShapeEdgeTo(eh, targetAng){ if(!eh||!eh.__eh||!eh.o)return false; const s=segOf(eh); if(!s)return false; const ang=Math.atan2(s[3]-s[1],s[2]-s[0]); let d=targetAng-ang; d=d-Math.PI*Math.round(d/Math.PI); const bb=getObjBB(eh.o); if(!bb)return false; _rotateObj(eh.o, bb.x+bb.w/2, bb.y+bb.h/2, d); return true; }
 function _isShapeEdge(o){ return o && o.__eh && o.o && o.o.pts && o.o.pts.length>3; }
+// Un « cercle dessiné en petits segments » (boucle fermée ~ronde, plein de points) : on calcule
+// son centre (barycentre) + rayon moyen pour le TRAITER COMME UN CERCLE dans les contraintes.
+function _loopCenterR(pts){ if(!pts||pts.length<8)return null; let P=pts; if(P.length>2&&Math.hypot(P[0][0]-P[P.length-1][0],P[0][1]-P[P.length-1][1])<1e-6)P=P.slice(0,-1); const n=P.length; if(n<8)return null; let cx=0,cy=0; for(const p of P){cx+=p[0];cy+=p[1];} cx/=n;cy/=n; const rs=P.map(p=>Math.hypot(p[0]-cx,p[1]-cy)); const r=rs.reduce((a,b)=>a+b,0)/n; if(r<0.5)return null; const mn=Math.min.apply(null,rs), mx=Math.max.apply(null,rs); if(mn<r*0.45||mx>r*1.9)return null; return {cx,cy,r}; }
+function _looksLikeCircle(o){ if(!o||o.type!=='free'||!o.pts||o._arc)return false; const P=o.pts; if(P.length<8)return false; const lc=_loopCenterR(P); if(!lc)return false; if(Math.hypot(P[0][0]-P[P.length-1][0],P[0][1]-P[P.length-1][1])>lc.r*0.6)return false; // doit se refermer
+  const ang=P.map(p=>Math.atan2(p[1]-lc.cy,p[0]-lc.cx)).sort((a,b)=>a-b); let gap=0; for(let i=1;i<ang.length;i++)gap=Math.max(gap,ang[i]-ang[i-1]); gap=Math.max(gap,(ang[0]+2*Math.PI)-ang[ang.length-1]); if(gap>Math.PI*0.6)return false; // les points doivent entourer le centre (vraie boucle)
+  return true; }
+// RENDRE ROND : transforme une boucle fermée ~ronde (plein de petits segments) en VRAI cercle.
+function cadToTrueCircle(){
+  const ids=(typeof selObjIds!=='undefined'&&selObjIds&&selObjIds.size)?[...selObjIds]:(selObjId!=null?[selObjId]:[]);
+  if(!ids.length){ if(typeof toastHist==='function')toastHist('◯ Sélectionne d\'abord le cercle en segments'); return; }
+  let done=0;
+  for(const id of ids){ const o=getObj(id); if(!o||o.type!=='free'||o._arc)continue; if(!_looksLikeCircle(o))continue; const lc=_loopCenterR(o.pts); if(!lc)continue;
+    const idx=paintObjects.indexOf(o); if(idx<0)continue;
+    const nc={id:o.id, type:'ellipse', _circle:true, x:lc.cx, y:lc.cy, rx:lc.r, ry:lc.r, strokeW:o.strokeW||currentStrokeW};
+    if(o.fill!==undefined)nc.fill=o.fill; if(o.toolId!==undefined)nc.toolId=o.toolId;
+    paintObjects[idx]=nc; done++; }
+  if(done){ if(typeof pushHistory==='function')pushHistory(); if(typeof updateObjCount==='function')updateObjCount(); if(typeof renderInspector==='function')renderInspector(); if(typeof toastHist==='function')toastHist('◯ '+done+' → vrai cercle rond (1 seule poignée au centre)'); }
+  else if(typeof toastHist==='function')toastHist('⚠️ Pas reconnu comme cercle (il faut une boucle fermée à peu près ronde)');
+  if(typeof redrawCanvasNow==='function')redrawCanvasNow();
+}
+// Corps « tangentable » : cercle vrai, arc, OU boucle-cercle. Renvoie {C,r,move(dx,dy)}.
+function _tanBody(o){ if(!o)return null;
+  if(o._arc){ const C=(typeof _arcCenter==='function')?_arcCenter(o):null; if(!C)return null; return {C, r:o._arc.r, move:(dx,dy)=>{ o._arc.p1=[o._arc.p1[0]+dx,o._arc.p1[1]+dy]; o._arc.p2=[o._arc.p2[0]+dx,o._arc.p2[1]+dy]; if(typeof _arcRegen==='function')_arcRegen(o); }}; }
+  if(o._circle||o.type==='ellipse'){ return {C:[o.x,o.y], r:(o.rx||o.ry), move:(dx,dy)=>{ o.x+=dx; o.y+=dy; }}; }
+  if(o.type==='free'&&o.pts&&o.pts.length>=8){ const lc=_loopCenterR(o.pts); if(lc)return {C:[lc.cx,lc.cy], r:lc.r, move:(dx,dy)=>{ o.pts=o.pts.map(p=>[p[0]+dx,p[1]+dy]); }}; }
+  return null; }
 function _applyConstraintNow(type, objs){
   _log('constraint',{ct:type, objs:(objs||[]).slice(0,4).map(_logObjBrief)});
-  const lines=objs.filter(o=>segOf(o)); const circs=objs.filter(o=>o._circle||o.type==='ellipse'||o.__arccenter); const pts=objs.filter(o=>o.type==='point');
+  let lines=objs.filter(o=>segOf(o)); const circs=objs.filter(o=>o._circle||o.type==='ellipse'||o.__arccenter); const pts=objs.filter(o=>o.type==='point');
+  // TANGENTE : un « cercle en petits segments » (boucle fermée ronde) compte comme un CERCLE,
+  // pas comme des arêtes -> on le sort des lignes et on l'ajoute aux cercles (synthétique).
+  if(type==='tangent'){ for(const o of objs){ const base=o&&o.__eh?o.o:o; if(base&&base.type==='free'&&!base._arc&&_looksLikeCircle(base)){ const lc=_loopCenterR(base.pts); if(lc){ lines=lines.filter(L=>((L&&L.__eh?L.o:L)!==base)); if(!circs.some(c=>c._src===base||c===base)) circs.push({__arccenter:true, x:lc.cx, y:lc.cy, rx:lc.r, ry:lc.r, r:lc.r, _src:base}); } } } }
   const T=(m)=>{ if(typeof toastHist==='function')toastHist(m); };
   const setL=(o,s)=>setSeg(o,s), L=(o)=>segOf(o), half=(s)=>Math.hypot(s[2]-s[0],s[3]-s[1])/2, mid=(s)=>[(s[0]+s[2])/2,(s[1]+s[3])/2];
   let ok=true;
@@ -8013,7 +8157,13 @@ function _applyConstraintNow(type, objs){
   else if(type==='concentric'){ if(circs.length>=2)_add('concentric',_rid(circs[0]),_rid(circs[1])); }
   else if(type==='coincident'){ if(lines.length>=2)_add('coincident',_rid(lines[0]),_rid(lines[1])); else if(pts.length>=2)_add('coincident',_rid(pts[0]),_rid(pts[1])); }
   else if(type==='midpoint'){ if(pts.length&&lines.length)_add('midpoint',_rid(pts[0]),_rid(lines[0])); }
-  else if(type==='tangent'){ if(circs.length&&lines.length){ const _ln=lines[0]; const _bref=_ln.__eh?(_ln.o.id+'#'+_ln.i):_ln.id; if(_bref!=null)_add('tangent',_rid(circs[0]),_bref); } }
+  else if(type==='tangent'){ if(circs.length&&lines.length){ const _ln=lines[0]; const _bref=_ln.__eh?(_ln.o.id+'#'+_ln.i):_ln.id; if(_bref!=null){ _add('tangent',_rid(circs[0]),_bref); const _ta=_rid(circs[0]); const _cc=_constraints.find(c=>c.ct==='tangent'&&String(c.a)===String(_ta)&&String(c.b)===String(_bref)); if(_cc)_cc.mode=(typeof _tangentMode!=='undefined'?_tangentMode:'contour'); } } }
+  // RECONCILIER TOUT LE SYSTEME tout de suite (comme un drag le ferait). Sinon, en ajoutant une
+  // 2e tangente (sur un segment non parallele), l'application immediate ci-dessus ne satisfait que
+  // la NOUVELLE contrainte et abandonne la precedente -> le cercle ne tient plus sur les 2.
+  // Le solveur converge vers le conge (fillet) tangent aux 2. anchor=null : seuls les cercles/arcs
+  // bougent pour les tangentes, les lignes restent en place.
+  if(typeof solveSketch==='function' && _constraints.length) solveSketch(null);
   if(typeof pushHistory==='function')pushHistory(); if(typeof redrawCanvasNow==='function')redrawCanvasNow();
   T('✅ Contrainte appliquée (persistante)');
 }
@@ -8044,14 +8194,29 @@ function _applyConstraintStep(c, anchorId){
       let best=null; for(const ea of [[a[0],a[1]],[a[2],a[3]]]) for(const w of [0,1]){ const eb=w?[s[2],s[3]]:[s[0],s[1]]; const d=Math.hypot(ea[0]-eb[0],ea[1]-eb[1]); if(!best||d<best.d)best={d,ea,w}; }
       const ns=s.slice(); if(best.w){ns[2]=best.ea[0];ns[3]=best.ea[1];}else{ns[0]=best.ea[0];ns[1]=best.ea[1];} setL(mov,ns); break; }
     case 'midpoint': { const pt=(A&&A.type==='point')?A:B, ln=(A&&A.type==='point')?B:A; if(!pt||!ln)return; if(_isAnchor(pt,anchorId))return; const s=L(ln); if(!s)return; pt.x=(s[0]+s[2])/2; pt.y=(s[1]+s[3])/2; break; }
-    case 'tangent': { const circ=A; if(!circ)return; let s=null; if(typeof c.b==='string' && String(c.b).indexOf('#')>=0){ s=segOfRef(c.b); } else if(B){ s=L(B); } if(!s)return; const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1; let nx=-ey/Ln,ny=ex/Ln; if(ny<-1e-9||(Math.abs(ny)<=1e-9&&nx<0)){nx=-nx;ny=-ny;}
-      if(circ._arc){ // ARC : on translate le vrai arc pour qu'il RESTE tangent (comme le cercle)
-        const C=(typeof _arcCenter==='function')?_arcCenter(circ):null; if(!C)return; const r=circ._arc.r;
-        const d=(C[0]-s[0])*nx+(C[1]-s[1])*ny, sg=(c.side||(c.side=(d>=0?1:-1))), shift=sg*r-d;
-        circ._arc.p1=[circ._arc.p1[0]+nx*shift, circ._arc.p1[1]+ny*shift];
-        circ._arc.p2=[circ._arc.p2[0]+nx*shift, circ._arc.p2[1]+ny*shift];
-        if(typeof _arcRegen==='function')_arcRegen(circ);
-      } else { const d=(circ.x-s[0])*nx+(circ.y-s[1])*ny,sg=(c.side||(c.side=(d>=0?1:-1))),r=(circ.rx||circ.ry),fx=circ.x-nx*d,fy=circ.y-ny*d; circ.x=fx+nx*sg*r; circ.y=fy+ny*sg*r; }
+    case 'tangent': {
+      // Le « mobile » A peut être un CERCLE vrai, un ARC, ou un CERCLE DESSINÉ EN PETITS SEGMENTS
+      // (boucle fermée ronde). _tanBody donne son centre C, son rayon r, et comment le déplacer.
+      const body=_tanBody(A); if(!body)return; const C=body.C, r=body.r;
+      // Cible : soit UN segment, soit tout un CONTOUR (polyligne à plusieurs segments).
+      let s=null, poly=null;
+      if(typeof c.b==='string' && String(c.b).indexOf('#')>=0){ const _bo=paintObjects.find(x=>String(x.id)===String(c.b).split('#')[0]); if(_bo&&_bo.pts&&_bo.pts.length>2&&!_bo._arc)poly=_bo; s=segOfRef(c.b); }
+      else if(B){ if(B.pts&&B.pts.length>2&&!B._arc)poly=B; s=L(B); }
+      // CONTOUR (polyligne) : la bille ROULE le long du contour. On prend le point du contour le
+      // PLUS PROCHE du centre et on pousse le centre à distance r -> au coin, il enchaîne tout seul
+      // sur le segment suivant au lieu de traverser comme si le coin existait pas.
+      if(poly && c.mode!=='seg'){
+        const pts=poly.pts; let bD=Infinity,bpt=null,bseg=null;
+        for(let i=0;i+1<pts.length;i++){ const ax=pts[i][0],ay=pts[i][1],bx=pts[i+1][0],by=pts[i+1][1]; const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy||1; let t=((C[0]-ax)*dx+(C[1]-ay)*dy)/L2; if(t<0)t=0; else if(t>1)t=1; const fx=ax+t*dx,fy=ay+t*dy,d=Math.hypot(C[0]-fx,C[1]-fy); if(d<bD){bD=d;bpt=[fx,fy];bseg=[ax,ay,bx,by];} }
+        if(bpt){ let nx=C[0]-bpt[0],ny=C[1]-bpt[1],nl=Math.hypot(nx,ny);
+          if(nl<1e-9){ const ex2=bseg[2]-bseg[0],ey2=bseg[3]-bseg[1],Ln2=Math.hypot(ex2,ey2)||1; const sg=(c.side||(c.side=1)); nx=-ey2/Ln2*sg; ny=ex2/Ln2*sg; }
+          else { nx/=nl; ny/=nl; c.side=undefined; }
+          body.move(bpt[0]+nx*r-C[0], bpt[1]+ny*r-C[1]); }
+        break;
+      }
+      if(!s)return; const ex=s[2]-s[0],ey=s[3]-s[1],Ln=Math.hypot(ex,ey)||1; let nx=-ey/Ln,ny=ex/Ln; if(ny<-1e-9||(Math.abs(ny)<=1e-9&&nx<0)){nx=-nx;ny=-ny;}
+      const d=(C[0]-s[0])*nx+(C[1]-s[1])*ny, sg=(c.side||(c.side=(d>=0?1:-1))), shift=sg*r-d;
+      body.move(nx*shift, ny*shift);
       break; }
   }
 }
@@ -9237,6 +9402,23 @@ function pmErase(xm,ym){
           // La gomme ne touche JAMAIS les cotes, points, contraintes, groupes, texte
           // (sinon elle les transforme en grosses barres). Elle n'agit que sur la géométrie.
           if(o.type==='dim'||o.type==='point'||o.type==='constraint'||o.type==='group'||o.type==='text'){continue;}
+          if(o.type==='free'&&o._arc&&o.pts&&o.pts.length>1){
+            // GOMMER UN ARC GARDE UN ARC : centre + rayon connus -> chaque morceau
+            // survivant redevient un vrai arc (poignées de bout + tangentes calculables),
+            // au lieu de dégénérer en polyligne. Le 1er garde le MÊME id => ses tangentes le suivent.
+            const _C=_arcCenter(o), _Rr=o._arc.r;
+            if(_C){
+              const segs=[];let sg=[];
+              for(const [px,py] of o.pts){ if(Math.hypot(px-xm,py-ym)>ER){sg.push([px,py]);} else{ if(sg.length>2)segs.push(sg); sg=[]; } }
+              if(sg.length>2)segs.push(sg);
+              if(segs.length===0){ o.pts=[]; changed=true; }
+              else {
+                o._arc=_segToArc(segs[0],_C,_Rr); _arcRegen(o); _arcFromCircle=o.id; changed=true;
+                for(let s=1;s<segs.length;s++){ const no={id:objCnt++,type:'free',strokeW:o.strokeW,_arc:_segToArc(segs[s],_C,_Rr)}; _arcRegen(no); toAdd.push(no); }
+              }
+              continue;
+            }
+          }
           if(o.type==='free'&&o.pts&&o.pts.length>0){
             // Split free path at erased points
             const segments=[];let seg=[];
