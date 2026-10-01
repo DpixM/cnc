@@ -1878,6 +1878,10 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           </div>
           <input type="range" id="cipScrub" min="0" max="1000" value="0" oninput="cip_ui('scrub')" aria-label="Position dans le programme">
           <div class="cipNum"><span>Vitesse simu</span><input type="range" id="cipSpeed" min="2" max="120" value="25" style="width:150px" aria-label="Vitesse"></div>
+          <div class="cipNum"><span>Aller à (%)</span><input type="number" id="cipGoto" min="0" max="100" step="0.1" value="0" onchange="cip_ui('goto')"></div>
+          <div class="cipRow"><button class="cipBtn" onclick="cip_ui('snap')">📋 Copier ce moment pour Claude</button></div>
+          <div class="cipStat" id="cipSnapMsg"></div>
+          <textarea id="cipSnapTxt" readonly style="display:none;width:100%;height:90px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px;margin-top:4px"></textarea>
           <div class="cipSt" id="cipSteps"></div>
           <div class="cipRow" style="margin-top:8px"><button class="cipBtn" disabled title="Arrive quand le format tube sera analysé">Générer le .LST (bientôt)</button></div>
         </div>
@@ -3274,7 +3278,7 @@ function upd(){const pr=S.profile;let f=frameAt(pos);
     .map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('');
   const al=$('cipAlert');if(cl<0){al.className='cipAl cipBad';al.textContent='Collision tête / tube ou mandrin avec ces cotes de tête.';}else{al.className='cipAl cipOk';al.textContent='Pas de collision détectée.';}
   $('cipHud').innerHTML=S.prog?`<b>${(pos/TOTAL*100).toFixed(0)}%</b> · ${pos.toFixed(0)} / ${TOTAL.toFixed(0)} mm de trajet`:`Mandrin ${S.cfg.chuck==='vertical'?'vertical':'horizontal'} · tube ${profTxt()}`;
-  $('cipScrub').value=TOTAL?pos/TOTAL*1000:0;$('cipPlay').textContent=playing?'Pause':(S.prog&&pos>=TOTAL?'Rejouer':'Lancer');}
+  $('cipScrub').value=TOTAL?pos/TOTAL*1000:0;if(document.activeElement!==$('cipGoto'))$('cipGoto').value=TOTAL?(pos/TOTAL*100).toFixed(1):0;$('cipPlay').textContent=playing?'Pause':(S.prog&&pos>=TOTAL?'Rejouer':'Lancer');}
 function profTxt(){const c=S.cfg;return c.prof==='rond'?`rond Ø${c.d}×${c.ep}`:c.prof==='carre'?`carré ${c.w}×${c.w}×${c.ep}`:c.prof==='rect'?`rectangle ${c.w}×${c.h}×${c.ep}`:`triangle ${c.w}×${c.ep}`;}
 // ---------- formulaire tube ----------
 function syncForm(){const c=S.cfg;['rond','carre','rect','tri'].forEach(k=>$('cipPf_'+k).classList.toggle('cipOn',c.prof===k));
@@ -3344,6 +3348,21 @@ S.api={
     else if(a==='fit'){if(S.part&&S.part.det){S.cfg.prof='rond';S.cfg.d=S.part.det.d;S.cfg.ep=S.part.det.ep;syncForm();rebuildAll(true);}return;}
     else if(a==='step'){const f=$('cipStepFile').files[0];if(f)readStep(f);$('cipStepFile').value='';return;}
     else if(a==='demo'){loadDemo();return;}
+    else if(a==='goto'){if(!TOTAL)return;pos=Math.max(0,Math.min(100,+$('cipGoto').value||0))/100*TOTAL;playing=false;}
+    else if(a==='snap'){playing=false;upd();const f=frameAt(pos);const R=x=>Array.isArray(x)?x.map(R):(typeof x==='number'?+x.toFixed(3):x);
+      let k=0;for(let i=0;i<F.length;i++)if(F[i].s<=pos)k=i;
+      const nb=F.slice(Math.max(0,k-3),k+4).map(q=>({ci:q.ci,j:q.j,s:R(q.s),p:R(q.p),d:R(q.d),th:R(q.th)}));
+      const o={ver:'CIP v3.4',quand:new Date().toISOString(),mandrin:S.cfg.chuck,tube:S.cfg,tete:{len:hp().len,angDeg:R(hp().ang/DEG),gap:hp().gap},
+        piece:S.part?{nom:S.part.name,longueur:R(S.part.len||0),rotation:+$('cipPRot').value,distanceBout:+$('cipPOff').value,retournee:S.flip}:(S.prog?'demo':null),
+        pct:TOTAL?R(pos/TOTAL*100):0,pos:R(pos),total:R(TOTAL),
+        frame:f?{contour:S.prog&&f.ci>=0?S.prog.C[f.ci].name:null,ci:f.ci,j:f.j,rapide:f.rapid,p:R(f.p),d:R(f.d),th:R(f.th)}:null,
+        lecture:$('cipReadout').innerText.replace(/\n/g,' | '),voisins:nb,
+        camera:{th:R(ctl.th),ph:R(ctl.ph),r:R(ctl.r),cible:R([ctl.target.x,ctl.target.y,ctl.target.z])}};
+      const txt='=== CIP MOMENT ===\n'+JSON.stringify(o);const ta=$('cipSnapTxt');ta.value=txt;ta.style.display='';
+      const ok=()=>{$('cipSnapMsg').innerHTML='<span class="cipOk">Copié ! Colle-le dans le chat (Ctrl+V).</span>';};
+      const fb=()=>{ta.focus();ta.select();$('cipSnapMsg').innerHTML='<span class="cipWarn">Sélectionné : fais Ctrl+C puis colle-le dans le chat.</span>';};
+      try{navigator.clipboard.writeText(txt).then(ok,fb);}catch(e){fb();}
+      $('cipGoto').value=TOTAL?(pos/TOTAL*100).toFixed(1):0;return;}
     upd();}
 };
 }
