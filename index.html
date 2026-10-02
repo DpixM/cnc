@@ -1868,6 +1868,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           </div>
           <div class="cipNote" style="margin-top:0">Astuce : attrape la pièce à la souris et fais-la glisser le long du tube.</div>
           <div class="cipNum"><span>Tourner autour du tube (°)</span><span class="cipRow" style="margin:0;gap:4px"><button class="cipBtn" style="padding:3px 8px" onclick="cip_ui('rotstep',-15)">−15</button><input type="number" id="cipPRot" value="0" step="5" style="width:60px" onchange="cip_ui('place')"><button class="cipBtn" style="padding:3px 8px" onclick="cip_ui('rotstep',15)">+15</button></span></div>
+          <div class="cipNum"><span>Piquages (corps qui traverse)</span><select id="cipPiqMode" onchange="cip_ui('piqmode')" style="width:150px"><option value="suit">C1 suit le point (tête au-dessus)</option><option value="para">Parallèle au tube qui passe (C1 et B fixes)</option></select></div>
           <div style="font-size:13px;margin-top:6px">Pièces sur le tube</div>
           <div id="cipInstList"></div>
           <div class="cipRow"><button class="cipBtn" onclick="cip_ui('instadd')">+ Ajouter une pièce</button>
@@ -3206,7 +3207,7 @@ function buildStatic(){statG.clear();const pr=profNow();S.profile=pr;const L=S.c
   const Rc=Math.max(95,pr.rmax+55);S.chuckR=Rc;
   const plate=new THREE.CylinderGeometry(Rc,Rc,60,48);const pm=new THREE.Mesh(plate,mChuck);pm.position.y=-60;statG.add(pm);
   const ring=new THREE.Mesh(new THREE.TorusGeometry(Rc-6,3,10,64),mJaw);ring.rotation.x=Math.PI/2;ring.position.y=-30;statG.add(ring);
-  for(let k=0;k<3;k++){const a=(90+120*k)*DEG;const dx=Math.cos(a),dz=Math.sin(a);let s=0;for(const q of pr.out)s=Math.max(s,q[0]*dx+q[1]*dz);
+  S.jawR=0;for(let k=0;k<3;k++){const a=(90+120*k)*DEG;const dx=Math.cos(a),dz=Math.sin(a);let s=0;for(const q of pr.out)s=Math.max(s,q[0]*dx+q[1]*dz);S.jawR=Math.max(S.jawR,Math.hypot(s+24,10));
     const j=new THREE.Mesh(new THREE.BoxGeometry(24,30,20),mJaw);j.position.set(dx*(s+12),-15,dz*(s+12));j.rotation.y=-a;statG.add(j);}
 }
 // ---------- tête ----------
@@ -3229,7 +3230,8 @@ function clearance(p,d){const h=hp(),pr=S.profile,L=S.cfg.L;const ref=Math.abs(d
     for(let k=0;k<24;k++){const a=k*Math.PI/12;const q=V.add(c,V.add(V.mul(e1,r*Math.cos(a)),V.mul(e2,r*Math.sin(a))));
       let cl;if(q[1]>=-90&&q[1]<=L){const inside=G.inPoly(pr.out,q[0],q[2]);const dd=pr.type==='rond'?Math.abs(Math.hypot(q[0],q[2])-pr.R):G.polyDist(pr.out,q[0],q[2]);cl=inside?-dd:dd;}
       else if(q[1]>L){cl=Math.hypot(Math.max(0,Math.hypot(q[0],q[2])-pr.rmax),q[1]-L);}else cl=1e9;
-      if(q[1]<0&&q[1]>-90){const rr=Math.hypot(q[0],q[2]);if(rr<S.chuckR)cl=Math.min(cl,-Math.min(S.chuckR-rr,-q[1],q[1]+90));}
+      if(q[1]<-30&&q[1]>-90){const rr=Math.hypot(q[0],q[2]);if(rr<S.chuckR)cl=Math.min(cl,-Math.min(S.chuckR-rr,-30-q[1],q[1]+90));}
+      else if(q[1]<0&&q[1]>=-30){const rr=Math.hypot(q[0],q[2]);if(rr<(S.jawR||S.chuckR))cl=Math.min(cl,-Math.min((S.jawR||S.chuckR)-rr,-q[1],q[1]+30));}
       if(cl<m)m=cl;}}
   return m;}
 // ---------- pièce ----------
@@ -3445,9 +3447,12 @@ function buildOps(C0){const pr=S.profile;const notes=[];const inst=instList();
     const tourOf=c=>phiSpan(c.P).span>=350;
     // ordre : trous d'abord, puis les coupes de tour du bout libre (haut) vers le mandrin (bas)
     const loops=[...[det,...holes].filter(c=>!tourOf(c)),...[det,...holes].filter(tourOf).sort((a,b)=>my(b)-my(a))];let k=0;
-    inst.forEach((ins,ii)=>loops.forEach(c=>{const D=c.fixed?c.D:c.P.map((p,i)=>dirFromB(p,merid(p,c.D[i])));const t=T({P:c.P,D},ins);const tour=tourOf(c);
+    const piqFollow=($('cipPiqMode')&&$('cipPiqMode').value)==='suit';let devMax=0;
+    inst.forEach((ins,ii)=>loops.forEach(c=>{const D=(c.fixed&&!(c.piq&&piqFollow))?c.D:c.P.map((p,i)=>dirFromB(p,merid(p,c.D[i])));
+      if(c.piq&&piqFollow)D.forEach((d,i)=>{devMax=Math.max(devMax,Math.acos(Math.min(1,V.dot(d,c.D[i]))));});const t=T({P:c.P,D},ins);const tour=tourOf(c);
       const bb=D.map((d,i)=>merid(c.P[i],d));const varB=Math.max(...bb)-Math.min(...bb)>2*DEG;
       ops.push({name:(tour?'Coupe tour ':(c.piq?'Piquage ':'Trou '))+(++k)+(tour?(varB?' (en biais)':' (droite)'):'')+(inst.length>1?' · pièce '+(ii+1):''),step:tour?(my(c)>=ymin+((ymax-ymin)/2)?1:4):2,P:t.P,D:t.D});}));
+    if(devMax>0.5*DEG)notes.push(`Piquage en « C1 suit » : arête intérieure décalée jusqu'à ${(pr.ep*Math.tan(devMax)).toFixed(1)} mm (faisceau jusqu'à ${(devMax/DEG).toFixed(0)}° du tube qui passe).`);
     notes.push(full||loops.some(tourOf)?'Pièce qui fait tout le tour du tube : chaque extrémité est coupée en un seul passage.':'Pas d\'extrémité droite : chaque contour est coupé en un passage.');
     ops.forEach(o=>{o.mode='continu';o.A=0;});return {ops,notes};}
   // ---- morceaux entre les deux bouts : chacun part du côté MANDRIN (bas) vers le BOUT LIBRE (haut / vide)
@@ -3473,7 +3478,11 @@ function buildOps(C0){const pr=S.profile;const notes=[];const inst=instList();
   for(const L of lev.values()){for(const [a0,a1,isFull] of arcsUnion(L.iv)){const r=isFull?ringArc(L.Y,L.B,sp.start,sp.start+360):ringArc(L.Y,L.B,a0,a1);
     rings[L.kind].push({...r,full:isFull,B:L.B});}}
   rings.top.forEach((r,i)=>ops.push({name:(Math.abs(r.B)>2*DEG?'Biseau':'Bout')+(r.full?' 360°':' (arc)')+(rings.top.length>1?' '+(i+1):''),step:1,P:r.P,D:r.D}));
-  let kh=0;inst.forEach(ins=>holes.forEach(h=>{const t=T(h,ins);ops.push({name:(h.piq?'Piquage ':'Trou ')+(++kh),step:2,P:t.P,D:t.D});}));
+  // piquages : mode « C1 suit le point » (tête toujours au-dessus, B s'incline au mieux)
+  const piqFollow=($('cipPiqMode')&&$('cipPiqMode').value)==='suit';
+  const piqD=h=>{if(!h.piq||!piqFollow)return h.D;let dev=0;const D=h.P.map((p,i)=>{const d2=dirFromB(p,merid(p,h.D[i]));dev=Math.max(dev,Math.acos(Math.min(1,V.dot(d2,h.D[i]))));return d2;});
+    notes.push(`Piquage en « C1 suit » : arête intérieure décalée jusqu'à ${(pr.ep*Math.tan(dev)).toFixed(1)} mm (faisceau jusqu'à ${(dev/DEG).toFixed(0)}° du tube qui passe).`);return D;};
+  let kh=0;inst.forEach(ins=>holes.forEach(h=>{const t=T({P:h.P,D:piqD(h)},ins);ops.push({name:(h.piq?'Piquage ':'Trou ')+(++kh),step:2,P:t.P,D:t.D});}));
   const done=[];let kl=0,kc=0;const axial=c=>{const t=V.nrm(V.sub(c.P[c.P.length-1],c.P[0]));return Math.abs(t[1])>0.999;};
   const phiM=c=>{const m=c.P[c.P.length>>1];return Math.atan2(m[2],m[0])/DEG;};
   const dupOf=c=>done.find(o=>axial(o)&&axial(c)&&Math.abs(((phiM(o)-phiM(c))%360+540)%360-180)<0.3&&Math.min(o.y1,c.P.reduce((m,p)=>Math.max(m,p[1]),-1e9))>Math.max(o.y0,c.P.reduce((m,p)=>Math.min(m,p[1]),1e9)));
@@ -3618,6 +3627,7 @@ S.api={
     else if(a==='prof'){S.cfg.prof=v;syncForm();readForm();rebuildAll(true);return;}
     else if(a==='tube'){readForm();syncForm();rebuildAll(true);return;}
     else if(a==='place'){placeAndShow();computeProgram();return;}
+    else if(a==='piqmode'){computeProgram();return;}
     else if(a==='instadd'){const L=instList().slice();const sp=S.part?360/Math.max(1,L.length+1):120;L.push({a:(L[L.length-1].a||0)+120,dy:0});S.inst=L;S.order=null;placeAndShow();computeProgram();return;}
     else if(a==='instspread'){const n=Math.max(1,Math.round(+$('cipNCopy').value||1));S.inst=Array.from({length:n},(_,k)=>({a:+(360*k/n).toFixed(3),dy:0}));S.order=null;placeAndShow();computeProgram();return;}
     else if(a==='flip'){if(!S.part)return;S.flip=!S.flip;placeAndShow();computeProgram();return;}
