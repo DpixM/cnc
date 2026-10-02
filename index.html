@@ -3079,7 +3079,21 @@ function cip_geo(){
     const innerPts=inner.map(L=>resample(L,0.25));
     const grid=buildGrid(g,Math.max(1.5,prof.ep*2));
     const C=[];let totalBad=0;
-    for(const L of outer){const P=resample(L,step||0.5);const r=beamDirs(g,prof,P,innerPts,grid,opts.noBlend);totalBad+=r.bad;
+    // triangles par sommet (pour trouver ce qui touche chaque contour)
+    const vt=new Map();g.T.forEach((t,i)=>{for(const v of t){(vt.get(v)||vt.set(v,[]).get(v)).push(i);}});
+    const keyOf=p=>p.map(x=>Math.round(x*1000)).join(',');const vIdx=new Map();g.M.forEach((p,i)=>vIdx.set(keyOf(p),i));
+    const Rout=prof.type==='rond'?prof.R:prof.rmax;
+    for(const L of outer){
+      // ---- corps qui TRAVERSE le tube (piquage) : faisceau parallèle à son axe
+      let piq=null;{const tris=new Set();for(const p of L){const vi=vIdx.get(keyOf(p));if(vi===undefined)continue;for(const t of (vt.get(vi)||[]))if(g.cls[t]===0)tris.add(t);}
+        let out=0,M=[[0,0,0],[0,0,0],[0,0,0]],At=0;for(const t of tris){for(const v of g.T[t]){const q=g.M[v];if(surfDist(prof,'out',q[0],q[2])>0.5&&!inPoly(prof.out,q[0],q[2]))out++;}
+          const n=g.NM[t]||V.nrm(V.cross(V.sub(g.M[g.T[t][1]],g.M[g.T[t][0]]),V.sub(g.M[g.T[t][2]],g.M[g.T[t][0]])));const a=1;At+=a;for(let r=0;r<3;r++)for(let c=0;c<3;c++)M[r][c]+=a*n[r]*n[c];}
+        if(tris.size>=6&&out>=3){const e=eigSym3(M);const ord=[0,1,2].sort((a,b)=>e.val[a]-e.val[b]);
+          if(e.val[ord[0]]<0.05*At&&e.val[ord[1]]>0.1*At){let ax=V.nrm(e.vec[ord[0]]);let c=[0,0,0];L.forEach(p=>{c=V.add(c,p);});c=V.mul(c,1/L.length);
+            if(V.dot(ax,inwardN(prof,c))<0)ax=V.mul(ax,-1);if(V.dot(ax,inwardN(prof,c))>0.15)piq=ax;}}}
+      const P=resample(L,step||0.5);
+      if(piq){C.push({P,D:P.map(()=>piq.slice()),mode:'fixe',A:0,len:P.reduce((s,p,i)=>i?s+V.len(V.sub(p,P[i-1])):0,0),spread:0,fixed:true,piq:true});continue;}
+      const r=beamDirs(g,prof,P,innerPts,grid,opts.noBlend);totalBad+=r.bad;
       // direction FIXE si elle convient à tout le contour (ex. trou : faisceau parallèle à l'axe du trou -> C1 fixe, B=0)
       {let sm=[0,0,0];for(const d of r.D)sm=V.add(sm,d);const dm=V.nrm(sm);const tolW=Math.max(0.06,prof.ep*0.05)*1.2;let ok=true;
        for(let i=0;i<P.length&&ok;i++){const p=P[i];const ni=inwardN(prof,p);const c=V.dot(dm,ni);if(c<0.5){ok=false;break;}const len=prof.ep/c;
@@ -3093,7 +3107,7 @@ function cip_geo(){
     C.sort((a,b)=>a.len-b.len);
     C.forEach((c,i)=>{const last=i===C.length-1&&C.length>1;c.step=last?2:1;c.name=last?'Détourage':`Contour ${i+1}`;});
     return {C,totalBad,nLoops:outer.length,nInner:inner.length};}
-  return {V,profile,weld,triInfo,fitAxis,toModel,program,inPoly,polyDist,surfDist,inwardN,resample};
+  return {V,profile,weld,triInfo,fitAxis,toModel,program,inPoly,polyDist,surfDist,inwardN,resample,eigSym3};
 }
 function cip_demo(){ var el=document.getElementById('cipDemoData'); return JSON.parse(el.textContent); }
 function cip_build(){
@@ -3221,7 +3235,9 @@ function clearance(p,d){const h=hp(),pr=S.profile,L=S.cfg.L;const ref=Math.abs(d
 // ---------- pièce ----------
 function partMeshFromTris(pos){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();return new THREE.Mesh(g,mPart);}
 const JAW=10; // marge mini entre la pièce et l'avant des mors (mm)
-function partSpan(){let a=1e9,b=-1e9;for(const p of S.part.base){const y=S.flip?-p[1]:p[1];a=Math.min(a,y);b=Math.max(b,y);}return [a,b];}
+function partSpan(){let a=1e9,b=-1e9;const pr=S.profile;const lo=(pr.type==='rond'?pr.R-pr.ep:0)-0.3,hi=(pr.type==='rond'?pr.R:pr.rmax)+0.3;
+  for(const p of S.part.base){const r=Math.hypot(p[0],p[2]);if(r<lo||r>hi)continue; // le tube seulement (pas les corps qui le traversent)
+    const y=S.flip?-p[1]:p[1];a=Math.min(a,y);b=Math.max(b,y);}if(a>b){for(const p of S.part.base){const y=S.flip?-p[1]:p[1];a=Math.min(a,y);b=Math.max(b,y);}}return [a,b];}
 function placeAndShow(){if(!S.part)return;const P=S.part;const rho=+$('cipPRot').value||0;let off=Math.max(0,+$('cipPOff').value||0);
   const [ymin,ymax]=partSpan();const len=ymax-ymin;
   // la pièce reste TOUJOURS hors des mors : on rallonge le tube si besoin
@@ -3229,8 +3245,13 @@ function placeAndShow(){if(!S.part)return;const P=S.part;const rho=+$('cipPRot')
   const L=S.cfg.L;off=Math.min(off,L-len-JAW);$('cipPOff').value=+off.toFixed(1);
   const dy=(L-off)-ymax;
   P.g.M=P.base.map(p=>{let q=S.flip?[-p[0],-p[1],p[2]]:p;q=rotM(q,rho);return [q[0],q[1]+dy,q[2]];});
-  const pos=new Float32Array(P.g.T.length*9);P.g.T.forEach((t,i)=>{for(let k=0;k<3;k++){const v=P.g.M[t[k]];pos[i*9+k*3]=v[0];pos[i*9+k*3+1]=v[1];pos[i*9+k*3+2]=v[2];}});
-  partG.clear();const m0=partMeshFromTris(pos);instList().forEach((ins,k)=>{const m=k?new THREE.Mesh(m0.geometry,mPart):m0;m.rotation.y=-ins.a*DEG;m.position.y=ins.dy;partG.add(m);});P.len=len;renderInst();}
+  let pos=new Float32Array(P.g.T.length*9);P.g.T.forEach((t,i)=>{for(let k=0;k<3;k++){const v=P.g.M[t[k]];pos[i*9+k*3]=v[0];pos[i*9+k*3+1]=v[1];pos[i*9+k*3+2]=v[2];}});
+  // séparer le tube (à découper) des corps qui le traversent (affichés en rouge transparent)
+  {const pr=S.profile;const outside=v=>{const r=Math.hypot(v[0],v[2]);return pr.type==='rond'?(r>pr.R+0.3||r<pr.R-pr.ep-0.3):(!G.inPoly(pr.out,v[0],v[2])&&G.polyDist(pr.out,v[0],v[2])>0.3)||(G.inPoly(pr.inn,v[0],v[2])&&G.polyDist(pr.inn,v[0],v[2])>0.3);};
+   const A=[],B=[];for(let i=0;i<pos.length;i+=9){const tri=[[pos[i],pos[i+1],pos[i+2]],[pos[i+3],pos[i+4],pos[i+5]],[pos[i+6],pos[i+7],pos[i+8]]];(tri.some(outside)?B:A).push(...pos.slice(i,i+9));}
+   S.part.corps=B.length?new Float32Array(B):null;if(B.length)pos=new Float32Array(A);}
+  partG.clear();const m0=partMeshFromTris(pos);
+  if(S.part.corps){const mc=new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(S.part.corps,3)),new THREE.MeshStandardMaterial({color:0xff5a4e,transparent:true,opacity:0.28,depthWrite:false,side:THREE.DoubleSide}));mc.geometry.computeVertexNormals();partG.add(mc);}instList().forEach((ins,k)=>{const m=k?new THREE.Mesh(m0.geometry,mPart):m0;m.rotation.y=-ins.a*DEG;m.position.y=ins.dy;partG.add(m);});P.len=len;renderInst();}
 function computeProgram(){if(!S.part){S.prog=null;rebuildPaths();return;}
   $('cipPartStat').innerHTML=S.part.info+'<br><span class="cipWarn">Calcul des trajectoires…</span>';
   setTimeout(()=>{try{const g=S.part.g;
@@ -3426,7 +3447,7 @@ function buildOps(C0){const pr=S.profile;const notes=[];const inst=instList();
     const loops=[...[det,...holes].filter(c=>!tourOf(c)),...[det,...holes].filter(tourOf).sort((a,b)=>my(b)-my(a))];let k=0;
     inst.forEach((ins,ii)=>loops.forEach(c=>{const D=c.fixed?c.D:c.P.map((p,i)=>dirFromB(p,merid(p,c.D[i])));const t=T({P:c.P,D},ins);const tour=tourOf(c);
       const bb=D.map((d,i)=>merid(c.P[i],d));const varB=Math.max(...bb)-Math.min(...bb)>2*DEG;
-      ops.push({name:(tour?'Coupe tour ':'Trou ')+(++k)+(tour?(varB?' (en biais)':' (droite)'):'')+(inst.length>1?' · pièce '+(ii+1):''),step:tour?(my(c)>=ymin+((ymax-ymin)/2)?1:4):2,P:t.P,D:t.D});}));
+      ops.push({name:(tour?'Coupe tour ':(c.piq?'Piquage ':'Trou '))+(++k)+(tour?(varB?' (en biais)':' (droite)'):'')+(inst.length>1?' · pièce '+(ii+1):''),step:tour?(my(c)>=ymin+((ymax-ymin)/2)?1:4):2,P:t.P,D:t.D});}));
     notes.push(full||loops.some(tourOf)?'Pièce qui fait tout le tour du tube : chaque extrémité est coupée en un seul passage.':'Pas d\'extrémité droite : chaque contour est coupé en un passage.');
     ops.forEach(o=>{o.mode='continu';o.A=0;});return {ops,notes};}
   // ---- morceaux entre les deux bouts : chacun part du côté MANDRIN (bas) vers le BOUT LIBRE (haut / vide)
@@ -3452,7 +3473,7 @@ function buildOps(C0){const pr=S.profile;const notes=[];const inst=instList();
   for(const L of lev.values()){for(const [a0,a1,isFull] of arcsUnion(L.iv)){const r=isFull?ringArc(L.Y,L.B,sp.start,sp.start+360):ringArc(L.Y,L.B,a0,a1);
     rings[L.kind].push({...r,full:isFull,B:L.B});}}
   rings.top.forEach((r,i)=>ops.push({name:(Math.abs(r.B)>2*DEG?'Biseau':'Bout')+(r.full?' 360°':' (arc)')+(rings.top.length>1?' '+(i+1):''),step:1,P:r.P,D:r.D}));
-  let kh=0;inst.forEach(ins=>holes.forEach(h=>{const t=T(h,ins);ops.push({name:'Trou '+(++kh),step:2,P:t.P,D:t.D});}));
+  let kh=0;inst.forEach(ins=>holes.forEach(h=>{const t=T(h,ins);ops.push({name:(h.piq?'Piquage ':'Trou ')+(++kh),step:2,P:t.P,D:t.D});}));
   const done=[];let kl=0,kc=0;const axial=c=>{const t=V.nrm(V.sub(c.P[c.P.length-1],c.P[0]));return Math.abs(t[1])>0.999;};
   const phiM=c=>{const m=c.P[c.P.length>>1];return Math.atan2(m[2],m[0])/DEG;};
   const dupOf=c=>done.find(o=>axial(o)&&axial(c)&&Math.abs(((phiM(o)-phiM(c))%360+540)%360-180)<0.3&&Math.min(o.y1,c.P.reduce((m,p)=>Math.max(m,p[1]),-1e9))>Math.max(o.y0,c.P.reduce((m,p)=>Math.min(m,p[1]),1e9)));
