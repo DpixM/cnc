@@ -1840,7 +1840,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <h3><i>1</i>Machine</h3>
           <div class="cipRow" style="justify-content:space-between"><span style="font-size:13px">Mandrin : <b id="cipChTxt">—</b></span><button class="cipBtn" onclick="cip_ui('startscreen')">Changer</button></div>
           <div class="cipNum"><span>Tête : longueur du cône (focale, mm)</span><input type="number" id="cipHLen" value="180" min="40" max="400" onchange="cip_ui('head')"></div>
-          <div class="cipNum"><span>Tête : demi-angle du cône (°)</span><input type="number" id="cipHAng" value="20" min="3" max="45" step="0.5" onchange="cip_ui('head')"></div>
+          <div class="cipNum"><span>Tête : demi-angle du cône (°)</span><input type="number" id="cipHAng" value="12" min="3" max="45" step="0.5" onchange="cip_ui('head')"></div>
           <div class="cipNum"><span>Distance buse / tube (mm)</span><input type="number" id="cipHGap" value="1" min="0" max="10" step="0.1" onchange="cip_ui('head')"></div>
         </div>
         <div class="cipBox">
@@ -3211,12 +3211,12 @@ function clearance(p,d){const h=hp(),pr=S.profile,L=S.cfg.L;const ref=Math.abs(d
     for(let k=0;k<24;k++){const a=k*Math.PI/12;const q=V.add(c,V.add(V.mul(e1,r*Math.cos(a)),V.mul(e2,r*Math.sin(a))));
       let cl;if(q[1]>=-90&&q[1]<=L){const inside=G.inPoly(pr.out,q[0],q[2]);const dd=pr.type==='rond'?Math.abs(Math.hypot(q[0],q[2])-pr.R):G.polyDist(pr.out,q[0],q[2]);cl=inside?-dd:dd;}
       else if(q[1]>L){cl=Math.hypot(Math.max(0,Math.hypot(q[0],q[2])-pr.rmax),q[1]-L);}else cl=1e9;
-      if(q[1]<0&&q[1]>-90&&Math.hypot(q[0],q[2])<S.chuckR)cl=Math.min(cl,q[1]);
+      if(q[1]<0&&q[1]>-90){const rr=Math.hypot(q[0],q[2]);if(rr<S.chuckR)cl=Math.min(cl,-Math.min(S.chuckR-rr,-q[1],q[1]+90));}
       if(cl<m)m=cl;}}
   return m;}
 // ---------- pièce ----------
 function partMeshFromTris(pos){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.computeVertexNormals();return new THREE.Mesh(g,mPart);}
-const JAW=3; // marge mini entre la pièce et l'avant des mors (mm)
+const JAW=10; // marge mini entre la pièce et l'avant des mors (mm)
 function partSpan(){let a=1e9,b=-1e9;for(const p of S.part.base){const y=S.flip?-p[1]:p[1];a=Math.min(a,y);b=Math.max(b,y);}return [a,b];}
 function placeAndShow(){if(!S.part)return;const P=S.part;const rho=+$('cipPRot').value||0;let off=Math.max(0,+$('cipPOff').value||0);
   const [ymin,ymax]=partSpan();const len=ymax-ymin;
@@ -3432,7 +3432,7 @@ function parseLST(text){const lines=text.replace(/\r/g,'').split('\n');let inT=f
     const v={};let m;re.lastIndex=0;const body=U.replace(/^(CIP|G0?[01])\s*/,'');while((m=re.exec(body))){const k=m[1].toUpperCase();const x=evalNum(m[2]);if(!isNaN(x))v[k]=x;}
     if(!('X' in v||'Y' in v||'Z' in v||'B' in v||'C1' in v))continue;
     const e={X:v.X??st.X,Y:v.Y??st.Y,Z:v.Z??st.Z,B:v.B??st.B,C:v.C1??st.C};
-    moves.push({t:isCIP?'CIP':'G01',s:{...st},e,m:isCIP?{X:v.I1??0,Y:v.J1??0,Z:v.K1??0}:null,laser});Object.assign(st,e);}
+    moves.push({t:isCIP?'CIP':'G01',s:moves.length?{...st}:{...e},e,m:isCIP?{X:v.I1??0,Y:v.J1??0,Z:v.K1??0}:null,laser});Object.assign(st,e);}
   return {trafo,moves};}
 function loadLST(text,name){const r=parseLST(text);if(!r.moves.length){$('cipPartStat').innerHTML='<span class="cipBad">Aucun mouvement TRAORI (G01/CIP) trouvé dans ce fichier.</span>';return;}
   S.cfg.chuck=r.trafo==='Bc1'?'horizontal':'vertical';
