@@ -1868,7 +1868,10 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           </div>
           <div class="cipNote" style="margin-top:0">Astuce : attrape la pièce à la souris et fais-la glisser le long du tube.</div>
           <div class="cipNum"><span>Tourner autour du tube (°)</span><span class="cipRow" style="margin:0;gap:4px"><button class="cipBtn" style="padding:3px 8px" onclick="cip_ui('rotstep',-15)">−15</button><input type="number" id="cipPRot" value="0" step="5" style="width:60px" onchange="cip_ui('place')"><button class="cipBtn" style="padding:3px 8px" onclick="cip_ui('rotstep',15)">+15</button></span></div>
-          <div class="cipNum"><span>Pièces autour du tube</span><input type="number" id="cipNCopy" value="1" min="1" max="12" step="1" onchange="cip_ui('ncopy')"></div>
+          <div style="font-size:13px;margin-top:6px">Pièces sur le tube</div>
+          <div id="cipInstList"></div>
+          <div class="cipRow"><button class="cipBtn" onclick="cip_ui('instadd')">+ Ajouter une pièce</button>
+            <span style="font-size:12px;color:var(--txt2)">ou répartir</span><input type="number" id="cipNCopy" value="3" min="1" max="12" step="1" style="width:46px;font:13px var(--mono);padding:3px 5px;background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px"><button class="cipBtn" onclick="cip_ui('instspread')">autour</button></div>
           <div class="cipNum"><span>Distance au bout du tube (mm)</span><input type="number" id="cipPOff" value="20" step="1" onchange="cip_ui('place')"></div>
           <div class="cipRow"><button class="cipBtn" onclick="cip_ui('flip')">Retourner la pièce</button><button class="cipBtn" id="cipFitBtn" onclick="cip_ui('fit')" disabled>Adapter le tube à la pièce</button></div>
           <div class="cipStat" id="cipPartStat">Aucune pièce. Importe ton STEP : le tube et l'axe sont détectés tout seuls.</div>
@@ -3227,8 +3230,7 @@ function placeAndShow(){if(!S.part)return;const P=S.part;const rho=+$('cipPRot')
   const dy=(L-off)-ymax;
   P.g.M=P.base.map(p=>{let q=S.flip?[-p[0],-p[1],p[2]]:p;q=rotM(q,rho);return [q[0],q[1]+dy,q[2]];});
   const pos=new Float32Array(P.g.T.length*9);P.g.T.forEach((t,i)=>{for(let k=0;k<3;k++){const v=P.g.M[t[k]];pos[i*9+k*3]=v[0];pos[i*9+k*3+1]=v[1];pos[i*9+k*3+2]=v[2];}});
-  partG.clear();const m0=partMeshFromTris(pos);partG.add(m0);const nc=Math.max(1,Math.round(+$('cipNCopy').value||1));
-  for(let k=1;k<nc;k++){const m=new THREE.Mesh(m0.geometry,mPart);m.rotation.y=-(360*k/nc)*DEG;partG.add(m);}P.len=len;}
+  partG.clear();const m0=partMeshFromTris(pos);instList().forEach((ins,k)=>{const m=k?new THREE.Mesh(m0.geometry,mPart):m0;m.rotation.y=-ins.a*DEG;m.position.y=ins.dy;partG.add(m);});P.len=len;renderInst();}
 function computeProgram(){if(!S.part){S.prog=null;rebuildPaths();return;}
   $('cipPartStat').innerHTML=S.part.info+'<br><span class="cipWarn">Calcul des trajectoires…</span>';
   setTimeout(()=>{try{const g=S.part.g;
@@ -3236,10 +3238,10 @@ function computeProgram(){if(!S.part){S.prog=null;rebuildPaths();return;}
     g.NM=[];g.CM=[];const r=G.program(g,S.profile,0.5,{noBlend:true});
     let extra=(S.part.len?'<br>Longueur pièce : '+S.part.len.toFixed(1)+' mm':'')+(S.part.note?'<br><span class="cipWarn">'+S.part.note+'</span>':'');S.part.note='';
     if(r.error){S.prog=null;$('cipPartStat').innerHTML=S.part.info+extra+'<br><span class="cipBad">'+r.error+'</span>';}
-    else{const bo=buildOps(r.C,+$('cipNCopy').value||1);let C=bo.ops;
+    else{const bo=buildOps(r.C);let C=bo.ops;
       // ordre choisi par l'utilisateur (si mêmes opérations)
       if(S.order&&S.order.length===C.length&&S.order.every(nm=>C.some(c=>c.name===nm)))C=S.order.map(nm=>C.find(c=>c.name===nm));
-      S.prog={C,steps:{1:['Biseau / bout 360°',''],2:['Trous',''],3:['Lamelles et coins',''],4:['Séparation 360°','']}};
+      S.prog={C,steps:{1:['Biseau / bout',''],2:['Trous',''],3:['Lamelles et coins',''],4:['Séparation','']}};
       if(bo.notes.length)extra+='<br><span class="cipWarn">'+bo.notes.join('<br>')+'</span>';
       $('cipPartStat').innerHTML=S.part.info+extra+'<br><span class="cipOk">'+C.length+' contour(s) trouvés.</span>'+(r.totalBad?' <span class="cipWarn">'+r.totalBad+' point(s) sans orientation sûre (repli sur la normale).</span>':'');}
     rebuildPaths();}catch(e){console.error('[CIP] programme',e);$('cipPartStat').innerHTML=S.part.info+'<br><span class="cipBad">Erreur de calcul : '+e.message+'</span>';}},30);}
@@ -3352,7 +3354,7 @@ function readStep(file){const st=$('cipPartStat');st.innerHTML='<span class="cip
 function loadMeshes(meshes,name){const g=G.weld(meshes);G.triInfo(g);const f=G.fitAxis(g);G.toModel(g,f);
   // centrer la pièce le long de son axe à partir de 0
   const base=g.M.map(p=>p.slice());
-  S.part={g,base,fit:f,name,info:''};S.flip=false;S.order=null;
+  S.part={g,base,fit:f,name,info:''};S.flip=false;S.order=null;S.inst=[{a:0,dy:0}];
   let info=`<b>${name}</b> · ${g.T.length} triangles<br>`;
   if(f.round&&f.rOut>0){const snap=x=>{const s=Math.round(x*20)/20;return Math.abs(s-x)<0.03?s:+x.toFixed(2);};const d=snap(2*f.rOut),e=snap(f.rOut-f.rIn);info+=`Tube détecté : rond Ø${d} × ${e} (appliqué au tube)`;S.part.det={d,ep:e};}
   else info+='Profil non rond : choisis le profil et ses cotes à la main.';
@@ -3397,58 +3399,85 @@ function splitStraight(P,D){ // morceaux droits (>=3 mm) / courbes
     if(L>=3){if(cur){out.push(cur);cur=null;}out.push({kind:'droit',P:P.slice(i,j+1),D:D.slice(i,j+1)});i=j;}
     else{if(!cur)cur={kind:'courbe',P:[P[i]],D:[D[i]]};cur.P.push(P[i+1]);cur.D.push(D[i+1]);i=i+1;}}
   if(cur)out.push(cur);return out.filter(s=>s.P.length>1);}
-function buildOps(C0,nCopy){const pr=S.profile;const notes=[];
+function instList(){const L=S.inst&&S.inst.length?S.inst:[{a:0,dy:0}];return L;}
+function arcsUnion(iv){ // intervalles [a,b] en degrés (b>a), union circulaire
+  const n=iv.map(([a,b])=>{a=((a%360)+360)%360;return [a,a+(b-a)];}).sort((x,y)=>x[0]-y[0]);const out=[];
+  for(const [a,b] of n){if(out.length&&a<=out[out.length-1][1]+1e-6)out[out.length-1][1]=Math.max(out[out.length-1][1],b);else out.push([a,b]);}
+  if(out.length>1&&out[out.length-1][1]>=out[0][0]+360-1e-6){const l=out.pop();out[0]=[l[0],Math.max(l[1],out[0][1]+360)];}
+  return out.map(([a,b])=>b-a>=359.5?[a,a+360,true]:[a,b,false]);}
+function ringArc(Yc,B,a0,a1){const pr=S.profile;if(pr.type!=='rond'){return ringOp(Yc,B,a0);}
+  const R=pr.R;const n=Math.max(2,Math.ceil((a1-a0)*DEG*R/0.5));const P=[];for(let k=0;k<=n;k++){const a=(a0+(a1-a0)*k/n)*DEG;P.push([R*Math.cos(a),Yc,R*Math.sin(a)]);}return {P,D:P.map(p=>dirFromB(p,B))};}
+function buildOps(C0){const pr=S.profile;const notes=[];const inst=instList();
   let det=null;C0.forEach(c=>{if(!det||c.len>det.len)det=c;});const holes=C0.filter(c=>c!==det);
   const P=det.P.slice(),Draw=det.D.slice();if(V.len(V.sub(P[0],P[P.length-1]))<0.3){P.pop();Draw.pop();}
   const N=P.length;let ymax=-1e9,ymin=1e9;P.forEach(p=>{ymax=Math.max(ymax,p[1]);ymin=Math.min(ymin,p[1]);});
   const Bm=P.map((p,i)=>merid(p,Draw[i]));
   const ringOf=(sel)=>{const idx=[];P.forEach((p,i)=>{if(sel(p))idx.push(i);});if(idx.length*0.5<5)return null;const bs=idx.map(i=>Bm[i]).sort((a,b)=>a-b);return {idx:new Set(idx),B:bs[bs.length>>1]};};
-  const top=ringOf(p=>p[1]>ymax-0.05),bot=ringOf(p=>p[1]<ymin+0.05);
-  if(top)top.Y=ymax;if(bot)bot.Y=ymin;
-  // copies autour du tube
-  const sp=phiSpan(P);let n=Math.max(1,Math.round(nCopy||1));if(n>1&&sp.span>360/n+0.5){notes.push(`La pièce couvre ${sp.span.toFixed(0)}° : impossible d'en mettre ${n} autour du tube (max ${Math.floor(360/sp.span)}).`);n=Math.max(1,Math.floor(360/sp.span));}
-  const ringStart=sp.span<359?sp.start+sp.span+(360/n-sp.span)/2:0;
-  // morceaux du contour hors anneaux
+  const top=ringOf(p=>p[1]>ymax-0.05),bot=ringOf(p=>p[1]<ymin+0.05);if(top)top.Y=ymax;if(bot)bot.Y=ymin;
+  const sp=phiSpan(P);const full=sp.span>=350;
+  // trous radiaux : faisceau pile dans l'axe
+  holes.forEach(h=>{if(!h.fixed)return;let c=[0,0,0];h.P.forEach(p=>{c=V.add(c,p);});c=V.mul(c,1/h.P.length);const nr=nIn(onSurf(c));if(Math.acos(Math.min(1,V.dot(h.D[0],nr)))<0.6*DEG)h.D=h.P.map(()=>nr.slice());});
+  const T=(c,ins)=>({P:c.P.map(p=>{const q=rotM(p,ins.a);return [q[0],q[1]+ins.dy,q[2]];}),D:c.D.map(d=>rotM(d,ins.a))});
+  const ops=[];
+  if((!top&&!bot)||full){ // pièce sans bouts droits (ex. tube coudé) : chaque boucle = une coupe
+    const my=c=>c.P.reduce((m,p)=>m+p[1],0)/c.P.length;
+    const tourOf=c=>phiSpan(c.P).span>=350;
+    // ordre : trous d'abord, puis les coupes de tour du bout libre (haut) vers le mandrin (bas)
+    const loops=[...[det,...holes].filter(c=>!tourOf(c)),...[det,...holes].filter(tourOf).sort((a,b)=>my(b)-my(a))];let k=0;
+    inst.forEach((ins,ii)=>loops.forEach(c=>{const D=c.fixed?c.D:c.P.map((p,i)=>dirFromB(p,merid(p,c.D[i])));const t=T({P:c.P,D},ins);const tour=tourOf(c);
+      const bb=D.map((d,i)=>merid(c.P[i],d));const varB=Math.max(...bb)-Math.min(...bb)>2*DEG;
+      ops.push({name:(tour?'Coupe tour ':'Trou ')+(++k)+(tour?(varB?' (en biais)':' (droite)'):'')+(inst.length>1?' · pièce '+(ii+1):''),step:tour?(my(c)>=ymin+((ymax-ymin)/2)?1:4):2,P:t.P,D:t.D});}));
+    notes.push(full||loops.some(tourOf)?'Pièce qui fait tout le tour du tube : chaque extrémité est coupée en un seul passage.':'Pas d\'extrémité droite : chaque contour est coupé en un passage.');
+    ops.forEach(o=>{o.mode='continu';o.A=0;});return {ops,notes};}
+  // ---- morceaux entre les deux bouts : chacun part du côté MANDRIN (bas) vers le BOUT LIBRE (haut / vide)
   const inRing=i=>(top&&top.idx.has(i))||(bot&&bot.idx.has(i));const ringAt=i=>top&&top.idx.has(i)?top:(bot&&bot.idx.has(i)?bot:null);
   let s0=0;for(let i=0;i<N;i++)if(inRing(i)){s0=i;break;}
   const runs=[];let cur=null;for(let k=0;k<=N;k++){const i=(s0+k)%N;if(inRing(i)||k===N){if(cur){cur.after=ringAt(i);runs.push(cur);cur=null;}}else{if(!cur)cur={idx:[],before:ringAt((i-1+N)%N)};cur.idx.push(i);}}
-  if(!top&&!bot)runs.length=0;
-  const pieces=[];
-  for(const r of runs){let Ps=r.idx.map(i=>P[i]);let Bs=medianB(r.idx.map(i=>Bm[i]),2).map(b=>Math.abs(b)<1.5*DEG?0:b);
-    // prolonger dans la saignée de l'anneau (jusque sous le biseau)
-    const ext=(pts,ring,atStart)=>{if(!ring||pts.length<2)return pts;const a=atStart?pts[1]:pts[pts.length-2],b=atStart?pts[0]:pts[pts.length-1];const t=V.nrm(V.sub(b,a));
-      const L=Math.abs(pr.ep*Math.tan(ring.B))+0.5;const add=[];for(let s=0.5;s<=L+1e-6;s+=0.5)add.push(onSurf(V.add(b,V.mul(t,s))));return atStart?add.reverse().concat(pts):pts.concat(add);};
-    const n0=Ps.length;Ps=ext(Ps,r.before,true);const pre=Ps.length-n0;Ps=ext(Ps,r.after,false);
-    while(Bs.length<Ps.length-0){if(Bs.length<pre+n0)Bs.unshift(Bs[0]);else Bs.push(Bs[Bs.length-1]);}
+  const edges=[];
+  for(const r of runs){let idx=r.idx.slice(),before=r.before,after=r.after;
+    if(before===top&&after!==top){idx.reverse();[before,after]=[after,before];} // toujours : bas -> haut
+    let Ps=idx.map(i=>P[i]);let Bs=medianB(idx.map(i=>Bm[i]),2).map(b=>Math.abs(b)<1.5*DEG?0:b);
+    // prolonger dans le vide, sous le biseau (bout libre)
+    if(after&&Ps.length>1){const a=Ps[Ps.length-2],b=Ps[Ps.length-1];const t=V.nrm(V.sub(b,a));const L=Math.abs(pr.ep*Math.tan(after.B))+0.5;for(let s=0.5;s<=L+1e-6;s+=0.5){Ps.push(onSurf(V.add(b,V.mul(t,s))));Bs.push(Bs[Bs.length-1]);}}
     const Ds=Ps.map((p,i)=>dirFromB(p,Bs[i]));
-    for(const pc of splitStraight(Ps,Ds)){
-      // B constant par morceau : droit = médiane ; courbe quasi droite (< 3°) = médiane aussi
-      const bb=pc.P.map((p,i)=>merid(p,pc.D[i])).sort((a,b)=>a-b);const med=bb[bb.length>>1];
-      if(pc.kind==='droit'||(Math.abs(med)<2*DEG&&bb[bb.length-1]-bb[0]<6*DEG)){const B0=Math.abs(med)<1.5*DEG?0:med;pc.D=pc.P.map(p=>dirFromB(p,B0));}
-      pieces.push(pc);}}
-  // assemblage avec copies + suppression des doublons (bords communs)
-  const ops=[];const rotC=(c,a)=>({P:c.P.map(p=>rotM(p,a)),D:c.D.map(d=>rotM(d,a))});
-  const same=(A,B)=>{const e=(p,q)=>V.len(V.sub(p,q))<0.05;return (e(A[0],B[0])&&e(A[A.length-1],B[B.length-1]))||(e(A[0],B[B.length-1])&&e(A[A.length-1],B[0]));};
-  if(top)ops.push({name:Math.abs(top.B)>2*DEG?'Biseau 360°':'Bout 360°',step:1,...ringOp(top.Y,top.B,ringStart)});
-  holes.forEach(h=>{if(!h.fixed)return;let c=[0,0,0];h.P.forEach(p=>{c=V.add(c,p);});c=V.mul(c,1/h.P.length);const nr=nIn(onSurf(c));
-    if(Math.acos(Math.min(1,V.dot(h.D[0],nr)))<0.6*DEG)h.D=h.P.map(()=>nr.slice());}); // trou radial : faisceau pile dans l'axe
-  let kh=0;for(let k=0;k<n;k++)holes.forEach(h=>{const c=rotC(h,360*k/n);ops.push({name:'Trou '+(++kh),step:2,P:c.P,D:c.D,fixed:h.fixed});});
-  const lam=[],coins=[];
-  const axial=c=>{const t=V.nrm(V.sub(c.P[c.P.length-1],c.P[0]));return Math.abs(t[1])>0.999;};
+    const pcs=splitStraight(Ps,Ds);
+    pcs.forEach(pc=>{const bb=pc.P.map((p,i)=>merid(p,pc.D[i])).sort((a,b)=>a-b);const med=bb[bb.length>>1];
+      if(pc.kind==='droit'||(Math.abs(med)<2*DEG&&bb[bb.length-1]-bb[0]<6*DEG)){const B0=Math.abs(med)<1.5*DEG?0:med;pc.D=pc.P.map(p=>dirFromB(p,B0));}});
+    edges.push(pcs);}
+  // ---- assemblage par pièce posée sur le tube
+  const lev=new Map();const addLev=(Y,B,a0,a1,kind)=>{const k=kind+':'+Y.toFixed(2);if(!lev.has(k))lev.set(k,{Y,B,kind,iv:[]});lev.get(k).iv.push([a0,a1]);};
+  const over=0.5/((pr.R||pr.rmax)*DEG); // dépassement 0,5 mm dans les saignées voisines
+  inst.forEach(ins=>{if(top)addLev(top.Y+ins.dy,top.B,sp.start+ins.a-over,sp.start+ins.a+sp.span+over,'top');if(bot)addLev(bot.Y+ins.dy,bot.B,sp.start+ins.a-over,sp.start+ins.a+sp.span+over,'bot');});
+  const rings={top:[],bot:[]};
+  for(const L of lev.values()){for(const [a0,a1,isFull] of arcsUnion(L.iv)){const r=isFull?ringArc(L.Y,L.B,sp.start,sp.start+360):ringArc(L.Y,L.B,a0,a1);
+    rings[L.kind].push({...r,full:isFull,B:L.B});}}
+  rings.top.forEach((r,i)=>ops.push({name:(Math.abs(r.B)>2*DEG?'Biseau':'Bout')+(r.full?' 360°':' (arc)')+(rings.top.length>1?' '+(i+1):''),step:1,P:r.P,D:r.D}));
+  let kh=0;inst.forEach(ins=>holes.forEach(h=>{const t=T(h,ins);ops.push({name:'Trou '+(++kh),step:2,P:t.P,D:t.D});}));
+  const done=[];let kl=0,kc=0;const axial=c=>{const t=V.nrm(V.sub(c.P[c.P.length-1],c.P[0]));return Math.abs(t[1])>0.999;};
   const phiM=c=>{const m=c.P[c.P.length>>1];return Math.atan2(m[2],m[0])/DEG;};
-  for(let k=0;k<n;k++)pieces.forEach(pc=>{const c=rotC(pc,360*k/n);
-    if(pc.kind==='droit'&&axial(c)){ // bord le long du tube : fusion si même angle
-      const o=lam.find(o=>axial(o)&&Math.abs(((phiM(o)-phiM(c))%360+540)%360-180)<0.3);
-      if(o){const ys=[...o.P,...c.P].map(p=>p[1]);const y0=Math.min(...ys),y1=Math.max(...ys);const up=o.P[o.P.length-1][1]>o.P[0][1];const ref=o.P[0];const B0=merid(ref,o.D[0]);
-        const n2=Math.max(2,Math.ceil((y1-y0)/0.5)+1);o.P=[];for(let i=0;i<n2;i++){const y=up?y0+(y1-y0)*i/(n2-1):y1-(y1-y0)*i/(n2-1);o.P.push([ref[0],y,ref[2]]);}o.D=o.P.map(p=>dirFromB(p,B0));return;}
-      lam.push(c);return;}
-    const list=pc.kind==='droit'?lam:coins;if(!list.some(o=>same(o.P,c.P)))list.push(c);});
-  lam.forEach((c,i)=>ops.push({name:'Lamelle '+(i+1),step:3,P:c.P,D:c.D}));coins.forEach((c,i)=>ops.push({name:'Coin '+(i+1),step:3,P:c.P,D:c.D}));
-  if(bot)ops.push({name:'Séparation 360°',step:4,...ringOp(bot.Y,bot.B,ringStart)});
-  if(!top&&!bot){notes.push('Pas d\'extrémité droite détectée : détourage en un seul morceau.');ops.push({name:'Détourage',step:3,P:det.P,D:det.P.map((p,i)=>dirFromB(p,merid(p,det.D[i])))});}
-  ops.forEach(o=>{o.mode='continu';o.A=0;});
-  return {ops,notes,n};}
+  const dupOf=c=>done.find(o=>axial(o)&&axial(c)&&Math.abs(((phiM(o)-phiM(c))%360+540)%360-180)<0.3&&Math.min(o.y1,c.P.reduce((m,p)=>Math.max(m,p[1]),-1e9))>Math.max(o.y0,c.P.reduce((m,p)=>Math.min(m,p[1]),1e9)));
+  inst.forEach(ins=>edges.forEach(pcs=>{const tp=pcs.map(pc=>({kind:pc.kind,...T(pc,ins)}));
+    const straight=tp.filter(x=>x.kind==='droit');const isDup=straight.length&&straight.every(x=>dupOf(x));
+    if(isDup){ // bord déjà coupé par la pièce voisine : on ne coupe que l'arrondi
+      tp.filter(x=>x.kind!=='droit').forEach(x=>ops.push({name:'Coin '+(++kc),step:3,P:x.P,D:x.D}));return;}
+    const P2=[],D2=[];tp.forEach((x,j)=>{const st=j&&P2.length&&V.len(V.sub(P2[P2.length-1],x.P[0]))<1e-6?1:0;P2.push(...x.P.slice(st));D2.push(...x.D.slice(st));});
+    straight.forEach(x=>{const ys=x.P.map(p=>p[1]);done.push({...x,y0:Math.min(...ys),y1:Math.max(...ys)});});
+    ops.push({name:'Lamelle '+(++kl),step:3,P:P2,D:D2});}));
+  rings.bot.forEach((r,i)=>ops.push({name:'Séparation'+(r.full?' 360°':' (arc)')+(rings.bot.length>1?' '+(i+1):''),step:4,P:r.P,D:r.D}));
+  // chevauchement entre pièces ?
+  for(let i=0;i<inst.length;i++)for(let j=i+1;j<inst.length;j++){const A=inst[i],B=inst[j];const dyOk=Math.abs(A.dy-B.dy)<(ymax-ymin);const da=Math.abs(((A.a-B.a)%360+540)%360-180);if(dyOk&&da<sp.span-0.5)notes.push(`Attention : les pièces ${i+1} et ${j+1} se chevauchent.`);}
+  ops.forEach(o=>{o.mode='continu';o.A=0;});return {ops,notes};}
 
+
+function renderInst(){const box=$('cipInstList');if(!box)return;const L=instList();box.innerHTML='';
+  L.forEach((ins,k)=>{const row=document.createElement('div');row.className='cipNum';row.style.gap='4px';
+    row.innerHTML=`<span style="min-width:58px">Pièce ${k+1}</span><span style="font-size:11px;color:var(--txt2)">angle°</span>`;
+    const ia=document.createElement('input');ia.type='number';ia.step='5';ia.value=ins.a;ia.style.width='60px';ia.onchange=()=>{S.inst=instList().slice();S.inst[k]={...S.inst[k],a:+ia.value||0};S.order=null;placeAndShow();computeProgram();};
+    const lb=document.createElement('span');lb.style.cssText='font-size:11px;color:var(--txt2)';lb.textContent='décal. mm';
+    const id=document.createElement('input');id.type='number';id.step='1';id.value=ins.dy;id.style.width='56px';id.onchange=()=>{S.inst=instList().slice();S.inst[k]={...S.inst[k],dy:+id.value||0};S.order=null;placeAndShow();computeProgram();};
+    row.append(ia,lb,id);
+    if(k>0){const x=document.createElement('button');x.className='cipBtn';x.style.padding='2px 7px';x.textContent='×';x.title='Retirer cette pièce';x.onclick=()=>{S.inst=instList().filter((_,j)=>j!==k);S.order=null;placeAndShow();computeProgram();};row.append(x);}
+    box.appendChild(row);});}
 // ---------- CIP : conventions déduites des programmes de Seb ----------
 // BA1 (mandrin à 90°, tube couché) : axe du tube = X, tête au-dessus (+Z). machine = RotX(+C1)·pièce.
 // Bc1 (mandrin à plat, tube debout) : axe du tube = Z, tête côté X−.       machine = RotZ(−C1)·pièce.
@@ -3568,7 +3597,8 @@ S.api={
     else if(a==='prof'){S.cfg.prof=v;syncForm();readForm();rebuildAll(true);return;}
     else if(a==='tube'){readForm();syncForm();rebuildAll(true);return;}
     else if(a==='place'){placeAndShow();computeProgram();return;}
-    else if(a==='ncopy'){S.order=null;placeAndShow();computeProgram();return;}
+    else if(a==='instadd'){const L=instList().slice();const sp=S.part?360/Math.max(1,L.length+1):120;L.push({a:(L[L.length-1].a||0)+120,dy:0});S.inst=L;S.order=null;placeAndShow();computeProgram();return;}
+    else if(a==='instspread'){const n=Math.max(1,Math.round(+$('cipNCopy').value||1));S.inst=Array.from({length:n},(_,k)=>({a:+(360*k/n).toFixed(3),dy:0}));S.order=null;placeAndShow();computeProgram();return;}
     else if(a==='flip'){if(!S.part)return;S.flip=!S.flip;placeAndShow();computeProgram();return;}
     else if(a==='fit'){if(S.part&&S.part.det){S.cfg.prof='rond';S.cfg.d=S.part.det.d;S.cfg.ep=S.part.det.ep;syncForm();rebuildAll(true);}return;}
     else if(a==='step'){const f=$('cipStepFile').files[0];if(f)readStep(f);$('cipStepFile').value='';return;}
