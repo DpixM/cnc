@@ -1886,7 +1886,13 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <div class="cipStat" id="cipSnapMsg"></div>
           <textarea id="cipSnapTxt" readonly style="display:none;width:100%;height:90px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px;margin-top:4px"></textarea>
           <div class="cipSt" id="cipSteps"></div>
-          <div class="cipRow" style="margin-top:8px"><button class="cipBtn" disabled title="Arrive quand le format tube sera analysé">Générer le .LST (bientôt)</button></div>
+          <div class="cipNum" style="margin-top:8px"><span>Mandrin 90° : bout libre du tube vers</span><select id="cipXDir" onchange="cip_ui('xdir')"><option value="-X">X−</option><option value="+X">X+</option></select></div>
+          <div class="cipRow"><button class="cipBtn cipMain" onclick="cip_ui('gencip')">Générer le bloc CIP</button>
+            <button class="cipBtn" onclick="document.getElementById('cipLstFile').click()">Ouvrir un .LST (voir)</button>
+            <input type="file" id="cipLstFile" class="cipFile" accept=".lst,.LST,.txt,.mpf,.MPF" onchange="cip_ui('lst')"></div>
+          <div class="cipStat" id="cipGenMsg"></div>
+          <div class="cipRow" id="cipGenBtns" style="display:none"><button class="cipBtn" onclick="cip_ui('copycip')">Copier</button><button class="cipBtn" onclick="cip_ui('dlcip')">Télécharger (.txt)</button></div>
+          <textarea id="cipGenTxt" readonly spellcheck="false" style="display:none;width:100%;height:160px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px;margin-top:4px;white-space:pre"></textarea>
         </div>
         <div class="cipBox">
           <h3>Position</h3>
@@ -3070,6 +3076,11 @@ function cip_geo(){
     const grid=buildGrid(g,Math.max(1.5,prof.ep*2));
     const C=[];let totalBad=0;
     for(const L of outer){const P=resample(L,step||0.5);const r=beamDirs(g,prof,P,innerPts,grid);totalBad+=r.bad;
+      // direction FIXE si elle convient à tout le contour (ex. trou : faisceau parallèle à l'axe du trou -> C1 fixe, B=0)
+      {let sm=[0,0,0];for(const d of r.D)sm=V.add(sm,d);const dm=V.nrm(sm);const tolW=Math.max(0.06,prof.ep*0.05)*1.2;let ok=true;
+       for(let i=0;i<P.length&&ok;i++){const p=P[i];const ni=inwardN(prof,p);const c=V.dot(dm,ni);if(c<0.5){ok=false;break;}const len=prof.ep/c;
+         for(const t of [0.2,0.5,0.8]){if(wallDist(g,grid,V.add(p,V.mul(dm,len*t)))>tolW){ok=false;break;}}}
+       if(ok)r.D=P.map(()=>dm.slice());}
       const phis=P.map(p=>Math.atan2(p[2],p[0])*180/Math.PI);let sx=0,sz=0;for(const p of P){const l=Math.hypot(p[0],p[2])||1;sx+=p[0]/l;sz+=p[2]/l;}
       const mean=Math.atan2(sz,sx)*180/Math.PI;let spread=0;for(const f of phis){let d=Math.abs(((f-mean)%360+540)%360-180);spread=Math.max(spread,d);}
       let len=0;for(let i=1;i<P.length;i++)len+=V.len(V.sub(P[i],P[i-1]));
@@ -3080,8 +3091,6 @@ function cip_geo(){
     return {C,totalBad,nLoops:outer.length,nInner:inner.length};}
   return {V,profile,weld,triInfo,fitAxis,toModel,program,inPoly,polyDist,surfDist};
 }
-
-
 function cip_demo(){ var el=document.getElementById('cipDemoData'); return JSON.parse(el.textContent); }
 function cip_build(){
 const G=cip_geo(),V=G.V;
@@ -3240,12 +3249,13 @@ function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;pla
   // timeline
   let s=0;const push=(p,d,th,ci,j)=>{if(F.length){const q=F[F.length-1].p;s+=V.len(V.sub(p,q))*(j<0?0.3:1);}F.push({p,d,th,ci,j,s});};
   const Rs=S.profile.rmax+60;
-  C.forEach((c,ci)=>{if(ci>0)rapid(F[F.length-1],c,ci,push,Rs);c.s0=null;c.P.forEach((p,j)=>{push(p,c.D[j],c.TH[j],ci,j);if(c.s0===null)c.s0=s;});c.s1=s;});
+  if(S.prog.frames){F=S.prog.frames.slice();s=F.length?F[F.length-1].s:0;}
+  else C.forEach((c,ci)=>{if(ci>0)rapid(F[F.length-1],c,ci,push,Rs);c.s0=null;c.P.forEach((p,j)=>{push(p,c.D[j],c.TH[j],ci,j);if(c.s0===null)c.s0=s;});c.s1=s;});
   TOTAL=s;
   // CINÉMATIQUE RÉELLE : la tête ne penche que dans le plan (axe du tube, vertical).
   // Le mandrin doit donc tourner pour que le faisceau n'ait AUCUNE composante avant/arrière :
   // A = atan2(-dx,-dz)  (faisceau ramené dans le plan vertical qui contient l'axe du tube)
-  let prevTh=null;F.forEach(fr=>{let t=Math.atan2(-fr.d[0],-fr.d[2])/DEG;if(prevTh!==null){while(t-prevTh>180)t-=360;while(t-prevTh<-180)t+=360;}fr.th=t;prevTh=t;});
+  let prevTh=null;if(!S.prog.frames)F.forEach(fr=>{let t=Math.atan2(-fr.d[0],-fr.d[2])/DEG;if(prevTh!==null){while(t-prevTh>180)t-=360;while(t-prevTh<-180)t+=360;}fr.th=t;prevTh=t;});
   // lignes
   C.forEach((c,ci)=>{const col=new THREE.Color(COL[(c.step-1)%4]);
     const pts=c.P.map(p=>{const r=Math.hypot(p[0],p[2])||1;const f=(r+0.15)/r;return new THREE.Vector3(p[0]*f,p[1],p[2]*f);});
@@ -3302,9 +3312,10 @@ function upd(){const pr=S.profile;let f=frameAt(pos);
   beam.visible=beamOut.visible=!f.rapid&&!!S.prog;
   const tilt=Math.atan2(dr[1],-dr[2])/DEG;const side=Math.abs(dr[0]);
   const cl=clearance(f.p,f.d);const A=((th%360)+540)%360-180;
+  const lq=toLst(f.p,f.d,th,lstOpt());
   const name=S.prog&&f.ci>=0?(f.rapid?'déplacement rapide':S.prog.C[f.ci].name):'tête au repos (0°)';
   $('cipReadout').innerHTML=[['Contour',name],['X (travers)',fmt(pr2[0])],['Y (le long du tube)',fmt(pr2[1])],['Z (vers la tête)',fmt(pr2[2])],
-    ['Mandrin (rotation)',fmt(A,1)+'°'],['Tête (inclinaison G/D)',fmt(tilt,1)+'°'+(side>0.02?' ⚠':'')],['Garde tête mini',cl>900?'—':cl.toFixed(1)+' mm'],['Paroi opposée',S.prog?hitTxt:'—']]
+    ['C1 (mandrin)',fmt(lq.C,1)+'°'],['B (tête)',fmt(lq.B,1)+'°'+(side>0.02?' ⚠':'')],['Garde tête mini',cl>900?'—':cl.toFixed(1)+' mm'],['Paroi opposée',S.prog?hitTxt:'—']]
     .map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('');
   const al=$('cipAlert');if(cl<0){al.className='cipAl cipBad';al.textContent='Collision tête / tube ou mandrin avec ces cotes de tête.';}else{al.className='cipAl cipOk';al.textContent='Pas de collision détectée.';}
   $('cipHud').innerHTML=S.prog?`<b>${(pos/TOTAL*100).toFixed(0)}%</b> · ${pos.toFixed(0)} / ${TOTAL.toFixed(0)} mm de trajet`:`Mandrin ${S.cfg.chuck==='vertical'?'vertical':'horizontal'} · tube ${profTxt()}`;
@@ -3355,8 +3366,108 @@ function loop(t){if(!visible()){S.looping=false;playing=false;return;}const dt=M
   if(playing&&TOTAL){pos+= +$('cipSpeed').value*dt;if(pos>=TOTAL){pos=TOTAL;playing=false;}upd();}
   stepAnim(t);ctl.update();renderer.render(scene,cam);renderCube();requestAnimationFrame(loop);}
 syncForm();buildHead();buildStatic();setMapping();rebuildPaths();
+// ---------- CIP : conventions déduites des programmes de Seb ----------
+// BA1 (mandrin à 90°, tube couché) : axe du tube = X, tête au-dessus (+Z). machine = RotX(+C1)·pièce.
+// Bc1 (mandrin à plat, tube debout) : axe du tube = Z, tête côté X−.       machine = RotZ(−C1)·pièce.
+// B : faisceau (repère machine) = (−sinB, 0, −cosB). B=0 vertical, B=−90 horizontal vers +X.
+// Avec TRAORI(1), X Y Z I1 J1 K1 sont dans le repère PIÈCE (qui tourne avec C1).
+function lstOpt(){return {trafo:S.cfg.chuck==='vertical'?'BA1':'Bc1',xdir:($('cipXDir')&&$('cipXDir').value)||'-X',L:S.cfg.L};}
+function toLst(p,d,th,o){const dr=rotM(d,th);const L=o.L;let X,Y,Z,B,C;
+  if(o.trafo==='BA1'){if(o.xdir==='-X'){X=L-p[1];Y=p[0];Z=p[2];C=th;B=Math.atan2(dr[1],-dr[2])/DEG;}else{X=p[1]-L;Y=-p[0];Z=p[2];C=-th;B=-Math.atan2(dr[1],-dr[2])/DEG;}}
+  else{X=-p[2];Y=-p[0];Z=p[1]-L;C=th;B=Math.atan2(dr[2],-dr[1])/DEG;}
+  return {X,Y,Z,B,C};}
+function fromLst(q,o){ // inverse : renvoie p (modèle, non tourné), d (modèle), th
+  let p,th,dr;const sb=Math.sin(q.B*DEG),cb=Math.cos(q.B*DEG);const L=o.L;
+  if(o.trafo==='BA1'){if(o.xdir==='-X'){p=[q.Y,L-q.X,q.Z];th=q.C;dr=[0,sb,-cb];}else{p=[-q.Y,q.X+L,q.Z];th=-q.C;dr=[0,-sb,-cb];}}
+  else{p=[-q.Y,q.Z+L,-q.X];th=q.C;dr=[0,-cb,sb];}
+  return {p,d:rotM(dr,-th),th};}
+const n3=v=>(Math.abs(v)<5e-4?0:v).toFixed(3);
+// cercle par 3 points (3D)
+function circ3(a,b,c){const ab=V.sub(b,a),ac=V.sub(c,a);const n=V.cross(ab,ac);const nn=V.dot(n,n);if(nn<1e-12)return null;
+  const t1=V.mul(V.cross(n,ab),V.dot(ac,ac)),t2=V.mul(V.cross(ac,n),V.dot(ab,ab));const ctr=V.add(a,V.mul(V.add(t1,t2),1/(2*nn)));
+  return {c:ctr,n:V.nrm(n),r:V.len(V.sub(a,ctr))};}
+function arcParam(ci,a,p){const u=V.nrm(V.sub(a,ci.c)),w=V.cross(ci.n,u);const q=V.sub(p,ci.c);let ang=Math.atan2(V.dot(q,w),V.dot(q,u));if(ang<0)ang+=2*Math.PI;return ang;}
+// découpe d'un contour en blocs CIP / G01 (tolérance 0,01 mm, orientation 0,3°)
+function fitBlocks(Q){const tol=0.01,atol=0.3,blocks=[];let i=0;const n=Q.length;
+  const pt=k=>[Q[k].X,Q[k].Y,Q[k].Z];
+  const oriOK=(i,j,cum)=>{for(let k=i+1;k<j;k++){const t=(cum[k]-cum[i])/((cum[j]-cum[i])||1);if(Math.abs(Q[i].B+(Q[j].B-Q[i].B)*t-Q[k].B)>atol||Math.abs(Q[i].C+(Q[j].C-Q[i].C)*t-Q[k].C)>atol)return false;}return true;};
+  const cum=[0];for(let k=1;k<n;k++)cum.push(cum[k-1]+V.len(V.sub(pt(k),pt(k-1))));
+  const lineOK=(i,j)=>{const a=pt(i),b=pt(j),ab=V.sub(b,a),L=V.len(ab);if(L<1e-9)return true;for(let k=i+1;k<j;k++){const ap=V.sub(pt(k),a);const t=V.dot(ap,ab)/(L*L);if(t<0||t>1)return false;if(V.len(V.cross(ap,ab))/L>tol)return false;}return oriOK(i,j,cum);};
+  const arcOK=(i,j)=>{const m=(i+j)>>1;const ci=circ3(pt(i),pt(m),pt(j));if(!ci||ci.r>5000)return null;const a=pt(i);const end=arcParam(ci,a,pt(j));if(end>Math.PI*0.95)return null;let prev=0;
+    for(let k=i+1;k<j;k++){const p=pt(k);const dpl=Math.abs(V.dot(V.sub(p,ci.c),ci.n));const dr=Math.abs(V.len(V.sub(p,ci.c))-ci.r);if(dpl>tol||dr>tol)return null;const t=arcParam(ci,a,p);if(t<prev-1e-6||t>end+1e-6)return null;prev=t;}
+    return oriOK(i,j,cum)?m:null;};
+  while(i<n-1){let jl=i+1;while(jl+1<n&&lineOK(i,jl+1))jl++;let ja=-1,ma=-1;
+    for(let j=i+2;j<n&&j<i+600;j++){const m=arcOK(i,j);if(m===null){if(j>i+4)break;else continue;}ja=j;ma=m;}
+    if(ja>jl){blocks.push({t:'CIP',m:Q[ma],e:Q[ja]});i=ja;}else{blocks.push({t:'G01',e:Q[jl]});i=jl;}}
+  return blocks;}
+function lineOf(b){const e=b.e;const tail=`X = ${n3(e.X)} Y = ${n3(e.Y)} Z = ${n3(e.Z)} B = ${n3(e.B)} C1 = ${n3(e.C)}`;
+  return b.t==='CIP'?` CIP I1 = ${n3(b.m.X)} J1 = ${n3(b.m.Y)} K1 = ${n3(b.m.Z)} ${tail}`:` G01 ${tail}`;}
+function genCIP(){if(!S.prog||!F.length)return null;const o=lstOpt();const C=S.prog.C;const out=[];let nCIP=0,nG=0;
+  out.push(';=== BLOC CIP genere par l\'onglet CIP Trumpf (CNC 3018) ===');
+  out.push(`;TC_SET_TRAFO("${o.trafo}") / TRAORI(1) attendus avant ce bloc`);
+  out.push(o.trafo==='BA1'?`;Origine piece : bout libre du tube, sur l'axe. Bout libre vers ${o.xdir}.`:';Origine piece : bout libre (haut) du tube, sur l\'axe.');
+  out.push(';Coordonnees X Y Z I1 J1 K1 = repere PIECE (TRAORI). B = inclinaison tete. C1 = mandrin.');
+  // regrouper les frames par contour
+  for(let ci=0;ci<C.length;ci++){const fr=F.filter(f=>f.ci===ci);const rap=fr.filter(f=>f.j<0),cut=fr.filter(f=>f.j>=0);
+    out.push('');out.push(`;----- ${ci===0?'APPROCHE':'DEGAGEMENT + DEPLACEMENT'} vers contour ${ci+1} -----`);
+    if(ci===0){const f0=cut[0];const a=V.sub(f0.p,V.mul(f0.d,30));const q=toLst(a,f0.d,f0.th,o);out.push(` G01 X = ${n3(q.X)} Y = ${n3(q.Y)} Z = ${n3(q.Z)} B = ${n3(q.B)} C1 = ${n3(q.C)}`);nG++;}
+    else rap.forEach((f,k)=>{if(k%3&&k!==rap.length-1)return;const q=toLst(f.p,f.d,f.th,o);out.push(` G01 X = ${n3(q.X)} Y = ${n3(q.Y)} Z = ${n3(q.Z)} B = ${n3(q.B)} C1 = ${n3(q.C)}`);nG++;});
+    out.push(`;----- CONTOUR ${ci+1} : ${C[ci].name.normalize('NFD').replace(/[̀-ͯ]/g,'')} -----`);
+    out.push(';>>> LASER ON ici (post-processeur)');
+    const Q=cut.map(f=>toLst(f.p,f.d,f.th,o));
+    for(const b of fitBlocks(Q)){out.push(lineOf(b));if(b.t==='CIP')nCIP++;else nG++;}
+    out.push(';>>> LASER OFF ici (post-processeur)');}
+  const fl=F[F.length-1];const r=V.sub(fl.p,V.mul(fl.d,30));const q=toLst(r,fl.d,fl.th,o);
+  out.push('');out.push(';----- DEGAGEMENT FINAL -----');out.push(` G01 X = ${n3(q.X)} Y = ${n3(q.Y)} Z = ${n3(q.Z)} B = ${n3(q.B)} C1 = ${n3(q.C)}`);
+  return {txt:out.join('\r\n')+'\r\n',nCIP,nG:nG+1};}
+// ---------- lecture d'un .LST (pour le voir dans la simu) ----------
+function evalNum(s){s=s.replace(/\s+/g,'');if(!/^[-+]?[\d.]+([-+*/][\d.]+)*$/.test(s))return NaN;try{return Function('"use strict";return ('+s+')')();}catch(e){return NaN;}}
+function parseLST(text){const lines=text.replace(/\r/g,'').split('\n');let inT=false,trafo=null,laser=false;const st={X:0,Y:0,Z:0,B:0,C:0};const moves=[];
+  const re=/(?<![A-Za-z0-9_])(C1|I1|J1|K1|X|Y|Z|B)\s*=?\s*([-+]?\s*[\d.]+(?:\s*[-+*/]\s*[\d.]+)*)/gi;
+  for(let raw of lines){let l=raw.split(';')[0].trim();if(!l)continue;const U=l.toUpperCase().replace(/^N\d+\s*/,'');
+    const tf=U.match(/TC_SET_TRAFO\(\s*"([^"]+)"/);if(tf){trafo=tf[1].toUpperCase()==='BA1'?'BA1':'Bc1';continue;}
+    if(/TRAORI/.test(U)){inT=true;continue;}if(/TRAFOOF/.test(U)){inT=false;continue;}
+    if(/TC_(LASER|WELD)_ON/.test(U)){laser=true;continue;}if(/TC_(LASER|WELD)_OFF/.test(U)){laser=false;continue;}
+    if(!inT)continue;const isCIP=/^CIP\b/.test(U);if(!isCIP&&!/^G0?[01]\b/.test(U)&&!/^[XYZBC]/.test(U))continue;
+    const v={};let m;re.lastIndex=0;const body=U.replace(/^(CIP|G0?[01])\s*/,'');while((m=re.exec(body))){const k=m[1].toUpperCase();const x=evalNum(m[2]);if(!isNaN(x))v[k]=x;}
+    if(!('X' in v||'Y' in v||'Z' in v||'B' in v||'C1' in v))continue;
+    const e={X:v.X??st.X,Y:v.Y??st.Y,Z:v.Z??st.Z,B:v.B??st.B,C:v.C1??st.C};
+    moves.push({t:isCIP?'CIP':'G01',s:{...st},e,m:isCIP?{X:v.I1??0,Y:v.J1??0,Z:v.K1??0}:null,laser});Object.assign(st,e);}
+  return {trafo,moves};}
+function loadLST(text,name){const r=parseLST(text);if(!r.moves.length){$('cipPartStat').innerHTML='<span class="cipBad">Aucun mouvement TRAORI (G01/CIP) trouvé dans ce fichier.</span>';return;}
+  S.cfg.chuck=r.trafo==='Bc1'?'horizontal':'vertical';
+  // échantillonner chaque bloc
+  const pts=[];for(const mv of r.moves){const a=mv.s,e=mv.e;let N=1,ci=null;
+    if(mv.t==='CIP'){ci=circ3([a.X,a.Y,a.Z],[mv.m.X,mv.m.Y,mv.m.Z],[e.X,e.Y,e.Z]);N=24;}
+    else{N=Math.max(1,Math.ceil(Math.hypot(e.X-a.X,e.Y-a.Y,e.Z-a.Z)/2));}
+    for(let k=1;k<=N;k++){const t=k/N;let X,Y,Z;
+      if(ci){const A=[a.X,a.Y,a.Z];const end=arcParam(ci,A,[e.X,e.Y,e.Z]);const u=V.nrm(V.sub(A,ci.c)),w=V.cross(ci.n,u);const ang=end*t;const P=V.add(ci.c,V.add(V.mul(u,ci.r*Math.cos(ang)),V.mul(w,ci.r*Math.sin(ang))));X=P[0];Y=P[1];Z=P[2];}
+      else{X=a.X+(e.X-a.X)*t;Y=a.Y+(e.Y-a.Y)*t;Z=a.Z+(e.Z-a.Z)*t;}
+      pts.push({X,Y,Z,B:a.B+(e.B-a.B)*t,C:a.C+(e.C-a.C)*t,laser:mv.laser});}}
+  // placer sur le tube : rayon médian -> Ø, et décalage le long de l'axe
+  const ax=r.trafo==='Bc1'?'Z':'X';const rad=pts.map(q=>r.trafo==='Bc1'?Math.hypot(q.X,q.Y):Math.hypot(q.Y,q.Z)).filter(x=>x>1).sort((a,b)=>a-b);
+  const R=rad.length?rad[rad.length>>1]:20;S.cfg.prof='rond';S.cfg.d=+(2*R).toFixed(1);S.cfg.ep=Math.max(0.5,+(R*0.08).toFixed(1));
+  let amin=1e9,amax=-1e9;for(const q of pts){amin=Math.min(amin,q[ax]);amax=Math.max(amax,q[ax]);}
+  S.cfg.L=Math.ceil(Math.max(S.cfg.L,amax-amin+40));const L=S.cfg.L;
+  const o={trafo:r.trafo,xdir:$('cipXDir').value,L};
+  // translation pour que tout soit sur le tube (10 mm du bout)
+  const sh=(r.trafo==='BA1'&&o.xdir==='-X')?(10-amin):(-10-amax);
+  pts.forEach(q=>{q[ax]+=sh;});
+  syncForm();S.part=null;partG.clear();$('cipFitBtn').disabled=true;buildStatic();setMapping();
+  // frames : laser ON = contours, le reste = déplacements
+  const C=[];const Fr=[];let cur=null,s=0,prev=null;
+  for(const q of pts){const f=fromLst(q,o);if(prev)s+=V.len(V.sub(f.p,prev))*(q.laser?1:0.3);prev=f.p;
+    if(q.laser){if(!cur){cur={name:'Trajet '+(C.length+1),step:1,P:[],D:[],mode:'fixe',A:0};C.push(cur);cur.s0=s;}cur.P.push(f.p);cur.D.push(f.d);Fr.push({p:f.p,d:f.d,th:f.th,ci:C.length-1,j:cur.P.length-1,s});cur.s1=s;}
+    else{cur=null;Fr.push({p:f.p,d:f.d,th:f.th,ci:Math.max(0,C.length),j:-1,s});}}
+  if(!C.length){$('cipPartStat').innerHTML='<span class="cipBad">Pas de laser/soudure allumé dans la zone TRAORI.</span>';return;}
+  Fr.forEach(f=>{if(f.ci>=C.length)f.ci=C.length-1;});
+  S.prog={C,frames:Fr,steps:{1:['Programme lu : '+name,'Rejoué tel quel depuis le fichier (B et C1 du fichier).']}};
+  $('cipPartStat').innerHTML=`<b>${name}</b> · ${r.moves.length} lignes de mouvement · TRAFO ${r.trafo}<br>Tube estimé : Ø${S.cfg.d} (rayon des points)`;
+  rebuildPaths();}
+
 S.api={
   frames(){return F;}, // pour les tests
+  gen(){return genCIP();},fit(Q){return fitBlocks(Q);},Q(ci){return F.filter(f=>f.ci===ci&&f.j>=0).map(f=>toLst(f.p,f.d,f.th,lstOpt()));},parse(t){return parseLST(t);},load(t,n){loadLST(t,n);},o(){return lstOpt();},tl(p,d,th){return toLst(p,d,th,lstOpt());},fl(q){return fromLst(q,lstOpt());}, // pour les tests
   cam(th,ph,r){ctl.th=th;ctl.ph=ph;if(r)ctl.r=r;}, // pour les tests
   goto(v){pos=v*TOTAL;playing=false;upd();}, // pour les tests
   start(){$('cipStart').style.display='';$('cipWork').style.display='none';},
@@ -3378,6 +3489,12 @@ S.api={
     else if(a==='fit'){if(S.part&&S.part.det){S.cfg.prof='rond';S.cfg.d=S.part.det.d;S.cfg.ep=S.part.det.ep;syncForm();rebuildAll(true);}return;}
     else if(a==='step'){const f=$('cipStepFile').files[0];if(f)readStep(f);$('cipStepFile').value='';return;}
     else if(a==='demo'){loadDemo();return;}
+    else if(a==='gencip'){const g=genCIP();if(!g){$('cipGenMsg').innerHTML='<span class="cipBad">Pas de programme : importe un STEP ou charge la démo.</span>';return;}
+      S.lastCIP=g.txt;const ta=$('cipGenTxt');ta.value=g.txt;ta.style.display='';$('cipGenMsg').innerHTML=`<span class="cipOk">${g.nCIP} lignes CIP + ${g.nG} lignes G01.</span> Copie ou télécharge-le pour ton post-processeur.`;$('cipGenBtns').style.display='';return;}
+    else if(a==='copycip'){const ta=$('cipGenTxt');const ok=()=>{$('cipGenMsg').innerHTML='<span class="cipOk">Copié !</span>';};try{navigator.clipboard.writeText(ta.value).then(ok,()=>{ta.focus();ta.select();});}catch(e){ta.focus();ta.select();}return;}
+    else if(a==='dlcip'){const nm=((S.part&&S.part.name)||'demo').replace(/\.[^.]*$/,'').replace(/[^A-Za-z0-9_-]+/g,'_').toUpperCase();const blob=new Blob([S.lastCIP||''],{type:'text/plain'});const u=URL.createObjectURL(blob);const lk=document.createElement('a');lk.href=u;lk.download='CIP_'+nm+'.txt';document.body.appendChild(lk);lk.click();lk.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);return;}
+    else if(a==='lst'){const f=$('cipLstFile').files[0];if(f)f.arrayBuffer().then(b=>{const txt=new TextDecoder('latin1').decode(b);loadLST(txt,f.name);});$('cipLstFile').value='';return;}
+    else if(a==='xdir'){if(S.prog&&!S.prog.frames)rebuildPaths();upd();return;}
     else if(a==='home'){flyTo(0.62,1.05,1.05);return;}
     else if(a==='goto'){if(!TOTAL)return;pos=Math.max(0,Math.min(100,+$('cipGoto').value||0))/100*TOTAL;playing=false;}
     else if(a==='snap'){playing=false;upd();const f=frameAt(pos);const R=x=>Array.isArray(x)?x.map(R):(typeof x==='number'?+x.toFixed(3):x);
