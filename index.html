@@ -3296,18 +3296,22 @@ function placeAndShow(){if(!S.part)return;const P=S.part;const rho=+$('cipPRot')
   if(S.part.corps){const mc=new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(S.part.corps,3)),new THREE.MeshStandardMaterial({color:0xff5a4e,transparent:true,opacity:0.28,depthWrite:false,side:THREE.DoubleSide}));mc.geometry.computeVertexNormals();partG.add(mc);}instList().forEach((ins,k)=>{const m=k?new THREE.Mesh(m0.geometry,mPart):m0;m.rotation.y=-ins.a*DEG;m.position.y=ins.dy;partG.add(m);});P.len=len;renderInst();}
 function computeProgram(){if(!S.part){S.prog=null;rebuildPaths();return;}
   $('cipPartStat').innerHTML=S.part.info+'<br><span class="cipWarn">Calcul des trajectoires…</span>';
-  setTimeout(()=>{try{const g=S.part.g;
+  clearTimeout(S.cpT);S.cpT=setTimeout(()=>{try{const g=S.part.g;
     // recalcul des infos triangles en coordonnées modèle
-    g.NM=[];g.CM=[];const r=G.program(g,S.profile,0.5,{noBlend:true});
+    const T0=performance.now();let r;
+    // la géométrie (le plus long) n'est recalculée que si la pièce ou le tube ont changé
+    if(S.geoC&&S.geoC.M===g.M&&S.geoC.pr===S.profile){r=structuredClone(S.geoC.r);}
+    else{g.NM=[];g.CM=[];r=G.program(g,S.profile,0.5,{noBlend:true});S.geoC={M:g.M,pr:S.profile,r:structuredClone(r)};}
+    const T1=performance.now();
     let extra=(S.part.len?'<br>Longueur pièce : '+S.part.len.toFixed(1)+' mm':'')+(S.part.note?'<br><span class="cipWarn">'+S.part.note+'</span>':'');S.part.note='';
     if(r.error){S.prog=null;$('cipPartStat').innerHTML=S.part.info+extra+'<br><span class="cipBad">'+r.error+'</span>';}
-    else{const isWeld=$('cipProc').value==='soudure';if(!isWeld)S.bodies=[];const bo=isWeld?weldOps(r.C):buildOps(r.C);let C=bo.ops;if(!isWeld)C.forEach(o=>applyStart(o));
+    else{const isWeld=$('cipProc').value==='soudure';if(!isWeld)S.bodies=[];const bo=isWeld?weldOps(r.C):buildOps(r.C);let C=bo.ops;if(!isWeld)C.forEach(o=>applyStart(o));S.tm={geo:T1-T0,ops:performance.now()-T1};
       // ordre choisi par l'utilisateur (si mêmes opérations)
       if(S.order&&S.order.length===C.length&&S.order.every(nm=>C.some(c=>c.name===nm)))C=S.order.map(nm=>C.find(c=>c.name===nm));
       S.prog={C,steps:isWeld?{2:['Soudure','']}:{1:['Biseau / bout',''],2:['Trous',''],3:['Lamelles et coins',''],4:['Séparation','']}};
       if(bo.notes.length)extra+='<br><span class="cipWarn">'+bo.notes.join('<br>')+'</span>';
       $('cipPartStat').innerHTML=S.part.info+extra+'<br><span class="cipOk">'+C.length+' contour(s) trouvés.</span>'+(r.totalBad?' <span class="cipWarn">'+r.totalBad+' point(s) sans orientation sûre (repli sur la normale).</span>':'');}
-    rebuildPaths();}catch(e){console.error('[CIP] programme',e);$('cipPartStat').innerHTML=S.part.info+'<br><span class="cipBad">Erreur de calcul : '+e.message+'</span>';}},30);}
+    {const T2=performance.now();rebuildPaths();if(S.tm)S.tm.paths=performance.now()-T2;}}catch(e){console.error('[CIP] programme',e);$('cipPartStat').innerHTML=S.part.info+'<br><span class="cipBad">Erreur de calcul : '+e.message+'</span>';}},30);}
 // ---------- trajectoires + timeline ----------
 let F=[],TOTAL=0,lines=[],bwPts=null,pos=0,playing=false,last=performance.now(),ctBtns=[];let codeL=[],codeEl=[],codeCur=-1;let pickM=null;const CARD_TXT=['0° côté mandrin','90° flanc','180° côté bout','270° flanc'];
 function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;playing=false;ctBtns=[];const box=$('cipSteps');box.innerHTML='';
@@ -3751,6 +3755,7 @@ function loadLST(text,name){const r=parseLST(text);if(!r.moves.length){$('cipPar
 
 S.api={
   frames(){return F;}, // pour les tests
+  tm(){return S.tm;},
   gen(){return genCIP();},fit(Q){return fitBlocks(Q);},Q(ci){return F.filter(f=>f.ci===ci&&f.j>=0).map(f=>toLst(f.p,f.d,f.th,lstOpt()));},parse(t){return parseLST(t);},load(t,n){loadLST(t,n);},o(){return lstOpt();},tl(p,d,th){return toLst(p,d,th,lstOpt());},fl(q){return fromLst(q,lstOpt());}, // pour les tests
   cam(th,ph,r){ctl.th=th;ctl.ph=ph;if(r)ctl.r=r;}, // pour les tests
   goto(v){pos=v*TOTAL;playing=false;upd();}, // pour les tests
