@@ -1893,9 +1893,12 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
         </div>
         <div class="cipBox">
           <h3><i>4</i>Programme</h3>
-          <div class="cipNum"><span>Procédé</span><select id="cipProc" onchange="cip_ui('proc')" style="width:150px"><option value="decoupe">Découpe</option><option value="soudure">Soudure</option></select></div>
+          <select id="cipProc" onchange="cip_ui('proc')" style="display:none"><option value="decoupe">Découpe</option><option value="soudure">Soudure</option></select>
+          <div class="cipSeg" style="margin-bottom:6px"><button class="cipBtn cipOn" id="cipPr_decoupe" style="font-size:14px;padding:8px" onclick="cip_ui('procset','decoupe')">✂ Découpe</button><button class="cipBtn" id="cipPr_soudure" style="font-size:14px;padding:8px" onclick="cip_ui('procset','soudure')">🔥 Soudure</button></div>
+          <div id="cipWeldOpts" style="display:none">
           <div class="cipNum"><span>Soudure : recouvrement (mm)</span><input type="number" id="cipWOv" value="10" min="0" step="1" onchange="cip_ui('proc')"></div>
           <div class="cipNum"><span>Soudure : pente de fin (mm)</span><input type="number" id="cipWRamp" value="10" min="0" step="1" onchange="cip_ui('proc')"></div>
+          </div>
           <div class="cipRow">
             <button class="cipBtn cipMain" id="cipPlay" onclick="cip_ui('play')">Lancer</button>
             <button class="cipBtn" onclick="cip_ui('restart')">Début</button>
@@ -3178,16 +3181,14 @@ const ctl={target:new THREE.Vector3(),r:330,th:0.62,ph:1.05,update(){const s=Mat
  const rc=new THREE.Raycaster();let drag=null;
  const rayAt=e=>{const b=el.getBoundingClientRect();rc.setFromCamera(new THREE.Vector2((e.clientX-b.left)/b.width*2-1,-(e.clientY-b.top)/b.height*2+1),cam);return rc.ray;};
  el.addEventListener('pointerdown',e=>{anim=null;
-   if(S.pickFor&&S.prog){const cs=S.prog.C.filter(x=>S.pickFor==='*'||x.name===S.pickFor);let c=null;if(cs.length){scene.updateMatrixWorld(true);const b=el.getBoundingClientRect();let best=null,bd=1e9;
-     for(const cc of cs)for(const p of cc.P){const v=new THREE.Vector3(...p);rotG.localToWorld(v);v.project(cam);const sx=(v.x+1)/2*b.width+b.left,sy=(1-v.y)/2*b.height+b.top;const d=Math.hypot(sx-e.clientX,sy-e.clientY);if(d<bd){bd=d;best=p;c=cc;}}
-     if(best&&bd<25){S.starts=S.starts||{};S.starts[c.name]=best.slice();setPick(null);computeProgram();return;}}}
+   if(S.pickFor&&S.prog&&e.button===0){const h=pickAt(e);if(h){S.starts=S.starts||{};S.starts[h.c.name]=h.p.slice();S.afterPick=h.c.name;setPick(null);computeProgram();return;}}
    if(e.button===0&&!e.shiftKey&&pts.size===0&&S.part&&partG.children.length){scene.updateMatrixWorld(true);const ray=rayAt(e);rc.ray.copy(ray);const hit=rc.intersectObjects(partG.children,true)[0];
      if(hit){const ax=new THREE.Vector3(0,1,0).applyMatrix4(new THREE.Matrix4().extractRotation(root.matrix)).normalize();
        const cd=new THREE.Vector3();cam.getWorldDirection(cd);const n=cd.clone().sub(ax.clone().multiplyScalar(cd.dot(ax)));if(n.lengthSq()<1e-6)n.copy(cd);n.normalize();
        drag={ax,plane:new THREE.Plane().setFromNormalAndCoplanarPoint(n,hit.point),p0:hit.point.clone(),off0:+$('cipPOff').value||0};
        el.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);mode='part';pathG.visible=false;el.style.cursor='ew-resize';return;}}
    el.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);mode=(e.button===2||e.shiftKey||pts.size===2)?'pan':'rot';lx=e.clientX;ly=e.clientY;if(pts.size===2){const a=[...pts.values()];pd=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);}el.style.cursor='grabbing';});
- el.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,[e.clientX,e.clientY]);
+ el.addEventListener('pointermove',e=>{if(S.pickFor&&S.prog&&!pts.size){pickHover(e);return;}if(!pts.has(e.pointerId))return;pts.set(e.pointerId,[e.clientX,e.clientY]);
    if(pts.size===2){const a=[...pts.values()];const d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(pd>0)ctl.r=Math.min(2500,Math.max(40,ctl.r*pd/d));pd=d;return;}
    if(mode==='part'&&drag){const q=new THREE.Vector3();if(rayAt(e).intersectPlane(drag.plane,q)){const d=q.sub(drag.p0).dot(drag.ax);$('cipPOff').value=+(drag.off0-d).toFixed(1);placeAndShow();}return;}
    const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;
@@ -3308,7 +3309,7 @@ function computeProgram(){if(!S.part){S.prog=null;rebuildPaths();return;}
       $('cipPartStat').innerHTML=S.part.info+extra+'<br><span class="cipOk">'+C.length+' contour(s) trouvés.</span>'+(r.totalBad?' <span class="cipWarn">'+r.totalBad+' point(s) sans orientation sûre (repli sur la normale).</span>':'');}
     rebuildPaths();}catch(e){console.error('[CIP] programme',e);$('cipPartStat').innerHTML=S.part.info+'<br><span class="cipBad">Erreur de calcul : '+e.message+'</span>';}},30);}
 // ---------- trajectoires + timeline ----------
-let F=[],TOTAL=0,lines=[],bwPts=null,pos=0,playing=false,last=performance.now(),ctBtns=[];let codeL=[],codeEl=[],codeCur=-1;
+let F=[],TOTAL=0,lines=[],bwPts=null,pos=0,playing=false,last=performance.now(),ctBtns=[];let codeL=[],codeEl=[],codeCur=-1;let pickM=null;const CARD_TXT=['0° côté mandrin','90° flanc','180° côté bout','270° flanc'];
 function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;playing=false;ctBtns=[];const box=$('cipSteps');box.innerHTML='';
   const leg=$('cipLeg');
   if(!S.prog){setTimeout(renderCode,0);{const pb=$('cipPickBtn');if(pb)pb.style.display='none';}setPick(null);box.innerHTML='<div class="cipStD">Pas encore de programme : importe un STEP ou charge la démo.</div>';leg.innerHTML='';upd();return;}
@@ -3342,7 +3343,7 @@ function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;pla
   bwPts=new THREE.Points(bg,new THREE.PointsMaterial({size:1.6,vertexColors:true}));pathG.add(bwPts);
   // liste
   const st=[...new Set(C.map(c=>c.step))].sort();
-  const hd=document.createElement('div');hd.className='cipStD';hd.textContent=S.prog.frames?'Ordre du fichier lu.':'Ordre de découpe (▲▼ pour changer, clic sur le nom pour y aller) :';box.appendChild(hd);
+  const hd=document.createElement('div');hd.className='cipStD';hd.textContent=S.prog.frames?'Ordre du fichier lu.':'Ordre des contours (▲▼ pour changer, clic sur le nom pour y aller, 📍 pour choisir où ça démarre) :';box.appendChild(hd);
   C.forEach((c,ci)=>{const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:4px';
     row.innerHTML=`<span style="font:600 11px var(--mono);min-width:20px;text-align:right">${ci+1}.</span><i style="width:8px;height:8px;border-radius:2px;background:${COL[(c.step-1)%4]};display:inline-block"></i>`;
     const b=document.createElement('button');b.className='cipBtn cipCt';b.style.flex='1';b.style.textAlign='left';b.textContent=c.name;b.onclick=()=>{pos=c.s0;playing=false;upd();};row.appendChild(b);ctBtns[ci]=b;
@@ -3358,8 +3359,10 @@ function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;pla
    const old=document.getElementById('cipCollMsg');if(old)old.remove();
    const div=document.createElement('div');div.id='cipCollMsg';div.className='cipStat';
    div.innerHTML=worst?`<span class="cipBad">⚠ Collision vers ${(worst.s/TOTAL*100).toFixed(0)} % (${worst.rap?'déplacement vers ':''}${C[worst.ci]?C[worst.ci].name:''}) : ${worst.cl.toFixed(0)} mm.</span> <button class="cipBtn" style="padding:2px 7px" onclick="cip_ui('gotocoll')">Voir</button>`:'<span class="cipOk">Aucune collision sur tout le programme.</span>';
-   S.collAt=worst?worst.s:null;$('cipSteps').prepend(div);}
+   S.collAt=worst?worst.s:null;$('cipSteps').prepend(div);
+   if(!S.prog.frames&&$('cipProc').value!=='soudure'&&C.some(c=>/^Piquage/.test(c.name))){const h=document.createElement('div');h.className='cipStat';h.innerHTML='<span class="cipWarn">Tu es en DÉCOUPE : le tube inséré sert juste à découper son trou (faisceau parallèle à lui, la tête bouge peu). Pour le souder :</span> <button class="cipBtn cipMain" style="padding:3px 8px" onclick="cip_ui(\'procset\',\'soudure\')">Passer en Soudure</button>';$('cipSteps').prepend(h);}}
   {const pb=$('cipPickBtn');if(pb)pb.style.display=!S.prog.frames?'':'none';}setPick(S.pickFor&&C.some(c=>S.pickFor==='*'||c.name===S.pickFor)?S.pickFor:null);
+  if(S.afterPick){const c=C.find(x=>x.name===S.afterPick);S.afterPick=null;if(c&&c.s0!=null)pos=c.s0;}
   setTimeout(renderCode,0);
   leg.innerHTML=st.map(k=>`<span><i class="cipSw" style="background:${COL[(k-1)%4]}"></i>${(S.prog.steps[k]||[''])[0]}</span>`).join('')+'<span><i class="cipSw" style="background:#ef5350"></i>Impact paroi opposée</span>';
   upd();}
@@ -3403,8 +3406,9 @@ function upd(){const pr=S.profile;let f=frameAt(pos);
     ['C1 (mandrin)',fmt(lq.C,1)+'°'],['B (tête)',fmt(lq.B,1)+'°'+(side>0.02?' ⚠':'')],['Garde tête mini',cl>900?'—':cl.toFixed(1)+' mm'],['Paroi opposée',S.prog?hitTxt:'—']]
     .map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('');
   const al=$('cipAlert');if(cl<0){al.className='cipAl cipBad';al.textContent='Collision tête / tube ou mandrin avec ces cotes de tête.';}else{al.className='cipAl cipOk';al.textContent='Pas de collision détectée.';}
-  $('cipHud').innerHTML=S.prog?`<b>${(pos/TOTAL*100).toFixed(0)}%</b> · ${pos.toFixed(0)} / ${TOTAL.toFixed(0)} mm de trajet`:`Mandrin ${S.cfg.chuck==='vertical'?'vertical':'horizontal'} · tube ${profTxt()}`;
+  $('cipHud').innerHTML=S.prog?`<b>${S.prog.frames?'LST':($('cipProc').value==='soudure'?'SOUDURE':'DÉCOUPE')}</b> · <b>${(pos/TOTAL*100).toFixed(0)}%</b> · ${pos.toFixed(0)} / ${TOTAL.toFixed(0)} mm de trajet`:`Mandrin ${S.cfg.chuck==='vertical'?'vertical':'horizontal'} · tube ${profTxt()}`;
   $('cipScrub').value=TOTAL?pos/TOTAL*1000:0;if(document.activeElement!==$('cipGoto'))$('cipGoto').value=TOTAL?(pos/TOTAL*100).toFixed(1):0;$('cipPlay').textContent=playing?'Pause':(S.prog&&pos>=TOTAL?'Rejouer':'Lancer');updCode();}
+function syncProc(){const v=$('cipProc').value;['decoupe','soudure'].forEach(k=>{const b=$('cipPr_'+k);if(b)b.classList.toggle('cipOn',k===v);});const w=$('cipWeldOpts');if(w)w.style.display=v==='soudure'?'':'none';}
 function profTxt(){const c=S.cfg;return c.prof==='rond'?`rond Ø${c.d}×${c.ep}`:c.prof==='carre'?`carré ${c.w}×${c.w}×${c.ep}`:c.prof==='rect'?`rectangle ${c.w}×${c.h}×${c.ep}`:`triangle ${c.w}×${c.ep}`;}
 // ---------- formulaire tube ----------
 function syncForm(){const c=S.cfg;['rond','carre','rect','tri'].forEach(k=>$('cipPf_'+k).classList.toggle('cipOn',c.prof===k));
@@ -3668,7 +3672,34 @@ function updCode(){if(!codeEl.length)return;let k;
   if(k===codeCur)return;if(codeCur>=0&&codeEl[codeCur])codeEl[codeCur].classList.remove('cur');codeCur=k;
   if(k>=0&&codeEl[k]){codeEl[k].classList.add('cur');if(S.codeFollow!==false){const box=$('cipCodeList');const e=codeEl[k];const top=e.offsetTop-box.offsetTop;
     if(top<box.scrollTop+20||top>box.scrollTop+box.clientHeight-40)box.scrollTop=Math.max(0,top-box.clientHeight/3);}}}
-function setPick(name){S.pickFor=name;const bn=$('cipPickBan');if(bn){bn.style.display=name?'':'none';bn.innerHTML=name?'📍 Clique sur '+(name==='*'?'un contour (en blanc)':'le contour « '+name+' »')+' dans la 3D (sur la ligne) pour choisir le point de départ — <u style="cursor:pointer" onclick="cip_ui(\'pickoff\')">annuler</u>':'';}
+// ---------- choix du point de départ : aimant sur le cordon + points cardinaux ----------
+function pickMarks(){if(pickM)return pickM;const g=new THREE.Group();const mk=(r,col)=>{const s=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),new THREE.MeshBasicMaterial({color:col,depthTest:false,transparent:true}));s.renderOrder=10;return s;};
+  const cur=mk(2.6,'#ffc107');const card=[0,1,2,3].map(()=>mk(1.5,'#ffffff'));g.add(cur,...card);g.visible=false;rotG.add(g);pickM={g,cur,card};return pickM;}
+function cardInfo(c){if(c._card)return c._card;let P=c.P;if(c.mOv!==undefined)P=P.slice(0,c.mOv+1);const n0=P.length;
+  if(!isClosed(c)){c._card={open:true,ends:[0,n0-1]};return c._card;}
+  const g=[0,0,0];P.forEach(p=>{g[0]+=p[0]/n0;g[1]+=p[1]/n0;g[2]+=p[2]/n0;});
+  let N=[0,0,0];for(let i=0;i<n0;i++){const a=V.sub(P[i],g),b=V.sub(P[(i+1)%n0],g);N=V.add(N,V.cross(a,b));}N=V.nrm(N);
+  let k0=0;P.forEach((p,i)=>{if(p[1]<P[k0][1])k0=i;}); // 0° = côté mandrin (le plus près des mors)
+  let u=V.sub(P[k0],g);u=V.nrm(V.sub(u,V.mul(N,V.dot(u,N))));const w=V.cross(N,u);
+  const ang=P.map(p=>{const q=V.sub(p,g);let a=Math.atan2(V.dot(q,w),V.dot(q,u))/DEG;return (a+360)%360;});
+  const best=[0,90,180,270].map(t=>{let bi=0,bd=1e9;ang.forEach((a,i)=>{const d=Math.abs(((a-t+540)%360)-180);if(d<bd){bd=d;bi=i;}});return bi;});
+  c._card={ang,best,n0};return c._card;}
+function pickAt(e){const el=renderer.domElement;const b=el.getBoundingClientRect();scene.updateMatrixWorld(true);
+  const cs=S.prog.C.filter(x=>S.pickFor==='*'||x.name===S.pickFor);let best=null,bd=1e9;
+  const scr=p=>{const v=new THREE.Vector3(...p);rotG.localToWorld(v);v.project(cam);return [(v.x+1)/2*b.width+b.left,(1-v.y)/2*b.height+b.top,v.z];};
+  for(const c of cs){const ci=cardInfo(c);const n=ci.open?c.P.length:ci.n0;for(let j=0;j<n;j++){const s=scr(c.P[j]);const d=Math.hypot(s[0]-e.clientX,s[1]-e.clientY);if(d<bd){bd=d;best={c,j};}}}
+  if(!best||bd>30)return null;const c=best.c,ci=cardInfo(c);let j=best.j,snap=null;
+  if(ci.open){const ends=ci.ends;const k=Math.abs(j-ends[0])<Math.abs(j-ends[1])?0:1;j=ends[k];snap=k?'bout 2':'bout 1';}
+  else if(!e.shiftKey){const a=ci.ang[j];for(let t=0;t<4;t++){const d=Math.abs(((a-t*90+540)%360)-180);if(d<14){j=ci.best[t];snap=CARD_TXT[t];break;}}}
+  const fr=F.find(f=>f.ci===S.prog.C.indexOf(c)&&f.j===j);let q=null;if(fr)q=toLst(fr.p,fr.d,fr.th,lstOpt());
+  return {c,j,p:c.P[j],snap,ang:ci.open?null:ci.ang[j],q,card:ci.open?ci.ends.map(k=>c.P[k]):ci.best.map(k=>c.P[k])};}
+function pickHover(e){const M=pickMarks();const h=pickAt(e);const bn=$('cipPickBan');
+  if(!h){M.g.visible=false;renderer.domElement.style.cursor='crosshair';if(bn)bn.querySelector('.cipPI').textContent='Approche la souris d\'une ligne de soudure…';return;}
+  M.g.visible=true;M.cur.position.set(...h.p);M.cur.material.color.set(h.snap?'#4caf50':'#ffc107');M.card.forEach((s,i)=>{s.visible=!!h.card[i];if(h.card[i])s.position.set(...h.card[i]);});
+  renderer.domElement.style.cursor='pointer';
+  if(bn)bn.querySelector('.cipPI').innerHTML=`<b>${h.c.name}</b> · ${h.snap?'🧲 '+h.snap:(h.ang!=null?h.ang.toFixed(0)+'°':'')}${h.q?` · tête B ${h.q.B.toFixed(1)}° · C1 ${h.q.C.toFixed(1)}°`:''} — clic pour démarrer ici <span style="opacity:.75">(Maj = sans aimant)</span>`;}
+function setPick(name){S.pickFor=name;const bn=$('cipPickBan');if(bn){bn.style.display=name?'':'none';bn.innerHTML=name?'📍 Promène la souris sur '+(name==='*'?'une soudure (en blanc)':'« '+name+' »')+' : le point s\'aimante sur le cordon et sur les points tous les 90°. <u style="cursor:pointer" onclick="cip_ui(\'pickoff\')">annuler</u><br><span class="cipPI" style="font-weight:600"></span>':'';}
+  if(!name&&pickM){pickM.g.visible=false;}if(renderer&&renderer.domElement)renderer.domElement.style.cursor=name?'crosshair':'grab';
   if(S.prog)S.prog.C.forEach((c,ci)=>{const L=lines[ci];if(!L)return;const f=pathG.children[ci*3];if(f&&f.material){const hi=name&&(name==='*'||c.name===name);f.material.opacity=hi?1:0.3;f.material.color.set(hi?'#ffffff':COL[(c.step-1)%4]);}});
   const pb=$('cipPickBtn');if(pb)pb.classList.toggle('cipOn',!!name);}
 // ---------- lecture d'un .LST (pour le voir dans la simu) ----------
@@ -3723,6 +3754,7 @@ S.api={
   gen(){return genCIP();},fit(Q){return fitBlocks(Q);},Q(ci){return F.filter(f=>f.ci===ci&&f.j>=0).map(f=>toLst(f.p,f.d,f.th,lstOpt()));},parse(t){return parseLST(t);},load(t,n){loadLST(t,n);},o(){return lstOpt();},tl(p,d,th){return toLst(p,d,th,lstOpt());},fl(q){return fromLst(q,lstOpt());}, // pour les tests
   cam(th,ph,r){ctl.th=th;ctl.ph=ph;if(r)ctl.r=r;}, // pour les tests
   goto(v){pos=v*TOTAL;playing=false;upd();}, // pour les tests
+  scr(ci){const el=renderer.domElement;const b=el.getBoundingClientRect();scene.updateMatrixWorld(true);return S.prog.C[ci].P.map(p=>{const v=new THREE.Vector3(...p);rotG.localToWorld(v);v.project(cam);return [(v.x+1)/2*b.width+b.left,(1-v.y)/2*b.height+b.top];});}, // pour les tests
   start(){$('cipStart').style.display='';$('cipWork').style.display='none';},
   run(){size();upd();if(!S.looping){S.looping=true;last=performance.now();requestAnimationFrame(loop);}},
   ui(a,v){
@@ -3738,7 +3770,8 @@ S.api={
     else if(a==='prof'){S.cfg.prof=v;syncForm();readForm();rebuildAll(true);return;}
     else if(a==='tube'){readForm();syncForm();rebuildAll(true);return;}
     else if(a==='place'){placeAndShow();computeProgram();return;}
-    else if(a==='piqmode'||a==='proc'){S.order=null;computeProgram();return;}
+    else if(a==='procset'){$('cipProc').value=v;syncProc();S.order=null;computeProgram();return;}
+    else if(a==='piqmode'||a==='proc'){syncProc();S.order=null;computeProgram();return;}
     else if(a==='pickany'){setPick(S.pickFor?null:'*');return;}
     else if(a==='pickoff'){setPick(null);return;}
     else if(a==='orig'){renderCode();if($('cipGenTxt').style.display!=='none')cip_ui('gencip');return;}
@@ -3763,7 +3796,7 @@ S.api={
     else if(a==='snap'){playing=false;upd();const f=frameAt(pos);const R=x=>Array.isArray(x)?x.map(R):(typeof x==='number'?+x.toFixed(3):x);
       let k=0;for(let i=0;i<F.length;i++)if(F[i].s<=pos)k=i;
       const nb=F.slice(Math.max(0,k-3),k+4).map(q=>({ci:q.ci,j:q.j,s:R(q.s),p:R(q.p),d:R(q.d),th:R(q.th)}));
-      const o={ver:'CIP v3.4',quand:new Date().toISOString(),mandrin:S.cfg.chuck,tube:S.cfg,tete:{len:hp().len,angDeg:R(hp().ang/DEG),gap:hp().gap},
+      const o={ver:'CIP v9.1',quand:new Date().toISOString(),procede:$('cipProc').value,mandrin:S.cfg.chuck,tube:S.cfg,tete:{len:hp().len,angDeg:R(hp().ang/DEG),gap:hp().gap},
         piece:S.part?{nom:S.part.name,longueur:R(S.part.len||0),rotation:+$('cipPRot').value,distanceBout:+$('cipPOff').value,retournee:S.flip}:(S.prog?'demo':null),
         pct:TOTAL?R(pos/TOTAL*100):0,pos:R(pos),total:R(TOTAL),
         frame:f?{contour:S.prog&&f.ci>=0?S.prog.C[f.ci].name:null,ci:f.ci,j:f.j,rapide:f.rapid,p:R(f.p),d:R(f.d),th:R(f.th)}:null,
