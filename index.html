@@ -1842,8 +1842,18 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     #cipBody .cipStepper button{background:none;border:0;color:var(--txt2);font:600 12px var(--sans);cursor:pointer;padding:3px 5px;border-radius:4px}
     #cipBody .cipStepper button:hover{color:var(--txt)} #cipBody .cipStepper button.on{color:#111;background:var(--acc)} #cipBody .cipStepper span{color:var(--txt2)}
     #cipBody #cipProcPage{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:480px;padding:20px 0;text-align:center} #cipBody #cipProcPage h2{font:600 20px var(--sans);color:var(--txt);margin-bottom:8px} #cipBody #cipProcPage p{color:var(--txt2);font-size:13px;margin-bottom:18px}
-    #cipBody .cipW[data-step="prep"] [data-st="sim"],#cipBody .cipW[data-step="sim"] [data-st="prep"]{display:none}
-    #cipBody .cipW[data-step="build"] [data-st="sim"],#cipBody .cipW[data-step="build"] [data-st="prep"],#cipBody .cipW[data-step="prep"] [data-st="build"],#cipBody .cipW[data-step="sim"] [data-st="build"]{display:none}
+    #cipBody .cipW [data-st]{display:none}
+    #cipBody .cipW[data-step="build"] [data-st~="build"],#cipBody .cipW[data-step="prep"] [data-st~="prep"],#cipBody .cipW[data-step="sim"] [data-st~="sim"],#cipBody .cipW[data-step="mach"] [data-st~="mach"]{display:block}
+    #cipBody .cipW:not(.cipAdvOn) .cipAdv{display:none!important}
+    #cipBody .cipWzS{border:1px solid var(--brd2);border-radius:6px;padding:7px 9px;margin:7px 0;background:var(--bg);transition:opacity .2s}
+    #cipBody .cipWzS h4{margin:0 0 4px;font:600 13px var(--sans);display:flex;align-items:center;gap:7px}
+    #cipBody .cipWzS h4 i{font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--brd2);font-size:12px}
+    #cipBody .cipWzS.cur{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+    #cipBody .cipWzS.cur h4 i{background:var(--acc);color:#000}
+    #cipBody .cipWzS.done h4 i{background:#43a047;color:#fff}
+    #cipBody .cipWzS.lock{opacity:.4;pointer-events:none}
+    #cipBody .cipWzS .cipWzT{font-size:13px;line-height:1.45;color:var(--txt)}
+    #cipBody .cipWzS .cipWzBig{font:700 15px var(--mono);color:var(--acc)}
     #cipBody #cipPartPage{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:480px;padding:20px 0;text-align:center}
     #cipBody #cipPartPage h2{font:600 20px var(--sans);color:var(--txt)} #cipBody #cipPartPage p{color:var(--txt2);font-size:13px}
     #cipBody .cipGB{border:1px solid var(--brd2);border-radius:6px;padding:6px 8px;margin:6px 0;background:var(--bg)}
@@ -1897,8 +1907,12 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="10" y="74" width="180" height="28" rx="4" fill="#9aa5ae"/><rect x="10" y="83" width="180" height="10" fill="#7d8890"/><rect x="88" y="16" width="26" height="62" rx="2" fill="#b9c3cb" transform="rotate(20 101 76)"/><rect x="140" y="40" width="10" height="36" fill="#b9c3cb"/><path d="M78 76q22-8 44 0" stroke="#ffb74d" stroke-width="4" fill="none"/><circle cx="40" cy="40" r="16" fill="none" stroke="#f5a623" stroke-width="4"/><path d="M40 28v24M28 40h24" stroke="#f5a623" stroke-width="4"/></svg>
           <b>🛠 Créer ma pièce</b><span>Un tube + des piquages, ronds, plats ou une bride, en tapant juste les cotes. Ligne de soudure exacte.</span>
         </button>
+        <button class="cipCard" id="cipCardDemo" onclick="cip_ui('partdemo')">
+          <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="20" y="66" width="160" height="30" rx="4" fill="#9aa5ae"/><rect x="20" y="76" width="160" height="10" fill="#7d8890"/><rect x="88" y="22" width="24" height="46" fill="#b9c3cb"/><path d="M84 66q16-7 32 0" stroke="#4fc3f7" stroke-width="4" fill="none"/><path d="M150 18l20 12-20 12z" fill="#f5a623"/></svg>
+          <b id="cipCardDemoT">▶ Voir un exemple</b><span id="cipCardDemoS">Une pièce toute prête, calculée en vrai, pour essayer.</span>
+        </button>
       </div>
-      <p id="cipPartKeep" style="display:none"><button class="cipBtn" onclick="cip_ui('partkeep')">Garder la pièce actuelle →</button></p>
+      <p id="cipPartKeep"><button class="cipBtn" id="cipPartKeepBtn" onclick="cip_ui('partkeep')">Continuer sans pièce →</button></p>
     </div>
     <div class="cipW" id="cipWork" style="display:none">
       <div id="cipView">
@@ -1911,7 +1925,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
         <button class="cipBtn" id="cipPickBtn" style="position:absolute;right:8px;top:8px;z-index:3;display:none" onclick="cip_ui('pickany')" title="Puis clique sur la ligne du contour dans la 3D">📍 Choisir le départ</button>
       </div>
       <div class="cipSide">
-        <div class="cipStepper" id="cipStepper"><button onclick="cip_ui('startscreen')">Mandrin</button><span>›</span><button onclick="cip_ui('procscreen')" id="cipStpProc">Procédé</button><span>›</span><button onclick="cip_ui('partscreen')" id="cipStpPart">Pièce</button><span>›</span><button onclick="cip_ui('gostep','prep')" id="cipStpPrep">Préparation</button><span>›</span><button onclick="cip_ui('gostep','sim')" id="cipStpSim">Simulation</button></div>
+        <div class="cipStepper" id="cipStepper"><button onclick="cip_ui('startscreen')">Mandrin</button><span>›</span><button onclick="cip_ui('procscreen')" id="cipStpProc">Procédé</button><span>›</span><button onclick="cip_ui('partscreen')" id="cipStpPart">Pièce</button><span>›</span><button onclick="cip_ui('gostep','prep')" id="cipStpPrep">Préparation</button><span>›</span><button onclick="cip_ui('gostep','sim')" id="cipStpSim">Simulation</button><span>›</span><button onclick="cip_ui('gostep','mach')" id="cipStpMach">Mise en machine</button></div>
         <div class="cipBox" data-st="build" id="cipGenBox">
           <h3>🛠 Créer ma pièce</h3>
           <div class="cipNote" style="margin-top:0">Tape les cotes : la pièce se met à jour toute seule dans la 3D. Les lignes de soudure sont calculées exactement (pas devinées).</div>
@@ -1952,7 +1966,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <h3><i>3</i>Pièce</h3>
           <div class="cipRow">
             <button class="cipBtn cipMain" onclick="document.getElementById('cipStepFile').click()">Importer un STEP</button>
-            <button class="cipBtn" onclick="cip_ui('demo')">Démo tuiles Ø54</button>
+            <button class="cipBtn" id="cipDemoBtn" onclick="cip_ui('demo')">Exemple</button>
             <input type="file" id="cipStepFile" class="cipFile" accept=".step,.stp,.STEP,.STP" onchange="cip_ui('step')">
           </div>
           <div class="cipNote" style="margin-top:0">Astuce : attrape la pièce à la souris et fais-la glisser le long du tube.</div>
@@ -1997,8 +2011,14 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <div class="cipRow"><button class="cipBtn" id="cipCodeShow" style="display:none" onclick="cip_ui('codeshow')">Afficher le code en direct</button></div>
           <div class="cipRow"><button class="cipBtn" onclick="cip_ui('gostep','prep')">← Retour préparation</button></div>
         </div>
-        <div class="cipBox" id="cipLstBox" data-st="sim">
-          <h3><i>6</i>Fichier .LST (machine)</h3>
+        <div class="cipBox" data-st="mach" id="cipMachBox">
+          <h3>🔧 Mise en machine</h3>
+          <div class="cipNote" style="margin-top:0">Fais les étapes dans l'ordre : chaque étape débloque la suivante.</div>
+          <div id="cipWz"></div>
+          <label class="cipChk" style="margin-top:8px"><input type="checkbox" id="cipAdvChk" onchange="cip_ui('advtoggle')"> Réglages avancés (origine, mandrin, bloc CIP…)</label>
+        </div>
+        <div class="cipBox cipAdv" id="cipLstBox" data-st="mach">
+          <h3>Réglages avancés du .LST</h3>
           <div class="cipNote" style="margin-bottom:6px">Le bloc CIP + l'en-tête et la fin de tes vrais programmes. Valeurs machine copiées de tes fichiers qui tournent, rien d'inventé. <b>Toujours tester à vide d'abord.</b></div>
           <div class="cipNum"><span>Nom du programme</span><input id="cipLName" style="width:170px" placeholder="ex : TUBE-PIQUAGE" onchange="cip_ui('lstclr')"></div>
           <div id="cipLWeld">
@@ -3624,12 +3644,12 @@ function frameAt(s){if(!F.length)return null;let lo=0,hi=F.length-1;while(hi-lo>
 const fmt=(v,n=2)=>(v>=0?' ':'−')+Math.abs(v).toFixed(n);
 function upd(){const pr=S.profile;let f=frameAt(pos);
   if(!f){const top=pr.type==='rond'?pr.R:(()=>{let m=0;for(const q of pr.out)m=Math.max(m,q[1]);return m;})();f={p:[0,S.cfg.L*0.55,top],d:[0,0,-1],th:0,ci:-1,j:0,rapid:false};}
-  const rot=true;const th=f.th;rotG.rotation.y=-th*DEG;
+  const rot=true;const th=S.c0?0:f.th;rotG.rotation.y=-th*DEG;
   if(S.prog){const C=S.prog.C;C.forEach((c,ci)=>{const L=lines[ci];let n=0;if(pos>=c.s1)n=L.n;else if(pos>=c.s0&&ci===f.ci&&f.j>=0)n=f.j+1;L.cut.geometry.setDrawRange(0,n);L.vec.visible=$('cipVec').checked;
     if(ctBtns[ci]){ctBtns[ci].classList.toggle('cipCur',ci===f.ci);ctBtns[ci].classList.toggle('cipDone',pos>=c.s1);}});}
   partG.visible=$('cipParts').checked;if(bwPts)bwPts.visible=$('cipBw').checked;
   const pr2=rotM(f.p,th),dr=rotM(f.d,th);const P=new THREE.Vector3(...pr2),D=new THREE.Vector3(...dr);
-  {const w=$('cipWork');headG.visible=!(w&&w.dataset.step==='build');}  headG.position.copy(P);headG.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),D.clone().negate());
+  {const w=$('cipWork');headG.visible=!(w&&w.dataset.step==='build')&&!S.c0;}  headG.position.copy(P);headG.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),D.clone().negate());
   const h=hp();const top=P.clone().addScaledVector(D,-(h.len+h.gap));
   const bw=backwall(f.p,f.d);let exitP=P.clone().addScaledVector(D,60),hitTxt='aucun';
   if(bw){exitP=new THREE.Vector3(...rotM(bw.q,th));hitTxt=(bw.q[1]>=-90&&bw.q[1]<=S.cfg.L)?bw.t.toFixed(0)+' mm sous le foyer':'sort du tube';}
@@ -3749,6 +3769,7 @@ function genRender(){const box=$('cipGBodies');if(!box)return;const D=S.genDef;$
     inp.addEventListener(inp.type==='checkbox'?'change':'input',()=>{S.genDef.bodies[i][k]=inp.type==='checkbox'?inp.checked:+inp.value;genSoon();});});
   box.querySelectorAll('[data-del]').forEach(bt=>bt.onclick=()=>{S.genDef.bodies.splice(+bt.dataset.del,1);S.hlFocus=S.hlHover=null;genRender();genSoon();});
   document.querySelectorAll('#cipGenBox .cipGK').forEach(hlWire);hlSet();}
+function wzMaybe(){const w=$('cipWork');if(w&&w.dataset.step==='mach')try{wzRender();}catch(e){}}
 function genSoon(){clearTimeout(S.genT);S.genT=setTimeout(()=>genApply(false),250);}
 // ---------- code couleur : chaque cote a sa couleur, et la 3D montre ce qu'elle change ----------
 const GC={d:'#29b6f6',w:'#29b6f6',t:'#26e0c0',ep:'#26e0c0',h:'#ff9800',ang:'#c387ff',pos:'#66d36e',L:'#66d36e',rot:'#ffd740',exc:'#ff5fa2',trav:'#ff5252'};
@@ -3802,6 +3823,50 @@ function genHLdraw(){hlG.children.slice().forEach(o=>{hlG.remove(o);o.traverse(x
   else if(k==='exc'){const c1=top,c0=V.add(top,V.mul(e1,-I.exc));const base0=rotM([0,I.yb,0],I.rot);line([base0,c0]);line([c0,c1]);dot(c0);dot(c1);label(V.add(V.mul(V.add(c0,c1),0.5),V.mul(a,R*0.4)),mm(b.exc)+' mm');}
   else if(k==='trav'){if(!I.trav){label(V.sub(I.B0,V.mul(a,R*1.3)),'non');return;}line(sec(I.sBot),true);const o=V.add(I.loP,V.mul(I.loN,rl*3));line([o,V.add(o,V.mul(a,-I.H))]);label(V.sub(I.B0,V.mul(a,R+I.H*0.6)),'traverse');}
 }
+// ======================= MISE EN MACHINE (étape par étape, chaque étape débloque la suivante) =======================
+// Méthode « pointe » : origine = 1er point soudé/coupé, SET_G54 = valeur lue sur la machine quand la pointe est dessus.
+S.wz={d1:false,d2:false,x:null,key:''};
+let wzM=null;
+function wzMarker(){if(wzM)return wzM;const g=new THREE.Group();const m=new THREE.MeshBasicMaterial({color:0xffeb3b,depthTest:false,transparent:true,opacity:0.95});
+  const s=new THREE.Mesh(new THREE.SphereGeometry(2.4,16,12),m);s.renderOrder=1001;const r=new THREE.Mesh(new THREE.TorusGeometry(7,0.8,8,48),m.clone());r.renderOrder=1001;g.add(s,r);g.visible=false;rotG.add(g);wzM={g,r};return wzM;}
+function wzP1(){const f=F.find(x=>x.j>=0);if(!f||!S.prog||S.prog.frames)return null;const o=lstOpt(true);const q=toLst(f.p,f.d,f.th,o);
+  return {f,C:q.C,ax:o.ax,key:[f.p.map(v=>v.toFixed(2)).join(','),f.th.toFixed(2),S.cfg.chuck,o.xdir].join('|')};}
+function wzCur(){const P=wzP1();if(!P)return 0;if(!S.wz.d1)return 1;if(!S.wz.d2)return 2;if(S.wz.x===null||S.wz.key!==P.key)return 3;return 4;}
+function wzApplyG54(){const P=wzP1();if(!P||S.wz.x===null)return;$('cipOrig').value='p1';$('cipLG54Mode').value='main';const v=S.wz.x;
+  if(P.ax==='X'){$('cipLOX').value=v;$('cipLOY').value=0;$('cipLOZ').value=0;}else{$('cipLOX').value=0;$('cipLOY').value=0;$('cipLOZ').value=v;}try{lstSync();}catch(e){}}
+function wzRender(){const box=$('cipWz');if(!box)return;const P=wzP1();const cur=wzCur();const W=$('cipProc').value==='soudure';
+  if(!P){box.innerHTML='<div class="cipNote"><span class="cipWarn">Pas encore de programme : reviens à la préparation et charge ou crée ta pièce.</span></div>';wzView();return;}
+  try{lstSync();}catch(e){}
+  const st=n=>n<cur?'done':(n===cur?'cur':'lock');const ok='<span style="color:#66bb6a">✓</span>';const fx=v=>(+(+v).toFixed(3))+'';
+  const Ctxt=(+(((P.C%360)+540)%360-180).toFixed(1))+'';
+  let h='';
+  h+=`<div class="cipWzS ${st(1)}"><h4><i>${cur>1?'✓':1}</i>Monte le tube</h4><div class="cipWzT">Passe le tube dans le mandrin et serre-le où tu veux. Tourne le mandrin à la main pour vérifier que la tête ne touche rien.</div>
+    ${cur===1?`<div class="cipRow"><button class="cipBtn cipMain" onclick="cip_ui('wz',1)">C'est fait →</button></div>`:''}</div>`;
+  h+=`<div class="cipWzS ${st(2)}"><h4><i>${cur>2?'✓':2}</i>Oriente la pièce</h4><div class="cipWzT">Mets le mandrin à <span class="cipWzBig">C = 0</span>. La pièce doit être tournée <b>comme sur la 3D</b> (le haut de la 3D = côté tête).</div>
+    ${cur===2?`<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',1)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',2)">C'est fait →</button></div>`:''}</div>`;
+  h+=`<div class="cipWzS ${st(3)}"><h4><i>${cur>3?'✓':3}</i>Pose la pointe sur le départ</h4><div class="cipWzT">Tourne le mandrin à <span class="cipWzBig">C = ${Ctxt}°</span> puis amène la pointe <b>pile sur le point jaune qui clignote</b> (départ ${W?'de la soudure':'de la découpe'}).<br>Tape le <b>${P.ax}</b> affiché par la machine, exactement comme à l'écran (avec le signe) :</div>
+    <div class="cipNum"><span>${P.ax} lu sur la machine</span><input type="number" step="0.001" id="cipWzX" value="${S.wz.x!==null&&S.wz.key===P.key?S.wz.x:''}" placeholder="ex : -125.40"></div>
+    ${cur===3?`<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',2)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',3)">Valider →</button></div>`:(cur>3?`<div class="cipNote" style="margin:2px 0 0">${ok} SET_G54(${P.ax==='X'?S.wz.x+', 0, 0':'0, 0, '+S.wz.x}) — le programme part de ce point.</div>`:'')}</div>`;
+  const nm=$('cipLName').value||'';const dry=S.wz.dry!==false;
+  h+=`<div class="cipWzS ${st(4)}"><h4><i>4</i>Fichier .LST</h4>
+    <div class="cipNum"><span>Nom du programme</span><input id="cipWzName" style="width:150px" value="${nm.replace(/"/g,'')}" placeholder="ex : TUBE-EN-T"></div>
+    ${W?`<div class="cipNum"><span>Techno soudure (WTT)</span><input id="cipWzTech" list="cipLTWl" style="width:150px" value="${($('cipLTW').value||'').replace(/"/g,'')}" placeholder="ex : TUBECOUDE-DORE"></div>`
+       :`<div class="cipNum"><span>Techno découpe (LTT)</span><b style="font:13px var(--mono)">${$('cipLTC').textContent}</b></div>`}
+    <label class="cipChk"><input type="checkbox" id="cipWzDry" ${dry?'checked':''}> <b>Test à vide</b> (laser jamais allumé)</label>
+    <div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',3)">←</button><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('wzgen')">⬇ Générer et télécharger</button></div>
+    <div class="cipStat" id="cipWzMsg">${S.wz.msg||''}</div></div>`;
+  box.innerHTML=h;wzView();}
+function wzView(){const w=$('cipWork');const on=w&&w.dataset.step==='mach'&&w.style.display!=='none';const cur=on?wzCur():0;const P=on?wzP1():null;const m=wzMarker();
+  S.c0=on&&cur<=2;
+  if(P&&on&&cur>=3){m.g.position.set(...P.f.p);m.g.visible=true;if(S.wz.posFor!==P.key+cur){const first=cur===3&&S.wz.posFor.slice(-1)!=='3';S.wz.posFor=P.key+cur;pos=P.f.s;playing=false;if(first){try{upd();scene.updateMatrixWorld(true);const v=new THREE.Vector3();m.g.getWorldPosition(v);anim={t0:performance.now(),th0:ctl.th,ph0:ctl.ph,r0:ctl.r,c0:ctl.target.clone(),th1:ctl.th,ph1:ctl.ph,r1:Math.min(ctl.r,170),c1:v};}catch(e){}}}}else{m.g.visible=false;S.wz.posFor='';}
+  try{upd();}catch(e){}}
+function wzGen(){const P=wzP1();if(!P||wzCur()<4)return;const W=$('cipProc').value==='soudure';
+  const nm=$('cipWzName');if(nm)$('cipLName').value=nm.value;if(W&&$('cipWzTech'))$('cipLTW').value=$('cipWzTech').value;const dry=$('cipWzDry')?$('cipWzDry').checked:true;S.wz.dry=dry;$('cipLDry').checked=dry;
+  wzApplyG54();const r=genLST();
+  if(r.err){S.wz.msg='<span class="cipBad">'+r.err+'</span>';}
+  else{S.lastLST=r;cip_ui('lstdl');S.wz.msg=`<span class="cipOk">${r.file} téléchargé.</span> `+(dry&&!W?'À vide, la buse passe 3 mm au-dessus de la pièce (pas de palpage laser éteint). ':'')+(dry?'Passe-le d\'abord à vide : la pointe doit suivre '+(W?'la jonction':'les contours')+'. Si c\'est bon, décoche « Test à vide » et regénère le vrai.':'<span class="cipWarn">Version AVEC laser.</span>');}
+  wzRender();}
+{const _rp=rebuildPaths;rebuildPaths=function(){_rp.apply(this,arguments);if(S.wz)S.wz.posFor='';wzMaybe();};}
 // ---------- démo ----------
 function loadDemo(){const D=cip_demo();S.cfg.prof='rond';S.cfg.d=54;S.cfg.ep=2;S.cfg.L=Math.max(S.cfg.L,140);syncForm();buildStatic();
   const shift=S.cfg.L-120;S.part=null;$('cipFitBtn').disabled=true;partG.clear();
@@ -3816,7 +3881,7 @@ new ResizeObserver(size).observe(view);
 function visible(){const w=document.getElementById('wzpCIP');return !!(w&&w.classList.contains('wz-on')&&$('cipWork').style.display!=='none');}
 function loop(t){if(!visible()){S.looping=false;playing=false;return;}const dt=Math.min(0.1,(t-last)/1000);last=t;
   if(playing&&TOTAL){pos+= +$('cipSpeed').value*dt;if(pos>=TOTAL){pos=TOTAL;playing=false;}upd();}
-  stepAnim(t);ctl.update();renderer.render(scene,cam);renderCube();requestAnimationFrame(loop);}
+  if(wzM&&wzM.g.visible){const k=1+0.35*Math.sin(t/160);wzM.r.scale.setScalar(k);}stepAnim(t);ctl.update();renderer.render(scene,cam);renderCube();requestAnimationFrame(loop);}
 syncForm();buildHead();buildStatic();setMapping();rebuildPaths();
 // ---------- OPÉRATIONS : anneaux 360°, trous, lamelles, coins (process de Seb) ----------
 const AX=[0,1,0];
@@ -4061,7 +4126,7 @@ function weldOps(C0){const notes=[];const inst=instList();const seams=C0.filter(
     // seuls les points qui touchent vraiment le corps sont à souder (pas le bout du tube / une arête de face du STEP)
     let Wk=null;if(c.W){Wk=keepIdx.map(i=>!!c.W[i]);}
     const nm0='Soudure '+(++k);
-    {const st=S.starts&&S.starts[nm0];if(st){let bi=0,bd=1e9;P.forEach((p,i)=>{const d=V.len(V.sub(p,st));if(d<bd){bd=d;bi=i;}});
+    {const st=S.starts&&S.starts[nm0];{let bi=0,bd=1e9;if(st)P.forEach((p,i)=>{const d=V.len(V.sub(p,st));if(d<bd){bd=d;bi=i;}});else if(S.part&&S.part.gen)P.forEach((p,i)=>{if(p[1]<P[bi][1]-1e-6)bi=i;}); // départ par défaut : 0° côté mandrin (comme au boulot)
       if(bi>0){const rot=a=>a.slice(bi).concat(a.slice(0,bi));P=rot(P);Dr=rot(Dr);if(Wk)Wk=rot(Wk);}}}
     const seamObj={name:nm0,P:P.concat([P[0]])};
     const segs=[];if(!Wk||Wk.every(Boolean))segs.push({P,D:Dr,closed:true});
@@ -4190,13 +4255,17 @@ function genLST(){if(!S.prog||S.prog.frames||!F.length)return {err:'Pas de progr
       `TC_SET_TRAFO("${o.trafo}")`,"TRAORI(1)",g54,"");}
   else{B.push("TC_RESET","G71","g90","TC_DYNAMIC_LEVEL(0)",`TC_SET_TRAFO("${o.trafo}")`,"TRAORI(1)",";TC_DIST(1);distance buse piece en mm",g54,"G01 F = 2000","TC_LASER_REQUEST(1)");}
   B.push(";=== mouvements generes par l'onglet CIP Trumpf (CNC 3018) ===");if(dry)B.push(';!!! VERSION TEST A VIDE : laser jamais allume (TC_WELD_ON / TC_LASER_ON en commentaire) !!!');
+  // découpe : la trajectoire est SUR la pièce, c'est le palpage (techno LTT : distance buse 1,5 / 0,7 mm, perçage 3 mm) qui tient la buse au-dessus.
+  // À vide il n'y a pas de palpage -> on recule toute la trajectoire de DRYOFF mm vers la tête, sinon la buse frotte la pièce.
+  const DRYOFF=(!W&&dry)?3:0;const sh=f=>DRYOFF?V.sub(f.p,V.mul(f.d,DRYOFF)):f.p;
+  if(DRYOFF)B.push(';!!! A VIDE : toute la trajectoire est reculee de '+DRYOFF+' mm vers la tete (pas de palpage laser eteint) !!!');
   for(let ci=0;ci<C.length;ci++){const fr=F.filter(f=>f.ci===ci);const rap=fr.filter(f=>f.j<0),cut=fr.filter(f=>f.j>=0);if(!cut.length)continue;
-    const Q=cut.map(f=>toLst(f.p,f.d,f.th,o));
+    const Q=cut.map(f=>toLst(sh(f),f.d,f.th,o));
     if(ci===0){const f0=cut[0];const a=toLst(V.sub(f0.p,V.mul(f0.d,30)),f0.d,f0.th,o);
       B.push(lstMv(a,W?'f5000':'')+' ;pre-approche 30 mm dans l\'axe du faisceau');
       if(!W)B.push("fgroup(X,Y,Z,c1)",`FGREF [c1] = ${(+fg).toFixed(3)}`);
       B.push(lstMv(Q[0],W?'f5000':'')+'   ; point d\'approche'+(W?'':' (debut du contour)'));if(W)B.push("m0");B.push("");}
-    else{B.push(`;----- deplacement vers contour ${ci+1} (faisceau coupe) -----`);rap.forEach((f,k)=>{B.push(lstMv(toLst(f.p,f.d,f.th,o)));});B.push(lstMv(Q[0]));}
+    else{B.push(`;----- deplacement vers contour ${ci+1} (faisceau coupe) -----`);rap.forEach((f,k)=>{B.push(lstMv(toLst(sh(f),f.d,f.th,o)));});B.push(lstMv(Q[0]));}
     B.push(`;----- CONTOUR ${ci+1} : ${C[ci].name.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\x20-\x7e]/g,'')} -----`);
     B.push((dry?';A VIDE ':'')+ON(Q[Q.length-1].C-Q[0].C));
     const segs=W&&C[ci].mOv!==undefined?[[0,C[ci].mOv,';soudure normale'],[C[ci].mOv,C[ci].mRamp!==undefined?C[ci].mRamp:Q.length-1,';recouvrement'],[C[ci].mRamp!==undefined?C[ci].mRamp:Q.length-1,Q.length-1,';pente de fin']]:[[0,Q.length-1,null]];
@@ -4215,11 +4284,13 @@ function showProcPage(){$('cipStart').style.display='none';$('cipWork').style.di
   $('cipProcCh').textContent=S.cfg.chuck==='vertical'?'à 90° (vertical, tube couché)':'à plat (horizontal, tube debout)';
   const v=$('cipProc').value;$('cipCardW').classList.toggle('cipOn',S.procChosen&&v==='soudure');$('cipCardC').classList.toggle('cipOn',S.procChosen&&v==='decoupe');S.procChosen=true;}
 function showPartPage(){$('cipStart').style.display='none';$('cipProcPage').style.display='none';$('cipWork').style.display='none';$('cipPartPage').style.display='';
-  $('cipPartProc').textContent=$('cipProc').value==='soudure'?'🔥 Soudure':'✂ Découpe laser';$('cipPartKeep').style.display=S.part?'':'none';}
+  const W=$('cipProc').value==='soudure';$('cipPartProc').textContent=W?'🔥 Soudure':'✂ Découpe laser';
+  $('cipPartKeepBtn').textContent=S.part?'Garder la pièce actuelle →':'Continuer sans pièce →';
+  $('cipCardDemoT').textContent=W?'▶ Exemple : tube en T':'▶ Exemple : tuiles';$('cipCardDemoS').textContent=W?'Un piquage à 90°, calculé en vrai, pour essayer.':'3 tuiles à 120° dans un tube Ø54×2 : biseau, trous, lamelles, séparation.';}
 function showWork(st){$('cipStart').style.display='none';$('cipProcPage').style.display='none';$('cipPartPage').style.display='none';$('cipWork').style.display='';setStep(st);S.api.run();requestAnimationFrame(()=>{size();upd();});}
-function setStep(st){const w=$('cipWork');w.dataset.step=st;['Prep','Sim'].forEach(k=>{const b=$('cipStp'+k);if(b)b.classList.toggle('on',k.toLowerCase()===st);});{const b=$('cipStpPart');if(b)b.classList.toggle('on',st==='build');}
-  const hide=st==='prep'||st==='build'||S.codeHidden;w.classList.toggle('cipNoCode',hide);const cs=$('cipCodeShow');if(cs)cs.style.display=(st==='sim'&&S.codeHidden)?'':'none';
-  headG.visible=st!=='build';
+function setStep(st){const w=$('cipWork');w.dataset.step=st;{const b=$('cipDemoBtn');if(b)b.textContent=$('cipProc').value==='soudure'?'Exemple : tube en T':'Exemple : tuiles (découpe)';}['Prep','Sim','Mach'].forEach(k=>{const b=$('cipStp'+k);if(b)b.classList.toggle('on',k.toLowerCase()===st);});{const b=$('cipStpPart');if(b)b.classList.toggle('on',st==='build');}
+  const hide=st==='prep'||st==='build'||st==='mach'||S.codeHidden;w.classList.toggle('cipNoCode',hide);const cs=$('cipCodeShow');if(cs)cs.style.display=(st==='sim'&&S.codeHidden)?'':'none';
+  headG.visible=st!=='build';if(st==='mach'){try{wzRender();}catch(e){console.warn(e);}}else{try{wzView();}catch(e){}}
   if(st!=='build'){S.hlFocus=S.hlHover=null;try{genHLdraw();}catch(e){}}
   if(st==='sim'){codeCur=-1;try{lstSync();}catch(e){}updCode();}
   setTimeout(()=>window.dispatchEvent(new Event('resize')),30);}
@@ -4277,7 +4348,7 @@ const TIPS={
 
 };
 const TIPSEL={"#cipCode .cipCH span":'Le code CIP du programme, ligne par ligne.\nJaune = CIP (arc 5 axes par un point intermédiaire I1 J1 K1)\nBlanc = G01 (ligne droite)\nVert = allumage / extinction laser\nGris = commentaires\nClique une ligne : la simu va pile à ce moment.',
- "[onclick*=\"cip_ui('demo')\"]":'Charge une pièce d\'exemple pour essayer sans STEP.',
+ "[onclick*=\"cip_ui('demo')\"]":'Charge une pièce d\'exemple calculée en vrai :\n• soudure : un tube en T (piquage à 90°)\n• découpe : 3 tuiles à 120° dans un tube Ø54×2.',
  "[onclick*=\"getElementById('cipStepFile')\"]":'Importe ton fichier 3D (.step / .stp). Le tube, son axe et les tubes qui le traversent sont détectés tout seuls.',
  "[onclick*=\"cip_ui('instadd')\"]":'Ajoute une copie de la pièce sur le même tube (angle et décalage réglables).',
  "[onclick*=\"cip_ui('flip')\"]":'Retourne la pièce bout pour bout sur le tube.',
@@ -4406,7 +4477,8 @@ function navSync(){const pg=document.getElementById('wzpCIP');const on=!!(pg&&pg
     const w=$('cipWork');const vis=w&&w.style.display!=='none';const st=w&&w.dataset.step;
     if(vis&&st==='build'){mine.style.display='';if(mine.dataset.m!=='b'){mine.dataset.m='b';mine.textContent='Suivant : préparation →';mine.onclick=()=>cip_ui('gostep','prep');}}
     else if(vis&&st==='prep'){mine.style.display='';if(mine.dataset.m!=='p'){mine.dataset.m='p';mine.textContent='Suivant : simulation →';mine.onclick=()=>cip_ui('gostep','sim');}}
-    else if(vis&&st==='sim'){mine.style.display='';if(mine.dataset.m!=='s'){mine.dataset.m='s';mine.textContent='⬇ Générer le .LST';mine.onclick=()=>{cip_ui('lstgen');const b=$('cipLstBox');if(b)b.scrollIntoView({behavior:'smooth',block:'start'});};}}
+    else if(vis&&st==='sim'){mine.style.display='';if(mine.dataset.m!=='s'){mine.dataset.m='s';mine.textContent='Suivant : mise en machine →';mine.onclick=()=>cip_ui('gostep','mach');}}
+    else if(vis&&st==='mach'&&wzCur()===4){mine.style.display='';if(mine.dataset.m!=='m'){mine.dataset.m='m';mine.textContent='⬇ Générer le .LST';mine.onclick=()=>cip_ui('wzgen');}}
     else mine.style.display='none';}
   else{if(bn&&bn.dataset.cipHid==='1'){bn.style.display=bn.dataset.cipPrev;delete bn.dataset.cipHid;delete bn.dataset.cipPrev;}mine.style.display='none';}}
 setInterval(()=>{try{navSync();}catch(e){}},250);
@@ -4417,7 +4489,7 @@ setInterval(()=>{try{navSync();}catch(e){}},250);
     const st=$('cipStart'),pp=$('cipProcPage'),w=$('cipWork');
     const vis=el=>el&&el.style.display!=='none';
     const pp2=$('cipPartPage');
-    if(vis(w)){e.stopPropagation();e.preventDefault();playing=false;if(w.dataset.step==='sim')setStep('prep');else if(w.dataset.step==='prep'&&S.part&&S.part.gen)setStep('build');else showPartPage();}
+    if(vis(w)){e.stopPropagation();e.preventDefault();playing=false;if(w.dataset.step==='mach')setStep('sim');else if(w.dataset.step==='sim')setStep('prep');else if(w.dataset.step==='prep'&&S.part&&S.part.gen)setStep('build');else showPartPage();}
     else if(vis(pp2)){e.stopPropagation();e.preventDefault();showProcPage();}
     else if(vis(pp)){e.stopPropagation();e.preventDefault();S.api.start();}
     /* écran Mandrin : on laisse le vrai retour au menu */},true);}}
@@ -4445,10 +4517,15 @@ S.api={
     else if(a==='procpick_old'){const ch=$('cipProc').value!==v;$('cipProc').value=v;syncProc();$('cipStart').style.display='none';$('cipProcPage').style.display='none';$('cipWork').style.display='';
       setStep('prep');S.api.run();requestAnimationFrame(()=>{size();upd();});if(ch&&S.part){S.order=null;computeProgram();}return;}
     else if(a==='rapmode'){if(S.prog&&!S.prog.frames)rebuildPaths();return;}
+    else if(a==='wz'){if(v==1)S.wz.d1=true;else if(v==2)S.wz.d2=true;else if(v==3){const P=wzP1();const x=parseFloat(($('cipWzX')||{}).value);if(!P)return;if(isNaN(x)){const i=$('cipWzX');if(i){i.focus();i.style.outline='2px solid #ef5350';}return;}S.wz.x=+x.toFixed(3);S.wz.key=P.key;wzApplyG54();}S.wz.msg='';wzRender();return;}
+    else if(a==='wzback'){if(v==1)S.wz.d1=false;else if(v==2)S.wz.d2=false;else if(v==3){S.wz.x=null;}S.wz.msg='';wzRender();return;}
+    else if(a==='wzgen'){wzGen();return;}
+    else if(a==='advtoggle'){$('cipWork').classList.toggle('cipAdvOn',$('cipAdvChk').checked);return;}
     else if(a==='gostep'){if(v==='build'&&!(S.part&&S.part.gen)){cip_ui('partcreate');return;}showWork(v);return;}
     else if(a==='partscreen'){playing=false;showPartPage();return;}
     else if(a==='partimport'){showWork('prep');setTimeout(()=>$('cipStepFile').click(),50);return;}
     else if(a==='partkeep'){showWork('prep');return;}
+    else if(a==='partdemo'){showWork('prep');cip_ui('demo');return;}
     else if(a==='partcreate'){showWork('build');if(!S.genDef)S.genDef=GEN_DEF();genRender();if(!(S.part&&S.part.gen))genApply(true);return;}
     else if(a==='gen'){S.genDef=S.genDef||GEN_DEF();S.genDef.d=+$('cipGTD').value;S.genDef.ep=+$('cipGTE').value;S.genDef.L=+$('cipGTL').value;genSoon();return;}
     else if(a==='genadd'){S.genDef=S.genDef||GEN_DEF();const n=S.genDef.bodies.length;const B={rond:{type:'rond',d:20,h:50,ang:90,pos:30+25*n,exc:0,rot:0,trav:false},plat:{type:'plat',w:40,t:5,h:40,ang:90,pos:40,exc:0,rot:90,trav:false},bride:{type:'bride',d:+S.genDef.d+30,t:4,pos:15}}[v];S.genDef.bodies.push(B);genRender();genSoon();return;}
@@ -4482,7 +4559,11 @@ S.api={
     else if(a==='flip'){if(!S.part)return;S.flip=!S.flip;placeAndShow();computeProgram();return;}
     else if(a==='fit'){if(S.part&&S.part.det){S.cfg.prof='rond';S.cfg.d=S.part.det.d;S.cfg.ep=S.part.det.ep;syncForm();rebuildAll(true);}return;}
     else if(a==='step'){const f=$('cipStepFile').files[0];if(f)readStep(f);$('cipStepFile').value='';return;}
-    else if(a==='demo'){loadDemo();return;}
+    else if(a==='demo'){if($('cipProc').value==='soudure'){S.genDef=GEN_DEF();genApply(true);return;}
+      // découpe : la tuile (3 tuiles à 120° dans un tube Ø54×2), calculée en vrai comme un STEP importé
+      const D=cip_demo();const v=D.part;const idx=new Uint32Array(v.length/3);for(let i=0;i<idx.length;i++)idx[i]=i;
+      loadMeshes([{attributes:{position:{array:new Float32Array(v)}},index:{array:idx}}],'TUILE-EXEMPLE');
+      if(S.part){S.cfg.L=Math.max(S.cfg.L,260);syncForm();buildStatic();S.inst=[{a:0,dy:0},{a:120,dy:0},{a:240,dy:0}];$('cipNCopy').value=3;S.order=null;placeAndShow();computeProgram();}return;}
     else if(a==='gencip'){const g=genCIP();if(!g){$('cipGenMsg').innerHTML='<span class="cipBad">Pas de programme : importe un STEP ou charge la démo.</span>';return;}
       S.lastCIP=g.txt;const ta=$('cipGenTxt');ta.value=g.txt;ta.style.display='';$('cipGenMsg').innerHTML=`<span class="cipOk">${g.nCIP} lignes CIP + ${g.nG} lignes G01.</span> Copie ou télécharge-le pour ton post-processeur.`;$('cipGenBtns').style.display='';return;}
     else if(a==='copycip'){const ta=$('cipGenTxt');const ok=()=>{$('cipGenMsg').innerHTML='<span class="cipOk">Copié !</span>';};try{navigator.clipboard.writeText(ta.value).then(ok,()=>{ta.focus();ta.select();});}catch(e){ta.focus();ta.select();}return;}
