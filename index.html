@@ -1991,6 +1991,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <div class="cipNum"><span>Écart max à l'angle idéal (°)</span><input type="number" id="cipWMaxDev" value="60" min="0" max="75" step="5" onchange="cip_ui('proc')"></div>
           </div>
           <div class="cipNum"><span>Dégagement entre passages</span><select id="cipRapMode" onchange="cip_ui('rapmode')" style="width:150px"><option value="x">En X (le long du tube)</option><option value="z">Par le dessus (Z)</option></select></div>
+          <label class="cipChk" data-tip="À la fin du programme, la tête revient au point de départ (30 mm au-dessus du 1er point), par un chemin calculé sans collision."><input type="checkbox" id="cipRetDep" checked onchange="cip_ui('rapmode')"> Revenir au point de départ à la fin</label>
           <div class="cipSt" id="cipSteps"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : simulation →</button></div>
         </div>
@@ -3535,11 +3536,25 @@ function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;pla
   if(S.bodyCloud){let mr=0;for(const p of S.bodyCloud.P)mr=Math.max(mr,Math.hypot(p[0],p[2]));Rs=Math.max(Rs,mr+40);}
   if(S.prog.frames){F=S.prog.frames.slice();s=F.length?F[F.length-1].s:0;}
   else C.forEach((c,ci)=>{if(ci>0){const _t=performance.now();const rx=($('cipRapMode')&&$('cipRapMode').value==='x')?rapidX(F[F.length-1],c):null;S.tmRx=(S.tmRx||0)+performance.now()-_t;if(rx){c.rapX=true;rx.forEach(f=>push(f[0],f[1],f[2],ci,-1));}else{c.rapX=false;rapid(F[F.length-1],c,ci,push,Rs);}}c.s0=null;c.P.forEach((p,j)=>{push(p,c.D[j],c.TH[j],ci,j);if(c.s0===null)c.s0=s;});c.s1=s;});
+  // retour au point de départ (30 mm au-dessus du 1er point), chemin sans collision comme les déplacements entre passages
+  S.prog.home=null;
+  if(!S.prog.frames&&C.length&&F.length&&(!$('cipRetDep')||$('cipRetDep').checked)){const c0=C[0];const hp0=V.sub(c0.P[0],V.mul(c0.D[0],30));const home={P:[hp0],D:[c0.D[0]],TH:[c0.TH[0]]};const ci=C.length;const s0=s;
+    const rx=($('cipRapMode')&&$('cipRapMode').value==='x')?rapidX(F[F.length-1],home):null;
+    if(rx)rx.forEach(f=>push(f[0],f[1],f[2],ci,-1));else{rapid(F[F.length-1],home,ci,push,Rs);push(hp0,c0.D[0],c0.TH[0],ci,-1);}
+    S.prog.home={s0,s1:s,ci};}
   TOTAL=s;
   // CINÉMATIQUE RÉELLE : la tête ne penche que dans le plan (axe du tube, vertical).
   // Le mandrin doit donc tourner pour que le faisceau n'ait AUCUNE composante avant/arrière :
   // A = atan2(-dx,-dz)  (faisceau ramené dans le plan vertical qui contient l'axe du tube)
   let prevTh=null;if(!S.prog.frames)F.forEach(fr=>{let t=Math.atan2(-fr.d[0],-fr.d[2])/DEG;if(prevTh!==null){while(t-prevTh>180)t-=360;while(t-prevTh<-180)t+=360;}fr.th=t;prevTh=t;});
+  // retour au départ : on « déroule » aussi le mandrin pour retrouver EXACTEMENT le C1 du début (tête en l'air, au point le plus haut du retour)
+  if(S.prog.home&&F.length>2){const H=S.prog.home;const k=Math.round((F[F.length-1].th-F[0].th)/360);H.unwound=0;
+    if(k){let i0=-1,best=-1;for(let i=0;i<F.length;i++){const f=F[i];if(f.ci!==H.ci)continue;const r=Math.hypot(f.p[0],f.p[2]);if(r>best+0.5){best=r;i0=i;}}
+      if(i0>=0){const f=F[i0];const Pm=rotM(f.p,f.th),Dm=rotM(f.d,f.th);const n=Math.ceil(Math.abs(k)*360/5);const add=[];let ok=true;
+        for(let q=1;q<=n;q++){const th=f.th-360*k*q/n;const pp=rotM(Pm,-th),dd=rotM(Dm,-th);if(q%3===0&&clearance(pp,dd,true)<1){ok=false;break;}add.push({p:pp,d:dd,th,ci:H.ci,j:-1,s:0});}
+        if(ok){const ds=2*Math.PI*Math.hypot(Pm[0],Pm[2])*Math.abs(k)*0.3/n;add.forEach((a2,q)=>{a2.s=f.s+ds*(q+1);});const sh2=ds*n;
+          for(let i=i0+1;i<F.length;i++){F[i].s+=sh2;F[i].th-=360*k;}F.splice(i0+1,0,...add);TOTAL+=sh2;H.s1+=sh2;H.unwound=k;}
+        else H.unwound=null;}}}
   // lignes
   C.forEach((c,ci)=>{const col=new THREE.Color(COL[(c.step-1)%4]);
     const pts=c.P.map(p=>{const r=Math.hypot(p[0],p[2])||1;const f=(r+0.15)/r;return new THREE.Vector3(p[0]*f,p[1],p[2]*f);});
@@ -3584,7 +3599,7 @@ function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;pla
    const old=document.getElementById('cipCollMsg');if(old)old.remove();
    const div=document.createElement('div');div.id='cipCollMsg';div.className='cipStat';
    const pc=s=>(s/TOTAL*100).toFixed(0);
-   div.innerHTML=worst?`<span class="cipBad">⚠ La tête touche à ${zones.length} endroit(s) :</span>`+zones.slice(0,6).map((z,k)=>`<div style="margin:3px 0 0 8px"><span class="cipBad">• ${z.rap?'déplacement vers ':''}${C[z.ci]?C[z.ci].name:''} de ${pc(z.s0)} % à ${pc(z.s1)} % (jusqu'à ${(-z.min).toFixed(0)} mm dedans)</span> <button class="cipBtn" style="padding:1px 6px" onclick="cip_ui('gotocoll',${k})">Voir</button></div>`).join('')
+   div.innerHTML=worst?`<span class="cipBad">⚠ La tête touche à ${zones.length} endroit(s) :</span>`+zones.slice(0,6).map((z,k)=>`<div style="margin:3px 0 0 8px"><span class="cipBad">• ${C[z.ci]?(z.rap?'déplacement vers ':'')+C[z.ci].name:'retour au point de départ'} de ${pc(z.s0)} % à ${pc(z.s1)} % (jusqu'à ${(-z.min).toFixed(0)} mm dedans)</span> <button class="cipBtn" style="padding:1px 6px" onclick="cip_ui('gotocoll',${k})">Voir</button></div>`).join('')
      +(zones.some(z=>!z.rap&&C[z.ci]&&C[z.ci].weld)?'<div class="cipNote" style="margin:4px 0 0 8px">En soudure : même en inclinant la tête au maximum, le cône ne passe pas à ces endroits (creux trop étroit pour la tête, ou trop près du mandrin). Les points rouges dans la 3D montrent où.</div>':'')
      :'<span class="cipOk">Aucune collision sur tout le programme.</span>';
    S.tmColl=performance.now()-S.tmColl0;S.collAt=worst?worst.s:null;$('cipSteps').prepend(div);{const sc=$('cipSimColl');if(sc)sc.innerHTML=div.innerHTML;}
@@ -3659,7 +3674,7 @@ function upd(){const pr=S.profile;let f=frameAt(pos);
   const tilt=Math.atan2(dr[1],-dr[2])/DEG;const side=Math.abs(dr[0]);
   const cl=clearance(f.p,f.d);const A=((th%360)+540)%360-180;
   const lq=toLst(f.p,f.d,th,lstOpt());
-  const name=S.prog&&f.ci>=0?(f.rapid?'déplacement rapide':S.prog.C[f.ci].name):'tête au repos (0°)';
+  const name=S.prog&&f.ci>=0?(S.prog.home&&f.ci===S.prog.home.ci?'retour au point de départ':(f.rapid?'déplacement rapide':S.prog.C[f.ci].name)):'tête au repos (0°)';
   $('cipReadout').innerHTML=[['Contour',name],['X (travers)',fmt(pr2[0])],['Y (le long du tube)',fmt(pr2[1])],['Z (vers la tête)',fmt(pr2[2])],
     ['C1 (mandrin)',fmt(lq.C,1)+'°'],['B (tête)',fmt(lq.B,1)+'°'+(side>0.02?' ⚠':'')],['Garde tête mini',cl>900?'—':cl.toFixed(1)+' mm'],['Paroi opposée',S.prog?hitTxt:'—']]
     .map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('');
@@ -4215,8 +4230,10 @@ function genCIP(){if(!S.prog||!F.length)return null;const o=lstOpt();const C=S.p
     const segs=W&&C[ci].mOv!==undefined?[[0,C[ci].mOv,';soudure normale'],[C[ci].mOv,C[ci].mRamp!==undefined?C[ci].mRamp:Q.length-1,';recouvrement'],[C[ci].mRamp!==undefined?C[ci].mRamp:Q.length-1,Q.length-1,';pente de fin']]:[[0,Q.length-1,null]];
     for(const [a,b,lab] of segs){if(b<=a)continue;if(lab)put(lab);for(const bl of fitBlocks(Q.slice(a,b+1))){put(lineOf(bl),bl.e.s);if(bl.t==='CIP')nCIP++;else nG++;}}
     put(W?';>>> SOUDURE OFF ici (post-processeur)':';>>> LASER OFF ici (post-processeur)',cut.length?cut[cut.length-1].s:null);}
-  const fl=F[F.length-1];const r=V.sub(fl.p,V.mul(fl.d,30));
-  put('');put(';----- DEGAGEMENT FINAL -----');put(mv(toLst(r,fl.d,fl.th,o)),TOTAL);
+  const hm=S.prog.home?F.filter(f=>f.ci===S.prog.home.ci):[];
+  if(hm.length){put('');put(';----- RETOUR AU POINT DE DEPART (chemin sans collision) -----');hm.forEach(f=>{put(mv(toLst(f.p,f.d,f.th,o)),f.s);nG++;});nG--;}
+  else{const fl=F[F.length-1];const r=V.sub(fl.p,V.mul(fl.d,30));
+  put('');put(';----- DEGAGEMENT FINAL -----');put(mv(toLst(r,fl.d,fl.th,o)),TOTAL);}
   // les commentaires prennent le moment de la ligne de mouvement suivante
   let nx=TOTAL;for(let i=sv.length-1;i>=0;i--){if(sv[i]===null)sv[i]=nx;else nx=sv[i];}
   const lines=out.map((t,i)=>({t,s:sv[i]}));
@@ -4261,7 +4278,7 @@ function genLST(){if(!S.prog||S.prog.frames||!F.length)return {err:'Pas de progr
   if(DRYOFF)B.push(';!!! A VIDE : toute la trajectoire est reculee de '+DRYOFF+' mm vers la tete (pas de palpage laser eteint) !!!');
   for(let ci=0;ci<C.length;ci++){const fr=F.filter(f=>f.ci===ci);const rap=fr.filter(f=>f.j<0),cut=fr.filter(f=>f.j>=0);if(!cut.length)continue;
     const Q=cut.map(f=>toLst(sh(f),f.d,f.th,o));
-    if(ci===0){const f0=cut[0];const a=toLst(V.sub(f0.p,V.mul(f0.d,30)),f0.d,f0.th,o);
+    if(ci===0){const f0=cut[0];const a=toLst(V.sub(f0.p,V.mul(f0.d,30+DRYOFF)),f0.d,f0.th,o);
       B.push(lstMv(a,W?'f5000':'')+' ;pre-approche 30 mm dans l\'axe du faisceau');
       if(!W)B.push("fgroup(X,Y,Z,c1)",`FGREF [c1] = ${(+fg).toFixed(3)}`);
       B.push(lstMv(Q[0],W?'f5000':'')+'   ; point d\'approche'+(W?'':' (debut du contour)'));if(W)B.push("m0");B.push("");}
@@ -4271,7 +4288,9 @@ function genLST(){if(!S.prog||S.prog.frames||!F.length)return {err:'Pas de progr
     const segs=W&&C[ci].mOv!==undefined?[[0,C[ci].mOv,';soudure normale'],[C[ci].mOv,C[ci].mRamp!==undefined?C[ci].mRamp:Q.length-1,';recouvrement'],[C[ci].mRamp!==undefined?C[ci].mRamp:Q.length-1,Q.length-1,';pente de fin']]:[[0,Q.length-1,null]];
     for(const [a,b,lab] of segs){if(b<=a)continue;if(lab)B.push(lab);for(const bl of fitBlocks(Q.slice(a,b+1)))B.push(lineOf(bl));}
     B.push("",(dry?";A VIDE ":"")+OFF,"");}
-  const fl=F[F.length-1];B.push(lstMv(toLst(V.sub(fl.p,V.mul(fl.d,30)),fl.d,fl.th,o))+' ;degagement 30 mm dans l\'axe du faisceau');
+  {const hm=S.prog.home?F.filter(f=>f.ci===S.prog.home.ci):[];
+   if(hm.length){B.push(';----- retour au point de depart (chemin sans collision) -----');hm.forEach(f=>B.push(lstMv(toLst(sh(f),f.d,f.th,o))));B.push('');}
+   else{const fl=F[F.length-1];B.push(lstMv(toLst(V.sub(fl.p,V.mul(fl.d,30)),fl.d,fl.th,o))+' ;degagement 30 mm dans l\'axe du faisceau');}}
   if(W){B.push("","TRAFOOF","","G500","G90",o.trafo==='Bc1'?"G01 X =50 Y = 200 F10000":"G01 Y = 200 C1 =0 F10000",o.trafo==='Bc1'?"G01 Z = 350 B = 0 C1 =0":"G01 Z = 350 B = 0","",
       "TC_AUX_LIGHT(5,0)","TC_AUX_LIGHT(6,0)","TC_LASER_REQUEST(0)","TC_RESET","TC_OPEN_DOOR(0,1,0,0)","","M30");}
   else B.push("M30");
