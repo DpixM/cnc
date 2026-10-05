@@ -4111,13 +4111,19 @@ function optimizeWeldDirs(P,D){const _t0=performance.now();S.otm=S.otm||{};const
   const badPts=[];const pieces=segs.map(([k0,k1])=>{const pts=[],dirs=[];
     for(let k=k0;k<=k1;k++){const ka=nodeAt(k),kb=nodeAt(k+1);const i0=(k>k0&&ka===0)?n-1:nodes[ka].i;pts.push(i0);dirs.push(nd[ka].d);
       if(k<k1){const i1=nodes[kb].i===0&&ka===NN-1?n-1:nodes[kb].i;const da=nd[ka].d,db=nd[kb].d;for(let i=i0+1;i<i1;i++){const t=(cum[i]-cum[i0])/((cum[i1]-cum[i0])||1);pts.push(i);dirs.push(slerp(da,db,t));}}}
-    for(let it=0;it<2;it++){const c=dirs.map(x=>x.slice());for(let i=1;i<dirs.length-1;i++)dirs[i]=V.nrm(V.add(V.add(c[i-1],V.mul(c[i],2)),c[i+1]));}
+    const wrap=closed&&k0===0&&k1===NN&&dirs.length>4; // tour complet : le dernier point = le premier -> on lisse EN BOUCLE (pas de cassure au raccord)
+    for(let it=0;it<2;it++){const c=dirs.map(x=>x.slice());for(let i=1;i<dirs.length-1;i++)dirs[i]=V.nrm(V.add(V.add(c[i-1],V.mul(c[i],2)),c[i+1]));
+      if(wrap){const m=dirs.length-1;dirs[0]=V.nrm(V.add(V.add(c[m-1],V.mul(c[0],2)),c[1]));dirs[m]=dirs[0].slice();}}
     // limiteur de vitesse d'orientation (≤ 12°/mm) dans les 2 sens -> pas de coup de tête en bout de passe
     const capR=12;for(const dir of [1,-1]){const st=dir>0?1:dirs.length-2,en=dir>0?dirs.length:-1;for(let j=st;j!==en;j+=dir){const a0=dirs[j-dir],a1=dirs[j];const ds=Math.max(0.05,V.len(V.sub(P[pts[j]],P[pts[j-dir]])));
       const ang=Math.acos(Math.max(-1,Math.min(1,V.dot(a0,a1))))/DEG;const mx=capR*ds;if(ang>mx)dirs[j]=slerp(a0,a1,mx/ang);}}
     // tour complet fermé : la fin rejoint en douceur l'orientation du début (sur les 12 derniers mm) -> pas d'à-coup au recouvrement
     if(closed&&k0===0&&k1===NN&&pts.length>4){let L=0;const Ls=[0];for(let j=1;j<pts.length;j++){L+=V.len(V.sub(P[pts[j]],P[pts[j-1]]));Ls.push(L);}
-      const w0=Math.min(12,L*0.25);for(let j=0;j<pts.length;j++){const rem=L-Ls[j];if(rem<w0){const t=1-rem/w0;dirs[j]=slerp(dirs[j],dirs[0],t*t*(3-2*t));}}}
+      // on répartit seulement l'ÉCART restant entre la fin et le début (rotation progressive), sans figer l'orientation -> le mandrin ne s'arrête pas au raccord
+      const m=dirs.length-1;const a=dirs[m],b=dirs[0];const ax0=V.cross(a,b);const sn=V.len(ax0),cs=Math.max(-1,Math.min(1,V.dot(a,b)));const ang=Math.atan2(sn,cs);
+      if(ang>1e-5){const ax=V.mul(ax0,1/sn);const rot=(v,t)=>{const c=Math.cos(t),s2=Math.sin(t);return V.add(V.add(V.mul(v,c),V.mul(V.cross(ax,v),s2)),V.mul(ax,V.dot(ax,v)*(1-c)));};
+        const w0=Math.min(12,L*0.25);for(let j=0;j<pts.length;j++){const rem=L-Ls[j];if(rem<w0){const t=1-rem/w0;dirs[j]=V.nrm(rot(dirs[j],ang*t*t*(3-2*t)));}}}
+      dirs[m]=dirs[0].slice();}
     // dernière vérif point par point (vraie forme) : si un point entre deux nœuds touche, on choisit la plus proche orientation qui passe
     for(let j=0;j<pts.length;j++){const i=pts[j];let c0=clearance(P[i],dirs[j],'mid');if(c0<2.5)c0=clearance(P[i],dirs[j]);if(c0>=0.5)continue;let best=null,ba=1e9,mx=c0,dmx=null;
       const tries=cand.map(([w,l])=>dirOf(i,w,l));tries.push(D[i]);
@@ -4609,7 +4615,7 @@ S.api={
     else if(a==='snap'){playing=false;upd();const f=frameAt(pos);const R=x=>Array.isArray(x)?x.map(R):(typeof x==='number'?+x.toFixed(3):x);
       let k=0;for(let i=0;i<F.length;i++)if(F[i].s<=pos)k=i;
       const nb=F.slice(Math.max(0,k-3),k+4).map(q=>({ci:q.ci,j:q.j,s:R(q.s),p:R(q.p),d:R(q.d),th:R(q.th)}));
-      const o={ver:'CIP v20',quand:new Date().toISOString(),procede:$('cipProc').value,mandrin:S.cfg.chuck,tube:S.cfg,tete:{len:hp().len,angDeg:R(hp().ang/DEG),gap:hp().gap},
+      const o={ver:'CIP v28',quand:new Date().toISOString(),procede:$('cipProc').value,mandrin:S.cfg.chuck,tube:S.cfg,tete:{len:hp().len,angDeg:R(hp().ang/DEG),gap:hp().gap},
         piece:S.part?{nom:S.part.name,longueur:R(S.part.len||0),rotation:+$('cipPRot').value,distanceBout:+$('cipPOff').value,retournee:S.flip}:(S.prog?'demo':null),
         pct:TOTAL?R(pos/TOTAL*100):0,pos:R(pos),total:R(TOTAL),
         frame:f?{contour:S.prog&&f.ci>=0?S.prog.C[f.ci].name:null,ci:f.ci,j:f.j,rapide:f.rapid,p:R(f.p),d:R(f.d),th:R(f.th)}:null,
