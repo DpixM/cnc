@@ -1992,6 +1992,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <div class="cipNum"><span>Écart max à l'angle idéal (°)</span><input type="number" id="cipWMaxDev" value="60" min="0" max="75" step="5" onchange="cip_ui('proc')"></div>
           </div>
           <div class="cipNum"><span>Dégagement entre passages</span><select id="cipRapMode" onchange="cip_ui('rapmode')" style="width:150px"><option value="x">En X (le long du tube)</option><option value="z">Par le dessus (Z)</option></select></div>
+          <div class="cipNum" data-tip="Hauteur maxi de la pointe au-dessus du tube pendant les déplacements (entre passages et retour au départ). Le soft cherche d'abord un passage bas en dégageant en X et en tournant C1 ; il ne monte plus haut que s'il n'a pas le choix, et il te prévient."><span>Hauteur max de dégagement (mm au-dessus du tube)</span><input type="number" id="cipZMax" value="40" min="5" step="5" onchange="cip_ui('rapmode')"></div>
           <label class="cipChk" data-tip="Le mandrin est toujours à C1 = 0 au début du programme : la pièce est tournée dans le soft pour que le point de départ soit pile sous la tête à C1 = 0 (et le retour finit aussi à C1 = 0)."><input type="checkbox" id="cipC0" checked onchange="cip_ui('c0')"> Départ à C1 = 0</label>
           <label class="cipChk" data-tip="À la fin du programme, la tête revient pile sur le point de départ, tous les axes comme au début (X Y Z B C1), par un chemin calculé sans collision : prête pour la pièce suivante."><input type="checkbox" id="cipRetDep" checked onchange="cip_ui('rapmode')"> Revenir au point de départ à la fin</label>
           <div class="cipSt" id="cipSteps"></div>
@@ -3526,7 +3527,7 @@ function computeProgram(){if(!S.part){S.prog=null;rebuildPaths();return;}
     setTimeout(()=>{try{c0Fix();}catch(e){console.warn('[CIP] C1=0',e);}c0Ui();},0);}catch(e){console.error('[CIP] programme',e);$('cipPartStat').innerHTML=S.part.info+'<br><span class="cipBad">Erreur de calcul : '+e.message+'</span>';}},30);}
 // ---------- trajectoires + timeline ----------
 let F=[],TOTAL=0,lines=[],bwPts=null,pos=0,playing=false,last=performance.now(),ctBtns=[];let codeL=[],codeEl=[],codeCur=-1;let pickM=null;const CARD_TXT=['0° côté mandrin','90° flanc','180° côté bout','270° flanc'];
-function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;playing=false;ctBtns=[];const box=$('cipSteps');box.innerHTML='';
+function rebuildPaths(){S.zWarn=0;S.zWarnH=0;pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;playing=false;ctBtns=[];const box=$('cipSteps');box.innerHTML='';
   const leg=$('cipLeg');
   if(!S.prog){setTimeout(renderCode,0);{const pb=$('cipPickBtn');if(pb)pb.style.display='none';}setPick(null);box.innerHTML='<div class="cipStD">Pas encore de programme : importe un STEP ou charge la démo.</div>';leg.innerHTML='';upd();return;}
   const C=S.prog.C;
@@ -3538,11 +3539,11 @@ function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;pla
   let Rs=S.profile.rmax+60;(S.bodies||[]).forEach(b=>{[b.t0,b.t1].forEach(t=>{const e=V.add(b.c,V.mul(b.ax,t));Rs=Math.max(Rs,Math.hypot(e[0],e[2])+b.r+40);});});
   if(S.bodyCloud){let mr=0;for(const p of S.bodyCloud.P)mr=Math.max(mr,Math.hypot(p[0],p[2]));Rs=Math.max(Rs,mr+40);}
   if(S.prog.frames){F=S.prog.frames.slice();s=F.length?F[F.length-1].s:0;}
-  else C.forEach((c,ci)=>{if(ci>0){const _t=performance.now();const rx=($('cipRapMode')&&$('cipRapMode').value==='x')?rapidX(F[F.length-1],c):null;S.tmRx=(S.tmRx||0)+performance.now()-_t;if(rx){c.rapX=true;rx.forEach(f=>push(f[0],f[1],f[2],ci,-1));}else{c.rapX=false;rapid(F[F.length-1],c,ci,push,Rs);}}c.s0=null;c.P.forEach((p,j)=>{push(p,c.D[j],c.TH[j],ci,j);if(c.s0===null)c.s0=s;});c.s1=s;});
+  else C.forEach((c,ci)=>{if(ci>0){const _t=performance.now();const rx=($('cipRapMode')&&$('cipRapMode').value==='x')?rapidXlim(F[F.length-1],c):null;S.tmRx=(S.tmRx||0)+performance.now()-_t;if(rx){c.rapX=true;rx.forEach(f=>push(f[0],f[1],f[2],ci,-1));}else{c.rapX=false;rapid(F[F.length-1],c,ci,push,Rs);}}c.s0=null;c.P.forEach((p,j)=>{push(p,c.D[j],c.TH[j],ci,j);if(c.s0===null)c.s0=s;});c.s1=s;});
   // retour au point de départ (30 mm au-dessus du 1er point), chemin sans collision comme les déplacements entre passages
   S.prog.home=null;
   if(!S.prog.frames&&C.length&&F.length&&(!$('cipRetDep')||$('cipRetDep').checked)){const c0=C[0];const hp0=c0.P[0].slice();const home={P:[hp0],D:[c0.D[0]],TH:[c0.TH[0]]};/* fin = EXACTEMENT le 1er point (mêmes X Y Z B C1 qu au départ) */const ci=C.length;const s0=s;
-    const rx=($('cipRapMode')&&$('cipRapMode').value==='x')?rapidX(F[F.length-1],home):null;
+    const rx=($('cipRapMode')&&$('cipRapMode').value==='x')?rapidXlim(F[F.length-1],home):null;
     if(rx)rx.forEach(f=>push(f[0],f[1],f[2],ci,-1));else{rapid(F[F.length-1],home,ci,push,Rs);push(hp0,c0.D[0],c0.TH[0],ci,-1);}
     S.prog.home={s0,s1:s,ci};}
   TOTAL=s;
@@ -3605,6 +3606,7 @@ function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;pla
    div.innerHTML=worst?`<span class="cipBad">⚠ La tête touche à ${zones.length} endroit(s) :</span>`+zones.slice(0,6).map((z,k)=>`<div style="margin:3px 0 0 8px"><span class="cipBad">• ${C[z.ci]?(z.rap?'déplacement vers ':'')+C[z.ci].name:'retour au point de départ'} de ${pc(z.s0)} % à ${pc(z.s1)} % (jusqu'à ${(-z.min).toFixed(0)} mm dedans)</span> <button class="cipBtn" style="padding:1px 6px" onclick="cip_ui('gotocoll',${k})">Voir</button></div>`).join('')
      +(zones.some(z=>!z.rap&&C[z.ci]&&C[z.ci].weld)?'<div class="cipNote" style="margin:4px 0 0 8px">En soudure : même en inclinant la tête au maximum, le cône ne passe pas à ces endroits (creux trop étroit pour la tête, ou trop près du mandrin). Les points rouges dans la 3D montrent où.</div>':'')
      :'<span class="cipOk">Aucune collision sur tout le programme.</span>';
+   if(S.zWarn)div.innerHTML+=`<div class="cipWarn" style="margin-top:4px">⚠ ${S.zWarn} déplacement(s) sans passage assez bas : la tête monte jusqu'à ${S.zWarnH>=999?'beaucoup plus haut (par le dessus)':Math.round(S.zWarnH)+' mm'} au-dessus du tube (limite réglée : ${zLim()} mm). Vérifie que ta machine peut monter jusque-là.</div>`;
    S.tmColl=performance.now()-S.tmColl0;S.collAt=worst?worst.s:null;$('cipSteps').prepend(div);{const sc=$('cipSimColl');if(sc)sc.innerHTML=div.innerHTML;}
    {let gl=0;(S.prog.all||C).forEach(c=>{if(c.gapPts)for(let i=1;i<c.gapPts.length;i++){const d=V.len(V.sub(c.gapPts[i],c.gapPts[i-1]));if(d<3)gl+=d;}});
     if(gl>0.5&&$('cipWMaxDev')){const md=+$('cipWMaxDev').value||60;const h=document.createElement('div');h.className='cipStat';
@@ -3619,29 +3621,38 @@ function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;pla
   upd();}
 // Dégagement « en X » (le long du tube, peu de Z) : on remonte juste un peu, on glisse le long du tube hors de la zone
 // des corps soudés, le mandrin tourne là, puis on revient attaquer le passage suivant. Vérifié anti-collision, sinon null.
-function rapidX(a,c){const th0=a.th;const p1=c.P[0],d1=c.D[0];let th1=Math.atan2(-d1[0],-d1[2])/DEG;while(th1-th0>180)th1-=360;while(th1-th0<-180)th1+=360;
+function rapidX(a,c,zlim){const th0=a.th;const p1=c.P[0],d1=c.D[0];let th1=Math.atan2(-d1[0],-d1[2])/DEG;while(th1-th0>180)th1-=360;while(th1-th0<-180)th1+=360;
   const P0m=rotM(a.p,th0),D0m=rotM(a.d,th0),R1m=rotM(V.sub(p1,V.mul(d1,30)),th1),D1m=rotM(d1,th1),P1m=rotM(p1,th1);const V0=[0,0,-1];
   const lerp=(A,B,t)=>A.map((v,i)=>v+(B[i]-v)*t);const L=S.cfg.L,rm=S.profile.rmax;
-  const build=(Rz,ys)=>{const fr=[];let sg=0;const add=(Pm,Dm,th)=>fr.push([rotM(Pm,-th),rotM(V.nrm(Dm),-th),th,sg]);
-    const A0=V.sub(P0m,V.mul(D0m,8));
-    for(let k=1;k<=4;k++)add(lerp(P0m,A0,k/4),D0m,th0);
-    sg=1;for(let k=1;k<=8;k++){const t=k/8;add(lerp(A0,[0,A0[1],Rz],t),lerp(D0m,V0,t),th0);}sg=2;
-    let n=Math.ceil(Math.abs(ys-A0[1])/6);for(let k=1;k<=n;k++)add([0,A0[1]+(ys-A0[1])*k/n,Rz],V0,th0);
-    sg=5;n=Math.ceil(Math.abs(th1-th0)/5);for(let k=1;k<=n;k++)add([0,ys,Rz],V0,th0+(th1-th0)*k/n);sg=6;
-    n=Math.ceil(Math.abs(R1m[1]-ys)/6);for(let k=1;k<=n;k++)add([0,ys+(R1m[1]-ys)*k/n,Rz],V0,th1);
-    sg=3;for(let k=1;k<=8;k++){const t=k/8;add(lerp([0,R1m[1],Rz],R1m,t),lerp(V0,D1m,t),th1);}sg=4;
+  // variantes : recul plus ou moins long dans l'axe du faisceau, tête remise droite ou gardée inclinée (près d'un gros corps, se redresser fait toucher)
+  const build=(Rz,ys,ret,Vout,Vin)=>{const fr=[];let sg=0;const add=(Pm,Dm,th)=>fr.push([rotM(Pm,-th),rotM(V.nrm(Dm),-th),th,sg]);
+    const A0=V.sub(P0m,V.mul(D0m,ret));
+    for(let k=1;k<=Math.max(4,Math.ceil(ret/3));k++)add(lerp(P0m,A0,k/Math.max(4,Math.ceil(ret/3))),D0m,th0);
+    sg=1;for(let k=1;k<=8;k++){const t=k/8;add(lerp(A0,[0,A0[1],Rz],t),lerp(D0m,Vout,t),th0);}sg=2;
+    let n=Math.ceil(Math.abs(ys-A0[1])/6);for(let k=1;k<=n;k++)add([0,A0[1]+(ys-A0[1])*k/n,Rz],Vout,th0);
+    sg=5;n=Math.max(2,Math.ceil(Math.abs(th1-th0)/5));for(let k=1;k<=n;k++)add([0,ys,Rz],lerp(Vout,Vin,k/n),th0+(th1-th0)*k/n);sg=6;
+    n=Math.ceil(Math.abs(R1m[1]-ys)/6);for(let k=1;k<=n;k++)add([0,ys+(R1m[1]-ys)*k/n,Rz],Vin,th1);
+    sg=3;for(let k=1;k<=8;k++){const t=k/8;add(lerp([0,R1m[1],Rz],R1m,t),lerp(Vin,D1m,t),th1);}sg=4;
     for(let k=1;k<=6;k++)add(lerp(R1m,P1m,k/6),D1m,th1);
     return fr;};
   // descente/montée près des soudures : on tolère la garde qu'on a déjà au point de soudure lui-même
   const c0=Math.min(1,clearance(a.p,a.d)-0.5),c1=Math.min(1,clearance(V.sub(p1,V.mul(d1,30)),d1)-0.5,clearance(p1,d1)-0.5);
   const ok=fr=>{for(let i=0;i<fr.length;i++){const f=fr[i];if(i%2&&i!==fr.length-2)continue;const need=(f[3]===0||f[3]===1)?c0:((f[3]===3||f[3]===4)?c1:1);if(clearance(f[0],f[1])<need)return f[3]===4?3:(f[3]===0?1:f[3]);}return -1;};
   const y0=P0m[1];
-  for(const dz of [12,20,30,45,65,90]){const Rz=Math.max(rm+dz,P0m[2]+4);
-    const ysL=[y0];for(let y=y0+10;y<=L+160;y+=10)ysL.push(y);
+  // le Z est limité (la machine ne monte pas haut) : on cherche d'abord le passage le plus BAS, en dégageant en X des DEUX côtés (vers le bout libre ou vers le mandrin)
+  const DZ=[8,12,20,30,45,65,90].filter(d=>d<=(zlim||90));const yLo=8,yHi=L+160;
+  const inPl=d=>{const q=[0,d[1],d[2]];const l=V.len(q);return l>0.3?V.mul(q,1/l):V0;};
+  const VAR=[[8,V0,V0],[8,inPl(D0m),inPl(D1m)],[25,V0,V0],[25,inPl(D0m),inPl(D1m)]];
+  for(const dz of DZ){for(const [ret,Vout,Vin] of VAR){const A0z=P0m[2]-D0m[2]*ret;const Rz=Math.max(rm+dz,A0z+4,R1m[2]+4);if(Rz-rm>(zlim||90)+0.01)continue;
+    const ysL=[y0];for(let k=10;k<=Math.max(yHi-y0,y0-yLo);k+=10){if(y0+k<=yHi)ysL.push(y0+k);if(y0-k>=yLo)ysL.push(y0-k);}
     for(const ys of ysL){ // tri rapide : d'abord la rotation du mandrin à cet endroit (là où ça casse le plus souvent)
-      let quick=true;const n=Math.max(2,Math.ceil(Math.abs(th1-th0)/15));for(let k=0;k<=n&&quick;k++){const th=th0+(th1-th0)*k/n;if(clearance(rotM([0,ys,Rz],-th),rotM(V0,-th),true)<1)quick=false;}
-      S.rxq=(S.rxq||0)+1;if(!quick)continue;S.rxb=(S.rxb||0)+1;const fr=build(Rz,ys);const bad=ok(fr);if(bad<0){S.rxw=[Rz,ys];return fr;}if(bad!==5)break; /* seule la rotation dépend de l'endroit choisi ; le reste bloqué -> on monte un peu plus */}}
+      let quick=true;const n=Math.max(2,Math.ceil(Math.abs(th1-th0)/15));for(let k=0;k<=n&&quick;k++){const th=th0+(th1-th0)*k/n;if(clearance(rotM([0,ys,Rz],-th),rotM(V.nrm(lerp(Vout,Vin,k/n)),-th),true)<1)quick=false;}
+      S.rxq=(S.rxq||0)+1;if(!quick)continue;S.rxb=(S.rxb||0)+1;const fr=build(Rz,ys,ret,Vout,Vin);const bad=ok(fr);S.rxDbg=S.rxDbg||{};S.rxDbg[bad]=(S.rxDbg[bad]||0)+1;if(bad<0){S.rxw=[Rz,ys,ret];return fr;}
+      if(bad===1||bad===3)break; /* le dégagement/la descente ne dépendent pas de l'endroit choisi -> autre variante ; sinon on essaie un autre endroit (des deux côtés) */}}}
   return null;}
+// passage bas d'abord (limite réglable), sinon plus haut avec alerte
+function zLim(){const v=parseFloat(($('cipZMax')||{}).value);return v>0?v:40;}
+function rapidXlim(a,c){const zl=zLim();let r=rapidX(a,c,zl);if(r)return r;r=rapidX(a,c,90);if(r){let mh=0;r.forEach(f=>{mh=Math.max(mh,Math.hypot(f[0][0],f[0][2]));});S.zWarn=(S.zWarn||0)+1;S.zWarnH=Math.max(S.zWarnH||0,mh-S.profile.rmax);}else{S.zWarn=(S.zWarn||0)+1;S.zWarnH=Math.max(S.zWarnH||0,999);}return r;}
 function rapid(a,c,ci,push,Rs){const L1=30;const sub=(p,d,k)=>V.sub(p,V.mul(d,k));
   const p0=a.p,d0=a.d,p1=c.P[0],d1=c.D[0];const r0=sub(p0,d0,L1),r1=sub(p1,d1,L1);
   let ph0=phiOf(r0),ph1=phiOf(r1);
@@ -3897,7 +3908,7 @@ function c0Fix(){if(!S.part||!S.prog||S.prog.frames||!F.length||!$('cipC0')||!$(
     placeAndShow();computeProgram();}}
 const C0SIGN=1;
 function c0Ui(){const on=$('cipC0')&&$('cipC0').checked;const r=$('cipPRot');if(!r)return;const row=r.closest('.cipNum');if(row){row.style.opacity=on?.45:1;row.style.pointerEvents=on?'none':'';row.title=on?'Avec « Départ à C1 = 0 », c\'est le soft qui tourne la pièce.':'';}}
-const CIP_VER='CIP v30',CIP_DATE='05/10/2026';{const e=$('cipVer');if(e){e.textContent='Version '+CIP_VER+' · '+CIP_DATE;e.title='Numéro de version de l\'onglet CIP. Si tu ne vois pas la dernière : Ctrl+F5.';}}
+const CIP_VER='CIP v31',CIP_DATE='05/10/2026';{const e=$('cipVer');if(e){e.textContent='Version '+CIP_VER+' · '+CIP_DATE;e.title='Numéro de version de l\'onglet CIP. Si tu ne vois pas la dernière : Ctrl+F5.';}}
 // ---------- démo ----------
 function loadDemo(){const D=cip_demo();S.cfg.prof='rond';S.cfg.d=54;S.cfg.ep=2;S.cfg.L=Math.max(S.cfg.L,140);syncForm();buildStatic();
   const shift=S.cfg.L-120;S.part=null;$('cipFitBtn').disabled=true;partG.clear();
