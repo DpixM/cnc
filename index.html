@@ -1991,6 +1991,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <div class="cipNum"><span>Écart max à l'angle idéal (°)</span><input type="number" id="cipWMaxDev" value="60" min="0" max="75" step="5" onchange="cip_ui('proc')"></div>
           </div>
           <div class="cipNum"><span>Dégagement entre passages</span><select id="cipRapMode" onchange="cip_ui('rapmode')" style="width:150px"><option value="x">En X (le long du tube)</option><option value="z">Par le dessus (Z)</option></select></div>
+          <label class="cipChk" data-tip="Le mandrin est toujours à C1 = 0 au début du programme : la pièce est tournée dans le soft pour que le point de départ soit pile sous la tête à C1 = 0 (et le retour finit aussi à C1 = 0)."><input type="checkbox" id="cipC0" checked onchange="cip_ui('c0')"> Départ à C1 = 0</label>
           <label class="cipChk" data-tip="À la fin du programme, la tête revient au point de départ (30 mm au-dessus du 1er point), par un chemin calculé sans collision."><input type="checkbox" id="cipRetDep" checked onchange="cip_ui('rapmode')"> Revenir au point de départ à la fin</label>
           <div class="cipSt" id="cipSteps"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : simulation →</button></div>
@@ -3520,7 +3521,8 @@ function computeProgram(){if(!S.part){S.prog=null;rebuildPaths();return;}
       S.prog={C,all:ALLC,steps:isWeld?{2:['Soudure','']}:{1:['Biseau / bout',''],2:['Trous',''],3:['Lamelles et coins',''],4:['Séparation','']}};
       if(bo.notes.length)extra+='<br><span class="cipWarn">'+bo.notes.join('<br>')+'</span>';
       $('cipPartStat').innerHTML=S.part.info+extra+'<br><span class="cipOk">'+C.length+' contour(s) trouvés.</span>'+(r.totalBad&&!isWeld?' <span class="cipWarn">'+r.totalBad+' point(s) sans orientation sûre (repli sur la normale).</span>':'');}
-    {const T2=performance.now();rebuildPaths();if(S.tm)S.tm.paths=performance.now()-T2;}}catch(e){console.error('[CIP] programme',e);$('cipPartStat').innerHTML=S.part.info+'<br><span class="cipBad">Erreur de calcul : '+e.message+'</span>';}},30);}
+    {const T2=performance.now();rebuildPaths();if(S.tm)S.tm.paths=performance.now()-T2;}
+    setTimeout(()=>{try{c0Fix();}catch(e){console.warn('[CIP] C1=0',e);}c0Ui();},0);}catch(e){console.error('[CIP] programme',e);$('cipPartStat').innerHTML=S.part.info+'<br><span class="cipBad">Erreur de calcul : '+e.message+'</span>';}},30);}
 // ---------- trajectoires + timeline ----------
 let F=[],TOTAL=0,lines=[],bwPts=null,pos=0,playing=false,last=performance.now(),ctBtns=[];let codeL=[],codeEl=[],codeCur=-1;let pickM=null;const CARD_TXT=['0° côté mandrin','90° flanc','180° côté bout','270° flanc'];
 function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;playing=false;ctBtns=[];const box=$('cipSteps');box.innerHTML='';
@@ -3859,7 +3861,7 @@ function wzRender(){const box=$('cipWz');if(!box)return;const P=wzP1();const cur
     ${cur===1?`<div class="cipRow"><button class="cipBtn cipMain" onclick="cip_ui('wz',1)">C'est fait →</button></div>`:''}</div>`;
   h+=`<div class="cipWzS ${st(2)}"><h4><i>${cur>2?'✓':2}</i>Oriente la pièce</h4><div class="cipWzT">Mets le mandrin à <span class="cipWzBig">C = 0</span>. La pièce doit être tournée <b>comme sur la 3D</b> (le haut de la 3D = côté tête).</div>
     ${cur===2?`<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',1)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',2)">C'est fait →</button></div>`:''}</div>`;
-  h+=`<div class="cipWzS ${st(3)}"><h4><i>${cur>3?'✓':3}</i>Pose la pointe sur le départ</h4><div class="cipWzT">Tourne le mandrin à <span class="cipWzBig">C = ${Ctxt}°</span> puis amène la pointe <b>pile sur le point jaune qui clignote</b> (départ ${W?'de la soudure':'de la découpe'}).<br>Tape le <b>${P.ax}</b> affiché par la machine, exactement comme à l'écran (avec le signe) :</div>
+  h+=`<div class="cipWzS ${st(3)}"><h4><i>${cur>3?'✓':3}</i>Pose la pointe sur le départ</h4><div class="cipWzT">${Math.abs(+Ctxt)<0.05?'Le mandrin reste à <span class="cipWzBig">C = 0</span>. Amène':'Tourne le mandrin à <span class="cipWzBig">C = '+Ctxt+'°</span> puis amène'} la pointe <b>pile sur le point jaune qui clignote</b> (départ ${W?'de la soudure':'de la découpe'}).<br>Tape le <b>${P.ax}</b> affiché par la machine, exactement comme à l'écran (avec le signe) :</div>
     <div class="cipNum"><span>${P.ax} lu sur la machine</span><input type="number" step="0.001" id="cipWzX" value="${S.wz.x!==null&&S.wz.key===P.key?S.wz.x:''}" placeholder="ex : -125.40"></div>
     ${cur===3?`<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',2)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',3)">Valider →</button></div>`:(cur>3?`<div class="cipNote" style="margin:2px 0 0">${ok} SET_G54(${P.ax==='X'?S.wz.x+', 0, 0':'0, 0, '+S.wz.x}) — le programme part de ce point.</div>`:'')}</div>`;
   const nm=$('cipLName').value||'';const dry=S.wz.dry!==false;
@@ -3882,6 +3884,18 @@ function wzGen(){const P=wzP1();if(!P||wzCur()<4)return;const W=$('cipProc').val
   else{S.lastLST=r;cip_ui('lstdl');S.wz.msg=`<span class="cipOk">${r.file} téléchargé.</span> `+(dry&&!W?'À vide, la buse passe 3 mm au-dessus de la pièce (pas de palpage laser éteint). ':'')+(dry?'Passe-le d\'abord à vide : la pointe doit suivre '+(W?'la jonction':'les contours')+'. Si c\'est bon, décoche « Test à vide » et regénère le vrai.':'<span class="cipWarn">Version AVEC laser.</span>');}
   wzRender();}
 {const _rp=rebuildPaths;rebuildPaths=function(){_rp.apply(this,arguments);if(S.wz)S.wz.posFor='';wzMaybe();};}
+// ---------- C1 = 0 au départ (comme sur la machine) : on tourne la pièce dans le soft pour que le 1er point soit sous la tête à C1 = 0 ----------
+function c0Fix(){if(!S.part||!S.prog||S.prog.frames||!F.length||!$('cipC0')||!$('cipC0').checked){S._c0=null;return;}const f=F.find(x=>x.j>=0);if(!f)return;
+  const t=((f.th%360)+540)%360-180;const st=S._c0||{n:0};
+  if(Math.abs(t)<0.02||st.n>=4){S._c0=null;S.c0Err=Math.abs(t)<0.02?0:t;return;}
+  // la réponse (signe/gain) est mesurée au 1er essai, puis corrigée
+  let dl=st.n===0?C0SIGN*t:(Math.abs(st.t-t)>1e-3?-t*st.dl/(t-st.t):C0SIGN*t);
+  S._c0={n:st.n+1,t,dl};
+  {const cur=+$('cipPRot').value||0;$('cipPRot').value=+(cur+dl).toFixed(4);
+    if(S.starts)for(const k in S.starts)S.starts[k]=rotM(S.starts[k],dl);
+    placeAndShow();computeProgram();}}
+const C0SIGN=1;
+function c0Ui(){const on=$('cipC0')&&$('cipC0').checked;const r=$('cipPRot');if(!r)return;const row=r.closest('.cipNum');if(row){row.style.opacity=on?.45:1;row.style.pointerEvents=on?'none':'';row.title=on?'Avec « Départ à C1 = 0 », c\'est le soft qui tourne la pièce.':'';}}
 // ---------- démo ----------
 function loadDemo(){const D=cip_demo();S.cfg.prof='rond';S.cfg.d=54;S.cfg.ep=2;S.cfg.L=Math.max(S.cfg.L,140);syncForm();buildStatic();
   const shift=S.cfg.L-120;S.part=null;$('cipFitBtn').disabled=true;partG.clear();
@@ -4535,6 +4549,7 @@ S.api={
     else if(a==='procpick'){const ch=$('cipProc').value!==v;$('cipProc').value=v;syncProc();if(ch&&S.part){S.order=null;computeProgram();}showPartPage();return;}
     else if(a==='procpick_old'){const ch=$('cipProc').value!==v;$('cipProc').value=v;syncProc();$('cipStart').style.display='none';$('cipProcPage').style.display='none';$('cipWork').style.display='';
       setStep('prep');S.api.run();requestAnimationFrame(()=>{size();upd();});if(ch&&S.part){S.order=null;computeProgram();}return;}
+    else if(a==='c0'){if(!$('cipC0').checked){const cur=+$('cipPRot').value||0;if(S.starts)for(const k in S.starts)S.starts[k]=rotM(S.starts[k],-cur);$('cipPRot').value=0;placeAndShow();}computeProgram();return;}
     else if(a==='rapmode'){if(S.prog&&!S.prog.frames)rebuildPaths();return;}
     else if(a==='wz'){if(v==1)S.wz.d1=true;else if(v==2)S.wz.d2=true;else if(v==3){const P=wzP1();const x=parseFloat(($('cipWzX')||{}).value);if(!P)return;if(isNaN(x)){const i=$('cipWzX');if(i){i.focus();i.style.outline='2px solid #ef5350';}return;}S.wz.x=+x.toFixed(3);S.wz.key=P.key;wzApplyG54();}S.wz.msg='';wzRender();return;}
     else if(a==='wzback'){if(v==1)S.wz.d1=false;else if(v==2)S.wz.d2=false;else if(v==3){S.wz.x=null;}S.wz.msg='';wzRender();return;}
