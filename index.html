@@ -8,6 +8,37 @@
 #                                                                              #
 ################################################################################
 
+  ##############################################################################
+  ##  ⚠️  RÈGLE N°1 — À LIRE AVANT DE TOUCHER AU PROGRAMME (toute conversation) #
+  ##############################################################################
+  Ce soft est modifié par PLUSIEURS conversations à la fois (ex : le dessin/CAO
+  d'un côté, l'onglet CIP Trumpf de l'autre). Pour ne RIEN casser et ne RIEN
+  perdre, CHAQUE conversation qui touche au programme DOIT faire ceci :
+
+   1. AVANT de modifier : repartir de la DERNIÈRE version de main.
+        git fetch origin main   -> partir de origin/main (JAMAIS d'une vieille copie).
+        (Sinon tu risques d'écraser le travail déjà en ligne d'une autre conversation.)
+
+   2. NE TOUCHER QUE SA ZONE :
+        - Dessin / CAO / G-code / laser  = « zone dessin ».
+        - Onglet CIP = UNIQUEMENT entre les marqueurs « ZONE CIP TRUMPF »
+          (HTML #cipBody + bloc JS cip_* / cipState). Rien en dehors.
+
+   3. NE JAMAIS pousser sur main sans que Seb ait TESTÉ et VALIDÉ.
+        Méthode : branche de test -> lien raw.githack -> Seb valide -> ENSUITE main.
+
+   4. APRÈS validation : pousser sur main. Si le push est REFUSÉ (non fast-forward),
+        c'est que main a bougé entre-temps -> refaire l'étape 1 (re-synchro) puis
+        repousser. NE JAMAIS forcer un push qui écraserait une autre conversation.
+
+   5. Résultat : en repartant toujours d'un main À JOUR et en restant dans sa zone,
+        les deux conversations restent synchro AUTOMATIQUEMENT (main = seule vérité).
+
+  Filets de sécurité (branches de sauvegarde) : sauvegarde-soft-2026-10-01 et
+  sauvegarde-main-cip-2026-10-03. En cas de pépin : revenir à l'une d'elles.
+  (Détails aussi dans le fichier A-LIRE-AVANT-DE-MODIFIER.md à la racine du dépôt.)
+  ##############################################################################
+
   ==============================================================================
   PROCÉDURE CLAUDE — ACCÈS GITHUB (À LIRE ET APPLIQUER EN PREMIER)
   ==============================================================================
