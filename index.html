@@ -1867,6 +1867,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     #cipBody [data-tip]{cursor:help} #cipBody button[data-tip],#cipBody input[data-tip],#cipBody select[data-tip]{cursor:pointer} #cipBody input[type=number][data-tip],#cipBody input:not([type])[data-tip]{cursor:text}
     #cipTip{position:fixed;z-index:100050;max-width:320px;background:#1f2430;color:#e8eaed;border:1px solid var(--acc);border-radius:7px;padding:8px 10px;font:12.5px/1.45 var(--sans);box-shadow:0 6px 20px rgba(0,0,0,.45);pointer-events:none;white-space:pre-line;display:none}
     </style>
+    <div style="position:relative;height:0"><span id="cipVer" style="position:absolute;right:0;top:-12px;font:600 11px var(--mono);color:var(--acc);background:var(--bg);border:1px solid var(--brd2);border-radius:10px;padding:1px 8px;z-index:5">Version CIP</span></div>
     <div id="cipStart">
       <h2>Position du mandrin</h2>
       <p>Choisis comment le mandrin est monté sur la machine aujourd'hui. Tu pourras changer plus tard avec le bouton « Changer » dans les réglages.</p>
@@ -3896,6 +3897,7 @@ function c0Fix(){if(!S.part||!S.prog||S.prog.frames||!F.length||!$('cipC0')||!$(
     placeAndShow();computeProgram();}}
 const C0SIGN=1;
 function c0Ui(){const on=$('cipC0')&&$('cipC0').checked;const r=$('cipPRot');if(!r)return;const row=r.closest('.cipNum');if(row){row.style.opacity=on?.45:1;row.style.pointerEvents=on?'none':'';row.title=on?'Avec « Départ à C1 = 0 », c\'est le soft qui tourne la pièce.':'';}}
+const CIP_VER='CIP v30',CIP_DATE='05/10/2026';{const e=$('cipVer');if(e){e.textContent='Version '+CIP_VER+' · '+CIP_DATE;e.title='Numéro de version de l\'onglet CIP. Si tu ne vois pas la dernière : Ctrl+F5.';}}
 // ---------- démo ----------
 function loadDemo(){const D=cip_demo();S.cfg.prof='rond';S.cfg.d=54;S.cfg.ep=2;S.cfg.L=Math.max(S.cfg.L,140);syncForm();buildStatic();
   const shift=S.cfg.L-120;S.part=null;$('cipFitBtn').disabled=true;partG.clear();
@@ -4616,7 +4618,7 @@ S.api={
     else if(a==='snap'){playing=false;upd();const f=frameAt(pos);const R=x=>Array.isArray(x)?x.map(R):(typeof x==='number'?+x.toFixed(3):x);
       let k=0;for(let i=0;i<F.length;i++)if(F[i].s<=pos)k=i;
       const nb=F.slice(Math.max(0,k-3),k+4).map(q=>({ci:q.ci,j:q.j,s:R(q.s),p:R(q.p),d:R(q.d),th:R(q.th)}));
-      const o={ver:'CIP v29',quand:new Date().toISOString(),procede:$('cipProc').value,mandrin:S.cfg.chuck,tube:S.cfg,tete:{len:hp().len,angDeg:R(hp().ang/DEG),gap:hp().gap},
+      const o={ver:CIP_VER,quand:new Date().toISOString(),procede:$('cipProc').value,mandrin:S.cfg.chuck,tube:S.cfg,tete:{len:hp().len,angDeg:R(hp().ang/DEG),gap:hp().gap},
         piece:S.part?{nom:S.part.name,longueur:R(S.part.len||0),rotation:+$('cipPRot').value,distanceBout:+$('cipPOff').value,retournee:S.flip}:(S.prog?'demo':null),
         pct:TOTAL?R(pos/TOTAL*100):0,pos:R(pos),total:R(TOTAL),
         frame:f?{contour:S.prog&&f.ci>=0?S.prog.C[f.ci].name:null,ci:f.ci,j:f.j,rapide:f.rapid,p:R(f.p),d:R(f.d),th:R(f.th)}:null,
