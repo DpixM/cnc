@@ -4239,6 +4239,15 @@ function navSync(){const pg=document.getElementById('wzpCIP');const on=!!(pg&&pg
     else mine.style.display='none';}
   else{if(bn&&bn.dataset.cipHid==='1'){bn.style.display=bn.dataset.cipPrev;delete bn.dataset.cipHid;delete bn.dataset.cipPrev;}mine.style.display='none';}}
 setInterval(()=>{try{navSync();}catch(e){}},250);
+// ---------- « ← Retour » en haut de l'onglet CIP : revient à l'étape précédente du CIP (pas directement au menu) ----------
+// Simulation -> Préparation -> Procédé -> Mandrin -> (seulement là) retour au menu « Mode d'usinage ».
+{const pg=document.getElementById('wzpCIP');if(pg&&!pg.dataset.cipBackHook){pg.dataset.cipBackHook='1';
+  pg.addEventListener('click',e=>{const bt=e.target.closest&&e.target.closest('button');if(!bt||(bt.getAttribute('onclick')||'').indexOf('cip_back')<0)return;
+    const st=$('cipStart'),pp=$('cipProcPage'),w=$('cipWork');
+    const vis=el=>el&&el.style.display!=='none';
+    if(vis(w)){e.stopPropagation();e.preventDefault();playing=false;if(w.dataset.step==='sim')setStep('prep');else showProcPage();}
+    else if(vis(pp)){e.stopPropagation();e.preventDefault();S.api.start();}
+    /* écran Mandrin : on laisse le vrai retour au menu */},true);}}
 S.api={
   frames(){return F;}, // pour les tests
   prog(){return S.prog;},clr(p,d,f){return clearance(p,d,f);},hit(){return S.lastHit;},cloudN(){return S.bodyCloud?S.bodyCloud.P.length:-1;},
@@ -4305,7 +4314,7 @@ S.api={
     else if(a==='snap'){playing=false;upd();const f=frameAt(pos);const R=x=>Array.isArray(x)?x.map(R):(typeof x==='number'?+x.toFixed(3):x);
       let k=0;for(let i=0;i<F.length;i++)if(F[i].s<=pos)k=i;
       const nb=F.slice(Math.max(0,k-3),k+4).map(q=>({ci:q.ci,j:q.j,s:R(q.s),p:R(q.p),d:R(q.d),th:R(q.th)}));
-      const o={ver:'CIP v18',quand:new Date().toISOString(),procede:$('cipProc').value,mandrin:S.cfg.chuck,tube:S.cfg,tete:{len:hp().len,angDeg:R(hp().ang/DEG),gap:hp().gap},
+      const o={ver:'CIP v19',quand:new Date().toISOString(),procede:$('cipProc').value,mandrin:S.cfg.chuck,tube:S.cfg,tete:{len:hp().len,angDeg:R(hp().ang/DEG),gap:hp().gap},
         piece:S.part?{nom:S.part.name,longueur:R(S.part.len||0),rotation:+$('cipPRot').value,distanceBout:+$('cipPOff').value,retournee:S.flip}:(S.prog?'demo':null),
         pct:TOTAL?R(pos/TOTAL*100):0,pos:R(pos),total:R(TOTAL),
         frame:f?{contour:S.prog&&f.ci>=0?S.prog.C[f.ci].name:null,ci:f.ci,j:f.j,rapide:f.rapid,p:R(f.p),d:R(f.d),th:R(f.th)}:null,
