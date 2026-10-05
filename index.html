@@ -1992,7 +1992,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           </div>
           <div class="cipNum"><span>Dégagement entre passages</span><select id="cipRapMode" onchange="cip_ui('rapmode')" style="width:150px"><option value="x">En X (le long du tube)</option><option value="z">Par le dessus (Z)</option></select></div>
           <label class="cipChk" data-tip="Le mandrin est toujours à C1 = 0 au début du programme : la pièce est tournée dans le soft pour que le point de départ soit pile sous la tête à C1 = 0 (et le retour finit aussi à C1 = 0)."><input type="checkbox" id="cipC0" checked onchange="cip_ui('c0')"> Départ à C1 = 0</label>
-          <label class="cipChk" data-tip="À la fin du programme, la tête revient au point de départ (30 mm au-dessus du 1er point), par un chemin calculé sans collision."><input type="checkbox" id="cipRetDep" checked onchange="cip_ui('rapmode')"> Revenir au point de départ à la fin</label>
+          <label class="cipChk" data-tip="À la fin du programme, la tête revient pile sur le point de départ, tous les axes comme au début (X Y Z B C1), par un chemin calculé sans collision : prête pour la pièce suivante."><input type="checkbox" id="cipRetDep" checked onchange="cip_ui('rapmode')"> Revenir au point de départ à la fin</label>
           <div class="cipSt" id="cipSteps"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : simulation →</button></div>
         </div>
@@ -3540,7 +3540,7 @@ function rebuildPaths(){pathG.clear();lines=[];bwPts=null;F=[];TOTAL=0;pos=0;pla
   else C.forEach((c,ci)=>{if(ci>0){const _t=performance.now();const rx=($('cipRapMode')&&$('cipRapMode').value==='x')?rapidX(F[F.length-1],c):null;S.tmRx=(S.tmRx||0)+performance.now()-_t;if(rx){c.rapX=true;rx.forEach(f=>push(f[0],f[1],f[2],ci,-1));}else{c.rapX=false;rapid(F[F.length-1],c,ci,push,Rs);}}c.s0=null;c.P.forEach((p,j)=>{push(p,c.D[j],c.TH[j],ci,j);if(c.s0===null)c.s0=s;});c.s1=s;});
   // retour au point de départ (30 mm au-dessus du 1er point), chemin sans collision comme les déplacements entre passages
   S.prog.home=null;
-  if(!S.prog.frames&&C.length&&F.length&&(!$('cipRetDep')||$('cipRetDep').checked)){const c0=C[0];const hp0=V.sub(c0.P[0],V.mul(c0.D[0],30));const home={P:[hp0],D:[c0.D[0]],TH:[c0.TH[0]]};const ci=C.length;const s0=s;
+  if(!S.prog.frames&&C.length&&F.length&&(!$('cipRetDep')||$('cipRetDep').checked)){const c0=C[0];const hp0=c0.P[0].slice();const home={P:[hp0],D:[c0.D[0]],TH:[c0.TH[0]]};/* fin = EXACTEMENT le 1er point (mêmes X Y Z B C1 qu au départ) */const ci=C.length;const s0=s;
     const rx=($('cipRapMode')&&$('cipRapMode').value==='x')?rapidX(F[F.length-1],home):null;
     if(rx)rx.forEach(f=>push(f[0],f[1],f[2],ci,-1));else{rapid(F[F.length-1],home,ci,push,Rs);push(hp0,c0.D[0],c0.TH[0],ci,-1);}
     S.prog.home={s0,s1:s,ci};}
@@ -4311,7 +4311,8 @@ function genLST(){if(!S.prog||S.prog.frames||!F.length)return {err:'Pas de progr
   {const hm=S.prog.home?F.filter(f=>f.ci===S.prog.home.ci):[];
    if(hm.length){B.push(';----- retour au point de depart (chemin sans collision) -----');hm.forEach(f=>B.push(lstMv(toLst(sh(f),f.d,f.th,o))));B.push('');}
    else{const fl=F[F.length-1];B.push(lstMv(toLst(V.sub(fl.p,V.mul(fl.d,30)),fl.d,fl.th,o))+' ;degagement 30 mm dans l\'axe du faisceau');}}
-  if(W){B.push("","TRAFOOF","","G500","G90",o.trafo==='Bc1'?"G01 X =50 Y = 200 F10000":"G01 Y = 200 C1 =0 F10000",o.trafo==='Bc1'?"G01 Z = 350 B = 0 C1 =0":"G01 Z = 350 B = 0","",
+  const park=!(S.prog.home);
+  if(W){B.push("","TRAFOOF","","G500","G90",...(park?[o.trafo==='Bc1'?"G01 X =50 Y = 200 F10000":"G01 Y = 200 C1 =0 F10000",o.trafo==='Bc1'?"G01 Z = 350 B = 0 C1 =0":"G01 Z = 350 B = 0"]:[";(tete laissee sur le point de depart, prete pour la piece suivante)"]),"",
       "TC_AUX_LIGHT(5,0)","TC_AUX_LIGHT(6,0)","TC_LASER_REQUEST(0)","TC_RESET","TC_OPEN_DOOR(0,1,0,0)","","M30");}
   else B.push("M30");
   const L=lstHead(prog,kind,tech).concat(B,["STOP_TEXT","C","ENDE_PROGRAMM","C"]);
