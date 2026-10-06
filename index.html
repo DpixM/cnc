@@ -1896,6 +1896,13 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     #cipBody .cipGK.hl{background:color-mix(in srgb,var(--c,#888) 22%,transparent)}
     #cipBody .cipGB.hl{border-color:var(--acc)}
     #cipBody [data-tip]{cursor:help} #cipBody button[data-tip],#cipBody input[data-tip],#cipBody select[data-tip]{cursor:pointer} #cipBody input[type=number][data-tip],#cipBody input:not([type])[data-tip]{cursor:text}
+    #cipDxfModal{position:fixed;inset:0;z-index:100040;background:#000a;display:flex;align-items:center;justify-content:center;padding:16px}
+    #cipDxfModal .cipDxfBox{background:var(--surf);border:1px solid var(--brd2);border-radius:10px;padding:14px;width:min(860px,100%);max-height:96vh;overflow:auto;box-shadow:0 10px 40px #000a}
+    #cipDxfModal .cipDxfGrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px}
+    @media (max-width:700px){#cipDxfModal .cipDxfGrid{grid-template-columns:1fr}}
+    #cipDxfModal svg{width:100%;aspect-ratio:1;background:#0d1117;border:1px solid var(--brd2);border-radius:8px;display:block}
+    #cipDxfModal .cipNum{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;margin:5px 0}
+    #cipDxfModal .cipNum input,#cipDxfModal .cipNum select{width:84px;font:13px var(--mono);padding:3px 5px;background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px}
     #cipTip{position:fixed;z-index:100050;max-width:320px;background:#1f2430;color:#e8eaed;border:1px solid var(--acc);border-radius:7px;padding:8px 10px;font:12.5px/1.45 var(--sans);box-shadow:0 6px 20px rgba(0,0,0,.45);pointer-events:none;white-space:pre-line;display:none}
     </style>
     <div style="position:relative;height:0"><span id="cipVer" style="position:absolute;right:0;top:-12px;font:600 11px var(--mono);color:var(--acc);background:var(--bg);border:1px solid var(--brd2);border-radius:10px;padding:1px 8px;z-index:5">Version CIP</span></div>
@@ -1985,11 +1992,12 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
             <button class="cipBtn" id="cipPf_carre" onclick="cip_ui('prof','carre')">Carré</button>
             <button class="cipBtn" id="cipPf_rect" onclick="cip_ui('prof','rect')">Rectangle</button>
             <button class="cipBtn" id="cipPf_tri" onclick="cip_ui('prof','tri')">Triangle</button>
-            <button class="cipBtn" disabled title="Arrive plus tard">DXF</button>
+            <button class="cipBtn" id="cipPf_perso" onclick="cip_ui('dxf')">DXF / Perso</button>
           </div>
           <div class="cipNum" id="cipRowD"><span>Ø extérieur (mm)</span><input type="number" id="cipTD" value="54" min="2" step="0.1" onchange="cip_ui('tube')"></div>
           <div class="cipNum" id="cipRowW"><span id="cipLblW">Côté (mm)</span><input type="number" id="cipTW" value="40" min="2" step="0.1" onchange="cip_ui('tube')"></div>
           <div class="cipNum" id="cipRowH"><span>Hauteur (mm)</span><input type="number" id="cipTH" value="20" min="2" step="0.1" onchange="cip_ui('tube')"></div>
+          <div class="cipNum" id="cipRowP" style="display:none" data-tip="Ton tube perso (section importée d'un DXF ou forme toute faite). « Modifier » rouvre la fenêtre pour changer l'épaisseur, la taille, la rotation ou l'axe."><span id="cipPerTxt" style="font-size:12px">Perso</span><button class="cipBtn" onclick="cip_ui('dxf')">Modifier</button></div>
           <div class="cipNum" id="cipRowR"><span>Rayon des angles (mm)</span><input type="number" id="cipTR" value="3" min="0" step="0.1" onchange="cip_ui('tube')"></div>
           <div class="cipNum"><span>Épaisseur (mm)</span><input type="number" id="cipTE" value="2" min="0.2" step="0.1" onchange="cip_ui('tube')"></div>
           <div class="cipNum"><span>Longueur qui dépasse des mors (mm)</span><input type="number" id="cipTL" value="150" min="10" step="1" onchange="cip_ui('tube')"></div>
@@ -3220,7 +3228,17 @@ function cip_geo(){
     const sel=g.T.map((t,i)=>{const nn=g.N[i];if(Math.abs(V.dot(nn,best.ax))>0.1)return false;const c=g.Cn[i];const px=V.dot(c,best.u),py=V.dot(c,best.v);let nx=V.dot(nn,best.u),ny=V.dot(nn,best.v);const l=Math.hypot(nx,ny)||1;nx/=l;ny/=l;
       const r=Math.hypot(px-best.cx,py-best.cy);return Math.abs((best.cx-px)*ny-(best.cy-py)*nx)<=Math.max(0.5,0.02*r);});
     return sel.filter(Boolean).length>=6?sel:null;}
-  function fitAxis(g){let sel=tubeSeed(g)||g.T.map(()=>true);let ax,u,v,cx=0,cy=0,ratio=0,round=false;
+  // tube à faces planes (carré, hexagone, profil perso…) : si la recherche « tube rond » donne n'importe quoi, on repart de l'axe des normales
+  function fitAxis(g){const f=fitAxis0(g);let y0=1e9,y1=-1e9,a0=1e9,a1=-1e9,b0=1e9,b1=-1e9;for(const p of g.P){const y=V.dot(p,f.ax);y0=Math.min(y0,y);y1=Math.max(y1,y);const a=V.dot(p,f.u),b=V.dot(p,f.v);a0=Math.min(a0,a);a1=Math.max(a1,a);b0=Math.min(b0,b);b1=Math.max(b1,b);}const mr=Math.hypot(a1-a0,b1-b0)/2;
+    const bad=!(mr>0)||(f.round&&f.rOut>1.3*mr)||(!f.round&&(y1-y0)<0.25*mr);if(!bad)return f;
+    const M=[[0,0,0],[0,0,0],[0,0,0]];g.N.forEach((n,i)=>{const a=g.A[i];for(let r=0;r<3;r++)for(let c=0;c<3;c++)M[r][c]+=a*n[r]*n[c];});
+    const e=eigSym3(M);let k=0;for(let i=1;i<3;i++)if(e.val[i]<e.val[k])k=i;const ax=V.nrm(e.vec[k]);
+    // dessus = la plus grande face plane (normale ⟂ axe)
+    const cl=[];g.N.forEach((n,i)=>{if(Math.abs(V.dot(n,ax))>0.05)return;let c=cl.find(q=>V.dot(q.n,n)>0.998);if(!c){c={n:n.slice(),a:0};cl.push(c);}c.a+=g.A[i];});
+    cl.sort((a,b)=>b.a-a.a);let v=cl.length?V.nrm(V.sub(cl[0].n,V.mul(ax,V.dot(cl[0].n,ax)))):V.nrm(V.cross(Math.abs(ax[0])<0.9?[1,0,0]:[0,1,0],ax));const u=V.nrm(V.cross(ax,v));
+    let mn=[1e9,1e9],mx=[-1e9,-1e9];g.P.forEach(p=>{const x=V.dot(p,u),y=V.dot(p,v);mn=[Math.min(mn[0],x),Math.min(mn[1],y)];mx=[Math.max(mx[0],x),Math.max(mx[1],y)];});
+    const cx=(mn[0]+mx[0])/2,cy=(mn[1]+mx[1])/2;return {ax,u,v,c:V.add(V.mul(u,cx),V.mul(v,cy)),rIn:0,rOut:0,ratio:0,round:false,prism:true,box:[mx[0]-mn[0],mx[1]-mn[1]]};}
+  function fitAxis0(g){let sel=tubeSeed(g)||g.T.map(()=>true);let ax,u,v,cx=0,cy=0,ratio=0,round=false;
     const det=m=>m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1])-m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0])+m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);
     for(let it=0;it<6;it++){
       const M=[[0,0,0],[0,0,0],[0,0,0]];let At=0;
@@ -3293,6 +3311,7 @@ function cip_geo(){
     // normale du segment extérieur le plus proche
     const poly=prof.out;let m=1e18,best=0;for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length];const d=segDist2(p[0],p[2],a[0],a[1],b[0],b[1]);if(d<m){m=d;best=i;}}
     const a=poly[best],b=poly[(best+1)%poly.length];let nx=b[1]-a[1],nz=-(b[0]-a[0]);const l=Math.hypot(nx,nz)||1;nx/=l;nz/=l;
+    if(prof.type==='perso'){return [-nx,0,-nz];} // contour dans le sens trigo : l'intérieur est à gauche (marche aussi pour les formes creuses / décentrées)
     if(nx*(a[0]+b[0])/2+nz*(a[1]+b[1])/2>0){nx=-nx;nz=-nz;}return [nx,0,nz];}
   function beamDirs(g,prof,P,inner,grid,noBlend){const reach=prof.ep*4.5+1.5;const tol=Math.max(0.06,prof.ep*0.05);const D=[],amb=[];let bad=0;
     const score=(p,q,lim)=>{let sc=0;for(const t of [0.25,0.5,0.75]){sc=Math.max(sc,wallDist(g,grid,V.add(p,V.mul(V.sub(q,p),t))));if(sc>lim)break;}return sc;};
@@ -3471,7 +3490,7 @@ const mStock=new THREE.MeshStandardMaterial({color:0x9aa5ae,metalness:0.45,rough
 const mChuck=new THREE.MeshStandardMaterial({color:0xd3d9de,metalness:0.55,roughness:0.28}); // alu
 const mJaw=new THREE.MeshStandardMaterial({color:0xa9b1b8,metalness:0.6,roughness:0.32});
 const mPart=new THREE.MeshStandardMaterial({color:0xc4ccd3,metalness:0.55,roughness:0.42,side:THREE.DoubleSide});
-function profNow(){const c=S.cfg;return G.profile({type:c.prof,d:c.d,w:c.w,h:c.h,r:c.r,ep:c.ep});}
+function profNow(){const c=S.cfg;if(c.prof==='perso'&&S.custProf)return S.custProf;return G.profile({type:c.prof,d:c.d,w:c.w,h:c.h,r:c.r,ep:c.ep});}
 function buildStatic(){statG.clear();const pr=profNow();S.profile=pr;const L=S.cfg.L,back=90;
   const sh=new THREE.Shape(pr.out.map(p=>new THREE.Vector2(p[0],p[1])));sh.holes.push(new THREE.Path(pr.inn.map(p=>new THREE.Vector2(p[0],p[1]))));
   const geo=new THREE.ExtrudeGeometry(sh,{depth:L+back,bevelEnabled:false,curveSegments:24});geo.rotateX(Math.PI/2);geo.translate(0,L,0);
@@ -3727,14 +3746,15 @@ function upd(){const pr=S.profile;let f=frameAt(pos);
   $('cipHud').innerHTML=S.prog&&TOTAL>0?`<b>${S.prog.frames?'LST':($('cipProc').value==='soudure'?'SOUDURE':'DÉCOUPE')}</b> · <b>${(pos/TOTAL*100).toFixed(0)}%</b> · ${pos.toFixed(0)} / ${TOTAL.toFixed(0)} mm de trajet`:`Mandrin ${S.cfg.chuck==='vertical'?'vertical':'horizontal'} · tube ${profTxt()}`;
   $('cipScrub').value=TOTAL?pos/TOTAL*1000:0;if(document.activeElement!==$('cipGoto'))$('cipGoto').value=TOTAL?(pos/TOTAL*100).toFixed(1):0;$('cipPlay').textContent=playing?'Pause':(S.prog&&pos>=TOTAL?'Rejouer':'Lancer');updCode();}
 function syncProc(){try{lstSync();}catch(e){}const v=$('cipProc').value;{const t=$('cipProcTxt');if(t)t.textContent=v==='soudure'?'🔥 Soudure':'✂ Découpe laser';}['decoupe','soudure'].forEach(k=>{const b=$('cipPr_'+k);if(b)b.classList.toggle('cipOn',k===v);});const w=$('cipWeldOpts');if(w)w.style.display=v==='soudure'?'':'none';}
-function profTxt(){const c=S.cfg;return c.prof==='rond'?`rond Ø${c.d}×${c.ep}`:c.prof==='carre'?`carré ${c.w}×${c.w}×${c.ep}`:c.prof==='rect'?`rectangle ${c.w}×${c.h}×${c.ep}`:`triangle ${c.w}×${c.ep}`;}
+function profTxt(){const c=S.cfg;if(c.prof==='perso'&&S.custProf){const P=S.custProf;return `perso ${P.w.toFixed(1)}×${P.h.toFixed(1)}×${P.ep}`;}return c.prof==='rond'?`rond Ø${c.d}×${c.ep}`:c.prof==='carre'?`carré ${c.w}×${c.w}×${c.ep}`:c.prof==='rect'?`rectangle ${c.w}×${c.h}×${c.ep}`:`triangle ${c.w}×${c.ep}`;}
 // ---------- formulaire tube ----------
-function syncForm(){const c=S.cfg;['rond','carre','rect','tri'].forEach(k=>$('cipPf_'+k).classList.toggle('cipOn',c.prof===k));
-  $('cipRowD').style.display=c.prof!=='rond'?'none':'';$('cipRowW').style.display=c.prof==='rond'?'none':'';$('cipRowH').style.display=c.prof!=='rect'?'none':'';$('cipRowR').style.display=c.prof==='rond'?'none':'';
+function syncForm(){const c=S.cfg;if(c.prof==='perso'&&!S.custProf)c.prof='rond';['rond','carre','rect','tri','perso'].forEach(k=>{const b=$('cipPf_'+k);if(b)b.classList.toggle('cipOn',c.prof===k);});
+  {const P=c.prof==='perso';const rp=$('cipRowP');if(rp){rp.style.display=P?'':'none';if(P&&S.custProf)$('cipPerTxt').textContent=(S.custProf.name||'Perso')+' · '+S.custProf.w.toFixed(1)+'×'+S.custProf.h.toFixed(1)+' · ép. '+S.custProf.ep;}const re=$('cipTE');if(re&&re.closest('.cipNum'))re.closest('.cipNum').style.display=P?'none':'';}
+  $('cipRowD').style.display=c.prof!=='rond'?'none':'';if(c.prof==='perso'){['cipRowW','cipRowH','cipRowR'].forEach(id=>$(id).style.display='none');}else{$('cipRowW').style.display=c.prof==='rond'?'none':'';$('cipRowH').style.display=c.prof!=='rect'?'none':'';$('cipRowR').style.display=c.prof==='rond'?'none':'';}
   $('cipLblW').textContent=c.prof==='rect'?'Largeur (mm)':'Côté (mm)';
   $('cipTD').value=c.d;$('cipTW').value=c.w;$('cipTH').value=c.h;$('cipTR').value=c.r;$('cipTE').value=c.ep;$('cipTL').value=c.L;}
 function readForm(){const c=S.cfg;const n=(id,mn)=>Math.max(mn,+$(id).value||mn);c.d=n('cipTD',2);c.w=n('cipTW',2);c.h=n('cipTH',2);c.r=Math.max(0,+$('cipTR').value||0);c.ep=n('cipTE',0.2);c.L=n('cipTL',10);
-  const lim=c.prof==='rond'?c.d/2:Math.min(c.w,c.prof==='rect'?c.h:c.w)/2;if(c.ep>=lim*0.95){c.ep=+(lim*0.9).toFixed(2);}}
+  if(c.prof==='perso')return;const lim=c.prof==='rond'?c.d/2:Math.min(c.w,c.prof==='rect'?c.h:c.w)/2;if(c.ep>=lim*0.95){c.ep=+(lim*0.9).toFixed(2);}}
 function rebuildAll(keepView){buildStatic();if(!keepView)setMapping();placeAndShow();computeProgram();upd();}
 // ---------- STEP ----------
 function readStep(file){const st=$('cipPartStat');st.innerHTML='<span class="cipWarn">Lecture du STEP… (la 1re fois, téléchargement du lecteur ~8 Mo)</span>';
@@ -3939,7 +3959,178 @@ function c0Fix(){if(!S.part||!S.prog||S.prog.frames||!F.length||!$('cipC0')||!$(
     placeAndShow();computeProgram();}}
 const C0SIGN=1;
 function c0Ui(){const on=$('cipC0')&&$('cipC0').checked;const r=$('cipPRot');if(!r)return;const row=r.closest('.cipNum');if(row){row.style.opacity=on?.45:1;row.style.pointerEvents=on?'none':'';row.title=on?'Avec « Départ à C1 = 0 », c\'est le soft qui tourne la pièce.':'';}}
-const CIP_VER='CIP v32',CIP_DATE='06/10/2026';{const e=$('cipVer');if(e){e.textContent='Version '+CIP_VER+' · '+CIP_DATE;e.title='Numéro de version de l\'onglet CIP. Si tu ne vois pas la dernière : Ctrl+F5.';}}
+const CIP_VER='CIP v33',CIP_DATE='07/10/2026';{const e=$('cipVer');if(e){e.textContent='Version '+CIP_VER+' · '+CIP_DATE;e.title='Numéro de version de l\'onglet CIP. Si tu ne vois pas la dernière : Ctrl+F5.';}}
+// ======================= TUBE « PERSO » : section importée d'un DXF (ou forme toute faite), éditable =======================
+// La section = un contour fermé (extérieur) + l'intérieur (lu dans le DXF ou calculé à l'épaisseur voulue).
+function dxfParse(txt){const L=txt.replace(/\r/g,'').split('\n');const pr=[];for(let i=0;i+1<L.length;i+=2)pr.push([+L[i].trim(),L[i+1].trim()]);
+  let units=4;for(let i=0;i<pr.length-2;i++){if(pr[i][0]===9&&pr[i][1]==='$INSUNITS'){units=+pr[i+1][1];break;}}
+  const ents=[];let inEnt=false,cur=null,poly=null;
+  for(let i=0;i<pr.length;i++){const [c,v]=pr[i];
+    if(c===2&&pr[i-1]&&pr[i-1][0]===0&&pr[i-1][1]==='SECTION'){inEnt=(v==='ENTITIES'||v==='BLOCKS');}
+    if(!inEnt)continue;
+    if(c===0){if(cur&&cur.t!=='VERTEX'&&cur.t!=='SEQEND')ents.push(cur);
+      if(v==='VERTEX'&&poly){cur={t:'VERTEX'};poly.v.push(cur);continue;}
+      if(v==='SEQEND'){poly=null;cur=null;continue;}
+      cur={t:v,v:[],k:[],cp:[],fp:[]};if(v==='POLYLINE')poly=cur;continue;}
+    if(!cur)continue;const n=+v;
+    switch(cur.t){
+      case 'LINE':if(c===10)cur.x1=n;else if(c===20)cur.y1=n;else if(c===11)cur.x2=n;else if(c===21)cur.y2=n;break;
+      case 'ARC':case 'CIRCLE':if(c===10)cur.x=n;else if(c===20)cur.y=n;else if(c===40)cur.r=n;else if(c===50)cur.a0=n;else if(c===51)cur.a1=n;break;
+      case 'LWPOLYLINE':if(c===70)cur.fl=n;else if(c===10)cur.v.push({x:n,y:0,b:0});else if(c===20&&cur.v.length)cur.v[cur.v.length-1].y=n;else if(c===42&&cur.v.length)cur.v[cur.v.length-1].b=n;break;
+      case 'POLYLINE':if(c===70)cur.fl=n;break;
+      case 'VERTEX':if(c===10)cur.x=n;else if(c===20)cur.y=n;else if(c===42)cur.b=n;break;
+      case 'ELLIPSE':if(c===10)cur.x=n;else if(c===20)cur.y=n;else if(c===11)cur.mx=n;else if(c===21)cur.my=n;else if(c===40)cur.ra=n;else if(c===41)cur.p0=n;else if(c===42)cur.p1=n;break;
+      case 'SPLINE':if(c===71)cur.deg=n;else if(c===70)cur.fl=n;else if(c===40)cur.k.push(n);else if(c===10)cur.cp.push([n,0]);else if(c===20&&cur.cp.length)cur.cp[cur.cp.length-1][1]=n;
+        else if(c===11)cur.fp.push([n,0]);else if(c===21&&cur.fp.length)cur.fp[cur.fp.length-1][1]=n;break;}}
+  if(cur&&cur.t!=='VERTEX'&&cur.t!=='SEQEND')ents.push(cur);
+  const sc={1:25.4,2:304.8,4:1,5:10,6:1000}[units]||1;
+  // chaque entité -> une suite de points (les arcs et courbes découpés finement)
+  const arcPts=(cx,cy,r,a0,a1)=>{let d=a1-a0;while(d<=0)d+=360;const n=Math.max(8,Math.ceil(d/3));const o=[];for(let k=0;k<=n;k++){const a=(a0+d*k/n)*DEG;o.push([cx+r*Math.cos(a),cy+r*Math.sin(a)]);}return o;};
+  const bulge=(p,q,b)=>{if(!b)return [q];const th=4*Math.atan(b);const dx=q[0]-p[0],dy=q[1]-p[1];const c=Math.hypot(dx,dy);if(c<1e-9)return [q];const r=c/(2*Math.sin(th/2));
+    const mx=(p[0]+q[0])/2,my=(p[1]+q[1])/2;const h=r*Math.cos(th/2);const nx=-dy/c,ny=dx/c;const cx=mx+nx*h,cy=my+ny*h;
+    const a0=Math.atan2(p[1]-cy,p[0]-cx);const n=Math.max(4,Math.ceil(Math.abs(th)/DEG/3));const o=[];for(let k=1;k<=n;k++){const a=a0+th*k/n;o.push([cx+Math.abs(r)*Math.cos(a)*Math.sign(r)*Math.sign(r),cy+Math.abs(r)*Math.sin(a)]);}
+    // recalcule proprement (le signe du rayon dépend du sens)
+    const rr=Math.hypot(p[0]-cx,p[1]-cy);for(let k=1;k<=n;k++){const a=a0+th*k/n;o[k-1]=[cx+rr*Math.cos(a),cy+rr*Math.sin(a)];}o[n-1]=q;return o;};
+  const spline=e=>{if(e.fp.length>=2&&!(e.cp.length>=e.deg+1&&e.k.length))return e.fp;const p=e.deg||3,P=e.cp,K=e.k;if(P.length<2)return P;if(K.length!==P.length+p+1)return P;
+    const N=Math.max(40,P.length*12);const o=[];const u0=K[p],u1=K[K.length-p-1];
+    for(let s=0;s<=N;s++){const u=Math.min(u1-1e-9,u0+(u1-u0)*s/N);let k=p;while(k<P.length-1&&K[k+1]<=u)k++;const d=[];for(let j=0;j<=p;j++)d.push(P[j+k-p].slice());
+      for(let r=1;r<=p;r++)for(let j=p;j>=r;j--){const i=j+k-p;const den=K[i+p-r+1]-K[i];const al=den?(u-K[i])/den:0;d[j]=[(1-al)*d[j-1][0]+al*d[j][0],(1-al)*d[j-1][1]+al*d[j][1]];}o.push(d[p]);}
+    return o;};
+  const segs=[],loops=[];
+  for(const e of ents){let pts=null,closed=false;
+    if(e.t==='LINE'&&e.x1!==undefined)pts=[[e.x1,e.y1],[e.x2,e.y2]];
+    else if(e.t==='ARC')pts=arcPts(e.x,e.y,e.r,e.a0||0,e.a1||360);
+    else if(e.t==='CIRCLE'){pts=arcPts(e.x,e.y,e.r,0,360);pts.pop();closed=true;}
+    else if(e.t==='LWPOLYLINE'||e.t==='POLYLINE'){const V2=e.v.filter(q=>q.x!==undefined);if(V2.length<2)continue;closed=!!(e.fl&1);pts=[[V2[0].x,V2[0].y]];
+      for(let i=1;i<V2.length;i++)pts.push(...bulge([V2[i-1].x,V2[i-1].y],[V2[i].x,V2[i].y],V2[i-1].b||0));
+      if(closed){const l=V2[V2.length-1];const tail=bulge([l.x,l.y],[V2[0].x,V2[0].y],l.b||0);tail.pop();pts.push(...tail);}}
+    else if(e.t==='ELLIPSE'){const a=Math.hypot(e.mx,e.my),ang=Math.atan2(e.my,e.mx),b=a*(e.ra||1);let t0=e.p0||0,t1=e.p1===undefined?2*Math.PI:e.p1;if(t1<=t0)t1+=2*Math.PI;
+      const full=Math.abs(t1-t0-2*Math.PI)<1e-6;const n=96;pts=[];for(let k=0;k<=n;k++){const t=t0+(t1-t0)*k/n;const x=a*Math.cos(t),y=b*Math.sin(t);pts.push([e.x+x*Math.cos(ang)-y*Math.sin(ang),e.y+x*Math.sin(ang)+y*Math.cos(ang)]);}if(full){pts.pop();closed=true;}}
+    else if(e.t==='SPLINE'){pts=spline(e);closed=!!(e.fl&1);}
+    if(!pts||pts.length<2)continue;pts=pts.map(q=>[q[0]*sc,q[1]*sc]);
+    if(closed||Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])<1e-6){if(!closed)pts.pop();loops.push(pts);}else segs.push(pts);}
+  // les morceaux ouverts (lignes + arcs) sont recollés bout à bout pour refaire des contours fermés
+  let ext=1;for(const s of segs.concat(loops))for(const q of s)ext=Math.max(ext,Math.abs(q[0]),Math.abs(q[1]));const tol=Math.max(0.01,ext*2e-4);
+  const used=new Array(segs.length).fill(false);const d2=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);let open=0;
+  for(let i=0;i<segs.length;i++){if(used[i])continue;used[i]=true;let ch=segs[i].slice();let grew=true;
+    while(grew&&d2(ch[0],ch[ch.length-1])>tol){grew=false;const end=ch[ch.length-1];let best=-1,bd=tol,rev=false;
+      for(let j=0;j<segs.length;j++){if(used[j])continue;const s=segs[j];const a=d2(end,s[0]),b=d2(end,s[s.length-1]);if(a<bd){bd=a;best=j;rev=false;}if(b<bd){bd=b;best=j;rev=true;}}
+      if(best>=0){used[best]=true;const s=rev?segs[best].slice().reverse():segs[best];ch=ch.concat(s.slice(1));grew=true;}}
+    if(d2(ch[0],ch[ch.length-1])<=tol&&ch.length>3){ch.pop();loops.push(ch);}else open++;}
+  return {loops,open,units};}
+const pArea=P=>{let a=0;for(let i=0;i<P.length;i++){const p=P[i],q=P[(i+1)%P.length];a+=p[0]*q[1]-q[0]*p[1];}return a/2;};
+const pCCW=P=>pArea(P)<0?P.slice().reverse():P.slice();
+function pSimplify(P,eps){ // Douglas-Peucker en boucle fermée
+  if(P.length<8)return P;const rec=(a,b,out)=>{let m=-1,mi=-1;const A=P[a],B=P[b];const dx=B[0]-A[0],dy=B[1]-A[1],l=Math.hypot(dx,dy)||1e-9;
+    for(let i=a+1;i<b;i++){const d=Math.abs((P[i][0]-A[0])*dy-(P[i][1]-A[1])*dx)/l;if(d>m){m=d;mi=i;}}if(m>eps){rec(a,mi,out);out.push(P[mi]);rec(mi,b,out);}};
+  let far=0,fd=-1;for(let i=1;i<P.length;i++){const d=Math.hypot(P[i][0]-P[0][0],P[i][1]-P[0][1]);if(d>fd){fd=d;far=i;}}
+  const Q=P.concat([P[0]]);const out=[P[0]];const rec2=(a,b)=>{let m=-1,mi=-1;const A=Q[a],B=Q[b];const dx=B[0]-A[0],dy=B[1]-A[1],l=Math.hypot(dx,dy)||1e-9;
+    for(let i=a+1;i<b;i++){const d=Math.abs((Q[i][0]-A[0])*dy-(Q[i][1]-A[1])*dx)/l;if(d>m){m=d;mi=i;}}if(m>eps){rec2(a,mi);out.push(Q[mi]);rec2(mi,b);}};
+  rec2(0,far);out.push(Q[far]);rec2(far,Q.length-1);return out;}
+function pDensify(P,step){const o=[];for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length];const L=Math.hypot(b[0]-a[0],b[1]-a[1]);const n=Math.max(1,Math.ceil(L/step));for(let k=0;k<n;k++)o.push([a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n]);}return o;}
+// intérieur à épaisseur constante : courbe de niveau de la distance au contour (marche à coup sûr, même sur une forme biscornue)
+function pInset(P,e){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;P.forEach(q=>{x0=Math.min(x0,q[0]);y0=Math.min(y0,q[1]);x1=Math.max(x1,q[0]);y1=Math.max(y1,q[1]);});
+  const W=x1-x0,H=y1-y0;if(2*e>=Math.min(W,H))return null;const h=Math.max(Math.max(W,H)/260,0.05);const nx=Math.ceil(W/h)+3,ny=Math.ceil(H/h)+3;const ox=x0-h,oy=y0-h;
+  const Pd=pSimplify(P,h*0.05);const f=new Float32Array(nx*ny);
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const x=ox+i*h,y=oy+j*h;const ins=G.inPoly(Pd,x,y);f[j*nx+i]=ins?G.polyDist(Pd,x,y)-e:-1;}
+  // marching squares (niveau 0)
+  const segs=[];const at=(i,j)=>f[j*nx+i];const ip=(i0,j0,i1,j1)=>{const a=at(i0,j0),b=at(i1,j1);const t=a/(a-b);return [ox+(i0+(i1-i0)*t)*h,oy+(j0+(j1-j0)*t)*h];};
+  for(let j=0;j<ny-1;j++)for(let i=0;i<nx-1;i++){const c=(at(i,j)>0?1:0)|(at(i+1,j)>0?2:0)|(at(i+1,j+1)>0?4:0)|(at(i,j+1)>0?8:0);if(c===0||c===15)continue;
+    const E=[ip(i,j,i+1,j),ip(i+1,j,i+1,j+1),ip(i,j+1,i+1,j+1),ip(i,j,i,j+1)]; // bas, droite, haut, gauche
+    const T={1:[[3,0]],2:[[0,1]],3:[[3,1]],4:[[1,2]],5:[[3,2],[0,1]],6:[[0,2]],7:[[3,2]],8:[[2,3]],9:[[0,2]],10:[[0,3],[1,2]],11:[[1,2]],12:[[1,3]],13:[[0,1]],14:[[0,3]]}[c];
+    for(const [a,b] of T)segs.push([E[a],E[b]]);}
+  // recoller les segments en boucles
+  const key=q=>Math.round(q[0]/h*1000)+','+Math.round(q[1]/h*1000);const adj=new Map();segs.forEach((s,k)=>{for(const q of s){const kk=key(q);if(!adj.has(kk))adj.set(kk,[]);adj.get(kk).push(k);}});
+  const used=new Array(segs.length).fill(false);let best=null,ba=0;
+  for(let k=0;k<segs.length;k++){if(used[k])continue;used[k]=true;const loop=[segs[k][0],segs[k][1]];let cur=segs[k][1];
+    for(let g=0;g<segs.length;g++){const nb=(adj.get(key(cur))||[]).find(m=>!used[m]);if(nb===undefined)break;used[nb]=true;const s=segs[nb];const nxt=key(s[0])===key(cur)?s[1]:s[0];loop.push(nxt);cur=nxt;}
+    const a=Math.abs(pArea(loop));if(a>ba){ba=a;best=loop;}}
+  if(!best||best.length<4)return null;return pCCW(pSimplify(best,h*0.08));}
+// formes toutes faites (pour essayer sans DXF, ou partir d'une base)
+function dxfPreset(k){const o=[];const c=(n,f)=>{for(let i=0;i<n;i++)o.push(f(2*Math.PI*i/n));};
+  if(k==='ovale')c(144,t=>[30*Math.cos(t),18*Math.sin(t)]);
+  else if(k==='hexa')c(6,t=>[25*Math.cos(t),25*Math.sin(t)]);
+  else if(k==='octo')c(8,t=>[25*Math.cos(t+Math.PI/8),25*Math.sin(t+Math.PI/8)]);
+  else if(k==='d'){const R=25,cut=15,t0=Math.acos(-cut/R);for(let i=0;i<=120;i++){const t=-t0+2*t0*i/120;o.push([R*Math.cos(t),R*Math.sin(t)]);}}
+  else if(k==='larme'){for(let i=0;i<=100;i++){const t=Math.PI*0.25+Math.PI*1.5*i/100;o.push([20*Math.cos(t),20*Math.sin(t)]);}o.push([28.28,0]);}
+  else if(k==='bord')c(144,t=>[32*Math.cos(t),14*Math.sin(t)*(1+0.25*Math.cos(2*t))]);
+  return pCCW(o);}
+// --------- fenêtre d'édition ---------
+S.dxf=null; // {src:{out,inn,name}, ep, sx, sy, rot, mir, axe:'boite'|'gravite'|[x,y], L}
+function dxfDerive(){const D=S.dxf;if(!D)return null;const T=p=>{let x=p[0]*D.sx,y=p[1]*D.sy;if(D.mir)x=-x;const a=D.rot*DEG;return [x*Math.cos(a)-y*Math.sin(a),x*Math.sin(a)+y*Math.cos(a)];};
+  let out=D.src.out.map(T);let inn=D.src.inn&&D.useInn?D.src.inn.map(T):null;out=pCCW(out);if(inn)inn=pCCW(inn);
+  // axe du mandrin -> origine
+  let c=[0,0];if(D.axe==='boite'){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;out.forEach(q=>{x0=Math.min(x0,q[0]);y0=Math.min(y0,q[1]);x1=Math.max(x1,q[0]);y1=Math.max(y1,q[1]);});c=[(x0+x1)/2,(y0+y1)/2];}
+  else if(D.axe==='gravite'){let A=0,cx=0,cy=0;for(let i=0;i<out.length;i++){const p=out[i],q=out[(i+1)%out.length];const k=p[0]*q[1]-q[0]*p[1];A+=k;cx+=(p[0]+q[0])*k;cy+=(p[1]+q[1])*k;}A/=2;c=[cx/(6*A),cy/(6*A)];}
+  else if(Array.isArray(D.axe))c=D.axe;
+  out=out.map(q=>[q[0]-c[0],q[1]-c[1]]);if(inn)inn=inn.map(q=>[q[0]-c[0],q[1]-c[1]]);
+  let ep=D.ep;if(inn){const ds=inn.filter((_,i)=>i%Math.max(1,Math.floor(inn.length/60))===0).map(q=>G.polyDist(out,q[0],q[1])).sort((a,b)=>a-b);ep=ds[ds.length>>1]||D.ep;}
+  else inn=pInset(out,D.ep);
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,rmax=0;out.forEach(q=>{x0=Math.min(x0,q[0]);y0=Math.min(y0,q[1]);x1=Math.max(x1,q[0]);y1=Math.max(y1,q[1]);rmax=Math.max(rmax,Math.hypot(q[0],q[1]));});
+  const err=!inn?'Épaisseur trop grande pour cette forme.':(!G.inPoly(out,0,0)?'L\'axe du mandrin est en dehors du tube : le mandrin ne pourra pas le tenir.':(G.inPoly(inn,0,0)?null:'Attention : l\'axe du mandrin tombe dans la paroi, pas dans le vide du tube.'));
+  // densité utile pour la 3D et les calculs (~1 mm, avec les angles gardés)
+  const dens=P=>{const s=pSimplify(P,0.01);return s.length<120?pDensify(s,Math.max(0.6,(x1-x0+y1-y0)/300)):s;};
+  return {out:dens(out),inn:inn?dens(inn):null,ep:+ep.toFixed(3),w:x1-x0,h:y1-y0,rmax,err,box:[x0,y0,x1,y1]};}
+function dxfOpen(){if(!S.dxf){S.dxf={src:{out:dxfPreset('ovale'),inn:null,name:'Ovale'},ep:2,sx:1,sy:1,rot:0,mir:false,axe:'boite',useInn:true,L:S.cfg.L};}
+  let m=$('cipDxfModal');if(!m){m=document.createElement('div');m.id='cipDxfModal';($('cipBody')||document.body).appendChild(m);}
+  m.style.display='';dxfRender();}
+function dxfClose(){const m=$('cipDxfModal');if(m)m.style.display='none';}
+function dxfRender(){const m=$('cipDxfModal');if(!m||!S.dxf)return;const D=S.dxf;const R=dxfDerive();
+  const hasInn=!!D.src.inn;const f1=v=>(+v).toFixed(1);
+  m.innerHTML=`<div class="cipDxfBox"><div class="cipRow" style="justify-content:space-between;margin:0 0 6px"><b style="font-size:15px">📐 Tube perso (section)</b><button class="cipBtn" data-x="close" data-tip="Fermer sans rien changer.">✕</button></div>
+   <div class="cipDxfGrid"><div><svg id="cipDxfSvg" viewBox="-100 -100 200 200"></svg>
+     <div class="cipNote" style="margin:4px 0 0">${D.axe==='clic'?'<b style="color:var(--acc)">Clique dans le dessin pour placer l\'axe du mandrin.</b>':'La croix orange = axe du mandrin (là où il tient le tube).'}</div></div>
+    <div class="cipDxfSide">
+     <div class="cipRow" style="margin:0 0 6px"><button class="cipBtn cipMain" data-x="file" data-tip="Ouvrir un fichier DXF qui contient la section du tube (vue de bout). Le contour doit être fermé. Lignes, arcs, polylignes, cercles, ellipses et splines sont acceptés.">📂 Ouvrir un DXF</button><input type="file" id="cipDxfFile" accept=".dxf,.DXF" style="display:none"></div>
+     <div class="cipNum" data-tip="Ou pars d'une forme toute faite, puis déforme-la avec les réglages en dessous."><span>Forme toute faite</span><select data-k="preset" style="width:120px"><option value="">—</option><option value="ovale">Ovale</option><option value="hexa">Hexagone</option><option value="octo">Octogone</option><option value="d">Profil en D</option><option value="larme">Larme</option><option value="bord">Ovale bombé</option></select></div>
+     <div class="cipNote" style="margin:2px 0 6px">Source : <b>${(D.src.name||'').replace(/</g,'')}</b>${hasInn?' · intérieur lu dans le DXF':''}</div>
+     ${hasInn?`<label class="cipChk" data-tip="Coché : on garde l'intérieur dessiné dans le DXF. Décoché : l'intérieur est recalculé à l'épaisseur que tu tapes."><input type="checkbox" data-k="useInn" ${D.useInn?'checked':''}> Garder l'intérieur du DXF</label>`:''}
+     <div class="cipNum" data-tip="Épaisseur de paroi (mm). L'intérieur est calculé à cette distance partout du contour extérieur."><span>Épaisseur (mm)</span><input type="number" step="0.1" min="0.2" data-k="ep" value="${hasInn&&D.useInn?R.ep:D.ep}" ${hasInn&&D.useInn?'disabled':''}></div>
+     <div class="cipNum" data-tip="Largeur hors tout de la section (mm). Change la taille de la forme."><span>Largeur (mm)</span><input type="number" step="0.1" min="1" data-k="w" value="${f1(R.w)}"></div>
+     <div class="cipNum" data-tip="Hauteur hors tout de la section (mm)."><span>Hauteur (mm)</span><input type="number" step="0.1" min="1" data-k="h" value="${f1(R.h)}"></div>
+     <label class="cipChk" data-tip="Coché : changer la largeur change aussi la hauteur (la forme garde ses proportions)."><input type="checkbox" data-k="lock" ${D.lock!==false?'checked':''}> Garder les proportions</label>
+     <div class="cipNum" data-tip="Agrandir ou rétrécir toute la forme (%)."><span>Échelle</span><span class="cipRow" style="margin:0;gap:3px"><button class="cipBtn" data-x="sc" data-v="0.9" style="padding:2px 7px">−10%</button><button class="cipBtn" data-x="sc" data-v="1.1" style="padding:2px 7px">+10%</button></span></div>
+     <div class="cipNum" data-tip="Tourner la section : ce qui est en haut du dessin est côté tête quand le mandrin est à C1 = 0."><span>Rotation (°)</span><span class="cipRow" style="margin:0;gap:3px"><button class="cipBtn" data-x="rot" data-v="-90" style="padding:2px 7px">↺90</button><input type="number" step="1" data-k="rot" value="${D.rot}" style="width:58px"><button class="cipBtn" data-x="rot" data-v="90" style="padding:2px 7px">↻90</button></span></div>
+     <label class="cipChk" data-tip="Retourner la forme en miroir (gauche ↔ droite)."><input type="checkbox" data-k="mir" ${D.mir?'checked':''}> Miroir</label>
+     <div class="cipNum" data-tip="Où le mandrin tient le tube (l'axe de rotation C1).\n• Centre : milieu de la boîte autour de la forme.\n• Centre de gravité : le « milieu de matière ».\n• Clic : tu cliques dans le dessin."><span>Axe du mandrin</span><select data-k="axe" style="width:120px"><option value="boite" ${D.axe==='boite'?'selected':''}>Centre</option><option value="gravite" ${D.axe==='gravite'?'selected':''}>Centre de gravité</option><option value="clic" ${(D.axe==='clic'||Array.isArray(D.axe))?'selected':''}>Clic sur le dessin</option></select></div>
+     <div class="cipNum" data-tip="Longueur de tube qui dépasse des mors (mm)."><span>Longueur qui dépasse (mm)</span><input type="number" step="1" min="10" data-k="L" value="${D.L}"></div>
+     <div class="cipStat">${R.err?`<span class="${R.err.startsWith('Attention')?'cipWarn':'cipBad'}">${R.err}</span><br>`:''}Hors tout ${f1(R.w)} × ${f1(R.h)} mm · ép. ${R.ep} mm · rayon maxi ${f1(R.rmax)} mm</div>
+     <div class="cipRow" style="margin-top:8px"><button class="cipBtn" data-x="dl" data-tip="Enregistrer cette section en fichier DXF (pour la garder ou la redessiner ailleurs).">💾 DXF</button><button class="cipBtn" data-x="close">Annuler</button><button class="cipBtn cipMain" data-x="ok" ${R.err&&!R.err.startsWith('Attention')?'disabled':''} data-tip="Utiliser ce tube dans le soft (3D, collisions, programme).">✔ Utiliser ce tube</button></div>
+    </div></div></div>`;
+  // dessin
+  const sv=m.querySelector('#cipDxfSvg');const [x0,y0,x1,y1]=R.box;const sp=Math.max(x1-x0,y1-y0,10)*0.62;const cx=(x0+x1)/2,cy=(y0+y1)/2;
+  const vb=[Math.min(cx-sp,-6),Math.min(-cy-sp,-6)];const vs=Math.max(Math.max(cx+sp,6)-vb[0],Math.max(-cy+sp,6)-vb[1]);sv.setAttribute('viewBox',`${vb[0]} ${vb[1]} ${vs} ${vs}`);
+  const path=P=>P?'M'+P.map(q=>q[0].toFixed(2)+' '+(-q[1]).toFixed(2)).join('L')+'Z':'';const k=vs/200;
+  let grid='';const gs=Math.pow(10,Math.floor(Math.log10(vs/4)));for(let g=Math.ceil(vb[0]/gs)*gs;g<vb[0]+vs;g+=gs)grid+=`<line x1="${g}" y1="${vb[1]}" x2="${g}" y2="${vb[1]+vs}"/>`;for(let g=Math.ceil(vb[1]/gs)*gs;g<vb[1]+vs;g+=gs)grid+=`<line x1="${vb[0]}" y1="${g}" x2="${vb[0]+vs}" y2="${g}"/>`;
+  sv.innerHTML=`<g stroke="#ffffff14" stroke-width="${0.6*k}">${grid}</g><path d="${path(R.out)} ${path(R.inn)}" fill="#9aa5ae" fill-rule="evenodd" stroke="#e8eaed" stroke-width="${0.8*k}"/>
+    <g stroke="#f5a623" stroke-width="${1.2*k}"><line x1="${-8*k}" y1="0" x2="${8*k}" y2="0"/><line x1="0" y1="${-8*k}" x2="0" y2="${8*k}"/></g><circle r="${2*k}" fill="#f5a623"/>
+    <text x="0" y="${vb[1]+12*k}" fill="#8b949e" font-size="${6*k}" text-anchor="middle">↑ côté tête (C1 = 0)</text>`;
+  sv.onclick=ev=>{if(S.dxf.axe!=='clic'&&!Array.isArray(S.dxf.axe))return;const pt=sv.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;const q=pt.matrixTransform(sv.getScreenCTM().inverse());
+    const D2=S.dxf;/* le dessin est dans le repère déjà recentré sur l'axe -> on cumule */const base=Array.isArray(D2.axe)?D2.axe:[0,0];D2.axe=[base[0]+q.x,base[1]-q.y];dxfRender();};
+  // réglages
+  m.querySelectorAll('[data-k]').forEach(el=>{el.onchange=()=>{const k2=el.dataset.k,v=el.type==='checkbox'?el.checked:el.value;const D2=S.dxf;
+    if(k2==='preset'){if(!v)return;D2.src={out:dxfPreset(v),inn:null,name:el.options[el.selectedIndex].text};D2.sx=D2.sy=1;D2.rot=0;D2.mir=false;D2.axe='boite';}
+    else if(k2==='ep')D2.ep=Math.max(0.2,+v||D2.ep);
+    else if(k2==='w'||k2==='h'){const cur=dxfDerive();const want=Math.max(1,+v||1);const f=want/(k2==='w'?cur.w:cur.h);const rot90=Math.round(((D2.rot%180)+180)%180/90)===1;
+      if(D2.lock!==false){D2.sx*=f;D2.sy*=f;}else{const onX=(k2==='w')!==rot90;if(onX)D2.sx*=f;else D2.sy*=f;}}
+    else if(k2==='lock')D2.lock=v;else if(k2==='rot')D2.rot=+v||0;else if(k2==='mir')D2.mir=v;else if(k2==='useInn')D2.useInn=v;
+    else if(k2==='axe'){D2.axe=v==='clic'?'clic':v;}else if(k2==='L')D2.L=Math.max(10,+v||D2.L);
+    dxfRender();};});
+  m.querySelectorAll('[data-x]').forEach(el=>{el.onclick=()=>{const x=el.dataset.x,D2=S.dxf;
+    if(x==='close')dxfClose();else if(x==='file')m.querySelector('#cipDxfFile').click();
+    else if(x==='sc'){D2.sx*=+el.dataset.v;D2.sy*=+el.dataset.v;dxfRender();}
+    else if(x==='rot'){D2.rot=((D2.rot+(+el.dataset.v))%360+360)%360;dxfRender();}
+    else if(x==='dl'){const R2=dxfDerive();const lw=P=>['0','LWPOLYLINE','8','0','90',String(P.length),'70','1',...P.flatMap(q=>['10',q[0].toFixed(4),'20',q[1].toFixed(4)])];
+      const t=['0','SECTION','2','HEADER','9','$INSUNITS','70','4','0','ENDSEC','0','SECTION','2','ENTITIES',...lw(pSimplify(R2.out,0.005)),...(R2.inn?lw(pSimplify(R2.inn,0.005)):[]),'0','ENDSEC','0','EOF'].join('\r\n');
+      const u=URL.createObjectURL(new Blob([t],{type:'application/dxf'}));const a=document.createElement('a');a.href=u;a.download='TUBE-PERSO-'+R2.w.toFixed(0)+'x'+R2.h.toFixed(0)+'.dxf';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);}
+    else if(x==='ok'){const R2=dxfDerive();if(!R2||(R2.err&&!R2.err.startsWith('Attention')))return;S.custProf={type:'perso',out:R2.out,inn:R2.inn,rmax:R2.rmax,ep:R2.ep,R:null,name:D2.src.name,w:R2.w,h:R2.h};
+      S.cfg.prof='perso';S.cfg.ep=R2.ep;S.cfg.L=D2.L;dxfClose();syncForm();rebuildAll(true);}};});
+  const fi=m.querySelector('#cipDxfFile');fi.onchange=()=>{const f=fi.files[0];fi.value='';if(!f)return;f.text().then(t=>{let r;try{r=dxfParse(t);}catch(e){r={loops:[],open:0};}
+    if(!r.loops.length){const st=m.querySelector('.cipStat');if(st)st.innerHTML='<span class="cipBad">Aucun contour fermé trouvé dans ce DXF'+(r.open?' ('+r.open+' morceau(x) qui ne se rejoignent pas)':'')+'. Vérifie que la section est bien fermée.</span>';return;}
+    const L2=r.loops.map(P=>pCCW(P)).sort((a,b)=>Math.abs(pArea(b))-Math.abs(pArea(a)));const out=L2[0];const inn=L2.slice(1).find(P=>P.every((q,i)=>i%5||G.inPoly(out,q[0],q[1])))||null;
+    let cx=0,cy=0;out.forEach(q=>{cx+=q[0];cy+=q[1];});cx/=out.length;cy/=out.length;const sh=P=>P.map(q=>[q[0]-cx,q[1]-cy]);
+    S.dxf.src={out:sh(out),inn:inn?sh(inn):null,name:f.name};S.dxf.sx=S.dxf.sy=1;S.dxf.rot=0;S.dxf.mir=false;S.dxf.axe='boite';S.dxf.useInn=!!inn;dxfRender();});};}
+
 // ---------- démo ----------
 function loadDemo(){const D=cip_demo();S.cfg.prof='rond';S.cfg.d=54;S.cfg.ep=2;S.cfg.L=Math.max(S.cfg.L,140);syncForm();buildStatic();
   const shift=S.cfg.L-120;S.part=null;$('cipFitBtn').disabled=true;partG.clear();
@@ -4395,6 +4586,7 @@ function lstSync(){const W=$('cipProc').value==='soudure';
   if(!$('cipLName').value&&S.part&&S.part.name)$('cipLName').value=S.part.name.replace(/\.[^.]*$/,'').toUpperCase().replace(/[^A-Z0-9_-]+/g,'-').replace(/^-+|-+$/g,'');}
 // ---------- bulles d'aide (survol) ----------
 const TIPS={
+ cipPf_perso:'Tube de n\'importe quelle forme : importe la section depuis un DXF, ou pars d\'une forme toute faite (ovale, hexagone, profil en D…), puis règle épaisseur, taille, rotation et axe du mandrin.',
  cipGTD:'Diamètre extérieur du tube principal (mm).',
  cipGTE:'Épaisseur de paroi du tube principal (mm).',
  cipGTL:'Longueur de la pièce (le morceau de tube principal), en mm.',
@@ -4654,6 +4846,7 @@ S.api={
     else if(a==='procpick_old'){const ch=$('cipProc').value!==v;$('cipProc').value=v;syncProc();$('cipStart').style.display='none';$('cipProcPage').style.display='none';$('cipWork').style.display='';
       setStep('prep');S.api.run();requestAnimationFrame(()=>{size();upd();});if(ch&&S.part){S.order=null;computeProgram();}return;}
     else if(a==='c0'){if(!$('cipC0').checked){const cur=+$('cipPRot').value||0;if(S.starts)for(const k in S.starts)S.starts[k]=rotM(S.starts[k],-cur);$('cipPRot').value=0;placeAndShow();}computeProgram();return;}
+    else if(a==='dxf'){dxfOpen();return;}
     else if(a==='rapmode'){if(S.prog&&!S.prog.frames)rebuildPaths();return;}
     else if(a==='wz'){if(v==1)S.wz.d1=true;else if(v==2)S.wz.d2=true;else if(v==3){const P=wzP1();const x=parseFloat(($('cipWzX')||{}).value);if(!P)return;if(isNaN(x)){const i=$('cipWzX');if(i){i.focus();i.style.outline='2px solid #ef5350';}return;}S.wz.x=+x.toFixed(3);S.wz.key=P.key;wzApplyG54();}S.wz.msg='';wzRender();return;}
     else if(a==='wzback'){if(v==1)S.wz.d1=false;else if(v==2)S.wz.d2=false;else if(v==3){S.wz.x=null;}S.wz.msg='';wzRender();return;}
