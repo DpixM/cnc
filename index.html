@@ -3912,7 +3912,7 @@ function wzRender(){const box=$('cipWz');if(!box)return;const P=wzP1();const cur
     <div class="cipNum"><span>Nom du programme</span><input id="cipWzName" style="width:150px" value="${nm.replace(/"/g,'')}" placeholder="ex : TUBE-EN-T"></div>
     ${W?`<div class="cipNum"><span>Techno soudure (WTT)</span><input id="cipWzTech" list="cipLTWl" style="width:150px" value="${($('cipLTW').value||'').replace(/"/g,'')}" placeholder="ex : TUBECOUDE-DORE"></div>`
        :`<div class="cipNum"><span>Techno découpe (LTT)</span><b style="font:13px var(--mono)">${$('cipLTC').textContent}</b></div>`}
-    <label class="cipChk"><input type="checkbox" id="cipWzDry" ${dry?'checked':''}> <b>Test à vide</b> (laser jamais allumé)</label>
+    <label class="cipChk" data-tip="Test à vide : le laser ne s'allume jamais (allumage en commentaire), fichier « -VIDE ». En découpe, la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint). Toujours passer à vide avant le vrai !"><input type="checkbox" id="cipWzDry" ${dry?'checked':''}> <b>Test à vide</b> (laser jamais allumé)</label>
     <div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',3)">←</button><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('wzgen')">⬇ Générer et télécharger</button></div>
     <div class="cipStat" id="cipWzMsg">${S.wz.msg||''}</div></div>`;
   box.innerHTML=h;wzView();}
@@ -3939,7 +3939,7 @@ function c0Fix(){if(!S.part||!S.prog||S.prog.frames||!F.length||!$('cipC0')||!$(
     placeAndShow();computeProgram();}}
 const C0SIGN=1;
 function c0Ui(){const on=$('cipC0')&&$('cipC0').checked;const r=$('cipPRot');if(!r)return;const row=r.closest('.cipNum');if(row){row.style.opacity=on?.45:1;row.style.pointerEvents=on?'none':'';row.title=on?'Avec « Départ à C1 = 0 », c\'est le soft qui tourne la pièce.':'';}}
-const CIP_VER='CIP v31',CIP_DATE='05/10/2026';{const e=$('cipVer');if(e){e.textContent='Version '+CIP_VER+' · '+CIP_DATE;e.title='Numéro de version de l\'onglet CIP. Si tu ne vois pas la dernière : Ctrl+F5.';}}
+const CIP_VER='CIP v32',CIP_DATE='06/10/2026';{const e=$('cipVer');if(e){e.textContent='Version '+CIP_VER+' · '+CIP_DATE;e.title='Numéro de version de l\'onglet CIP. Si tu ne vois pas la dernière : Ctrl+F5.';}}
 // ---------- démo ----------
 function loadDemo(){const D=cip_demo();S.cfg.prof='rond';S.cfg.d=54;S.cfg.ep=2;S.cfg.L=Math.max(S.cfg.L,140);syncForm();buildStatic();
   const shift=S.cfg.L-120;S.part=null;$('cipFitBtn').disabled=true;partG.clear();
@@ -4395,6 +4395,15 @@ function lstSync(){const W=$('cipProc').value==='soudure';
   if(!$('cipLName').value&&S.part&&S.part.name)$('cipLName').value=S.part.name.replace(/\.[^.]*$/,'').toUpperCase().replace(/[^A-Z0-9_-]+/g,'-').replace(/^-+|-+$/g,'');}
 // ---------- bulles d'aide (survol) ----------
 const TIPS={
+ cipGTD:'Diamètre extérieur du tube principal (mm).',
+ cipGTE:'Épaisseur de paroi du tube principal (mm).',
+ cipGTL:'Longueur de la pièce (le morceau de tube principal), en mm.',
+ cipPf_rond:'Tube rond.',cipPf_carre:'Tube carré.',cipPf_rect:'Tube rectangulaire.',cipPf_tri:'Tube triangulaire.',
+ cipWOpt:'Si la tête toucherait la pièce, le soft l\'incline tout seul (au plus près de l\'angle idéal) pour passer.',
+ cipVec:'Afficher les petits traits qui montrent la direction du faisceau le long du parcours.',
+ cipBw:'Afficher en rouge les points où le faisceau touche la paroi d\'en face (de l\'autre côté du tube).',
+ cipParts:'Afficher ou cacher la pièce dans la 3D.',
+ cipLDry:'Version test à vide : le laser ne s\'allume jamais, le fichier finit par « -VIDE ».',
  cipHLen:'Longueur du cône qui représente la tête (en mm), de la buse vers le haut.\nSert seulement au contrôle des collisions dans la simu.\n180 = ta focale LHT 7.',
  cipHAng:'Demi-angle du cône de la tête (en degrés).\nPlus petit = tête plus fine dans la simu.\n12° passe à 50° du mandrin comme sur ta machine.',
  cipHGap:'Distance entre la buse et la pièce (mm).\nLa simu laisse cet écart entre le bout du cône et la surface.',
@@ -4431,7 +4440,46 @@ const TIPS={
  cipHome:'Vue d\'ensemble.'
 
 };
-const TIPSEL={"#cipCode .cipCH span":'Le code CIP du programme, ligne par ligne.\nJaune = CIP (arc 5 axes par un point intermédiaire I1 J1 K1)\nBlanc = G01 (ligne droite)\nVert = allumage / extinction laser\nGris = commentaires\nClique une ligne : la simu va pile à ce moment.',
+const TIPSEL={
+ "#cipCardH":'Le mandrin est à plat (plateau couché, tube debout).\nRepère machine Bc1 : le tube est le long de Z.',
+ "#cipCardV":'Le mandrin est à 90° (plateau debout, tube couché).\nRepère machine BA1 : le tube est le long de X. C\'est le montage habituel.',
+ "#cipCardW":'Soudure : le soft suit la jonction entre les pièces (tube piqué, plat, bride…) et sort un programme TC_WELD_ON / OFF avec ta techno WTT.',
+ "#cipCardC":'Découpe laser : le soft découpe les contours de la pièce dans le tube (biseau, trous, lamelles, séparation) et sort un programme TC_LASER_ON / OFF avec ta table LTT.',
+ "#cipCardImp":'Charger un fichier STEP (.step / .stp) dessiné dans Fusion ou autre.\nLe tube et son axe sont détectés tout seuls.',
+ "#cipCardGen":'Dessiner une pièce simple en tapant les cotes : un tube + des tubes piqués, des plats ou une bride.\nLes lignes de soudure sont calculées exactement.',
+ "#cipCardDemo":'Charger une pièce d\'exemple toute prête, calculée en vrai, pour essayer le soft.',
+ "#cipPartKeepBtn":'Passer à la suite sans importer ni créer de pièce (ou garder celle déjà chargée).',
+ "#cipStpPart":'Revenir au choix / à la création de la pièce.',
+ "#cipStpPrep":'Préparation : réglages machine, tube, placement de la pièce et des passages.',
+ "#cipStpSim":'Simulation : voir la tête suivre le programme, vérifier les collisions et le code.',
+ "#cipStpMach":'Mise en machine : les étapes pour monter la pièce, prendre l\'origine avec la pointe et sortir le .LST.',
+ "[onclick*=\"cip_ui('genadd','rond')\"]":'Ajouter un tube (ou un rond plein) piqué sur le tube principal.',
+ "[onclick*=\"cip_ui('genadd','plat')\"]":'Ajouter un plat / un gousset soudé sur le tube.',
+ "[onclick*=\"cip_ui('genadd','bride')\"]":'Ajouter une bride / une collerette autour du tube (soudée des deux côtés).',
+ "[onclick*=\"cip_ui('rotstep',-15)\"]":'Tourner la pièce de 15° dans un sens autour du tube.',
+ "[onclick*=\"cip_ui('rotstep',15)\"]":'Tourner la pièce de 15° dans l\'autre sens autour du tube.',
+ "[onclick*=\"cip_ui('instspread')\"]":'Répartir ce nombre de pièces régulièrement autour du tube (ex : 3 → tous les 120°).',
+ "#cipInstList input":'Angle de cette pièce autour du tube (°).',
+ "#cipInstList button":'Enlever cette pièce.',
+ "[onclick*=\"cip_ui('restart')\"]":'Remettre la simulation au début du programme.',
+ "[onclick*=\"cip_ui('next')\"]":'Sauter au début du contour suivant.',
+ "[onclick*=\"cip_ui('gostep','prep')\"]":'Revenir à la préparation (réglages et placement).',
+ "[onclick*=\"cip_ui('gencip')\"]":'Sortir seulement le bloc de mouvements CIP (sans en-tête ni fin de programme), pour le coller dans un programme existant.',
+ "[onclick*=\"cipLstFile\"]":'Ouvrir un .LST existant pour le voir et le rejouer dans la simulation (rien n\'est modifié).',
+ "#cipLstBox summary":'Outils en plus : bloc CIP seul, ou relire un .LST.',
+ "#cipAdvChk":'Afficher tous les réglages du .LST : origine G54, épaisseur du mandrin, sens de l\'axe, table techno, bloc CIP…\nEn temps normal, les 4 étapes au-dessus suffisent.',
+ "#cipWz .cipWzS:nth-child(1) .cipMain":'Coche quand le tube est monté et que tu as vérifié en tournant à la main que la tête ne touche rien.',
+ "#cipWz .cipWzS:nth-child(2) .cipMain":'Coche quand la pièce est tournée comme sur la 3D, mandrin à C = 0.',
+ "#cipWz .cipWzS:nth-child(3) .cipMain":'Valide le X lu : il devient l\'origine (SET_G54) du programme.',
+ "#cipWzX":'Pose la pointe pile sur le point jaune de la pièce, puis tape ici la valeur X affichée par la machine, avec son signe (ex : -125.40).\nC\'est l\'origine du programme.',
+ "#cipWzName":'Nom du programme sur la machine (lettres, chiffres, tirets). Le fichier s\'appellera P + ce nom + .LST.',
+ "#cipWzTech":'Nom de ta table techno soudure (WTT), exactement comme dans TC_WELD_ON (ex : TUBECOUDE-DORE).',
+ "#cipWzDry":'Test à vide : le laser ne s\'allume jamais (allumage en commentaire), fichier « -VIDE ».\nEn découpe, toute la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint).\nToujours passer à vide avant le vrai !',
+ "#cipWz [onclick*=\"cip_ui('wzgen')\"]":'Créer le .LST et le télécharger. Mets-le ensuite sur la machine.',
+ "#cipWz [onclick*=\"cip_ui('wzback'\"]":'Revenir à l\'étape d\'avant.',
+ "#cipNavBtn":'Passer à l\'étape suivante.',
+ "[onclick*=\"cip_ui('gostep','sim')\"]":'Passer à la simulation : voir la tête suivre le programme et vérifier les collisions.',
+ "[onclick*=\"cip_ui('codehide')\"]":'Masquer le panneau du code (bouton « Afficher le code en direct » pour le remettre).',"#cipCode .cipCH span":'Le code CIP du programme, ligne par ligne.\nJaune = CIP (arc 5 axes par un point intermédiaire I1 J1 K1)\nBlanc = G01 (ligne droite)\nVert = allumage / extinction laser\nGris = commentaires\nClique une ligne : la simu va pile à ce moment.',
  "[onclick*=\"cip_ui('demo')\"]":'Charge une pièce d\'exemple calculée en vrai :\n• soudure : un tube en T (piquage à 90°)\n• découpe : 3 tuiles à 120° dans un tube Ø54×2.',
  "[onclick*=\"getElementById('cipStepFile')\"]":'Importe ton fichier 3D (.step / .stp). Le tube, son axe et les tubes qui le traversent sont détectés tout seuls.',
  "[onclick*=\"cip_ui('instadd')\"]":'Ajoute une copie de la pièce sur le même tube (angle et décalage réglables).',
@@ -4447,7 +4495,12 @@ function initTips(){Object.entries(TIPS).forEach(([id,t])=>{const e=$(id);if(!e)
   let cur=null,tm=null;const body=$('cipBody')||document.body;
   const show=el=>{tip.textContent=el.dataset.tip;tip.style.display='block';const r=el.getBoundingClientRect();const w=tip.offsetWidth,h=tip.offsetHeight;
     let x=r.left,y=r.bottom+6;if(x+w>innerWidth-8)x=innerWidth-8-w;if(y+h>innerHeight-8)y=r.top-6-h;tip.style.left=Math.max(8,x)+'px';tip.style.top=Math.max(8,y)+'px';};
-  body.addEventListener('mouseover',e=>{const el=e.target.closest&&e.target.closest('[data-tip]');if(el===cur)return;cur=el;clearTimeout(tm);if(!el){tip.style.display='none';return;}tm=setTimeout(()=>show(el),350);});
+  const findTip=t=>{if(!t||!t.closest)return null;let el=t.closest('[data-tip]');if(el)return el;
+    const lab=t.closest('label');if(lab){const i=lab.querySelector('[data-tip]');if(i)return i;}
+    const row=t.closest('.cipNum');if(row){const sp=row.querySelector('[data-tip]');if(sp)return sp;}
+    for(const [sel,tx] of Object.entries(TIPSEL)){let m=null;try{m=t.closest(sel);}catch(e){}if(m&&m.closest('#cipBody')){m.dataset.tip=tx;return m;}}
+    return null;};
+  body.addEventListener('mouseover',e=>{const el=findTip(e.target);if(el===cur)return;cur=el;clearTimeout(tm);if(!el){tip.style.display='none';return;}tm=setTimeout(()=>show(el),350);});
   body.addEventListener('mouseleave',()=>{cur=null;clearTimeout(tm);tip.style.display='none';});
   body.addEventListener('pointerdown',()=>{clearTimeout(tm);tip.style.display='none';});}
 // ---------- panneau code en direct ----------
