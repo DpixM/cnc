@@ -2993,13 +2993,19 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <div id="toolCalcWarn" style="display:none;margin-top:5px;padding:5px 8px;border-radius:4px;font-size:10px;font-weight:600"></div>
     </div>
     <script>
-      // Auto-calc on input change (inline, runs after inputs exist)
-      setTimeout(()=>{
-        ['tmDia','tmAngle','tmFxy','tmFz','tmSpin','tmMaxD','tmType','tmFlutes'].forEach(id=>{
-          document.getElementById(id)?.addEventListener('input',calcToolParams);
+      // [FIX] Calcul auto d'outil : on attend que calcToolParams soit défini.
+      // Sur un gros fichier, l'ancien setTimeout(200) pouvait se déclencher AVANT
+      // que la fonction existe -> "calcToolParams is not defined". Ici on réessaie
+      // tant qu'elle n'est pas prête, puis on pose les écouteurs une seule fois.
+      (function hookToolCalc(){
+        if(typeof calcToolParams!=='function'){ setTimeout(hookToolCalc,100); return; }
+        ['tmDia','tmAngle','tmFxy','tmFz','tmSpin','tmMaxD','tmType','tmFlutes'].forEach(function(id){
+          var el=document.getElementById(id);
+          if(el) el.addEventListener('input',calcToolParams);
         });
-      },200);
+      })();
     </script>
+
     <div class="fld"><label>Notes</label><textarea id="tmNotes" style="min-height:40px"></textarea></div>
     <div class="divider"></div>
     <div class="btn-row">
