@@ -161,6 +161,17 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-07 — HP : CORRECTEUR DE DIMENSION (saignée) pour la découpe laser + fix calcToolParams
+ [AJOUT] Panneau laser : "📏 Correcteur de dimension" = Saignée globale (mm) + Ajustement X/Y (mm) + une
+   aide "carré test mesuré -> je calcule". La trajectoire de chaque contour FERMÉ est décalée vers la CHUTE
+   (côté chute/pièce donné par la peinture vert=pièce/rouge=chute, sinon pair-impair) pour que la pièce
+   gardée retrouve sa cote. Fonctions _kerfOffset()/_lineIsect() (offset par arête, normale forcée vers
+   l'extérieur par point-in-poly -> robuste au sens de parcours). Défaut (0,0,0) = AUCUN décalage = sortie
+   STRICTEMENT identique à avant. Le dessin à l'écran reste à la cote ; la correction n'est que dans le prog.
+   Tests : t_kerf.cjs (carré 10->10.2 à saignée 0.2, no-op à 0, sens chute/pièce, ajustement X/Y, cercle).
+ [FIX] calcToolParams : les écouteurs du calcul auto d'outil attendent que la fonction existe (plus de
+   ReferenceError sur gros fichier). Hors zone CIP.
+
 -- 2026-10-03 — HO : EN LIGNE — fusion des améliorations HN (cercle/tangente/gomme, validées Seb) AVEC le CIP
  [MERGE] Les fixes HN (★ le vrai cercle ne part plus en segments, tangente qui roule + fenêtre mode,
    gomme-arc, rendre rond, tangente boucle-cercle/2 segments) sont fusionnés avec l'onglet CIP v9.2
@@ -1708,7 +1719,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-03-HO ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-07-HP ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2612,6 +2623,32 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Amorce/perçage (mm)
         <input id="laserLead" type="number" value="1" min="0.1" max="10" step="0.1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
     </div>
+    <!-- ▼ CORRECTEUR DE DIMENSION (saignée + ajustement X/Y) ▼ -->
+    <div style="margin-top:12px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:8px;padding:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:2px">📏 Correcteur de dimension (saignée)</div>
+      <div style="font-size:10px;color:var(--txt2);margin-bottom:9px">Le laser a une largeur : la pièce sort trop petite. On décale la coupe vers la <b>chute</b> pour que la pièce gardée (en <b style="color:#22c55e">vert</b>) retrouve sa cote. Le dessin à l'écran reste à la cote : la correction est ajoutée dans le programme machine.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <label style="flex:1;min-width:110px;font-size:10px;color:var(--txt2)">Saignée globale (mm)
+          <input id="laserKerf" type="number" value="0" min="0" max="5" step="0.01" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+        <label style="flex:1;min-width:110px;font-size:10px;color:var(--txt2)">Ajustement X (mm)
+          <input id="laserAdjX" type="number" value="0" min="-5" max="5" step="0.01" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+        <label style="flex:1;min-width:110px;font-size:10px;color:var(--txt2)">Ajustement Y (mm)
+          <input id="laserAdjY" type="number" value="0" min="-5" max="5" step="0.01" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+      </div>
+      <div style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--brd2)">
+        <div style="font-size:10px;color:var(--txt2);margin-bottom:5px">🧮 <b>Aide au réglage</b> — découpe un carré, mesure-le, et je calcule la correction :</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <label style="font-size:10px;color:var(--txt2)">Carré nominal (mm)
+            <input id="laserCalNom" type="number" value="10" min="1" step="0.1" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+          <label style="font-size:10px;color:var(--txt2)">Mesuré X (mm)
+            <input id="laserCalX" type="number" min="0" step="0.01" placeholder="9.80" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+          <label style="font-size:10px;color:var(--txt2)">Mesuré Y (mm)
+            <input id="laserCalY" type="number" min="0" step="0.01" placeholder="9.98" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+        </div>
+        <div id="laserCalMsg" style="font-size:11px;color:var(--acc);margin-top:7px;font-weight:600;min-height:14px">Tape le nominal + les mesures : la correction se calcule toute seule.</div>
+      </div>
+    </div>
+    <!-- ▲ FIN CORRECTEUR ▲ -->
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
       <input type="checkbox" id="laserLeadin" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
       <span><b>Perçage au centre de la chute</b> — perce au milieu de la partie qui tombe (loin du bord gardé, moins de projections), puis rejoint le contour.</span>
@@ -3001,13 +3038,19 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <div id="toolCalcWarn" style="display:none;margin-top:5px;padding:5px 8px;border-radius:4px;font-size:10px;font-weight:600"></div>
     </div>
     <script>
-      // Auto-calc on input change (inline, runs after inputs exist)
-      setTimeout(()=>{
-        ['tmDia','tmAngle','tmFxy','tmFz','tmSpin','tmMaxD','tmType','tmFlutes'].forEach(id=>{
-          document.getElementById(id)?.addEventListener('input',calcToolParams);
+      // [FIX] Calcul auto d'outil : on attend que calcToolParams soit défini.
+      // Sur un gros fichier, l'ancien setTimeout(200) pouvait se déclencher AVANT
+      // que la fonction existe -> "calcToolParams is not defined". Ici on réessaie
+      // tant qu'elle n'est pas prête, puis on pose les écouteurs une seule fois.
+      (function hookToolCalc(){
+        if(typeof calcToolParams!=='function'){ setTimeout(hookToolCalc,100); return; }
+        ['tmDia','tmAngle','tmFxy','tmFz','tmSpin','tmMaxD','tmType','tmFlutes'].forEach(function(id){
+          var el=document.getElementById(id);
+          if(el) el.addEventListener('input',calcToolParams);
         });
-      },200);
+      })();
     </script>
+
     <div class="fld"><label>Notes</label><textarea id="tmNotes" style="min-height:40px"></textarea></div>
     <div class="divider"></div>
     <div class="btn-row">
@@ -5910,9 +5953,18 @@ function _laserClassAt(xmm,ymm){
 function _laserPaintActive(){ const P=_laserPaint; if(!P||!P.cls) return false; for(let i=0;i<P.cls.length;i++) if(P.cls[i]) return true; return false; }
 function _lpContours(){
   const flat=_exportFlatObjs(); const polys=[];
+  // objToStrokesRaw rend rect/tri/star SANS point de fermeture -> le "mur" de la peinture
+  // avait un côté manquant (forme ouverte à l'écran + la peinture fuyait). On REFERME ces
+  // primitives. Sûr : poser un pont (tab) transforme la forme en 'free'/_poly, donc un tab
+  // n'est jamais rebouché ici.
+  const _primClose=t=>(t==='rect'||t==='tri'||t==='star'||t==='oblong'||t==='gear');
   for(const o of flat){ if(!o||o.type==='dim'||o.type==='point') continue;
     let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; }
-    for(const seg of st){ if(seg&&seg.length>=2) polys.push(seg); }
+    const close=_primClose(o.type);
+    for(let seg of st){ if(!seg||seg.length<2) continue;
+      if(close){ const a=seg[0],b=seg[seg.length-1]; if(Math.hypot(a[0]-b[0],a[1]-b[1])>1e-6) seg=seg.concat([[a[0],a[1]]]); }
+      polys.push(seg);
+    }
   }
   return polys;
 }
@@ -6024,6 +6076,22 @@ function _fitCircle(pts){
   if(per < 2*Math.PI*r*0.9)return null;
   return {cx,cy,r};
 }
+// Aide au réglage du correcteur : à partir d'un carré test mesuré, on décompose
+// l'écart en une saignée uniforme (la part commune X/Y) + un ajustement par axe.
+function laserCalc(){
+  const g=id=>document.getElementById(id);
+  const nom=parseFloat(g('laserCalNom')?.value), mx=parseFloat(g('laserCalX')?.value), my=parseFloat(g('laserCalY')?.value);
+  const msg=g('laserCalMsg');
+  if(isNaN(nom)||nom<=0||isNaN(mx)||mx<=0||isNaN(my)||my<=0){ if(msg)msg.textContent='Remplis le nominal + les deux mesures (X et Y).'; return; }
+  const lossX=nom-mx, lossY=nom-my;                 // ce qu'il manque sur chaque axe (négatif = trop grand)
+  const kerf=Math.max(0, Math.min(lossX, lossY));    // part uniforme = le plus petit manque
+  const ajX=lossX-kerf, ajY=lossY-kerf;              // le reste par axe
+  g('laserKerf').value=kerf.toFixed(3);
+  g('laserAdjX').value=ajX.toFixed(3);
+  g('laserAdjY').value=ajY.toFixed(3);
+  if(msg)msg.textContent='✅ Saignée '+kerf.toFixed(3)+' mm · ajustement X '+(ajX>=0?'+':'')+ajX.toFixed(3)+' · Y '+(ajY>=0?'+':'')+ajY.toFixed(3)+' mm appliqués.';
+  if(typeof wzGenLaser==='function') wzGenLaser();
+}
 function buildLaserBody(){
   const flat=_exportFlatObjs();
   const _zl=parseFloat(document.getElementById('laserZlift')?.value); const ZL=isNaN(_zl)?5:_zl;
@@ -6032,8 +6100,15 @@ function buildLaserBody(){
   const _ll=parseFloat(document.getElementById('laserLead')?.value); const LEAD=isNaN(_ll)?1:_ll;
   const ARC=document.getElementById('laserArc')?.checked!==false;   // entree en arc
   const INV=document.getElementById('laserInvert')?.checked||false; // inverser plein/vide
+  // === CORRECTEUR DE DIMENSION (saignée + ajustement X/Y) ===
+  const _kf=parseFloat(document.getElementById('laserKerf')?.value); const KERF=isNaN(_kf)?0:Math.max(0,_kf);
+  const _ax=parseFloat(document.getElementById('laserAdjX')?.value); const AJX=isNaN(_ax)?0:_ax;
+  const _ay=parseFloat(document.getElementById('laserAdjY')?.value); const AJY=isNaN(_ay)?0:_ay;
   const contours=[]; // {poly, start, moves}
-  const add=(poly,start,moves,closed)=>{ if(moves&&moves.length) contours.push({poly,start,moves,_closed:!!closed}); };
+  // _prim = contour d'une forme PRIMITIVE toujours fermée (rect/tri/star/oblong/gear/
+  // polygone/cercle). objToStrokesRaw rend rect/tri/star SANS point de fermeture, donc
+  // _closed y est faux ; _prim permet au correcteur de les refermer proprement (lui seul).
+  const add=(poly,start,moves,closed,prim)=>{ if(moves&&moves.length) contours.push({poly,start,moves,_closed:!!closed,_srcPrim:!!prim}); };
   for(const o of flat){
     if(!o || o.type==='dim' || o.type==='point') continue;
     // Cercle -> un seul G2 (tour complet)
@@ -6051,6 +6126,8 @@ function buildLaserBody(){
     // Sinon : polyligne FIDELE (meme logique que l'export DXF).
     const _CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon'];
     const _isClosed=_CLOSEDT.includes(o.type)||o._poly;
+    // Primitives TOUJOURS fermées (hors texte=lettres, hors svg/free = contenu libre ou à tab).
+    const _prim=(o.type==='rect'||o.type==='tri'||o.type==='star'||o.type==='oblong'||o.type==='gear'||o.type==='polygon');
     let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; }
     for(let s of st){ if(!s||s.length<2) continue;
       // Un TAB (pont) efface un bout du contour -> l'objet reste _poly (ferme) mais le
@@ -6060,9 +6137,10 @@ function buildLaserBody(){
       let closed=false; const a=s[0],b=s[s.length-1], egap=Math.hypot(a[0]-b[0],a[1]-b[1]);
       const _tol=Math.min(0.3,(typeof _tabW!=='undefined'&&_tabW>0?_tabW:0.8)*0.5);
       if(_isClosed && egap<=_tol){ if(egap>1e-6) s=s.concat([[a[0],a[1]]]); closed=true; }
+      else if(_prim){ if(egap>1e-6) s=s.concat([[a[0],a[1]]]); closed=true; } // primitive (rect/tri/star…) -> TOUJOURS refermée (sinon carré coupé ouvert)
       else { closed=(s.length>2 && egap<1e-6); }
       const moves=[]; for(let i=1;i<s.length;i++) moves.push('G1 X'+_lc(s[i][0])+' Y'+_lc(s[i][1]));
-      add(s.slice(), [s[0][0],s[0][1]], moves, closed);
+      add(s.slice(), [s[0][0],s[0][1]], moves, closed, _prim);
     }
   }
   // ORDRE DE COUPE : profondeur d'imbrication (un contour DANS un autre = coupe avant).
@@ -6089,6 +6167,35 @@ function buildLaserBody(){
   // de contours (regle pair-impair). Sert a verifier qu'une amorce ne traverse
   // AUCUN autre trait (ni le contour courant, ni un ilot a garder).
   const globalWaste=(pt)=>{ const _mc=_laserClassAt(pt[0],pt[1]); if(_mc===1)return true; if(_mc===2)return false; let cnt=0; for(const oc of contours){ const bb=oc._bb; if(!bb||pt[0]<bb[0]||pt[0]>bb[2]||pt[1]<bb[1]||pt[1]>bb[3])continue; const p=oc.poly; if(p&&p.length>=3&&_pointInPoly(pt,p))cnt++; } let mat=(cnt%2===1); if(INV)mat=!mat; return !mat; };
+  // === APPLICATION DU CORRECTEUR : décale chaque contour FERMÉ vers la CHUTE ===
+  // Le côté chute/pièce vient de globalWaste (peinture vert=pièce/rouge=chute, sinon
+  // règle pair-impair). On calcule TOUS les côtés d'abord (sur la géométrie d'origine),
+  // puis on décale, pour que le sens ne dépende pas de l'ordre. Défaut (0,0,0) = aucun
+  // décalage -> sortie identique à avant (sécurité).
+  if(KERF>0 || AJX!==0 || AJY!==0){
+    const _elig=c => (c._closed || c._srcPrim) && c.poly && c.poly.length>=3;
+    const _sides=contours.map(c => _elig(c) ? (globalWaste(c._c)===true) : null);
+    const _newp =contours.map((c,i)=> _sides[i]===null ? null : _kerfOffset(c.poly, _sides[i], KERF, AJX, AJY));
+    contours.forEach((c,i)=>{ const np=_newp[i]; if(np && np.length>=4){
+      c.poly=np; c._closed=true; // une primitive corrigée est désormais un contour FERMÉ propre
+      c._c=_polyInteriorPoint(np)||c._c; c._a=_area(np); c._pole=_polyPoleInside(np);
+      let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18; for(const q of np){ if(q[0]<x0)x0=q[0]; if(q[0]>x1)x1=q[0]; if(q[1]<y0)y0=q[1]; if(q[1]>y1)y1=q[1]; } c._bb=[x0,y0,x1,y1];
+      // Regénérer les moves depuis le contour CORRIGÉ : sinon, si le perçage (lead-in) est
+      // désactivé, la génération garderait les moves d'origine (non décalés). Avec lead-in
+      // actif, ce bloc re-régénère de toute façon les moves depuis c.poly -> cohérent.
+      const uniq=np.slice(0,np.length-1);
+      const _fc=_fitCircle(uniq);
+      if(_fc){
+        const st=np[0], nx2=np[1]||st;
+        const cr=(st[0]-_fc.cx)*(nx2[1]-_fc.cy)-(st[1]-_fc.cy)*(nx2[0]-_fc.cx);
+        c.moves=[(cr>=0?'G3':'G2')+' X'+_lc(st[0])+' Y'+_lc(st[1])+' I'+_lc(_fc.cx-st[0])+' J'+_lc(_fc.cy-st[1])+'   ;cercle (saignée appliquée)'];
+        c.start=[st[0],st[1]];
+      } else {
+        c.moves=np.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1]));
+        c.start=[np[0][0],np[0][1]];
+      }
+    }});
+  }
   const blocks=order.map((c,bi)=>{
     // Cote CHUTE connue AVANT de choisir le depart.
     let wasteInside=globalWaste(c._c);   // regle pair-impair GLOBALE (+ INV + peinture)
@@ -16873,6 +16980,57 @@ function offsetPolygon(pts, d) {
   }
 
   return result;
+}
+
+// Intersection de DEUX DROITES données par (point + direction unitaire).
+// Renvoie [x,y] ou null si quasi-parallèles.
+function _lineIsect(x1,y1,dx1,dy1, x2,y2,dx2,dy2){
+  const den = dx1*dy2 - dy1*dx2;
+  if (Math.abs(den) < 1e-9) return null;
+  const t = ((x2-x1)*dy2 - (y2-y1)*dx2) / den;
+  return [x1 + dx1*t, y1 + dy1*t];
+}
+
+// === CORRECTEUR DE SAIGNÉE (kerf) — découpe laser ===
+// Décale un contour FERMÉ vers la CHUTE, pour que la PIÈCE gardée retrouve sa cote.
+//   poly        : liste de points [x,y] (fermé ou non)
+//   scrapInside : la chute est-elle à l'INTÉRIEUR du contour ? (true pour un trou)
+//   kerf        : largeur de saignée (mm), appliquée uniformément sur tout le tour
+//   ajX / ajY   : ajustement AJOUTÉ à la dimension en X / en Y (mm) — gère un écart
+//                 machine différent entre les deux axes.
+// Chaque arête est décalée vers la chute de :  kerf/2 + |nx|*ajX/2 + |ny|*ajY/2
+//   (nx,ny = normale de l'arête : une arête verticale -> |nx|=1 -> reçoit l'ajustement X,
+//    une arête horizontale -> |ny|=1 -> reçoit l'ajustement Y).
+// La normale est orientée VERS L'EXTÉRIEUR par un test point-dans-polygone (robuste quel
+// que soit le sens de parcours et le repère Y). Retourne un contour FERMÉ, ou null.
+function _kerfOffset(poly, scrapInside, kerf, ajX, ajY){
+  if (!poly || poly.length < 3) return null;
+  // retirer le point de fermeture dupliqué puis les arêtes de longueur nulle
+  let p = poly.slice();
+  if (p.length > 1 && Math.hypot(p[0][0]-p[p.length-1][0], p[0][1]-p[p.length-1][1]) < 1e-7) p.pop();
+  const q = [];
+  for (let i=0;i<p.length;i++){ const a=p[i], b=p[(i+1)%p.length]; if (Math.hypot(a[0]-b[0],a[1]-b[1]) > 1e-7) q.push(a); }
+  p = q; const n = p.length; if (n < 3) return null;
+  const kHalf=(+kerf||0)/2, axHalf=(+ajX||0)/2, ayHalf=(+ajY||0)/2;
+  const s = scrapInside ? -1 : 1; // sens : vers l'intérieur si la chute est dedans
+  const lines = [];
+  for (let i=0;i<n;i++){
+    const a=p[i], b=p[(i+1)%n];
+    let dx=b[0]-a[0], dy=b[1]-a[1]; const L=Math.hypot(dx,dy)||1e-9; dx/=L; dy/=L;
+    let nx=dy, ny=-dx;                               // normale candidate
+    const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2;
+    if (_pointInPoly([mx+nx*1e-3, my+ny*1e-3], p)) { nx=-nx; ny=-ny; } // forcer VERS L'EXTÉRIEUR
+    const dist = (kHalf + Math.abs(nx)*axHalf + Math.abs(ny)*ayHalf) * s;
+    lines.push({ ox:a[0]+nx*dist, oy:a[1]+ny*dist, dx, dy });
+  }
+  const out = [];
+  for (let i=0;i<n;i++){
+    const L1=lines[(i-1+n)%n], L2=lines[i];
+    const pt=_lineIsect(L1.ox,L1.oy,L1.dx,L1.dy, L2.ox,L2.oy,L2.dx,L2.dy);
+    out.push(pt || [L2.ox, L2.oy]);
+  }
+  out.push([out[0][0], out[0][1]]); // refermer
+  return out;
 }
 
 function resampleContour(pts, sampleMm) {
