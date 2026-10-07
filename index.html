@@ -1994,10 +1994,11 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <div class="cipNum cipGK" data-hk="M:L" data-tip="Longueur de chaque tube depuis la jonction (sur son axe) : sert au dessin et au contrôle de collision de la tête."><span>Longueur des tubes (mm)</span><input type="number" id="cipMtL" value="80" step="1" min="10" oninput="cip_ui('mt')"></div>
           <div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">LA SOUDURE</div>
           <div class="cipNum cipGK" data-hk="M:pos" data-tip="Où la soudure démarre sur la jonction (là où tu poses la pointe pour le SET_G54).\n0° = petit axe (côté plat), 90° = grand axe (la pointe), 180° / 270° = en face.\nOu clique 📍 et choisis le point directement sur la pièce en 3D."><span>Départ (°)</span><span style="display:flex;gap:4px;align-items:center"><button class="cipBtn" style="padding:2px 7px" onclick="cip_ui('pickany')">📍</button><input type="number" id="cipMtS0" value="0" step="1" style="width:70px" oninput="cip_ui('mt')"></span></div>
-          <div class="cipNum cipGK" data-hk="M:rot" data-tip="Inclinaison fixe de la tête pendant toute la soudure. Sur un coude à 90°, 0 = tête dans l'axe du creux (le plus sûr)."><span>B tête (°)</span><input type="number" id="cipMtB" value="0" step="0.1" min="-134.9" max="134.9" oninput="cip_ui('mt')"></div>
+          <div class="cipNum cipGK" data-hk="M:rot" data-tip="Inclinaison fixe de la tête pendant toute la soudure.\nVide = auto : le soft la place tout seul dans le plan de la jonction (bissectrice des 2 tubes = B 0°), le seul sens où la tête ne touche ni un tube ni l\'autre.\nTape une valeur seulement si tu veux forcer un autre angle."><span>B tête (°)</span><input type="number" id="cipMtB" value="" placeholder="auto" step="0.1" min="-134.9" max="134.9" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:p0" data-tip="Rampe de départ (°) : la puissance monte."><span>Pente début (°)</span><input type="number" id="cipMtP0" value="2" step="1" min="0" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:sr" data-tip="Rotation de soudure (°). 365 = un tour + 5° de recouvrement (en orange)."><span>Rotation (°)</span><input type="number" id="cipMtR" value="365" step="1" min="10" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:p1" data-tip="Rampe de fin (°) avant TC_WELD_OFF : la puissance descend."><span>Pente fin (°)</span><input type="number" id="cipMtP1" value="20" step="1" min="0" oninput="cip_ui('mt')"></div>
+          <div class="cipNum" data-tip="Comment la tête revient au point de départ à la fin :\n• Chemin dégagé : recul de 30 mm, C1 se déroule, puis retour sur le départ.\n• Trajet inverse : laser coupé, elle refait à l'envers la pente de fin + le recouvrement et finit pile sur le départ (C1 un tour plus loin = même position)."><span>Retour</span><select id="cipMtRet" onchange="cip_ui('mt')" style="width:170px"><option value="std">Chemin dégagé</option><option value="inv">Trajet inverse (pente fin + recouvrement)</option></select></div>
           <div class="cipNum" data-tip="Précision du calcul (°). Les points sont ensuite regroupés en arcs CIP lissés."><span>Pas de calcul (°)</span><input type="number" id="cipMtStep" value="1" step="0.5" min="0.25" max="5" oninput="cip_ui('mt')"></div>
           <div class="cipNote" id="cipMtInfo"></div>
           <div class="cipRow"><button class="cipBtn" style="flex:1" onclick="cip_ui('miter')">📐 Voir l'ellipse et l'écart de rayon</button></div>
@@ -2021,7 +2022,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <h3><i>1</i>Machine</h3>
           <div class="cipRow" style="justify-content:space-between"><span style="font-size:13px">Mandrin : <b id="cipChTxt">—</b></span><button class="cipBtn" onclick="cip_ui('startscreen')">Changer</button></div>
           <div class="cipNum" data-tip="Ton mandrin réel (cotes mesurées) : il sert au contrôle des collisions et à la distance face d'appui → face des mors."><span>Mandrin</span><select id="cipMandrin" onchange="cip_ui('mandrin')" style="width:170px"><option value="rose">Points roses (mors en escalier)</option><option value="bronze">Mors bronze</option></select></div>
-          <div class="cipNum" data-tip="Forme de la tête pour le contrôle des collisions.\n• Selon le procédé : tête de soudure (bloc Ø44, focale 85 mm) ou tête de découpe (étagée Ø22 / Ø40 / Ø62).\n• Cône perso : l'ancien cône réglable."><span>Tête</span><select id="cipHeadT" onchange="cip_ui('head')" style="width:170px"><option value="auto">Selon le procédé</option><option value="soudure">Soudure (réelle)</option><option value="decoupe">Découpe (réelle)</option><option value="cone">Cône perso</option></select></div>
+          <div class="cipNum" style="display:none" data-tip="Forme de la tête pour le contrôle des collisions.\n• Selon le procédé : tête de soudure (bloc Ø44, focale 85 mm) ou tête de découpe (étagée Ø22 / Ø40 / Ø62).\n• Cône perso : l'ancien cône réglable."><span>Tête</span><select id="cipHeadT" onchange="cip_ui('head')" style="width:170px"><option value="auto">Selon le procédé</option><option value="soudure">Soudure (réelle)</option><option value="decoupe">Découpe (réelle)</option><option value="cone">Cône perso</option></select></div>
           <div id="cipHeadCone" style="display:none">
           <div class="cipNum"><span>Tête : longueur du cône (focale, mm)</span><input type="number" id="cipHLen" value="180" min="40" max="400" onchange="cip_ui('head')"></div>
           <div class="cipNum"><span>Tête : demi-angle du cône (°)</span><input type="number" id="cipHAng" value="12" min="3" max="45" step="0.5" onchange="cip_ui('head')"></div>
@@ -2044,7 +2045,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <div class="cipNum" id="cipRowP" style="display:none" data-tip="Ton tube perso (section importée d'un DXF ou forme toute faite). « Modifier » rouvre la fenêtre pour changer l'épaisseur, la taille, la rotation ou l'axe."><span id="cipPerTxt" style="font-size:12px">Perso</span><button class="cipBtn" onclick="cip_ui('dxf')">Modifier</button></div>
           <div class="cipNum" id="cipRowR"><span>Rayon des angles (mm)</span><input type="number" id="cipTR" value="3" min="0" step="0.1" onchange="cip_ui('tube')"></div>
           <div class="cipNum"><span>Épaisseur (mm)</span><input type="number" id="cipTE" value="2" min="0.2" step="0.1" onchange="cip_ui('tube')"></div>
-          <div class="cipNum"><span>Longueur qui dépasse des mors (mm)</span><input type="number" id="cipTL" value="150" min="10" step="1" onchange="cip_ui('tube')"></div>
+          <div class="cipNum" data-tip="Combien le tube dépasse des mors, le long de l'axe du mandrin (X avec le mandrin à 90°, Z avec le mandrin à plat)."><span id="cipLblL">Offset en X (mm)</span><input type="number" id="cipTL" value="150" min="10" step="1" onchange="cip_ui('tube')"></div>
         </div>
         <div class="cipBox" data-st="prep">
           <h3><i>3</i>Pièce</h3>
@@ -2055,13 +2056,17 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           </div>
           <div class="cipNote" style="margin-top:0">Astuce : attrape la pièce à la souris et fais-la glisser le long du tube.</div>
           <div class="cipNum"><span>Tourner autour du tube (°)</span><span class="cipRow" style="margin:0;gap:4px"><button class="cipBtn" style="padding:3px 8px" onclick="cip_ui('rotstep',-15)">−15</button><input type="number" id="cipPRot" value="0" step="5" style="width:60px" onchange="cip_ui('place')"><button class="cipBtn" style="padding:3px 8px" onclick="cip_ui('rotstep',15)">+15</button></span></div>
+          <div id="cipInstWrap">
           <div class="cipNum"><span>Piquages (corps qui traverse)</span><select id="cipPiqMode" onchange="cip_ui('piqmode')" style="width:150px"><option value="suit">C1 suit le point (tête au-dessus)</option><option value="para">Parallèle au tube qui passe (C1 et B fixes)</option></select></div>
           <div style="font-size:13px;margin-top:6px">Pièces sur le tube</div>
           <div id="cipInstList"></div>
           <div class="cipRow"><button class="cipBtn" onclick="cip_ui('instadd')">+ Ajouter une pièce</button>
             <span style="font-size:12px;color:var(--txt2)">ou répartir</span><input type="number" id="cipNCopy" value="3" min="1" max="12" step="1" style="width:46px;font:13px var(--mono);padding:3px 5px;background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px"><button class="cipBtn" onclick="cip_ui('instspread')">autour</button></div>
+          </div>
           <div class="cipNum"><span>Distance au bout du tube (mm)</span><input type="number" id="cipPOff" value="20" step="1" onchange="cip_ui('place')"></div>
-          <div class="cipRow"><button class="cipBtn" onclick="cip_ui('flip')">Retourner la pièce</button><button class="cipBtn" id="cipFitBtn" onclick="cip_ui('fit')" disabled>Adapter le tube à la pièce</button></div>
+          <div class="cipNum" data-tip="L'axe de ta pièce qui sera sur l'axe du mandrin (celui autour duquel elle tourne).\n• Auto : l'axe du tube détecté dans le STEP.\n• X / Y / Z du fichier : si ta pièce est tenue dans un montage, choisis l'axe de ton fichier STEP qui doit tourner."><span>Axe de rotation</span><select id="cipAxis" onchange="cip_ui('axis')" style="width:150px"><option value="auto">Auto (tube détecté)</option><option value="x">X du fichier</option><option value="y">Y du fichier</option><option value="z">Z du fichier</option></select></div>
+          <div class="cipNum" id="cipAxCRow" style="display:none" data-tip="Où passe l'axe de rotation :\n• Centre de la pièce : au milieu de la pièce (vue en bout).\n• Origine du fichier : par le 0,0,0 de ton STEP (pratique si ton montage est dessiné avec l'origine sur l'axe)."><span>L'axe passe par</span><select id="cipAxC" onchange="cip_ui('axis')" style="width:150px"><option value="centre">Centre de la pièce</option><option value="origine">Origine du fichier (0,0,0)</option></select></div>
+          <div class="cipRow"><button class="cipBtn" onclick="cip_ui('flip')" data-tip="Retourne la pièce bout pour bout sur cet axe.">↕ Inverser le sens</button><button class="cipBtn" id="cipFitBtn" onclick="cip_ui('fit')" disabled>Adapter le tube à la pièce</button></div>
           <div class="cipStat" id="cipPartStat">Aucune pièce. Importe ton STEP : le tube et l'axe sont détectés tout seuls.</div>
         </div>
         <div class="cipBox" data-st="prep">
@@ -2069,15 +2074,18 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <select id="cipProc" onchange="cip_ui('proc')" style="display:none"><option value="decoupe">Découpe</option><option value="soudure">Soudure</option></select>
           <div class="cipRow" style="justify-content:space-between"><span style="font-size:13px">Procédé : <b id="cipProcTxt">—</b></span><button class="cipBtn" onclick="cip_ui('procscreen')">Changer</button></div>
           <div id="cipWeldOpts" style="display:none">
-          <div class="cipNum"><span>Soudure : recouvrement (mm)</span><input type="number" id="cipWOv" value="10" min="0" step="1" onchange="cip_ui('proc')"></div>
-          <div class="cipNum"><span>Soudure : pente de fin (mm)</span><input type="number" id="cipWRamp" value="10" min="0" step="1" onchange="cip_ui('proc')"></div>
+          <div class="cipNum"><span>Soudure : recouvrement (°)</span><input type="number" id="cipWOv" value="10" min="0" step="1" onchange="cip_ui('proc')"></div>
+          <div class="cipNum"><span>Soudure : pente de fin (°)</span><input type="number" id="cipWRamp" value="20" min="0" step="1" onchange="cip_ui('proc')"></div>
           <label class="cipChk"><input type="checkbox" id="cipWOpt" checked onchange="cip_ui('proc')"> Incliner la tête tout seul pour ne rien toucher</label>
           <div class="cipNum"><span>Écart max à l'angle idéal (°)</span><input type="number" id="cipWMaxDev" value="60" min="0" max="75" step="5" onchange="cip_ui('proc')"></div>
           </div>
+          <div class="cipNum" data-tip="Inclinaison de la tête au point de départ, pour tous les passages (B machine).\nVide = automatique (soudure : dans l'angle entre les 2 surfaces ; découpe : perpendiculaire à la surface).\n0 = tête perpendiculaire à l'axe du mandrin. L'écart est gardé sur tout le tour.\nTu peux encore régler chaque passage dans la liste (case B°)."><span>B tête au départ (°)</span><input type="number" id="cipStartB" placeholder="auto" step="1" min="-134.9" max="134.9" onchange="cip_ui('proc')"></div>
+          <div class="cipNote" id="cipStartBTxt" style="margin:-2px 0 4px"></div>
           <div class="cipNum"><span>Dégagement entre passages</span><select id="cipRapMode" onchange="cip_ui('rapmode')" style="width:150px"><option value="x">En X (le long du tube)</option><option value="z">Par le dessus (Z)</option></select></div>
           <div class="cipNum" data-tip="Hauteur maxi de la pointe au-dessus du tube pendant les déplacements (entre passages et retour au départ). Le soft cherche d'abord un passage bas en dégageant en X et en tournant C1 ; il ne monte plus haut que s'il n'a pas le choix, et il te prévient."><span>Hauteur max de dégagement (mm au-dessus du tube)</span><input type="number" id="cipZMax" value="40" min="5" step="5" onchange="cip_ui('rapmode')"></div>
           <label class="cipChk" data-tip="Le mandrin est toujours à C1 = 0 au début du programme : la pièce est tournée dans le soft pour que le point de départ soit pile sous la tête à C1 = 0 (et le retour finit aussi à C1 = 0)."><input type="checkbox" id="cipC0" checked onchange="cip_ui('c0')"> Départ à C1 = 0</label>
           <label class="cipChk" data-tip="À la fin du programme, la tête revient pile sur le point de départ, tous les axes comme au début (X Y Z B C1), par un chemin calculé sans collision : prête pour la pièce suivante."><input type="checkbox" id="cipRetDep" checked onchange="cip_ui('rapmode')"> Revenir au point de départ à la fin</label>
+          <div class="cipNum" id="cipRetRow" data-tip="Comment la tête revient au point de départ à la fin :\n• Chemin dégagé : elle se dégage et revient par un chemin sans collision (C1 revient à sa valeur du début).\n• Trajet inverse : laser coupé, elle refait à l'envers la pente de fin + le recouvrement, et se retrouve pile sur le point de départ (C1 finit 1 tour plus loin = même position ; le G01 C1=0 du début du programme suivant le remet à 0, tête en haut)."><span>Retour</span><select id="cipRetMode" onchange="cip_ui('rapmode')" style="width:170px"><option value="std">Chemin dégagé (comme avant)</option><option value="inv">Trajet inverse (pente fin + recouvrement)</option></select></div>
           <div class="cipSt" id="cipSteps"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : simulation →</button></div>
         </div>
@@ -3675,16 +3683,18 @@ function rebuildPaths(){S.zWarn=0;S.zWarnH=0;pathG.clear();lines=[];bwPts=null;F
   // retour au point de départ (30 mm au-dessus du 1er point), chemin sans collision comme les déplacements entre passages
   S.prog.home=null;
   if(!S.prog.frames&&C.length&&F.length&&(!$('cipRetDep')||$('cipRetDep').checked)){const c0=C[0];const hp0=c0.P[0].slice();const home={P:[hp0],D:[c0.D[0]],TH:[c0.TH[0]]};/* fin = EXACTEMENT le 1er point (mêmes X Y Z B C1 qu au départ) */const ci=C.length;const s0=s;
+    let noUnw=false;if(($('cipRetMode')||{}).value==='inv'){const cl=C[C.length-1];if(cl.weld&&cl.mOv!==undefined&&cl.mOv<cl.P.length-1){for(let j=cl.P.length-2;j>=cl.mOv;j--){push(cl.P[j],cl.D[j],cl.TH[j],ci,-1);F[F.length-1].rev=true;}if(V.len(V.sub(F[F.length-1].p,hp0))<0.05)noUnw=true;}}
+    if(noUnw){S.prog.home={s0,s1:s,ci,noUnw:true};}else{
     const rx=($('cipRapMode')&&$('cipRapMode').value==='x')?rapidXlim(F[F.length-1],home):null;
     if(rx)rx.forEach(f=>push(f[0],f[1],f[2],ci,-1));else{rapid(F[F.length-1],home,ci,push,Rs);push(hp0,c0.D[0],c0.TH[0],ci,-1);}
-    S.prog.home={s0,s1:s,ci};}
+    S.prog.home={s0,s1:s,ci};}}
   TOTAL=s;
   // CINÉMATIQUE RÉELLE : la tête ne penche que dans le plan (axe du tube, vertical).
   // Le mandrin doit donc tourner pour que le faisceau n'ait AUCUNE composante avant/arrière :
   // A = atan2(-dx,-dz)  (faisceau ramené dans le plan vertical qui contient l'axe du tube)
   let prevTh=null;if(!S.prog.frames)F.forEach(fr=>{let t=Math.atan2(-fr.d[0],-fr.d[2])/DEG;if(prevTh!==null){while(t-prevTh>180)t-=360;while(t-prevTh<-180)t+=360;}fr.th=t;prevTh=t;});
   // retour au départ : on « déroule » aussi le mandrin pour retrouver EXACTEMENT le C1 du début (tête en l'air, au point le plus haut du retour)
-  if(S.prog.home&&F.length>2){const H=S.prog.home;const k=Math.round((F[F.length-1].th-F[0].th)/360);H.unwound=0;
+  if(S.prog.home&&!S.prog.home.noUnw&&F.length>2){const H=S.prog.home;const k=Math.round((F[F.length-1].th-F[0].th)/360);H.unwound=0;
     if(k){let i0=-1,best=-1;for(let i=0;i<F.length;i++){const f=F[i];if(f.ci!==H.ci)continue;const r=Math.hypot(f.p[0],f.p[2]);if(r>best+0.5){best=r;i0=i;}}
       if(i0>=0){const f=F[i0];const Pm=rotM(f.p,f.th),Dm=rotM(f.d,f.th);const n=Math.ceil(Math.abs(k)*360/5);const add=[];let ok=true;
         for(let q=1;q<=n;q++){const th=f.th-360*k*q/n;const pp=rotM(Pm,-th),dd=rotM(Dm,-th);if(q%3===0&&clearance(pp,dd,true)<1){ok=false;break;}add.push({p:pp,d:dd,th,ci:H.ci,j:-1,s:0});}
@@ -3829,10 +3839,12 @@ function upd(){const pr=S.profile;let f=frameAt(pos);
   const al=$('cipAlert');if(cl<0){al.className='cipAl cipBad';al.textContent='Collision tête / tube ou mandrin avec ces cotes de tête.';}else{al.className='cipAl cipOk';al.textContent='Pas de collision détectée.';}
   $('cipHud').innerHTML=S.prog&&TOTAL>0?`<b>${S.prog.frames?(S.miter?'ONGLET':'LST'):($('cipProc').value==='soudure'?'SOUDURE':'DÉCOUPE')}</b> · <b>${(pos/TOTAL*100).toFixed(0)}%</b> · ${pos.toFixed(0)} / ${TOTAL.toFixed(0)} mm de trajet`:`Mandrin ${S.cfg.chuck==='vertical'?'vertical':'horizontal'} · tube ${profTxt()}`;
   $('cipScrub').value=TOTAL?pos/TOTAL*1000:0;if(document.activeElement!==$('cipGoto'))$('cipGoto').value=TOTAL?(pos/TOTAL*100).toFixed(1):0;$('cipPlay').textContent=playing?'Pause':(S.prog&&pos>=TOTAL?'Rejouer':'Lancer');updCode();}
-function syncProc(){try{lstSync();}catch(e){}try{if(buildHead.sig&&S._hsig!==buildHead.sig()){S._hsig=buildHead.sig();buildHead();}}catch(e){}const v=$('cipProc').value;{const t=$('cipProcTxt');if(t)t.textContent=v==='soudure'?'🔥 Soudure':'✂ Découpe laser';}['decoupe','soudure'].forEach(k=>{const b=$('cipPr_'+k);if(b)b.classList.toggle('cipOn',k===v);});const w=$('cipWeldOpts');if(w)w.style.display=v==='soudure'?'':'none';}
+function syncProc(){try{lstSync();}catch(e){}try{const h=$('cipHeadT');if(h)h.value='auto';}catch(e){}
+  try{const W=$('cipProc').value==='soudure';const iw=$('cipInstWrap');if(iw)iw.style.display=W?'none':'';if(W&&S.inst&&S.inst.length>1){S.inst=[{a:0,dy:0}];try{renderInst();}catch(e){}}
+    const b=$('cipStartB'),t=$('cipStartBTxt');if(b&&t){const v=b.value;t.textContent=v===''?'Auto.':`B ${(+v).toFixed(0)}° = tête à ${(90-Math.abs(+v)).toFixed(0)}° de l'axe du mandrin (0 = perpendiculaire).`;}}catch(e){}try{if(buildHead.sig&&S._hsig!==buildHead.sig()){S._hsig=buildHead.sig();buildHead();}}catch(e){}const v=$('cipProc').value;{const t=$('cipProcTxt');if(t)t.textContent=v==='soudure'?'🔥 Soudure':'✂ Découpe laser';}['decoupe','soudure'].forEach(k=>{const b=$('cipPr_'+k);if(b)b.classList.toggle('cipOn',k===v);});const w=$('cipWeldOpts');if(w)w.style.display=v==='soudure'?'':'none';}
 function profTxt(){const c=S.cfg;if(c.prof==='perso'&&S.custProf){const P=S.custProf;return `perso ${P.w.toFixed(1)}×${P.h.toFixed(1)}×${P.ep}`;}return c.prof==='rond'?`rond Ø${c.d}×${c.ep}`:c.prof==='carre'?`carré ${c.w}×${c.w}×${c.ep}`:c.prof==='rect'?`rectangle ${c.w}×${c.h}×${c.ep}`:`triangle ${c.w}×${c.ep}`;}
 // ---------- formulaire tube ----------
-function syncForm(){const c=S.cfg;if(c.prof==='perso'&&!S.custProf)c.prof='rond';['rond','carre','rect','tri','perso'].forEach(k=>{const b=$('cipPf_'+k);if(b)b.classList.toggle('cipOn',c.prof===k);});
+function syncForm(){const c=S.cfg;{const l=$('cipLblL');if(l)l.textContent='Offset en '+(c.chuck==='vertical'?'X':'Z')+' (mm)';}if(c.prof==='perso'&&!S.custProf)c.prof='rond';['rond','carre','rect','tri','perso'].forEach(k=>{const b=$('cipPf_'+k);if(b)b.classList.toggle('cipOn',c.prof===k);});
   {const P=c.prof==='perso';const rp=$('cipRowP');if(rp){rp.style.display=P?'':'none';if(P&&S.custProf)$('cipPerTxt').textContent=(S.custProf.name||'Perso')+' · '+S.custProf.w.toFixed(1)+'×'+S.custProf.h.toFixed(1)+' · ép. '+S.custProf.ep;}const re=$('cipTE');if(re&&re.closest('.cipNum'))re.closest('.cipNum').style.display=P?'none':'';}
   $('cipRowD').style.display=c.prof!=='rond'?'none':'';if(c.prof==='perso'){['cipRowW','cipRowH','cipRowR'].forEach(id=>$(id).style.display='none');}else{$('cipRowW').style.display=c.prof==='rond'?'none':'';$('cipRowH').style.display=c.prof!=='rect'?'none':'';$('cipRowR').style.display=c.prof==='rond'?'none':'';}
   $('cipLblW').textContent=c.prof==='rect'?'Largeur (mm)':'Côté (mm)';
@@ -3851,10 +3863,20 @@ function readStep(file){const st=$('cipPartStat');st.innerHTML='<span class="cip
     w.onerror=e=>{w.terminate();st.innerHTML='<span class="cipBad">Impossible de charger le lecteur STEP (connexion internet ?).</span>';};
     w.postMessage(buf,[buf]);
   });}
-function loadMeshes(meshes,name){const g=G.weld(meshes);G.triInfo(g);const f=G.fitAxis(g);G.toModel(g,f);
+// axe de rotation choisi par l'utilisateur (montage) : auto, ou X / Y / Z du fichier, passant par le centre de la pièce ou par l'origine
+function applyAxis(){const P=S.part;if(!P||!P.g||!P.autoFit)return;const g=P.g;const sel=$('cipAxis').value;let f=P.autoFit;
+  {const r=$('cipAxCRow');if(r)r.style.display=sel==='auto'?'none':'';}
+  if(sel!=='auto'){const E={x:[[1,0,0],[0,1,0],[0,0,1]],y:[[0,1,0],[0,0,1],[1,0,0]],z:[[0,0,1],[1,0,0],[0,1,0]]}[sel];const ax=E[0],u=E[1],v=V.cross(ax,u);
+    let c=[0,0,0];const A0=P.autoFit;const same=Math.abs(V.dot(ax,A0.ax))>0.999;
+    if(same&&$('cipAxC').value!=='origine'){f=Object.assign({},A0,{user:true});}else{
+    if($('cipAxC').value!=='origine'){let a0=1e9,a1=-1e9,b0=1e9,b1=-1e9;for(const p of g.P){const a=V.dot(p,u),b=V.dot(p,v);a0=Math.min(a0,a);a1=Math.max(a1,a);b0=Math.min(b0,b);b1=Math.max(b1,b);}c=V.add(V.mul(u,(a0+a1)/2),V.mul(v,(b0+b1)/2));}
+    f={ax,u,v,c,rIn:0,rOut:0,ratio:0,round:false,user:true};}}
+  G.toModel(g,f);P.fit=f;P.base=g.M.map(p=>p.slice());S.flip=false;S.starts={};S.order=null;
+  rebuildAll(true);}
+function loadMeshes(meshes,name){const g=G.weld(meshes);G.triInfo(g);const f=G.fitAxis(g);G.toModel(g,f);if($('cipAxis'))$('cipAxis').value='auto';if($('cipAxCRow'))$('cipAxCRow').style.display='none';
   // centrer la pièce le long de son axe à partir de 0
   const base=g.M.map(p=>p.slice());
-  S.part={g,base,fit:f,name,info:''};S.flip=false;S.order=null;S.inst=[{a:0,dy:0}];S.starts={};S.startB={};S.off={};
+  S.part={g,base,fit:f,autoFit:f,name,info:''};S.flip=false;S.order=null;S.inst=[{a:0,dy:0}];S.starts={};S.startB={};S.off={};
   let info=`<b>${name}</b> · ${g.T.length} triangles<br>`;
   if(f.round&&f.rOut>0){const snap=x=>{const s=Math.round(x*20)/20;return Math.abs(s-x)<0.03?s:+x.toFixed(2);};const d=snap(2*f.rOut),e=snap(f.rOut-f.rIn);info+=`Tube détecté : rond Ø${d} × ${e} (appliqué au tube)`;S.part.det={d,ep:e};}
   else info+='Profil non rond : choisis le profil et ses cotes à la main.';
@@ -4045,7 +4067,7 @@ function c0Fix(){if(!S.part||!S.prog||S.prog.frames||!F.length||!$('cipC0')||!$(
     placeAndShow();computeProgram();}}
 const C0SIGN=1;
 function c0Ui(){const on=$('cipC0')&&$('cipC0').checked;const r=$('cipPRot');if(!r)return;const row=r.closest('.cipNum');if(row){row.style.opacity=on?.45:1;row.style.pointerEvents=on?'none':'';row.title=on?'Avec « Départ à C1 = 0 », c\'est le soft qui tourne la pièce.':'';}}
-const CIP_VER='CIP v37',CIP_DATE='07/10/2026';{const e=$('cipVer');if(e){e.textContent='Version '+CIP_VER+' · '+CIP_DATE;e.title='Numéro de version de l\'onglet CIP. Si tu ne vois pas la dernière : Ctrl+F5.';}}
+const CIP_VER='CIP v38',CIP_DATE='07/10/2026';{const e=$('cipVer');if(e){e.textContent='Version '+CIP_VER+' · '+CIP_DATE;e.title='Numéro de version de l\'onglet CIP. Si tu ne vois pas la dernière : Ctrl+F5.';}}
 // ======================= TUBE « PERSO » : section importée d'un DXF (ou forme toute faite), éditable =======================
 // La section = un contour fermé (extérieur) + l'intérieur (lu dans le DXF ou calculé à l'épaisseur voulue).
 function dxfParse(txt){const L=txt.replace(/\r/g,'').split('\n');const pr=[];for(let i=0;i+1<L.length;i+=2)pr.push([+L[i].trim(),L[i+1].trim()]);
@@ -4276,11 +4298,13 @@ function mtBuild(){try{mtRender();}catch(e){}const v=mtVals();if(Math.abs(v.B)>B
     const n=Math.max(1,Math.ceil((b-a)/st));for(let i=0;i<=n;i++){const ph=a+(b-a)*i/n;const f=fr(ph);c.P.push(sh(f.p));c.D.push(f.d);const F1=add(f.p,f.d,ph,ci,i);if(i===0)c.s0=F1.s;}c.s1=s;});
   if(!C.length){$('cipMtMsg').innerHTML='<span class="cipBad">Rien à souder (rotation nulle).</span>';return;}
   S.miter.ring=[];for(let ph=0;ph<360;ph++){const f=fr(ph);S.miter.ring.push({phi:ph,p:sh(f.p)});}
-  const last=C.length-1;const fe=fr(tot);const Pe=V.sub(fe.p,V.mul(fe.d,30));add(Pe,fe.d,tot,last,-1);
+  const last=C.length-1;
+  if(($('cipMtRet')||{}).value==='inv'&&tot>360+1e-6){for(let ph=tot-st;ph>360+1e-9;ph-=st){const f=fr(ph);add(f.p,f.d,ph,last,-1);}{const f=fr(360);add(f.p,f.d,360,last,-1);}}
+  else{const fe=fr(tot);const Pe=V.sub(fe.p,V.mul(fe.d,30));add(Pe,fe.d,tot,last,-1);
   const Pm=rotM(Pe,tot);const nU=Math.max(2,Math.ceil(tot/5));for(let k=1;k<=nU;k++){const th=tot*(1-k/nU);add(rotM(Pm,-th),rotM(Dm,-th),th,last,-1);}
-  add(pre,f0.d,0,last,-1);add(f0.p,f0.d,0,last,-1);
+  add(pre,f0.d,0,last,-1);add(f0.p,f0.d,0,last,-1);}
   // code affiché : le vrai .LST si les champs sont remplis, sinon un aperçu
-  let src=null;try{const g=mtGen();if(g&&g.txt){const o2={...o,L:Yj};const lines=g.txt.replace(/\r/g,'').split('\n');const pr=parseLST(g.txt);const lnS={};let i0=0;
+  let src=null;try{const g=mtGen(true);if(g&&g.txt){const o2={...o,L:Yj};const lines=g.txt.replace(/\r/g,'').split('\n');const pr=parseLST(g.txt);const lnS={};let i0=0;
     for(const mv of pr.moves){let bi=-1,bd=1e9;for(let i=i0;i<Math.min(Fr.length,i0+400);i++){const q=toLst(Fr[i].p,Fr[i].d,Fr[i].th,o2);const e=Math.hypot(q.X-mv.e.X,q.Y-mv.e.Y,q.Z-mv.e.Z)+Math.abs(q.C-mv.e.C)*0.05;if(e<bd){bd=e;bi=i;}}
       if(bi>=0&&bd<3){lnS[mv.ln]=Fr[bi].s;i0=bi;}}
     let nx=s;const sv=lines.map((t,i)=>lnS[i]!==undefined?lnS[i]:null);for(let i=sv.length-1;i>=0;i--){if(sv[i]===null)sv[i]=nx;else nx=sv[i];}src=lines.map((t,i)=>({t,s:sv[i]}));}}catch(e){console.warn('[CIP] onglet code',e);}
@@ -4311,14 +4335,14 @@ function mtHL(k){const M=S.miter;if(!M||!S.prog)return;const col=new THREE.Color
     const n=V.nrm(V.sub(w,V.mul(u1,V.dot(w,u1))));line(ring(T.J,ra,u1,n,0,v.th,40));dot(T.J);const mid=(v.th/2)*DEG;label(V.add(T.J,V.add(V.mul(u1,ra*1.8*Math.cos(mid)),V.mul(n,ra*1.8*Math.sin(mid)))),mm(v.th)+'°');}
   else if(k==='L'){const off=V.mul(e1,R+rl*4);const a0=V.add(T.J,off),a1=V.add(end,off);line([a0,a1]);line([V.add(end,V.mul(e1,R)),V.add(end,V.mul(e1,R+rl*8))]);dot(T.J);line(ring(end,R+rl,e1,e2,0,360),true);label(V.add(V.mul(V.add(a0,a1),0.5),V.mul(e1,R*0.6)),mm(M.Lt)+' mm');}
   else if(k==='pos'){const c=S.prog.C[0];const p=c.P[0];dot(p,rl*4);label(V.add(p,[0,0,R*0.7]),'départ');}
-  else if(k==='rot'){const c=S.prog.C[0];const p=c.P[0],d=c.D[0];line([p,V.sub(p,V.mul(d,R*2.2))]);dot(p);label(V.sub(p,V.mul(d,R*2.6)),'B '+mm(v.B)+'°');}
+  else if(k==='rot'){const c=S.prog.C[0];const p=c.P[0],d=c.D[0];line([p,V.sub(p,V.mul(d,R*2.2))]);dot(p);label(V.sub(p,V.mul(d,R*2.6)),'B '+mm(v.B)+'°'+(v.Bauto?' auto':''));}
   else{const name={p0:'Pente de début',sr:'Soudure normale',p1:'Pente de fin'}[k];const L=S.prog.C.filter(c=>c.name===name||(k==='sr'&&c.name==='Recouvrement'));
     L.forEach(c=>{const P=c.P.map(p=>{const r=Math.hypot(p[0],p[2])||1;const f=(r+1)/r;return [p[0]*f,p[1],p[2]*f];});line(P);dot(P[0]);});
     if(L.length){const P=L[0].P;const q=P[P.length>>1];label(V.add(q,V.mul(V.nrm([q[0],0,q[2]]),R*0.7)),({p0:mm(v.p0),sr:mm(v.rot),p1:mm(v.p1)})[k]+'°');}}}
 function mtVals(){const g=id=>+$(id).value;const D=Math.max(1,g('cipMtD')),th=Math.max(30,Math.min(180,g('cipMtA')||90));const b=D/2,a=b/Math.sin(th/2*DEG);
   const off=mtOff();
   const r=phi=>{const p=(phi+off)*DEG;return a*b/Math.sqrt((b*Math.cos(p))**2+(a*Math.sin(p))**2);};
-  return {D,th,a,b,r,r0:r(0),B:g('cipMtB')||0,p0:Math.max(0,g('cipMtP0')||0),rot:Math.max(1,g('cipMtR')||365),p1:Math.max(0,g('cipMtP1')||0),st:Math.max(0.5,g('cipMtStep')||2),flat:S.cfg.chuck!=='vertical'};}
+  return {D,th,a,b,r,r0:r(0),B:g('cipMtB')||0,Bauto:$('cipMtB').value==='',p0:Math.max(0,g('cipMtP0')||0),rot:Math.max(1,g('cipMtR')||365),p1:Math.max(0,g('cipMtP1')||0),st:Math.max(0.5,g('cipMtStep')||2),flat:S.cfg.chuck!=='vertical'};}
 function mtRender(){const v=mtVals();if($('cipMtGL'))$('cipMtGL').textContent=(v.flat?'Z':'X')+' lu sur la machine';
   const sv=$('cipMtSvg');const W=420,H=300;const sc=Math.min(100/v.a,100/v.b);const cx=118,cy=140;let e='';
   for(let k=0;k<=180;k++){const t=2*Math.PI*k/180;e+=(k?'L':'M')+(cx+v.a*sc*Math.cos(t)).toFixed(1)+' '+(cy-v.b*sc*Math.sin(t)).toFixed(1);}
@@ -4338,10 +4362,10 @@ function mtRender(){const v=mtVals();if($('cipMtGL'))$('cipMtGL').textContent=(v
   const e1=v.p0+v.rot,e2=e1+v.p1;let err=0;for(let k=1;k<20;k++){const p=e1+(e2-e1)*k/20;const lin=(v.r(e1)-v.r0)+((v.r(e2)-v.r(e1))*k/20);err=Math.max(err,Math.abs(v.r(p)-v.r0-lin));}
   {const e=$('cipMtInfo');if(e)e.innerHTML=`Jonction : ellipse ${(2*v.a).toFixed(1)} × ${(2*v.b).toFixed(1)} mm.`;}
   $('cipMtInfoE').innerHTML=`Ellipse : ${(2*v.a).toFixed(2)} × ${(2*v.b).toFixed(2)} mm. La jonction s'éloigne de l'axe de <b>${zmin.toFixed(2)}</b> à <b>${zmax.toFixed(2)}</b> mm par rapport au départ : le CIP sous TRAORI suit ça tout seul, en douceur.`+(v.p1>0?` `:'');}
-function mtGen(){const v=mtVals();const W=$('cipLWMode'),P=$('cipLWPage'),O=$('cipLWOff');const mode=W?W.value:'10',page=P?P.value:'100',offv=O?O.value:'10';
-  let prog=($('cipMtName').value||'').trim().toUpperCase().replace(/[^A-Z0-9_-]+/g,'-').replace(/^-+|-+$/g,'');const dry=$('cipMtDry').checked;if(prog&&dry&&!/-VIDE$/.test(prog))prog+='-VIDE';
-  if(!prog)return {err:'Donne un nom au programme.'};const tech=($('cipMtTech').value||'').trim();if(!tech)return {err:'Donne le nom de la techno soudure (WTT).'};if(/["',]/.test(tech))return {err:'Pas de guillemet ni de virgule dans la techno.'};
-  const g=$('cipMtG').value;if(g==='')return {err:'Pointe posée sur le point de départ : tape la valeur lue sur la machine.'};
+function mtGen(pv){const v=mtVals();const W=$('cipLWMode'),P=$('cipLWPage'),O=$('cipLWOff');const mode=W?W.value:'10',page=P?P.value:'100',offv=O?O.value:'10';
+  let prog=($('cipMtName').value||'').trim().toUpperCase().replace(/[^A-Z0-9_-]+/g,'-').replace(/^-+|-+$/g,'');const dry=$('cipMtDry').checked;if(!prog&&pv)prog='ONGLET';if(prog&&dry&&!/-VIDE$/.test(prog))prog+='-VIDE';
+  if(!prog)return {err:'Donne un nom au programme.'};let tech=($('cipMtTech').value||'').trim();if(!tech&&pv)tech='TECHNO';if(!tech)return {err:'Donne le nom de la techno soudure (WTT).'};if(/["',]/.test(tech))return {err:'Pas de guillemet ni de virgule dans la techno.'};
+  let g=$('cipMtG').value;if(g===''&&pv)g='0';if(g==='')return {err:'Pointe posée sur le point de départ : tape la valeur lue sur la machine.'};
   if(Math.abs(v.B)>BLIM)return {err:'B dépasse la butée (±'+BLIM+'°).'};
   // CIP sous TRAORI : la jonction (ellipse) est dans le plan perpendiculaire à l'axe du mandrin ; X (ou Z à plat) = 0 sur ce plan
   const {o,Dm,fr,tot,st}=mtCore(v);const Q=[];for(let ph=0;ph<=tot+1e-9;ph+=st){const f=fr(Math.min(ph,tot));Q.push(toLst(f.p,f.d,f.th,o));}
@@ -4352,11 +4376,16 @@ function mtGen(){const v=mtVals();const W=$('cipLWMode'),P=$('cipLWPage'),O=$('c
       `TC_SET_TRAFO("${o.trafo}")`,"TRAORI(1)",g54,"",
       `;=== SOUDURE EN ONGLET (coude ${v.th} deg, tube D${v.D}) generee par l'onglet CIP - piece centree dans le montage ===`];
   if(dry)B.push(';!!! VERSION TEST A VIDE : laser jamais allume (TC_WELD_ON en commentaire) !!!');
+  if(pv&&($('cipMtG').value===''||!($('cipMtName').value||'').trim()||!($('cipMtTech').value||'').trim()))B.push(';(APERCU : nom / techno / valeur lue a remplir a la mise en machine)');
   const f0=fr(0);const pre=toLst(V.sub(f0.p,V.mul(f0.d,30)),f0.d,f0.th,o);
   B.push(lstMv(pre,'f5000')+' ;pre-approche 30 mm dans l\'axe du faisceau',lstMv(Q[0],'f5000')+'   ; point d\'approche','m0','',A+`TC_WELD_ON(1, "${tech}", ${mode}, ${page}); ROTATIONCW`);
   const segs=[[0,idx(v.p0),';pente de debut'],[idx(v.p0),idx(v.p0+Math.min(v.rot,360)),';soudure normale'],[idx(v.p0+Math.min(v.rot,360)),idx(v.p0+v.rot),';recouvrement'],[idx(v.p0+v.rot),Q.length-1,';pente de fin']];
   for(const [a,b,lab] of segs){if(b<=a)continue;B.push(lab);for(const bl of fitBlocks(Q.slice(a,b+1)))B.push(lineOf(bl));}
   B.push('',A+`TC_WELD_OFF(3,${offv}) ;(00 sans pente,10 avec pente)`,'');
+  if(($('cipMtRet')||{}).value==='inv'&&tot>360+1e-6){const R=[];for(let ph=tot;ph>=360-1e-9;ph-=st){const f=fr(Math.max(ph,360));R.push(toLst(f.p,f.d,f.th,o));}{const f=fr(360);const q=toLst(f.p,f.d,f.th,o);const l=R[R.length-1];if(Math.hypot(l.X-q.X,l.Y-q.Y,l.Z-q.Z)+Math.abs(l.C-q.C)>1e-4)R.push(q);}
+    B.push(';----- retour : trajet inverse (pente de fin + recouvrement a l envers, laser coupe) -----');for(const bl of fitBlocks(R))B.push(lineOf(bl));
+    B.push(';(tete pile sur le point de depart, C1 = 1 tour plus loin = meme position)','',"TRAFOOF","","G500","G90","","TC_AUX_LIGHT(5,0)","TC_AUX_LIGHT(6,0)","TC_LASER_REQUEST(0)","TC_RESET","TC_OPEN_DOOR(0,1,0,0)","","M30");
+    const L2=lstHead(prog,'soudure',tech).concat(B,["STOP_TEXT","C","ENDE_PROGRAMM","C","ED"]);return {txt:L2.join('\r\n').replace(/[^\x09\x0a\x0d\x20-\x7e]/g,'')+'\r\n',file:'P'+prog+'.LST',n:B.length,Q};}
   // retour au départ : dégagement 30 mm, le mandrin se déroule tête en l'air (la tête ne bouge pas dans la machine), puis redescente
   const fe=fr(tot);const Pm=rotM(V.sub(fe.p,V.mul(fe.d,30)),fe.th);B.push(';----- retour au point de depart -----',lstMv(toLst(V.sub(fe.p,V.mul(fe.d,30)),fe.d,fe.th,o))+' ;degagement 30 mm');
   const nU=Math.max(2,Math.ceil(tot/10));for(let k=1;k<=nU;k++){const th=tot*(1-k/nU);B.push(lstMv(toLst(rotM(Pm,-th),rotM(Dm,-th),th,o)));}
@@ -4500,8 +4529,9 @@ function applyStart(o){ // point de départ choisi + angle de tête au départ (
   const st=S.starts&&S.starts[o.name];if(st&&isClosed(o)){let P=o.P.slice(),D=o.D.slice();if(V.len(V.sub(P[0],P[P.length-1]))<1e-6){P.pop();D.pop();}
     let k=0,bd=1e9;P.forEach((p,i)=>{const d=V.len(V.sub(p,st));if(d<bd){bd=d;k=i;}});P=P.slice(k).concat(P.slice(0,k));D=D.slice(k).concat(D.slice(0,k));P.push(P[0]);D.push(D[0]);o.P=P;o.D=D;}
   else if(st&&o.P.length>1&&V.len(V.sub(o.P[o.P.length-1],st))<V.len(V.sub(o.P[0],st))){o.P=o.P.slice().reverse();o.D=o.D.slice().reverse();}
-  const b0=S.startB&&S.startB[o.name];if(b0!==undefined&&b0!==''&&!isNaN(+b0)){const off=(+b0)*DEG-decomp(o.D[0]).B;o.D=o.D.map(d=>{const q=decomp(d);return compo(q.th,q.B+off);});}
+  let b0=S.startB&&S.startB[o.name];if((b0===undefined||b0==='')&&$('cipStartB')&&$('cipStartB').value!=='')b0=$('cipStartB').value;if(b0!==undefined&&b0!==''&&!isNaN(+b0)){const off=(+b0)*DEG-decomp(o.D[0]).B;o.D=o.D.map(d=>{const q=decomp(d);return compo(q.th,q.B+off);});}
   return o;}
+function plen(P,closed){let L=0;for(let i=1;i<P.length;i++)L+=V.len(V.sub(P[i],P[i-1]));if(closed&&P.length>2)L+=V.len(V.sub(P[0],P[P.length-1]));return L;}
 function addOverlap(o,ov,ramp){if(!isClosed(o))return o;const P=o.P,D=o.D;const n=P.length;o.mOv=n-1;let acc=0,k=1;const xP=[],xD=[];
   while(acc<ov+ramp&&k<n){acc+=V.len(V.sub(P[k],P[k-1]));xP.push(P[k]);xD.push(D[k]);if(o.mRamp===undefined&&acc>=ov)o.mRamp=n-1+xP.length;k++;}
   o.P=P.concat(xP);o.D=D.concat(xD);o.closed=true;return o;}
@@ -4652,9 +4682,9 @@ function weldOps(C0){const notes=[];const inst=instList();const seams=C0.filter(
       const gapPts=(opt.gap||[]).map(i=>PP[i]);
       opt.pieces.forEach((pc,j)=>{if(pc.idx.length<2)return;const Pp=pc.idx.map(i=>PP[i]);let o={name:np>1?nm+' · passe '+(j+1)+'/'+np:nm,step:2,P:Pp,D:pc.D.slice(),weld:true,opt,piece:true,gapPts:j===0?gapPts:null};
         o=applyStart(o);// ouverte : pas de recouvrement, juste la pente de fin
-        let acc=0,k2=o.P.length-1;while(k2>0&&acc<ramp){acc+=V.len(V.sub(o.P[k2],o.P[k2-1]));k2--;}o.mOv=k2;o.mRamp=k2;ops.push(o);});}
-    else if(sg.closed){let o={name:nm,step:2,P:PP,D:DD,weld:true,opt};o=applyStart(o);o=addOverlap(o,ov,ramp);ops.push(o);}
-    else{let o={name:nm,step:2,P:PP,D:DD,weld:true,opt,piece:true};o=applyStart(o);let acc=0,k2=o.P.length-1;while(k2>0&&acc<ramp){acc+=V.len(V.sub(o.P[k2],o.P[k2-1]));k2--;}o.mOv=k2;o.mRamp=k2;ops.push(o);}});
+        let acc=0,k2=o.P.length-1;while(k2>0&&acc<ramp/360*plen(PP,true)){acc+=V.len(V.sub(o.P[k2],o.P[k2-1]));k2--;}o.mOv=k2;o.mRamp=k2;ops.push(o);});}
+    else if(sg.closed){let o={name:nm,step:2,P:PP,D:DD,weld:true,opt};o=applyStart(o);{const Lp=plen(PP,true);o=addOverlap(o,ov/360*Lp,ramp/360*Lp);}ops.push(o);}
+    else{let o={name:nm,step:2,P:PP,D:DD,weld:true,opt,piece:true};o=applyStart(o);let acc=0,k2=o.P.length-1;while(k2>0&&acc<ramp/360*plen(PP,true)){acc+=V.len(V.sub(o.P[k2],o.P[k2-1]));k2--;}o.mOv=k2;o.mRamp=k2;ops.push(o);}});
     for(let q=nOps0;q<ops.length;q++)ops[q].seam=seamObj;}));
   splitNotes.forEach(s=>notes.push(s));
   if(nMoved)notes.push('Tête inclinée automatiquement à certains endroits pour éviter de toucher la pièce (au plus près de l\'angle idéal).');
@@ -4698,6 +4728,9 @@ function fitBlocks(Q){const tol=0.01,atol=0.3,blocks=[];let i=0;const n=Q.length
     for(let j=i+2;j<n&&j<i+600;j++){const m=arcOK(i,j);if(m===null){if(j>i+4)break;else continue;}ja=j;ma=m;}
     if(ja>jl){blocks.push({t:'CIP',m:Q[ma],e:Q[ja]});i=ja;}else{blocks.push({t:'G01',e:Q[jl]});i=jl;}}
   return blocks;}
+function homeLines(hm,o,pf){const out=[];let i=0;while(i<hm.length){const f=hm[i];if(f.rev){let j=i;while(j<hm.length&&hm[j].rev)j++;const k0=F.indexOf(f);const pr=F[k0-1]||f;
+    const Q=[pr].concat(hm.slice(i,j)).map(x=>{const q=toLst(pf(x),x.d,x.th,o);q.s=x.s;return q;});out.push({t:';trajet inverse : pente de fin + recouvrement a l envers (laser coupe)',s:f.s});fitBlocks(Q).forEach(bl=>out.push({t:lineOf(bl),s:bl.e.s}));i=j;}
+    else{out.push({f,s:f.s});i++;}}return out;}
 function lineOf(b){const e=b.e;const tail=`X = ${n3(e.X)} Y = ${n3(e.Y)} Z = ${n3(e.Z)} B = ${n3(e.B)} C1 = ${n3(e.C)}`;
   return b.t==='CIP'?` CIP I1 = ${n3(b.m.X)} J1 = ${n3(b.m.Y)} K1 = ${n3(b.m.Z)} ${tail}`:` G01 ${tail}`;}
 function genCIP(){if(!S.prog||!F.length)return null;const o=lstOpt();const C=S.prog.C;const out=[],sv=[];let nCIP=0,nG=0;
@@ -4722,7 +4755,7 @@ function genCIP(){if(!S.prog||!F.length)return null;const o=lstOpt();const C=S.p
     for(const [a,b,lab] of segs){if(b<=a)continue;if(lab)put(lab);for(const bl of fitBlocks(Q.slice(a,b+1))){put(lineOf(bl),bl.e.s);if(bl.t==='CIP')nCIP++;else nG++;}}
     put(W?';>>> SOUDURE OFF ici (post-processeur)':';>>> LASER OFF ici (post-processeur)',cut.length?cut[cut.length-1].s:null);}
   const hm=S.prog.home?F.filter(f=>f.ci===S.prog.home.ci):[];
-  if(hm.length){put('');put(';----- RETOUR AU POINT DE DEPART (chemin sans collision) -----');hm.forEach(f=>{put(mv(toLst(f.p,f.d,f.th,o)),f.s);nG++;});nG--;}
+  if(hm.length){put('');put(';----- RETOUR AU POINT DE DEPART -----');homeLines(hm,o,x=>x.p).forEach(l=>{if(l.t)put(l.t,l.s);else{put(mv(toLst(l.f.p,l.f.d,l.f.th,o)),l.f.s);nG++;}});nG--;}
   else{const fl=F[F.length-1];const r=V.sub(fl.p,V.mul(fl.d,30));
   put('');put(';----- DEGAGEMENT FINAL -----');put(mv(toLst(r,fl.d,fl.th,o)),TOTAL);}
   // les commentaires prennent le moment de la ligne de mouvement suivante
@@ -4781,7 +4814,7 @@ function genLST(){if(!S.prog||S.prog.frames||!F.length)return {err:'Pas de progr
     for(const [a,b,lab] of segs){if(b<=a)continue;if(lab)B.push(lab);for(const bl of fitBlocks(Q.slice(a,b+1)))B.push(lineOf(bl));}
     B.push("",(dry?";A VIDE ":"")+OFF,"");}
   {const hm=S.prog.home?F.filter(f=>f.ci===S.prog.home.ci):[];
-   if(hm.length){B.push(';----- retour au point de depart (chemin sans collision) -----');hm.forEach(f=>B.push(lstMv(toLst(sh(f),f.d,f.th,o))));B.push('');}
+   if(hm.length){B.push(';----- retour au point de depart -----');homeLines(hm,o,sh).forEach(l=>B.push(l.t?l.t:lstMv(toLst(sh(l.f),l.f.d,l.f.th,o))));B.push('');}
    else{const fl=F[F.length-1];B.push(lstMv(toLst(V.sub(fl.p,V.mul(fl.d,30)),fl.d,fl.th,o))+' ;degagement 30 mm dans l\'axe du faisceau');}}
   const park=!(S.prog.home);
   if(W){B.push("","TRAFOOF","","G500","G90",...(park?[o.trafo==='Bc1'?"G01 X =50 Y = 200 F10000":"G01 Y = 200 C1 =0 F10000",o.trafo==='Bc1'?"G01 Z = 350 B = 0 C1 =0":"G01 Z = 350 B = 0"]:[";(tete laissee sur le point de depart, prete pour la piece suivante)"]),"",
@@ -4800,7 +4833,7 @@ function showPartPage(){if($('cipMiterPage'))$('cipMiterPage').style.display='no
   $('cipPartKeepBtn').textContent=S.part?'Garder la pièce actuelle →':'Continuer sans pièce →';
   $('cipCardDemoT').textContent=W?'▶ Exemple : tube en T':'▶ Exemple : tuiles';$('cipCardDemoS').textContent=W?'Un piquage à 90°, calculé en vrai, pour essayer.':'3 tuiles à 120° dans un tube Ø54×2 : biseau, trous, lamelles, séparation.';}
 function showWork(st){if($('cipMiterPage'))$('cipMiterPage').style.display='none';$('cipStart').style.display='none';$('cipProcPage').style.display='none';$('cipPartPage').style.display='none';$('cipWork').style.display='';setStep(st);S.api.run();requestAnimationFrame(()=>{size();upd();});}
-function setStep(st){const w=$('cipWork');w.dataset.step=st;{const b=$('cipDemoBtn');if(b)b.textContent=$('cipProc').value==='soudure'?'Exemple : tube en T':'Exemple : tuiles (découpe)';}['Prep','Sim','Mach'].forEach(k=>{const b=$('cipStp'+k);if(b)b.classList.toggle('on',k.toLowerCase()===st);});{const b=$('cipStpPart');if(b)b.classList.toggle('on',st==='build');}
+function setStep(st){const w=$('cipWork');w.dataset.step=st;try{if(buildHead.sig&&S._hsig!==buildHead.sig()){S._hsig=buildHead.sig();buildHead();}}catch(e){}{const b=$('cipDemoBtn');if(b)b.textContent=$('cipProc').value==='soudure'?'Exemple : tube en T':'Exemple : tuiles (découpe)';}['Prep','Sim','Mach'].forEach(k=>{const b=$('cipStp'+k);if(b)b.classList.toggle('on',k.toLowerCase()===st);});{const b=$('cipStpPart');if(b)b.classList.toggle('on',st==='build');}
   const hide=st==='prep'||st==='build'||st==='mach'||S.codeHidden;w.classList.toggle('cipNoCode',hide);const cs=$('cipCodeShow');if(cs)cs.style.display=(st==='sim'&&S.codeHidden)?'':'none';
   headG.visible=st!=='build';if(st==='mach'){try{wzRender();}catch(e){console.warn(e);}}else{try{wzView();}catch(e){}}
   if(st!=='build'){S.hlFocus=S.hlHover=null;try{genHLdraw();}catch(e){}}
@@ -4845,8 +4878,8 @@ const TIPS={
  cipNCopy:'Nombre de pièces réparties régulièrement autour du tube (bouton « autour »).',
  cipPOff:'Distance entre la pièce et le bout libre du tube (mm).\nTu peux aussi attraper la pièce à la souris et la glisser.',
  cipFitBtn:'Met le tube aux dimensions détectées dans ton STEP (Ø et épaisseur).',
- cipWOv:'Recouvrement (mm) : la soudure repasse sur son début sur cette longueur pour bien fermer le cordon.\nCommentaire « ;recouvrement » dans le code.',
- cipWRamp:'Pente de fin (mm) : longueur où la puissance redescend à la fin (TC_WELD_OFF(3,10) = avec pente).\nCommentaire « ;pente de fin ».',
+ cipWOv:'Recouvrement (°) : la soudure repasse sur son début sur cet angle (360° = tout le cordon) pour bien fermer le cordon.\nCommentaire « ;recouvrement » dans le code.',
+ cipWRamp:'Pente de fin (°) : angle (360° = tout le cordon) où la puissance redescend à la fin (TC_WELD_OFF(3,10) = avec pente).\nCommentaire « ;pente de fin ».',
  cipRapMode:'Comment la tête passe d\'un passage au suivant :\n• En X : elle remonte un tout petit peu, glisse le long du tube hors des tubes soudés, le mandrin tourne là, puis elle revient. Peu de Z (machine pas très haute).\n• Par le dessus : elle monte et tourne autour du tube.\nLe soft vérifie les collisions ; si « En X » est impossible il passe par le dessus.',
  cipPickBtn:'Choisir où un passage démarre : promène la souris sur une ligne dans la 3D. Le point s\'aimante sur le cordon et sur les points tous les 90° (Maj = sans aimant). Clique pour valider.',
  cipPlay:'Lance / met en pause la simulation.',cipScrub:'Fais glisser pour aller à n\'importe quel moment du programme.',cipSpeed:'Vitesse de la simulation (n\'a aucun effet sur la machine).',
@@ -5079,7 +5112,8 @@ S.api={
     else if(a==='scrub'){pos=$('cipScrub').value/1000*TOTAL;playing=false;}
     else if(a==='head'){buildHead();S.geoC=S.geoC;S.order=null;if(S.miter){rebuildPaths();return;}if(S.part)computeProgram();else upd();return;}
     else if(a==='mandrin'){try{localStorage.setItem('cipMandrin',$('cipMandrin').value);}catch(e){}const CK=chuckDef();if($('cipLH')){$('cipLH').value=+(CK.Hb+CK.hj).toFixed(2);try{localStorage.setItem('cipChuckH_'+S.cfg.chuck,$('cipLH').value);}catch(e){}}if(S.miter){mtSim();return;}buildStatic();if(S.part){placeAndShow();computeProgram();}else upd();return;}
-    else if(a==='chuck'){S.cfg.chuck=v;setMapping();}
+    else if(a==='axis'){applyAxis();return;}
+    else if(a==='chuck'){S.cfg.chuck=v;setMapping();try{syncForm();}catch(e){}}
     else if(a==='choose'){S.cfg.chuck=v;setMapping();showProcPage();return;}
     else if(a==='procscreen'){playing=false;showProcPage();return;}
     else if(a==='procpick'){const ch=$('cipProc').value!==v;$('cipProc').value=v;syncProc();if(ch&&S.part){S.order=null;computeProgram();}showPartPage();return;}
