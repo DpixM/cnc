@@ -161,6 +161,14 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-08 — HR : IMPORT DXF — recollage des segments en contours fermés (amorces en arc)
+ [FIX] Beaucoup de DXF (export AutoCAD) sortent chaque côté/arc comme une entité SÉPARÉE (LINE + ARC).
+   À l'import, tout restait « ouvert » -> aucune amorce en arc à la découpe (l'utilisateur ne voyait
+   pas ses entrées en arrondis). Nouvelle fonction _dxfStitch : on RECOLLE les bouts dont les extrémités
+   se touchent (tol 0,08 mm, segment retourné au besoin) et on marque fermées les boucles. Testé sur
+   PEIGNE-BLOQUAGE-PION-C.DXF : 104 segments -> 13 contours fermés -> 13 amorces en arc. Un DXF déjà en
+   polylignes fermées passe tel quel. Hors zone CIP.
+
 -- 2026-10-07 — HQ : FENÊTRES D'OUTILS qui se ferment + calculateur inline + fermeture des primitives
  [FIX] Fenêtre de sélection (selPanel, « L × l ») : n'apparaît QU'AVEC l'outil Sélection, a un bouton ✕,
    et ne s'ouvre plus EN DOUBLE avec le panneau 📏 après chaque dessin (un seul éditeur à la fois).
@@ -1729,7 +1737,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-07-HQ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-08-HR ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -21383,6 +21391,38 @@ function importSvgOrImage(input){
   input.value='';
 }
 
+// Recolle des segments (chaque entite = une polyligne de points) en CHAINES continues :
+// on enchaine les bouts dont les extremites se touchent (tol mm), en retournant un segment
+// au besoin, et on marque fermee une chaine dont le debut rejoint la fin. Beaucoup de DXF
+// sortent chaque cote/arc separement -> sans ca tout reste "ouvert" (pas d'amorce en arc).
+function _dxfStitch(paths, tol){
+  tol = tol || 0.08;
+  const near=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1])<=tol;
+  const segs=paths.filter(p=>p&&p.length>=2).map(p=>p.map(q=>[q[0],q[1]]));
+  const used=new Array(segs.length).fill(false);
+  const chains=[];
+  for(let s=0;s<segs.length;s++){
+    if(used[s])continue; used[s]=true;
+    let chain=segs[s].slice();
+    let go=true, guard=0;
+    while(go && guard++<segs.length+2){
+      go=false;
+      const head=chain[0], tail=chain[chain.length-1];
+      if(near(head,tail) && chain.length>2) break; // deja boucle
+      for(let j=0;j<segs.length;j++){
+        if(used[j])continue;
+        const sp=segs[j], a=sp[0], b=sp[sp.length-1];
+        if(near(tail,a)){ chain=chain.concat(sp.slice(1)); used[j]=true; go=true; break; }
+        if(near(tail,b)){ chain=chain.concat(sp.slice(0,-1).reverse()); used[j]=true; go=true; break; }
+        if(near(head,b)){ chain=sp.slice(0,-1).concat(chain); used[j]=true; go=true; break; }
+        if(near(head,a)){ chain=sp.slice(1).reverse().concat(chain); used[j]=true; go=true; break; }
+      }
+    }
+    const closed = chain.length>2 && near(chain[0], chain[chain.length-1]);
+    chains.push({pts:chain, closed});
+  }
+  return chains;
+}
 function importDXF(file){
   const reader=new FileReader();
   reader.onload=e=>{
@@ -21401,16 +21441,23 @@ function importDXF(file){
       const TY=(y)=> (_cyD-y)+_H/2;                // inverser Y + centrer en Y
       const made=[];
       if(typeof _syncObjCnt==='function')_syncObjCnt();
-      for(const p of paths){
-        const pts=p.map(([x,y])=>[TX(x),TY(y)]);
-        if(pts.length<2)continue;
-        const closed = pts.length>2 && Math.hypot(pts[0][0]-pts[pts.length-1][0], pts[0][1]-pts[pts.length-1][1])<1e-6;
+      // On transforme (vraie taille, Y inverse, centre) PUIS on RECOLLE les segments en
+      // contours : ainsi un DXF en LINE+ARC separes redevient des boucles FERMEES et la
+      // decoupe genere bien les amorces en arc. Un DXF deja en polylignes fermees passe
+      // tel quel (chaque polyligne = une chaine, rien a recoller).
+      const _tp=paths.map(p=>p.map(([x,y])=>[TX(x),TY(y)]));
+      const chains=(typeof _dxfStitch==='function')
+        ? _dxfStitch(_tp,0.08)
+        : _tp.map(p=>({pts:p, closed:p.length>2 && Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-6}));
+      for(const ch of chains){
+        let pts=ch.pts; if(!pts||pts.length<2)continue;
         let o;
-        if(pts.length===2){
+        if(pts.length===2 && !ch.closed){
           o={id:objCnt++,type:'line',x1:pts[0][0],y1:pts[0][1],x2:pts[1][0],y2:pts[1][1],strokeW:(currentStrokeW||0.2)};
         } else {
+          if(ch.closed){ pts=pts.slice(); pts[pts.length-1]=[pts[0][0],pts[0][1]]; } // fermeture propre
           o={id:objCnt++,type:'free',pts,strokeW:(currentStrokeW||0.2)};
-          if(closed) o._poly=true;   // polyligne fermee = forme fermee (decoupe/chute)
+          if(ch.closed) o._poly=true;   // boucle fermee = forme fermee (decoupe/chute)
         }
         paintObjects.push(o); made.push(o.id);
         if(made.length>4000){ break; }
