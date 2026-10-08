@@ -161,6 +161,10 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-08 — HS : SIMU 3D — la boule CYAN « départ » plus petite + semi-transparente
+ [UI] La boule cyan du point de départ (simu 3D découpe) cachait les petites pièces. Rayon ~moitié
+   (spanXY*0.009 au lieu de *0.02) + opacité 0.5 -> on voit la pièce dessous. Cosmétique, hors zone CIP.
+
 -- 2026-10-08 — HR : IMPORT DXF — recollage des segments en contours fermés (amorces en arc)
  [FIX] Beaucoup de DXF (export AutoCAD) sortent chaque côté/arc comme une entité SÉPARÉE (LINE + ARC).
    À l'import, tout restait « ouvert » -> aucune amorce en arc à la découpe (l'utilisateur ne voyait
@@ -1737,7 +1741,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-08-HR ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-08-HS ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -28660,9 +28664,11 @@ function _s3dInit(moves) {
   const _pr=Math.min(0.09,Math.max(0.03,spanXY*0.0002)); if(moves.pierces){ for(const p of moves.pierces){ const sp=new THREE.Mesh(new THREE.SphereGeometry(_pr,10,10), new THREE.MeshBasicMaterial({color:0xff3b30})); sp.position.set(p[0],p[1],(p[2]||0)-0.05); pierceGrp.add(sp); } }
   pivot.add(pierceGrp);
   // ── DEPART de la decoupe (1er percage) = boule CYAN ──
-  const _mv=Math.max(0.6, spanXY*0.02);
+  const _mv=Math.max(0.6, spanXY*0.02); // (sert aussi au repere ZERO mauve plus bas)
   if(moves.pierces && moves.pierces.length){ const p0=moves.pierces[0];
-    const startBall=new THREE.Mesh(new THREE.SphereGeometry(_mv,16,16), new THREE.MeshBasicMaterial({color:0x00e5ff}));
+    // Plus PETITE (moitié) et SEMI-TRANSPARENTE : on voit la pièce dessous, même sur les petites.
+    const _bv=Math.max(0.3, spanXY*0.009);
+    const startBall=new THREE.Mesh(new THREE.SphereGeometry(_bv,16,16), new THREE.MeshBasicMaterial({color:0x00e5ff, transparent:true, opacity:0.5}));
     startBall.position.set(p0[0],p0[1],(p0[2]||0)); pivot.add(startBall); }
   // ── ZERO machine (0,0) = croix + boule MAUVES (au coin du dessin apres re-zero) ──
   { const zc=[ -_mv*1.6,0,0, _mv*1.6,0,0,  0,-_mv*1.6,0, 0,_mv*1.6,0 ];
