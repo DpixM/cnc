@@ -7966,7 +7966,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v41',
+  const CIP_VER = 'CIP v42',
     CIP_DATE = '07/10/2026';
   {
     const e = $('cipVer');
@@ -10224,7 +10224,15 @@ function cip_build() {
     }
     let b0 = S.startB && S.startB[o.name];
     if ((b0 === undefined || b0 === '') && $('cipStartB') && $('cipStartB').value !== '') b0 = $('cipStartB').value;
-    if (b0 !== undefined && b0 !== '' && !isNaN(+b0)) {
+    if (b0 !== undefined && b0 !== '' && !isNaN(+b0) && o.weld && S.bodies && S.bodies.length) {
+      // SOUDURE : l'angle demandé = inclinaison de la tête par rapport au tube, GARDÉE TOUT AUTOUR de la jonction
+      // (départ −55 -> côtés 55° sur le côté -> opposé +55). Avant, on ajoutait un décalage fixe sur B (sens de la
+      // longueur seulement) : ça marchait au départ puis s'écrasait sur les côtés et à l'opposé (34°, 5°…).
+      // angle aigu entre le faisceau et la normale du tube (à plat, B=±55 = 35° du tube, la tête se met du bon côté toute seule)
+      const lean = Math.abs(Math.asin(Math.sin(bMachToTube(+b0) * DEG)));
+      o.D = weldLean(o.P, o.D, lean);
+      o.leanDeg = lean / DEG;
+    } else if (b0 !== undefined && b0 !== '' && !isNaN(+b0)) {
       const off = bMachToTube(+b0) * DEG - decomp(o.D[0]).B; // b0 = B machine
       o.D = o.D.map(d => {
         const q = decomp(d);
@@ -10232,6 +10240,45 @@ function cip_build() {
       });
     }
     return o;
+  }
+  // Faisceau incliné de « a » (radians) par rapport à la normale du tube, dans le plan perpendiculaire au cordon,
+  // la tête TOUJOURS du côté extérieur du corps soudé (elle ne peut pas être au-dessus du piquage).
+  function weldLean(P, D, a) {
+    // corps soudé de ce cordon = celui dont la surface passe au plus près des points
+    let body = null,
+      be = 1e9;
+    for (const b of S.bodies) {
+      let e = 0;
+      for (let i = 0; i < P.length; i += Math.max(1, P.length >> 4)) {
+        const w = V.sub(P[i], b.c);
+        const r = V.len(V.sub(w, V.mul(b.ax, V.dot(w, b.ax))));
+        e += Math.abs(r - b.r);
+      }
+      if (e < be) {
+        be = e;
+        body = b;
+      }
+    }
+    const n = P.length;
+    return P.map((p, i) => {
+      const t0 = V.sub(P[Math.min(n - 1, i + 1)], P[Math.max(0, i - 1)]);
+      if (V.len(t0) < 1e-9) return D[i];
+      const t = V.nrm(t0);
+      let ni = nIn(p);
+      ni = V.nrm(V.sub(ni, V.mul(t, V.dot(ni, t))));
+      // côté du corps : de la tête vers le corps (composante latérale du faisceau)
+      let side = null;
+      if (body) {
+        const w = V.sub(p, body.c);
+        const out = V.sub(w, V.mul(body.ax, V.dot(w, body.ax))); // normale sortante du corps
+        side = V.mul(out, -1);
+      } else side = D[i];
+      side = V.sub(side, V.mul(t, V.dot(side, t)));
+      side = V.sub(side, V.mul(ni, V.dot(side, ni)));
+      if (V.len(side) < 1e-9) return D[i];
+      side = V.nrm(side);
+      return V.nrm(V.add(V.mul(ni, Math.cos(a)), V.mul(side, Math.sin(a))));
+    });
   }
   function plen(P, closed) {
     let L = 0;
@@ -11023,7 +11070,18 @@ function cip_build() {
       })
     );
     splitNotes.forEach(s => notes.push(s));
-    if (nMoved)
+    // angle de tête demandé : on dit clairement ce qui est fait (le signe de B au départ dépend du côté du piquage)
+    {
+      const ol = ops.find(x => x.leanDeg !== undefined);
+      if (ol) {
+        const d0 = ol.D[0];
+        const B0 = toLst(ol.P[0], d0, decomp(d0).th, lstOpt(true)).B;
+        notes.push(
+          `Tête à ${ol.leanDeg.toFixed(1)}° du tube TOUT AUTOUR de la jonction (départ B = ${B0.toFixed(1)}°, côté opposé = l'inverse). Le signe de B se met tout seul : la tête reste toujours à l'extérieur du piquage.`
+        );
+      }
+    }
+    if (nMoved && !ops.some(x => x.leanDeg !== undefined))
       notes.push(
         "Tête inclinée automatiquement à certains endroits pour éviter de toucher la pièce (au plus près de l'angle idéal)."
       );
