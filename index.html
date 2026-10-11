@@ -161,6 +161,13 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-11 — HV : SENS DE DÉCOUPE laser (Auto / Horaire / Antihoraire)
+ [AJOUT] Panneau laser : 3 boutons « Sens de découpe ». Auto = comportement actuel. Horaire/Antihoraire
+   orientent TOUS les contours fermés dans le sens choisi (réversion du winding, polyArea), appliqué
+   AVANT le perçage -> marche même perçage auto désactivé ; le cercle reste un cercle (G2/G3 selon le
+   sens). Testé (t_cutdir : chemin CW aire>0, CCW aire<0). Prochaine étape : points de perçage manuels.
+   Zone dessin, hors zone CIP.
+
 -- 2026-10-11 — HU : dock Style DÉPLAÇABLE + REPLIABLE (position mémorisée)
  [UI] Le dock de style (à gauche) a maintenant une poignée ⠿ pour le DÉPLACER où on veut (clampé
    dans le canvas) et un bouton ▾/▸ pour le REPLIER quand on n'en a pas besoin. Position + état repli
@@ -1756,7 +1763,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-11-HU ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-11-HV ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2712,6 +2719,14 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <input type="checkbox" id="laserInvert" onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
       <span><b>Inverser plein/vide</b> — coche si c'est l'inverse qui doit tomber (ex : tu gardes la petite pièce au lieu du tour).</span>
     </label>
+    <!-- SENS DE DÉCOUPE -->
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--txt)"><b>Sens de découpe</b></span>
+      <button type="button" id="lcd_auto" onclick="setLaserCutDir('auto')" style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--acc);background:var(--acc);color:#111;cursor:pointer;font-size:12px;font-weight:800">Auto</button>
+      <button type="button" id="lcd_cw"   onclick="setLaserCutDir('cw')"   style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↻ Horaire</button>
+      <button type="button" id="lcd_ccw"  onclick="setLaserCutDir('ccw')"  style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↺ Antihoraire</button>
+    </div>
+    <div style="font-size:9px;color:var(--txt3);margin-top:4px">Auto = le soft choisit. Sinon tous les contours sont coupés dans le sens choisi (utile pour le côté de la bavure / la compensation G41-G42 à venir).</div>
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
       <input type="checkbox" id="laserFrame" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
       <span><b>Délimitation (contour à vide + pause)</b> — avant de couper, la tête fait le tour du rectangle du dessin <b>sans laser</b>, puis s'arrête (M00). Tu vérifies le placement sur la tôle, tu valides sur la machine, et ça repart couper.</span>
@@ -14913,6 +14928,15 @@ function laserCalc(){
     msg.textContent='saignée '+kerf.toFixed(3)+'  ·  X '+sg(ajX)+'  ·  Y '+sg(ajY); }
   if(typeof wzGenLaser==='function') wzGenLaser();
 }
+// ── SENS DE DÉCOUPE (laser) : 'auto' (le soft choisit) | 'cw' (horaire) | 'ccw' (antihoraire) ──
+let _laserCutDir='auto';
+function setLaserCutDir(d){
+  _laserCutDir=(d==='cw'||d==='ccw')?d:'auto';
+  ['auto','cw','ccw'].forEach(k=>{ const b=document.getElementById('lcd_'+k); if(b){ const on=(k===_laserCutDir);
+    b.style.background=on?'var(--acc)':'var(--surf)'; b.style.color=on?'#111':'var(--txt)';
+    b.style.borderColor=on?'var(--acc)':'var(--brd2)'; b.style.fontWeight=on?'800':'600'; } });
+  if(typeof wzGenLaser==='function') wzGenLaser();
+}
 function buildLaserBody(){
   const flat=_exportFlatObjs();
   const _zl=parseFloat(document.getElementById('laserZlift')?.value); const ZL=isNaN(_zl)?5:_zl;
@@ -15018,6 +15042,23 @@ function buildLaserBody(){
     }});
   }
   const blocks=order.map((c,bi)=>{
+    // === SENS DE DÉCOUPE : oriente le contour FERMÉ (horaire / antihoraire) AVANT tout le reste,
+    // pour que ça marche même si le perçage auto est désactivé. polyArea>0 = horaire visuel (Y-bas). ===
+    if(typeof _laserCutDir!=='undefined' && _laserCutDir!=='auto' && c._closed && c.poly && c.poly.length>=3 && typeof polyArea==='function'){
+      let p=c.poly.slice();
+      if(p.length>1 && Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-7) p.pop();
+      if(p.length>=3){
+        const isCW=polyArea(p)>0, wantCW=(_laserCutDir==='cw');
+        if(isCW!==wantCW){
+          p.reverse(); p.push([p[0][0],p[0][1]]);
+          c.poly=p; c.start=[p[0][0],p[0][1]];
+          const uniq=p.slice(0,p.length-1); const _fc=(typeof _fitCircle==='function')?_fitCircle(uniq):null;
+          if(_fc){ const st=p[0], nx2=p[1]||st; const cr=(st[0]-_fc.cx)*(nx2[1]-_fc.cy)-(st[1]-_fc.cy)*(nx2[0]-_fc.cx);
+            c.moves=[(cr>=0?'G3':'G2')+' X'+_lc(st[0])+' Y'+_lc(st[1])+' I'+_lc(_fc.cx-st[0])+' J'+_lc(_fc.cy-st[1])+'   ;cercle (sens choisi)']; }
+          else { c.moves=p.slice(1).map(q=>'G1 X'+_lc(q[0])+' Y'+_lc(q[1])); }
+        }
+      }
+    }
     // Cote CHUTE connue AVANT de choisir le depart.
     let wasteInside=globalWaste(c._c);   // regle pair-impair GLOBALE (+ INV + peinture)
 
