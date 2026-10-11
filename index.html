@@ -1937,7 +1937,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     #cipBody .cipWzS.cur h4 i{background:var(--acc);color:#000}
     #cipBody .cipWzS.done h4 i{background:#43a047;color:#fff}
     #cipBody .cipWzS.lock{opacity:.4;pointer-events:none}
-    #cipBody .cipWzS.done .cipWzT,#cipBody .cipWzS.done > .cipNum{display:none} #cipBody .cipWzS.done h4{margin:0}
+    #cipBody .cipWzS.done .cipWzT,#cipBody .cipWzS.done > .cipNum,#cipBody .cipWzS.done .cipWzZn{display:none} #cipBody .cipWzS.done h4{margin:0}
     #cipBody .cipWzS .cipWzT{font-size:13px;line-height:1.45;color:var(--txt)}
     #cipBody .cipWzS .cipWzBig{font:700 15px var(--mono);color:var(--acc)}
     #cipBody #cipPartPage{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:480px;padding:20px 0;text-align:center}
@@ -7872,6 +7872,18 @@ function cip_build() {
       key: [f.p.map(v => v.toFixed(2)).join(','), f.th.toFixed(2), S.cfg.chuck, o.xdir].join('|')
     };
   }
+  // hauteur du point de départ au-dessus de l'axe du mandrin, mandrin tourné comme à l'étape 3 (C = C du départ)
+  function wzHgt(P) {
+    return rotM(P.f.p, P.f.th)[2];
+  }
+  function wzAxisZ() {
+    try {
+      const v = localStorage.getItem('cipAxisZ_' + S.cfg.chuck);
+      return v === null || v === '' || isNaN(+v) ? null : +v;
+    } catch (e) {
+      return null;
+    }
+  }
   function wzCur() {
     const P = wzP1();
     if (!P) return 0;
@@ -7945,9 +7957,21 @@ function cip_build() {
     ${cur === 1 ? `<div class="cipRow"><button class="cipBtn cipMain" onclick="cip_ui('wz',1)">C'est fait →</button></div>` : ''}</div>`;
     h += `<div class="cipWzS ${st(2)}"><h4><i>${cur > 2 ? '✓' : 2}</i>Oriente la pièce</h4><div class="cipWzT">Mets le mandrin à <span class="cipWzBig">C = 0</span>. La pièce doit être tournée <b>comme sur la 3D</b> (le haut de la 3D = côté tête).</div>
     ${cur === 2 ? `<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',1)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',2)">C'est fait →</button></div>` : ''}</div>`;
+    // Z du point de départ (mandrin à 90° seulement) : = Z de l'axe du mandrin (mesuré UNE fois, gardé) + hauteur du point
+    // au-dessus de l'axe (connue par la pièce). À plat, l'axe du tube EST le Z machine : pas de Z lu.
+    let zRow = '';
+    if (P.ax === 'X') {
+      const hgt = wzHgt(P);
+      const ax = wzAxisZ();
+      const auto = ax !== null ? +(ax + hgt).toFixed(3) : null;
+      const val = S.wz.z != null && S.wz.zKey === P.key ? S.wz.z : auto !== null ? auto : ''; // autre pièce = on recalcule
+      zRow =
+        `<div class="cipNum" data-tip="Z machine (SCM) de la pointe sur le point jaune, tête droite (B = 0).\n= Z de l'axe du mandrin + ${hgt.toFixed(2)} mm (hauteur du point de départ au-dessus de l'axe, connue par ta pièce).\nLe Z de l'axe du mandrin se mesure UNE fois : le soft le retient et remplit cette case tout seul ensuite.\nSert à la marge jusqu'au Z max (${$('cipZTop').value}) : les dégagements restent en dessous."><span>Z du point (B = 0)</span><input type="number" step="0.001" id="cipWzZ" value="${val}" placeholder="ex : 265.15"></div>` +
+        `<div class="cipNote cipWzZn" style="margin:-2px 0 4px">${auto !== null ? `Rempli tout seul : axe du mandrin Z ${ax.toFixed(3)} + ${hgt.toFixed(2)} mm. <b>Rappel</b> : vérifie avec la pointe, et corrige si besoin (le soft retiendra).` : `1re fois : tape le Z lu avec la pointe sur le point jaune (B = 0). Le soft en déduit le Z de l'axe du mandrin (${hgt.toFixed(2)} mm en dessous) et le retient pour les prochaines pièces.`}</div>`;
+    }
     h += `<div class="cipWzS ${st(3)}"><h4><i>${cur > 3 ? '✓' : 3}</i>Pose la pointe sur le départ</h4><div class="cipWzT">${Math.abs(+Ctxt) < 0.05 ? 'Le mandrin reste à <span class="cipWzBig">C = 0</span>. Amène' : 'Tourne le mandrin à <span class="cipWzBig">C = ' + Ctxt + '°</span> puis amène'} la pointe <b>pile sur le point jaune qui clignote</b> (départ ${W ? 'de la soudure' : 'de la découpe'}).<br>Tape le <b>${P.ax}</b> affiché par la machine, exactement comme à l'écran (avec le signe) :</div>
     <div class="cipNum"${P.ax === 'Z' ? ' data-tip="De la platine au joint de soudure : c\'est le Z que la machine affiche, la face de la platine étant le 0."' : ''}><span>${P.ax === 'Z' ? 'Z sur la machine — déport par rapport à la face de la platine (0)' : 'X lu sur la machine'}</span><input type="number" step="0.001" id="cipWzX" value="${S.wz.x !== null && S.wz.key === P.key ? S.wz.x : S.wz.xLast != null ? S.wz.xLast : ''}" placeholder="ex : -125.40"></div>
-    <div class="cipNum" data-tip="C'est le rayon de la pièce, qui est dans le même axe que le mandrin.\nFacultatif : tête droite (B = 0), pointe sur le point jaune, tape le Z machine (SCM). Le soft calcule la marge jusqu'au Z max (${$('cipZTop').value}) et limite les dégagements à cette hauteur."><span>Z lu (B = 0, facultatif)</span><input type="number" step="0.001" id="cipWzZ" value="${S.wz.z != null ? S.wz.z : ''}" placeholder="ex : 265.15"></div>
+    ${zRow}
     ${cur === 3 ? `<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',2)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',3)">Valider →</button></div>` : cur > 3 ? `<div class="cipNote" style="margin:2px 0 0">${ok} SET_G54(${P.ax === 'X' ? S.wz.x + ', 0, 0' : '0, 0, ' + S.wz.x}) — le programme part de ce point.${S.wz.z != null ? `<br>${ok} Marge en Z au-dessus du point : <b>${(+$('cipZTop').value - S.wz.z).toFixed(0)} mm</b> → dégagements limités à ${$('cipZMax').value} mm.` : ''}</div>` : ''}</div>`;
     const nm = $('cipLName').value || '';
     const dry = S.wz.dry !== false;
@@ -8124,8 +8148,8 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v44',
-    CIP_DATE = '11/10/2026';
+  const CIP_VER = 'CIP v45',
+    CIP_DATE = '12/10/2026';
   {
     const e = $('cipVer');
     if (e) {
@@ -13560,8 +13584,12 @@ function cip_build() {
             flyTo(0.62, 1.05, 1.05); // vue d'ensemble pour la simulation qui apparaît
           } catch (e) {}
           const zz = parseFloat(($('cipWzZ') || {}).value);
-          if (!isNaN(zz)) {
+          if (!isNaN(zz) && P.ax === 'X') {
             S.wz.z = +zz.toFixed(3);
+            S.wz.zKey = P.key;
+            try {
+              localStorage.setItem('cipAxisZ_' + S.cfg.chuck, (zz - wzHgt(P)).toFixed(3)); // Z de l'axe du mandrin, retenu
+            } catch (e) {}
             const marge = (+$('cipZTop').value || 401) - zz;
             const lim = Math.max(5, Math.floor(marge - 3));
             if ($('cipZMax') && +$('cipZMax').value !== lim) {
