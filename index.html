@@ -161,6 +161,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-11 — HT : BUG clic qui décale + barre de style en DOCK vertical à gauche
+ [FIX] Sélectionner une forme d'un simple clic la DÉPLAÇAIT : le seuil qui distingue un clic d'un
+   glisser était à 2 px -> un micro-tremblement du clic lançait un déplacement (et l'aimantation
+   faisait sauter la forme sur un point proche). Seuil relevé à 6 px (souris) / 10 px (tactile, le
+   doigt tremble plus) via _pointerIsTouch. Testé (t_dragthresh). Zone dessin, hors zone CIP.
+ [UI] La barre de style (TRAIT / Snap / seau / REMPLI) était une barre HORIZONTALE en haut qui
+   apparaissait à la sélection et POUSSAIT le canvas vers le bas. Déplacée en DOCK VERTICAL flottant
+   en haut à gauche, DANS #canvasWrap (position:absolute) -> elle se superpose au canvas, ne le pousse
+   plus. Mêmes boutons/ids/actions, séparateurs retirés, groupe REMPLI regroupé sur une ligne.
+
 -- 2026-10-08 — HS : SIMU 3D — la boule CYAN « départ » plus petite + semi-transparente
  [UI] La boule cyan du point de départ (simu 3D découpe) cachait les petites pièces. Rayon ~moitié
    (spanXY*0.009 au lieu de *0.02) + opacité 0.5 -> on voit la pièce dessous. Cosmétique, hors zone CIP.
@@ -1741,7 +1751,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-08-HS ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-11-HT ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2848,44 +2858,35 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     </div>
   </div>
 
-  <!-- Barre de style (Paint-style) -->
-  <div class="toolbar" id="styleBar" style="padding:4px 7px;gap:6px;border-top:1px solid var(--brd);background:var(--surf2);flex-wrap:nowrap;overflow-x:auto">
-    <div id="eraserSizeRow" style="display:none;align-items:center;gap:4px;flex-shrink:0">
-      <span style="font-size:9px;color:var(--txt3)">🧽 Gomme:</span>
-      <input type="range" id="eraserSizeSlider" min="0.2" max="20" step="0.2" value="4" style="width:80px;accent-color:var(--acc);vertical-align:middle" oninput="eraserRadius=parseFloat(this.value)||4;var n=document.getElementById('eraserSizeInput');if(n)n.value=this.value">
-      <input type="number" id="eraserSizeInput" min="0.2" max="50" step="0.2" value="4"
-        style="width:52px;padding:3px 5px;font-family:var(--mono);font-size:10px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:4px;color:var(--acc);outline:none"
-        title="Taille de la gomme (mm)" oninput="eraserRadius=Math.max(0.2,parseFloat(this.value)||4);var s=document.getElementById('eraserSizeSlider');if(s)s.value=this.value">
-      <span style="font-size:8px;color:var(--txt3);font-family:var(--mono)">mm</span>
-      <div class="tsep"></div>
-    </div>
-    <div id="starOpts" style="display:none;align-items:center;gap:4px;flex-shrink:0">
-      <span style="font-size:9px;color:var(--txt3)">★ Branches:</span>
-      <button class="ptool" style="min-width:30px;min-height:30px;padding:3px 6px;font-size:14px" onclick="currentStarBranches=Math.max(4,currentStarBranches-1);document.getElementById('starNb').textContent=currentStarBranches">−</button>
-      <span id="starNb" style="font-family:var(--mono);font-size:13px;color:var(--acc);min-width:18px;text-align:center">5</span>
-      <button class="ptool" style="min-width:30px;min-height:30px;padding:3px 6px;font-size:14px" onclick="currentStarBranches++;document.getElementById('starNb').textContent=currentStarBranches">+</button>
-      <div class="tsep"></div>
-    </div>
-    <span id="strokeGroup" style="display:flex;align-items:center;gap:6px"><span style="font-size:8px;color:var(--txt3);font-family:var(--mono);white-space:nowrap;letter-spacing:.5px">TRAIT :</span>
-    <div id="strokePicker" style="display:flex;align-items:center;gap:4px"></div>
-    <input type="number" id="strokeManual" min="0.01" max="20" step="0.01" value="0.5"
-      style="width:54px;padding:3px 5px;font-family:var(--mono);font-size:10px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:4px;color:var(--acc);outline:none"
-      title="Épaisseur personnalisée (mm)" onchange="setStrokeW(parseFloat(this.value)||0.5)">
-    <span style="font-size:8px;color:var(--txt3);font-family:var(--mono)">mm</span></span>
-    <div class="tsep"></div>
-    <!-- Snap déplacé ici, à côté de l'épaisseur -->
-    <button class="ptool" id="snapBtn" title="Accrochage" onclick="snapEnabled=!snapEnabled;renderSnapBtn()" style="gap:3px;cursor:pointer;flex-shrink:0">
-      <span style="font-size:9px">🧲 Snap</span>
-    </button>
-    <button class="ptool" id="pt-bucket" onclick="startBucket()" title="Seau : remplir une zone fermée → poche" style="display:none;background:rgba(59,130,246,.22);color:#60a5fa"><svg viewBox="0 0 24 24" width="17" height="17" style="pointer-events:none"><path d="M4 7.5h16l-1.5 11.6a1.2 1.2 0 0 1-1.2 1H6.7a1.2 1.2 0 0 1-1.2-1L4 7.5z" fill="currentColor"/><rect x="2.7" y="4.3" width="18.6" height="2.6" rx="1.3" fill="currentColor"/></svg></button>
-    <div class="tsep"></div>
-    <span style="font-size:8px;color:var(--txt3);font-family:var(--mono);white-space:nowrap;letter-spacing:.5px">REMPLI :</span>
-    <button class="fill-btn active" id="fb-none"   onclick="setFill('none')"   title="Contour seul">◻ Aucun</button>
-    <button class="fill-btn"        id="fb-filled" onclick="setFill('filled')" title="Rempli plein">◼ Plein</button>
-  </div>
+  <!-- Barre de style : déplacée en DOCK VERTICAL flottant à GAUCHE, dans #canvasWrap
+       (avant : barre horizontale en haut qui poussait le canvas vers le bas). -->
 
   <!-- Canvas infini -->
   <div id="canvasWrap" class="canvas-area" style="touch-action:none"><canvas id="paintCanvas" touch-action="none"></canvas>
+    <!-- Barre de style (trait / Snap / seau / remplissage) : DOCK VERTICAL à gauche, flottant -->
+    <div class="toolbar" id="styleBar" style="position:absolute;left:8px;top:8px;z-index:40;flex-direction:column;align-items:flex-start;gap:7px;padding:8px 9px;width:auto;max-width:172px;border:1px solid var(--brd2);border-radius:11px;background:var(--surf2);box-shadow:0 6px 20px rgba(0,0,0,.5);max-height:calc(100% - 16px);overflow-y:auto;overflow-x:hidden">
+      <div id="eraserSizeRow" style="display:none;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap">
+        <span style="font-size:9px;color:var(--txt3)">🧽 Gomme:</span>
+        <input type="range" id="eraserSizeSlider" min="0.2" max="20" step="0.2" value="4" style="width:80px;accent-color:var(--acc);vertical-align:middle" oninput="eraserRadius=parseFloat(this.value)||4;var n=document.getElementById('eraserSizeInput');if(n)n.value=this.value">
+        <input type="number" id="eraserSizeInput" min="0.2" max="50" step="0.2" value="4" style="width:52px;padding:3px 5px;font-family:var(--mono);font-size:10px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:4px;color:var(--acc);outline:none" title="Taille de la gomme (mm)" oninput="eraserRadius=Math.max(0.2,parseFloat(this.value)||4);var s=document.getElementById('eraserSizeSlider');if(s)s.value=this.value">
+        <span style="font-size:8px;color:var(--txt3);font-family:var(--mono)">mm</span>
+      </div>
+      <div id="starOpts" style="display:none;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap">
+        <span style="font-size:9px;color:var(--txt3)">★ Branches:</span>
+        <button class="ptool" style="min-width:30px;min-height:30px;padding:3px 6px;font-size:14px" onclick="currentStarBranches=Math.max(4,currentStarBranches-1);document.getElementById('starNb').textContent=currentStarBranches">−</button>
+        <span id="starNb" style="font-family:var(--mono);font-size:13px;color:var(--acc);min-width:18px;text-align:center">5</span>
+        <button class="ptool" style="min-width:30px;min-height:30px;padding:3px 6px;font-size:14px" onclick="currentStarBranches++;document.getElementById('starNb').textContent=currentStarBranches">+</button>
+      </div>
+      <span id="strokeGroup" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:8px;color:var(--txt3);font-family:var(--mono);white-space:nowrap;letter-spacing:.5px">TRAIT :</span>
+        <div id="strokePicker" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"></div>
+        <input type="number" id="strokeManual" min="0.01" max="20" step="0.01" value="0.5" style="width:54px;padding:3px 5px;font-family:var(--mono);font-size:10px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:4px;color:var(--acc);outline:none" title="Épaisseur personnalisée (mm)" onchange="setStrokeW(parseFloat(this.value)||0.5)">
+        <span style="font-size:8px;color:var(--txt3);font-family:var(--mono)">mm</span></span>
+      <button class="ptool" id="snapBtn" title="Accrochage" onclick="snapEnabled=!snapEnabled;renderSnapBtn()" style="gap:3px;cursor:pointer;flex-shrink:0"><span style="font-size:9px">🧲 Snap</span></button>
+      <button class="ptool" id="pt-bucket" onclick="startBucket()" title="Seau : remplir une zone fermée → poche" style="display:none;background:rgba(59,130,246,.22);color:#60a5fa"><svg viewBox="0 0 24 24" width="17" height="17" style="pointer-events:none"><path d="M4 7.5h16l-1.5 11.6a1.2 1.2 0 0 1-1.2 1H6.7a1.2 1.2 0 0 1-1.2-1L4 7.5z" fill="currentColor"/><rect x="2.7" y="4.3" width="18.6" height="2.6" rx="1.3" fill="currentColor"/></svg></button>
+      <span style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span style="font-size:8px;color:var(--txt3);font-family:var(--mono);white-space:nowrap;letter-spacing:.5px">REMPLI :</span>
+        <button class="fill-btn active" id="fb-none"   onclick="setFill('none')"   title="Contour seul">◻ Aucun</button>
+        <button class="fill-btn"        id="fb-filled" onclick="setFill('filled')" title="Rempli plein">◼ Plein</button></span>
+    </div>
     <div id="cadStatus" style="display:none">
       <span id="cadStatusTxt">Ligne : clique le 1er point</span>
       <button onclick="cadFinish()">✓ Terminer</button>
@@ -15785,7 +15786,8 @@ let dragObj = null;
 let dragStart = {cpx:0,cpy:0};
 let dragOrigBB = null;
 let panStart = {cpx:0,cpy:0,panX:0,panY:0};
-let dragPending = null; // {mode,obj,cpx,cpy,origBB,startMm} — activated after 4px movement
+let dragPending = null; // {mode,obj,cpx,cpy,origBB,startMm} — activated après un seuil de mouvement
+let _pointerIsTouch = false; // dernier geste tactile ? (seuil clic-vs-glisser plus large au doigt)
 let dragStartMm = {x:0,y:0}; // cursor position in mm at drag start
 let eraserRadius = 4; // mm
 let _tabW = 0.8; // largeur d'un tab (pont non coupé), en mm
@@ -19734,6 +19736,7 @@ function onTS(e){
     return;
   }
   pinchActive=false;
+  _pointerIsTouch=true;
   const pos=getTouchPos(e);
   const r=pCanvas.getBoundingClientRect();
   const[xm,ym]=pxToMm(pos.x,pos.y);
@@ -19779,6 +19782,7 @@ function onMS(e){
     if(pCanvas)pCanvas.style.cursor='grabbing';
     return;
   }
+  _pointerIsTouch=false;
   handlePointerDown(e.offsetX,e.offsetY);
 }
 
@@ -20115,7 +20119,11 @@ function handlePointerMove(cpx,cpy){
 function pmActivatePendingDrag(cpx,cpy){
     if(dragPending&&!isDragging){
         const dist=Math.hypot(cpx-dragPending.cpx,cpy-dragPending.cpy);
-        if(dist>=2){
+        // Seuil clic-vs-glisser : AVANT 2 px (trop sensible -> un simple clic, avec un
+        // micro-tremblement, déplaçait la forme, surtout avec l'aimantation). Maintenant
+        // 6 px à la souris, 10 px au doigt (le tactile tremble plus).
+        const _dragThresh = _pointerIsTouch ? 10 : 6;
+        if(dist>=_dragThresh){
           if(dragPending.obj&&dragPending.obj.fixed&&(dragPending.mode==='mv'||dragPending.mode==='rs')){ if(typeof toastHist==='function')toastHist('🔒 Forme verrouillée — déverrouille-la pour la déplacer'); dragPending=null; return 'attendre'; }
           isDragging=true;dragMode=dragPending.mode;dragObj=dragPending.obj;
           dragStart={cpx:dragPending.cpx,cpy:dragPending.cpy}; // original click px
