@@ -161,6 +161,21 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-12 — HX : FENÊTRE « DÉCOUPE » DÉDIÉE + FLÈCHES MAUVES (sens réel) + inversion par forme
+ [AJOUT] La fenêtre Chute/Pièce devient la fenêtre « ✂️ Découpe » avec onglets : 🎨 Chute/Pièce · 📍 Départs ·
+   ↻ Sens (+ Rentrée et Décalage grisés = étapes suivantes). Les boutons Sens ont quitté le panneau G-code
+   (moins de fouillis) ; un résumé y reste (sens, départs, inversions).
+ [AJOUT] Onglet Sens : réglage global Auto/Horaire/Antihoraire + clic sur UN contour = inverser son sens
+   (anneau ⇄, re-clic = annuler). Stocké dans _laserDirFlips, appliqué dans buildLaserBody (_revContour).
+ [AJOUT] Petites flèches mauves transparentes le long de chaque contour = sens RÉEL du programme
+   (buildLaserBody remplit _laserCutPaths). Dans la fenêtre Découpe (+ amorce orange et point de perçage)
+   et sur la page dessin en mode laser (masquées pendant qu'on modifie, réapparaissent ~0,3 s après).
+ [FIX] La fenêtre Chute/Pièce affichait le dessin à l'envers (haut/bas) : maintenant même sens que la page
+   dessin. [FIX] La peinture n'était pas remise à zéro si le dessin bougeait seulement en hauteur.
+ [FIX] Cercle « 1 seul G2 » sans perçage : le choix Antihoraire ne l'inversait pas (poly construit dans
+   l'autre sens que le G2). En Auto sans inversion : sortie G-code STRICTEMENT identique à avant.
+   Zone dessin/laser, hors zone CIP.
+
 -- 2026-10-11 — HW : POINTS DE PERÇAGE MANUELS (laser) — choisir où le laser rentre
  [AJOUT] Dans la fenêtre « Chute/Pièce », nouveau mode « 📍 Départ » : on clique sur un contour pour
    poser le point où le laser perce/rentre (reclic dessus = enlève ; bouton « ✖ Départs » = tout
@@ -1771,7 +1786,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-11-HW ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-HX ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2664,11 +2679,11 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 
 <!-- PAGE 10 : G-CODE NORMAL (1 fichier) -->
 <div class="wz-wrap" id="wzp20" style="padding-bottom:90px">
-  <div class="wz-h1">🎨 Chute / Pièce <span style="font-size:12px;color:var(--txt3)">(optionnel)</span></div>
-  <div class="wz-sub">Dis à la main ce qui tombe (chute) et ce qui reste (pièce). Si tu ne touches à rien, la détection automatique s'applique comme d'habitude.</div>
-  <button class="btn btn-p" style="width:100%;margin-top:12px;padding:12px" onclick="openLaserPaint()">🎨 Ouvrir la peinture (pot de peinture)</button>
+  <div class="wz-h1">✂️ Découpe <span style="font-size:12px;color:var(--txt3)">(optionnel)</span></div>
+  <div class="wz-sub">Tout ce qui concerne la façon de couper, au même endroit : chute/pièce, points de départ, sens de coupe (bientôt : rentrée et décalage). Si tu ne touches à rien, tout reste automatique comme d'habitude.</div>
+  <button class="btn btn-p" style="width:100%;margin-top:12px;padding:12px" onclick="openLaserPaint()">✂️ Ouvrir la fenêtre Découpe</button>
   <div id="wzPaintState" style="margin-top:12px;font-size:12px;color:var(--acc)"></div>
-  <div style="font-size:11px;color:var(--txt3);margin-top:12px;line-height:1.6">Le pot de peinture remplit une zone entière jusqu'aux traits (comme Paint).<br>Molette = zoom · clic droit / molette pressée glissé = déplacer.<br>Clique « Suivant » en bas quand c'est bon.</div>
+  <div style="font-size:11px;color:var(--txt3);margin-top:12px;line-height:1.6">Les petites flèches <b style="color:#9333ea">mauves</b> montrent le sens réel de coupe ; l'arc <b style="color:#f97316">orange</b> = la rentrée du laser.<br>Molette = zoom · clic droit / molette pressée glissé = déplacer.<br>Clique « Suivant » en bas quand c'est bon.</div>
 </div>
 
 <div class="wz-wrap" id="wzp10" style="padding-bottom:90px">
@@ -2728,14 +2743,6 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <input type="checkbox" id="laserInvert" onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
       <span><b>Inverser plein/vide</b> — coche si c'est l'inverse qui doit tomber (ex : tu gardes la petite pièce au lieu du tour).</span>
     </label>
-    <!-- SENS DE DÉCOUPE -->
-    <div style="margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <span style="font-size:12px;color:var(--txt)"><b>Sens de découpe</b></span>
-      <button type="button" id="lcd_auto" onclick="setLaserCutDir('auto')" style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--acc);background:var(--acc);color:#111;cursor:pointer;font-size:12px;font-weight:800">Auto</button>
-      <button type="button" id="lcd_cw"   onclick="setLaserCutDir('cw')"   style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↻ Horaire</button>
-      <button type="button" id="lcd_ccw"  onclick="setLaserCutDir('ccw')"  style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↺ Antihoraire</button>
-    </div>
-    <div style="font-size:9px;color:var(--txt3);margin-top:4px">Auto = le soft choisit. Sinon tous les contours sont coupés dans le sens choisi (utile pour le côté de la bavure / la compensation G41-G42 à venir).</div>
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
       <input type="checkbox" id="laserFrame" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
       <span><b>Délimitation (contour à vide + pause)</b> — avant de couper, la tête fait le tour du rectangle du dessin <b>sans laser</b>, puis s'arrête (M00). Tu vérifies le placement sur la tôle, tu valides sur la machine, et ça repart couper.</span>
@@ -2745,7 +2752,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <span><b>Fichier complet machine</b> (entête + pied machine TRUMPF). Décoche pour la version simple lisible.</span>
     </label>
     <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <button onclick="openLaserPaint()" style="padding:9px 13px;border-radius:8px;border:1.5px solid var(--acc);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">🎨 Chute / pièce + 📍 départs (optionnel)</button>
+      <button onclick="openLaserPaint()" style="padding:9px 13px;border-radius:8px;border:1.5px solid var(--acc);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:700">✂️ Fenêtre Découpe (chute/pièce · départs · sens)</button>
       <span id="laserPaintStatus" style="font-size:11px;color:var(--acc)"></span>
     </div>
     <div style="font-size:9px;color:var(--txt3);margin-top:6px">Le nom du tableau techno doit correspondre EXACTEMENT à celui créé dans la machine (puissance/vitesse). « A CHANGER! » = à remplacer par le tien (ex : INOX3MM_S).</div>
@@ -14222,7 +14229,7 @@ function wzOnEnter(step){
   if(step===12){ wzGenInlay(); }
   if(step===13){ /* mâle déjà généré dans step 12 */ }
   if(step===4&&appMode==='normal'){ wzInitMachineMode(); }
-  if(step===20){ const el=document.getElementById('wzPaintState'); if(el) el.textContent=(typeof _laserPaintActive==='function'&&_laserPaintActive())?'✏️ peinture manuelle active':'Aucune peinture — détection automatique'; }
+  if(step===20){ const el=document.getElementById('wzPaintState'); if(typeof _lpSummary==='function') _lpSummary(); if(el) el.textContent=document.getElementById('lpSummary')?.textContent||''; }
   if(step===10){ const _lc=document.getElementById('laserCfg'); if(_lc)_lc.style.display=(appMode==='laser')?'block':'none'; if(appMode==='laser') wzGenLaser(); else wzGenNormal(); }
   if(step===9){ wzRenderRecap(); if(appMode==='inlay') setTimeout(()=>{ if(window.THREE) wz3dInit(); },100); }
 }
@@ -14858,7 +14865,7 @@ let _lpTool = 1;        // 1=chute, 2=piece, 0=gomme
 let _lpStartMode = false; // mode "📍 poser les départs" (clique sur un contour)
 function _laserClassAt(xmm,ymm){
   const P=_laserPaint; if(!P||!P.cls) return 0;
-  const px=Math.round((xmm-P.minX)*P.scale), py=Math.round((P.maxY-ymm)*P.scale);
+  const px=Math.round((xmm-P.minX)*P.scale), py=Math.round((ymm-P.minY)*P.scale); // même sens que la page dessin (Y vers le bas)
   if(px<0||py<0||px>=P.W||py>=P.H) return 0;
   return P.cls[py*P.W+px]||0;
 }
@@ -14883,33 +14890,79 @@ function _lpContours(){
 let _lpView={scale:1,tx:0,ty:0};
 function _lpApplyView(){ const cv=document.getElementById('lpCanvas'); if(!cv)return; cv.style.transformOrigin='0 0'; cv.style.transform='translate('+_lpView.tx+'px,'+_lpView.ty+'px) scale('+_lpView.scale+')'; }
 function _lpFitView(){ const P=_laserPaint, vp=document.getElementById('lpViewport'); if(!P||!vp)return; const W=vp.clientWidth||800,H=vp.clientHeight||600; const s=Math.min(W/P.W,H/P.H)*0.92; _lpView.scale=s; _lpView.tx=(W-P.W*s)/2; _lpView.ty=(H-P.H*s)/2; _lpApplyView(); }
-function _lpWheel(e){ e.preventDefault(); const vp=document.getElementById('lpViewport'); const r=vp.getBoundingClientRect(); const mx=e.clientX-r.left, my=e.clientY-r.top; const f=e.deltaY<0?1.15:1/1.15; const ns=Math.max(0.15,Math.min(30,_lpView.scale*f)); _lpView.tx=mx-(mx-_lpView.tx)*(ns/_lpView.scale); _lpView.ty=my-(my-_lpView.ty)*(ns/_lpView.scale); _lpView.scale=ns; _lpApplyView(); }
+function _lpWheel(e){ e.preventDefault(); const vp=document.getElementById('lpViewport'); const r=vp.getBoundingClientRect(); const mx=e.clientX-r.left, my=e.clientY-r.top; const f=e.deltaY<0?1.15:1/1.15; const ns=Math.max(0.15,Math.min(30,_lpView.scale*f)); _lpView.tx=mx-(mx-_lpView.tx)*(ns/_lpView.scale); _lpView.ty=my-(my-_lpView.ty)*(ns/_lpView.scale); _lpView.scale=ns; _lpApplyView(); _lpRenderSoon(); }
 function _lpPanStart(e){ if(e.button!==1 && e.button!==2) return; e.preventDefault(); const sx=e.clientX,sy=e.clientY,ox=_lpView.tx,oy=_lpView.ty; const mv=(ev)=>{ _lpView.tx=ox+(ev.clientX-sx); _lpView.ty=oy+(ev.clientY-sy); _lpApplyView(); }; const up=()=>{ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); }; window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up); }
 function openLaserPaint(){
   const polys=_lpContours();
   if(!polys.length){ if(typeof toastHist==='function')toastHist('Rien a peindre : importe/dessine une forme.'); return; }
   let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
   for(const seg of polys) for(const p of seg){ if(p[0]<minX)minX=p[0]; if(p[0]>maxX)maxX=p[0]; if(p[1]<minY)minY=p[1]; if(p[1]>maxY)maxY=p[1]; }
-  const pad=2; minX-=pad;minY-=pad;maxX+=pad;maxY+=pad;
+  const pad=8; minX-=pad;minY-=pad;maxX+=pad;maxY+=pad;   // marge : l'arc de rentrée du contour extérieur reste visible
   const wmm=Math.max(1,maxX-minX), hmm=Math.max(1,maxY-minY);
   const scale=Math.max(2, Math.min(900/wmm, 900/hmm));
   const W=Math.max(2,Math.round(wmm*scale)), H=Math.max(2,Math.round(hmm*scale));
-  if(!_laserPaint || _laserPaint.W!==W || _laserPaint.H!==H || Math.abs((_laserPaint.minX||0)-minX)>1e-4){
+  if(!_laserPaint || _laserPaint.W!==W || _laserPaint.H!==H || Math.abs((_laserPaint.minX||0)-minX)>1e-4 || Math.abs((_laserPaint.minY||0)-minY)>1e-4){
     _laserPaint={cls:new Uint8Array(W*H), W,H,minX,minY,maxX,maxY,scale};
   }
   // Mur = pixels des contours (offscreen) -> bornes du remplissage
   const wc=document.createElement('canvas'); wc.width=W; wc.height=H; const wx=wc.getContext('2d');
   wx.fillStyle='#fff'; wx.fillRect(0,0,W,H);
   wx.strokeStyle='#000'; wx.lineWidth=2; wx.lineJoin='round'; wx.lineCap='round';
-  const _m=(p)=>[ (p[0]-minX)*scale, (maxY-p[1])*scale ];
+  const _m=(p)=>[ (p[0]-minX)*scale, (p[1]-minY)*scale ]; // même orientation que la page dessin
   for(const seg of polys){ wx.beginPath(); const q0=_m(seg[0]); wx.moveTo(q0[0],q0[1]); for(let i=1;i<seg.length;i++){ const q=_m(seg[i]); wx.lineTo(q[0],q[1]); } wx.stroke(); }
   const wd=wx.getImageData(0,0,W,H).data; const wall=new Uint8Array(W*H);
   for(let i=0;i<W*H;i++){ wall[i]=(wd[i*4]<128)?1:0; }
   _laserPaint.wall=wall;
   document.getElementById('laserPaintModal').classList.add('open');
-  _lpSetTool(1); _lpRender();
-  setTimeout(_lpFitView, 30);
+  _lpSetTab(_lpTab||'paint'); _lpRefresh();
+  setTimeout(()=>{ _lpFitView(); _lpRender(); }, 30);
 }
+// ═══ FENÊTRE « DÉCOUPE » DÉDIÉE : onglets Chute/Pièce · Départs · Sens · (Rentrée) · (Décalage) ═══
+let _lpTab='paint';     // onglet actif
+let _lpVer=0;           // version de la peinture (pour savoir quand recalculer les flèches)
+// Dessine des petites flèches (sens de parcours) le long d'un chemin en pixels.
+function _drawDirArrows(ctx, pts, opt){
+  opt=opt||{}; const step=opt.step||60, sz=opt.size||4.5; if(!pts||pts.length<2) return;
+  ctx.save(); ctx.fillStyle=opt.color||'rgba(147,51,234,.55)';
+  const tri=(x,y,ux,uy)=>{ const nx=-uy,ny=ux; ctx.beginPath(); ctx.moveTo(x+ux*sz,y+uy*sz); ctx.lineTo(x-ux*sz*0.7+nx*sz*0.75,y-uy*sz*0.7+ny*sz*0.75); ctx.lineTo(x-ux*sz*0.7-nx*sz*0.75,y-uy*sz*0.7-ny*sz*0.75); ctx.closePath(); ctx.fill(); };
+  let total=0; for(let i=0;i+1<pts.length;i++) total+=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]);
+  if(total<sz*1.5){ ctx.restore(); return; }
+  const st=(total<step*1.2)?total/2:step;     // contour court -> au moins une flèche au milieu
+  let need=(total<step*1.2)?total/2:step*0.5, placed=0;
+  for(let i=0;i+1<pts.length;i++){ const a=pts[i],b=pts[i+1]; const dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy); if(L<1e-9) continue;
+    let s=0; while(need<=L-s){ s+=need; tri(a[0]+dx*s/L, a[1]+dy*s/L, dx/L, dy/L); placed++; need=st; if(placed>400) break; }
+    need-=(L-s); if(placed>400) break; }
+  ctx.restore();
+}
+// ── Flèches sur la PAGE DESSIN (mode laser) : on recalcule le parcours un peu APRÈS la dernière
+//    modif (fluide pendant un glisser), et on ne montre les flèches que si elles sont à jour. ──
+let _lcpSig='', _lcpTimer=null, _lcpOff=false;
+function _lcpNum(v,d){ let s=0; if(d>5||v==null) return 0;
+  if(Array.isArray(v)){ for(let i=0;i<v.length;i++){ const w=v[i]; if(typeof w==='number') s+=w*(1+(i%7)*0.137); else if(w&&typeof w==='object') s+=_lcpNum(w,d+1)*(1+(i%5)*0.071); } }
+  else if(typeof v==='object'){ const pr=Object.getPrototypeOf(v); if(pr!==Object.prototype && pr!==null) return 0; /* pas d'objets DOM/images */ let j=0; for(const k in v){ j++; const w=v[k]; if(typeof w==='number') s+=w*(1+j*0.113); else if(typeof w==='boolean') s+=w?j*0.31:0; else if(w&&typeof w==='object') s+=_lcpNum(w,d+1)*(1+j*0.05); else if(k==='text'&&typeof w==='string'){ for(let q=0;q<w.length&&q<200;q++) s+=w.charCodeAt(q)*(q+1)*0.001; } } }
+  return s; }
+function _laserSceneSig(){
+  let s=paintObjects.length+':'+_lcpNum(paintObjects,0).toFixed(6);
+  for(const id of ['laserKerf','laserAdjX','laserAdjY','laserLead']){ const el=document.getElementById(id); s+='|'+(el?el.value:''); }
+  for(const id of ['laserLeadin','laserArc','laserInvert']){ const el=document.getElementById(id); s+='|'+(el?(el.checked?1:0):''); }
+  s+='|'+_laserCutDir+'|'+JSON.stringify(_laserStarts)+'|'+JSON.stringify(_laserDirFlips)+'|'+_lpVer;
+  return s;
+}
+function _laserArrowsMain(){
+  if(_lcpOff || !pCtx) return;
+  const sig=_laserSceneSig();
+  if(sig!==_lcpSig){
+    clearTimeout(_lcpTimer);
+    _lcpTimer=setTimeout(()=>{ const t0=Date.now(); try{ buildLaserBody(); }catch(e){ _laserCutPaths=[]; }
+      _lcpSig=_laserSceneSig(); if(Date.now()-t0>1500) _lcpOff=true;   // dessin énorme : on n'insiste pas (fluidité d'abord)
+      if(typeof redrawCanvas==='function') redrawCanvas(); }, 280);
+    return;
+  }
+  for(const p of (_laserCutPaths||[])){ if(!p||!p.pts||p.pts.length<2) continue; _drawDirArrows(pCtx, p.pts.map(q=>mmToPx(q[0],q[1])), {step:60, size:5.5, color:'rgba(147,51,234,.68)'}); }
+}
+// Recalcule le parcours réel (buildLaserBody remplit _laserCutPaths) puis redessine.
+function _lpRefresh(){ try{ if(typeof buildLaserBody==='function') buildLaserBody(); }catch(e){ _laserCutPaths=[]; } _lpRender(); _lpSummary(); if(typeof redrawCanvas==='function') redrawCanvas(); }
+let _lpRaf=false; function _lpRenderSoon(){ if(_lpRaf) return; _lpRaf=true; requestAnimationFrame(()=>{ _lpRaf=false; _lpRender(); }); }
 function _lpRender(){
   const P=_laserPaint; if(!P) return; const cv=document.getElementById('lpCanvas'); if(!cv) return;
   cv.width=P.W; cv.height=P.H; const ctx=cv.getContext('2d');
@@ -14921,17 +14974,58 @@ function _lpRender(){
     const o=i*4; img.data[o]=r; img.data[o+1]=g; img.data[o+2]=b; img.data[o+3]=255;
   }
   ctx.putImageData(img,0,0);
+  const k=1/Math.max(0.15,_lpView.scale||1);              // taille constante à l'écran quel que soit le zoom
+  const toPx=q=>[(q[0]-P.minX)*P.scale,(q[1]-P.minY)*P.scale];
+  const paths=(typeof _laserCutPaths!=='undefined'&&_laserCutPaths)?_laserCutPaths:[];
+  // AMORCES (orange) : demi-arc du perçage jusqu'au contour + point de perçage
+  for(const p of paths){
+    if(p.lead){ const L=p.lead, O=L.O, r=Math.hypot(L.A[0]-O[0],L.A[1]-O[1]), a0=Math.atan2(L.A[1]-O[1],L.A[0]-O[0]), dir=(L.g==='G3')?1:-1;
+      ctx.save(); ctx.strokeStyle='rgba(249,115,22,.95)'; ctx.lineWidth=2.2*k; ctx.lineCap='round'; ctx.beginPath();
+      for(let s=0;s<=24;s++){ const an=a0+dir*Math.PI*s/24; const q=toPx([O[0]+r*Math.cos(an),O[1]+r*Math.sin(an)]); if(s===0)ctx.moveTo(q[0],q[1]); else ctx.lineTo(q[0],q[1]); }
+      ctx.stroke(); const A=toPx(L.A); ctx.fillStyle='#f97316'; ctx.beginPath(); ctx.arc(A[0],A[1],3.2*k,0,2*Math.PI); ctx.fill(); ctx.restore(); }
+    else if(p.start && p.closed){ const S=toPx(p.start); ctx.save(); ctx.fillStyle='#f97316'; ctx.beginPath(); ctx.arc(S[0],S[1],3.2*k,0,2*Math.PI); ctx.fill(); ctx.restore(); }
+  }
+  // FLÈCHES MAUVES : le sens réel de coupe, le long de chaque contour
+  for(const p of paths){ _drawDirArrows(ctx, p.pts.map(toPx), {step:55*k, size:5*k, color:'rgba(147,51,234,.6)'}); }
+  // Contours dont le sens a été inversé à la main : petit anneau mauve
+  for(const f of (_laserDirFlips||[])){ const q=toPx(f); ctx.save(); ctx.strokeStyle='rgba(147,51,234,.9)'; ctx.lineWidth=2*k; ctx.beginPath(); ctx.arc(q[0],q[1],6*k,0,2*Math.PI); ctx.stroke(); ctx.font='bold '+(10*k)+'px sans-serif'; ctx.fillStyle='rgba(147,51,234,.95)'; ctx.fillText('⇄',q[0]+7*k,q[1]-6*k); ctx.restore(); }
   // Marqueurs des DÉPARTS de perçage (cyan) par-dessus
   if(typeof _laserStarts!=='undefined' && _laserStarts.length){
-    const rad=Math.max(4, P.scale*0.7);
-    for(const s of _laserStarts){ const sx=(s[0]-P.minX)*P.scale, sy=(P.maxY-s[1])*P.scale;
-      ctx.beginPath(); ctx.arc(sx,sy,rad,0,2*Math.PI); ctx.fillStyle='rgba(0,229,255,.9)'; ctx.fill();
-      ctx.lineWidth=1.5; ctx.strokeStyle='#073b45'; ctx.stroke(); }
+    const rad=7*k;
+    for(const s of _laserStarts){ const q=toPx(s);
+      ctx.beginPath(); ctx.arc(q[0],q[1],rad,0,2*Math.PI); ctx.fillStyle='rgba(0,229,255,.9)'; ctx.fill();
+      ctx.lineWidth=1.5*k; ctx.strokeStyle='#073b45'; ctx.stroke(); }
   }
 }
-function _lpSetTool(t){ _lpTool=t; _lpStartMode=false; const map={1:'lp_chute',2:'lp_piece',0:'lp_gomme'}; ['lp_chute','lp_piece','lp_gomme'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.outline=(id===map[t])?'3px solid #fff':'none'; }); const bs=document.getElementById('lp_start'); if(bs)bs.style.outline='none'; }
-function _lpSetStartMode(){ _lpStartMode=true; ['lp_chute','lp_piece','lp_gomme'].forEach(id=>{const b=document.getElementById(id);if(b)b.style.outline='none';}); const bs=document.getElementById('lp_start'); if(bs)bs.style.outline='3px solid #fff'; }
-function _lpClearStarts(){ _laserStarts=[]; _lpRender(); }
+function _lpSetTab(t){
+  if(t==='lead'||t==='off') return;   // étapes suivantes (pas encore actives)
+  _lpTab=t;
+  ['paint','start','dir','lead','off'].forEach(k=>{ const b=document.getElementById('lpt_'+k); if(b && k!=='lead' && k!=='off'){ const on=(k===t); b.style.background=on?'var(--acc)':'var(--surf2)'; b.style.color=on?'#111':'var(--txt)'; b.style.fontWeight=on?'800':'600'; }
+    const pn=document.getElementById('lpp_'+k); if(pn) pn.style.display=(k===t)?'flex':'none'; });
+  if(t==='paint') _lpSetTool(_lpTool); else if(t==='start') _lpSetStartMode(); else _lpStartMode=false;
+  const cv=document.getElementById('lpCanvas'); if(cv) cv.style.cursor=(t==='paint')?'crosshair':'pointer';
+}
+function _lpSetTool(t){ _lpTool=t; _lpStartMode=false; const map={1:'lp_chute',2:'lp_piece',0:'lp_gomme'}; ['lp_chute','lp_piece','lp_gomme'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.outline=(id===map[t])?'3px solid #fff':'none'; }); }
+function _lpSetStartMode(){ _lpStartMode=true; }
+function _lpClearStarts(){ _laserStarts=[]; _lpRefresh(); }
+function _lpClearFlips(){ _laserDirFlips=[]; _lpRefresh(); }
+// Petit résumé (fenêtre + panneau G-code) : sens, départs, inversions, peinture.
+function _lpSummary(){
+  const dn={auto:'Auto',cw:'↻ Horaire',ccw:'↺ Antihoraire'}[_laserCutDir]||'Auto';
+  const txt='Sens : '+dn+' · Départs posés : '+(_laserStarts.length||0)+' · Contours inversés : '+((_laserDirFlips||[]).length)+(_laserPaintActive()?' · peinture active':'');
+  ['laserPaintStatus','lpSummary'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=txt; });
+}
+// Onglet SENS : clic sur un contour = inverser SON sens (re-clic = annuler).
+function _lpToggleFlipAt(mx,my){
+  const polys=_lpContours(); let bd=1e18, bp=null, bi=-1;
+  polys.forEach((seg,si)=>{ for(let i=0;i+1<seg.length;i++){ const a=seg[i],b=seg[i+1]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((mx-a[0])*dx+(my-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy,d=Math.hypot(mx-fx,my-fy); if(d<bd){bd=d;bp=[fx,fy];bi=si;} } });
+  const tol=(_laserPaint&&_laserPaint.scale)?Math.max(1.2, 10/_laserPaint.scale):3;
+  if(!bp || bd>tol) return;
+  const seg=polys[bi]; const onSeg=f=>{ for(let i=0;i+1<seg.length;i++){ const a=seg[i],b=seg[i+1]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((f[0]-a[0])*dx+(f[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); if(Math.hypot(f[0]-(a[0]+t*dx),f[1]-(a[1]+t*dy))<0.05) return true; } return false; };
+  const before=_laserDirFlips.length; _laserDirFlips=_laserDirFlips.filter(f=>!onSeg(f));
+  if(_laserDirFlips.length===before) _laserDirFlips.push(bp);   // pas encore inversé -> on l'inverse
+  _lpRefresh();
+}
 // Placer / retirer un point de départ sur le contour le plus proche du clic (coord mm).
 function _lpAddStartAt(mx,my){
   const polys=_lpContours(); let bd=1e18, bp=null;
@@ -14941,14 +15035,17 @@ function _lpAddStartAt(mx,my){
   // si on clique près d'un départ existant -> on le retire ; sinon on l'ajoute
   let ri=-1; for(let i=0;i<_laserStarts.length;i++){ if(Math.hypot(_laserStarts[i][0]-bp[0],_laserStarts[i][1]-bp[1])<tol){ri=i;break;} }
   if(ri>=0) _laserStarts.splice(ri,1); else _laserStarts.push(bp);
-  _lpRender();
+  _lpRefresh();
 }
 function _lpClickCanvas(ev){
   const P=_laserPaint; if(!P||!P.wall) return;
   const cv=document.getElementById('lpCanvas'); const r=cv.getBoundingClientRect();
   const px=Math.round((ev.clientX-r.left)/r.width*P.W), py=Math.round((ev.clientY-r.top)/r.height*P.H);
   if(px<0||py<0||px>=P.W||py>=P.H) return;
-  if(_lpStartMode){ _lpAddStartAt(P.minX+px/P.scale, P.maxY-py/P.scale); return; }
+  const mxx=P.minX+px/P.scale, myy=P.minY+py/P.scale;
+  if(_lpTab==='dir'){ _lpToggleFlipAt(mxx,myy); return; }
+  if(_lpStartMode || _lpTab==='start'){ _lpAddStartAt(mxx,myy); return; }
+  if(_lpTab!=='paint') return; // onglets sans action au clic
   const start=py*P.W+px; if(P.wall[start]) return; // clic sur un trait -> rien
   const tool=_lpTool, cls=P.cls, wall=P.wall, W=P.W, H=P.H;
   const seen=new Uint8Array(W*H); const stack=[start];
@@ -14956,11 +15053,11 @@ function _lpClickCanvas(ev){
     const x=i%W, y=(i/W)|0;
     if(x>0)stack.push(i-1); if(x<W-1)stack.push(i+1); if(y>0)stack.push(i-W); if(y<H-1)stack.push(i+W);
   }
-  _lpRender();
+  _lpVer++; _lpRefresh();
 }
-function _lpReset(){ if(_laserPaint&&_laserPaint.cls) _laserPaint.cls.fill(0); _lpRender(); }
+function _lpReset(){ if(_laserPaint&&_laserPaint.cls) _laserPaint.cls.fill(0); _lpVer++; _lpRefresh(); }
 function _lpUpdateStatus(){ const el=document.getElementById('laserPaintStatus'); if(el) el.textContent=_laserPaintActive()?'✏️ peinture manuelle active':''; }
-function closeLaserPaint(){ document.getElementById('laserPaintModal').classList.remove('open'); _lpUpdateStatus(); const el=document.getElementById('wzPaintState'); if(el) el.textContent=_laserPaintActive()?'✏️ peinture manuelle active':'Aucune peinture — détection automatique'; if(typeof wzGenLaser==='function')wzGenLaser(); }
+function closeLaserPaint(){ document.getElementById('laserPaintModal').classList.remove('open'); const el=document.getElementById('wzPaintState'); if(typeof wzGenLaser==='function')wzGenLaser(); _lpSummary(); if(el) el.textContent=document.getElementById('lpSummary')?.textContent||''; if(typeof redrawCanvas==='function') redrawCanvas(); }
 
 // DELIMITATION : enveloppe convexe des points + decalage vers l'exterieur (~1cm).
 // Grossier mais suffisant : delimite a peu pres la place que prendra la piece.
@@ -15032,12 +15129,19 @@ let _laserCutDir='auto';
 // ── POINTS DE PERÇAGE MANUELS (laser) : liste de points [x,y] mm posés par l'utilisateur.
 //    Un point qui tombe SUR un contour force l'amorce à cet endroit (sinon choix auto). ──
 let _laserStarts=[];
+// ── INVERSIONS DE SENS PAR CONTOUR : un point [x,y] posé sur un contour = ce contour tourne
+//    dans l'autre sens que le réglage global. ──
+let _laserDirFlips=[];
+// ── PARCOURS RÉEL (rempli par buildLaserBody) : [{pts (ordre de passage, mm), closed, start, lead}]
+//    sert aux flèches mauves (fenêtre Découpe + page dessin). ──
+let _laserCutPaths=[];
 function setLaserCutDir(d){
   _laserCutDir=(d==='cw'||d==='ccw')?d:'auto';
   ['auto','cw','ccw'].forEach(k=>{ const b=document.getElementById('lcd_'+k); if(b){ const on=(k===_laserCutDir);
     b.style.background=on?'var(--acc)':'var(--surf)'; b.style.color=on?'#111':'var(--txt)';
     b.style.borderColor=on?'var(--acc)':'var(--brd2)'; b.style.fontWeight=on?'800':'600'; } });
   if(typeof wzGenLaser==='function') wzGenLaser();
+  const m=document.getElementById('laserPaintModal'); if(m && m.classList.contains('open')) _lpRefresh(); else { _lpSummary(); if(typeof redrawCanvas==='function') redrawCanvas(); }
 }
 function buildLaserBody(){
   const flat=_exportFlatObjs();
@@ -15143,6 +15247,37 @@ function buildLaserBody(){
       }
     }});
   }
+  // Inverse le sens de parcours d'un contour FERMÉ (et regénère ses moves ; un cercle reste un G2/G3).
+  const _revContour=(c)=>{
+    let p=c.poly.slice();
+    if(p.length>1 && Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-7) p.pop();
+    if(p.length<3) return;
+    p.reverse(); p.push([p[0][0],p[0][1]]);
+    c.poly=p; c.start=[p[0][0],p[0][1]];
+    const uniq=p.slice(0,p.length-1); const _fc=(typeof _fitCircle==='function')?_fitCircle(uniq):null;
+    if(_fc){ const st=p[0], nx2=p[1]||st; const cr=(st[0]-_fc.cx)*(nx2[1]-_fc.cy)-(st[1]-_fc.cy)*(nx2[0]-_fc.cx);
+      c.moves=[(cr>=0?'G3':'G2')+' X'+_lc(st[0])+' Y'+_lc(st[1])+' I'+_lc(_fc.cx-st[0])+' J'+_lc(_fc.cy-st[1])+'   ;cercle (sens choisi)']; }
+    else { c.moves=p.slice(1).map(q=>'G1 X'+_lc(q[0])+' Y'+_lc(q[1])); }
+  };
+  // Sens RÉEL d'un cercle « 1 seul G2/G3 » : son poly (24 pts) peut être construit dans l'autre sens
+  // que le code. true = le poly ne suit pas le code.
+  const _polyVsArc=(c)=>{ if(!(c.moves && c.moves.length===1 && c.poly && c.poly.length>=3 && typeof polyArea==='function')) return false;
+    const m=/^G([23])\s/.exec(String(c.moves[0])); if(!m) return false;
+    let p=c.poly.slice(); if(p.length>1&&Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-7) p.pop();
+    return (polyArea(p)>0)!==(m[1]==='3'); };
+  // Inversions manuelles (onglet Sens) : chaque point est rattaché au contour fermé LE PLUS PROCHE.
+  const _flipSet=new Set();
+  if(typeof _laserDirFlips!=='undefined' && _laserDirFlips && _laserDirFlips.length){
+    for(const f of _laserDirFlips){ let bd=1e18, bc=null;
+      for(const c of contours){ if(!c._closed||!c.poly||c.poly.length<3) continue; const pp=c.poly;
+        for(let e=0;e+1<pp.length;e++){ const a=pp[e],b=pp[e+1]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((f[0]-a[0])*dx+(f[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const d=Math.hypot(f[0]-(a[0]+t*dx),f[1]-(a[1]+t*dy)); if(d<bd){bd=d;bc=c;} } }
+      if(bc){ const tol=Math.max(0.8, bc._a>0?Math.sqrt(bc._a)*0.05:1.2); if(bd<=tol){ if(_flipSet.has(bc)) _flipSet.delete(bc); else _flipSet.add(bc); } } }
+  }
+  // Avant de RÉORIENTER un cercle, on aligne son poly sur le sens réel du code (sinon l'inversion
+  // ne change rien). Seulement si on réoriente : en Auto sans inversion, sortie STRICTEMENT identique.
+  contours.forEach(c=>{ const reo=((typeof _laserCutDir!=='undefined' && _laserCutDir!=='auto') || _flipSet.has(c));
+    if(reo && c._closed && _polyVsArc(c)){ let p=c.poly.slice(); if(p.length>1&&Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-7) p.pop(); c.poly=[p[0]].concat(p.slice(1).reverse()).concat([[p[0][0],p[0][1]]]); } });
+  const _prev=[];   // parcours réel pour les flèches mauves
   const blocks=order.map((c,bi)=>{
     // === SENS DE DÉCOUPE : oriente le contour FERMÉ (horaire / antihoraire) AVANT tout le reste,
     // pour que ça marche même si le perçage auto est désactivé. polyArea>0 = horaire visuel (Y-bas). ===
@@ -15151,16 +15286,11 @@ function buildLaserBody(){
       if(p.length>1 && Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-7) p.pop();
       if(p.length>=3){
         const isCW=polyArea(p)>0, wantCW=(_laserCutDir==='cw');
-        if(isCW!==wantCW){
-          p.reverse(); p.push([p[0][0],p[0][1]]);
-          c.poly=p; c.start=[p[0][0],p[0][1]];
-          const uniq=p.slice(0,p.length-1); const _fc=(typeof _fitCircle==='function')?_fitCircle(uniq):null;
-          if(_fc){ const st=p[0], nx2=p[1]||st; const cr=(st[0]-_fc.cx)*(nx2[1]-_fc.cy)-(st[1]-_fc.cy)*(nx2[0]-_fc.cx);
-            c.moves=[(cr>=0?'G3':'G2')+' X'+_lc(st[0])+' Y'+_lc(st[1])+' I'+_lc(_fc.cx-st[0])+' J'+_lc(_fc.cy-st[1])+'   ;cercle (sens choisi)']; }
-          else { c.moves=p.slice(1).map(q=>'G1 X'+_lc(q[0])+' Y'+_lc(q[1])); }
-        }
+        if(isCW!==wantCW) _revContour(c);
       }
     }
+    // === INVERSION MANUELLE de CE contour (onglet Sens de la fenêtre Découpe) ===
+    if(_flipSet.has(c) && c._closed && c.poly && c.poly.length>=3) _revContour(c);
     // Cote CHUTE connue AVANT de choisir le depart.
     let wasteInside=globalWaste(c._c);   // regle pair-impair GLOBALE (+ INV + peinture)
 
@@ -15287,6 +15417,9 @@ function buildLaserBody(){
           +'G1 Z0   ;redescendre sur la tole avant de percer\n'
           +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n';
     }
+    // Parcours réel (ordre de passage) pour l'affichage des flèches mauves — n'influence PAS le code.
+    try{ let pts=(c.poly||[]).map(q=>[q[0],q[1]]); if(c._closed && _polyVsArc(c)) pts=pts.slice().reverse();
+      _prev.push({pts, closed:!!c._closed, start:S?[S[0],S[1]]:null, lead:chosen?{A:chosen.A.slice(),O:chosen.O.slice(),g:chosen.g}:null}); }catch(e){}
     return head + c.moves.join('\n')+'\n'
       +'TC_LASER_OFF(2)\n'
       +'G1 Z'+_lc(ZL)+'   ;lever la tete pour degager la piece coupee';
@@ -15323,6 +15456,7 @@ function buildLaserBody(){
   let text=frameTxt+blocks.join('\n\n');
   // RE-ZERO : coordonnees ramenees au coin (tout positif). I/J (arcs, relatifs) NON touches.
   if(haveOff){ text=text.replace(/([XY])(-?\d*\.?\d+)/g, (mm,ax,num)=> ax+_lc(parseFloat(num)-(ax==='X'?offX:offY)) ); }
+  _laserCutPaths=_prev;
   return {text, count:contours.length};
 }
 // Emballe le corps dans le squelette .LST (fourni par l'ingénieur).
@@ -18418,6 +18552,8 @@ function redrawCanvasNow(){
       }
     }
   }
+  // Mode LASER : petites flèches mauves = sens réel de découpe (masquées pendant qu'on modifie le dessin)
+  try{ if(typeof appMode!=='undefined' && appMode==='laser' && typeof _laserArrowsMain==='function') _laserArrowsMain(); }catch(e){}
 
   // Multi-select highlight
   // Perf : avec beaucoup d'objets (SVG dissocié = parfois 200+), dessiner un
@@ -29709,24 +29845,50 @@ function _s3dStartRender() {
   </div>
 </div>
 
-<!-- ══ CHUTE / PIÈCE (peinture manuelle) ══ -->
+<!-- ══ FENÊTRE DÉCOUPE (dédiée) : Chute/Pièce · Départs · Sens · Rentrée · Décalage ══ -->
 <div class="modal-bg" id="laserPaintModal" style="align-items:stretch;padding:0">
   <div style="width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg)">
-    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surf);border-bottom:1px solid var(--brd);flex-wrap:wrap">
-      <span style="font-size:13px;color:var(--acc);flex:1;min-width:180px">🎨 Chute / Pièce + 📍 Départs — peins les zones, ou pose les points de perçage</span>
-      <button id="lp_chute" onclick="_lpSetTool(1)" style="padding:6px 12px;border-radius:8px;border:none;background:#ef4444;color:#fff;cursor:pointer;font-weight:700">🔴 Chute (tombe)</button>
-      <button id="lp_piece" onclick="_lpSetTool(2)" style="padding:6px 12px;border-radius:8px;border:none;background:#22c55e;color:#04240f;cursor:pointer;font-weight:700">🟢 Pièce (garder)</button>
-      <button id="lp_gomme" onclick="_lpSetTool(0)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer">🧽 Effacer</button>
-      <button id="lp_start" onclick="_lpSetStartMode()" title="Clique sur un contour pour poser le point où le laser rentre (reclique dessus pour l'enlever)" style="padding:6px 12px;border-radius:8px;border:none;background:#00e5ff;color:#073b45;cursor:pointer;font-weight:700">📍 Départ</button>
-      <button onclick="_lpClearStarts()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer">✖ Départs</button>
-      <button onclick="_lpReset()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer">↺ Tout effacer</button>
-      <button onclick="closeLaserPaint()" style="padding:6px 16px;border-radius:8px;border:none;background:var(--acc);color:#04240f;cursor:pointer;font-weight:700">✓ Valider</button>
+    <!-- Titre + onglets -->
+    <div style="display:flex;align-items:center;gap:6px;padding:9px 12px;background:var(--surf);border-bottom:1px solid var(--brd);flex-wrap:wrap">
+      <span style="font-size:14px;font-weight:800;color:var(--acc);margin-right:6px">✂️ Découpe</span>
+      <button id="lpt_paint" onclick="_lpSetTab('paint')" style="padding:7px 12px;border-radius:8px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">🎨 Chute / Pièce</button>
+      <button id="lpt_start" onclick="_lpSetTab('start')" style="padding:7px 12px;border-radius:8px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">📍 Départs</button>
+      <button id="lpt_dir"   onclick="_lpSetTab('dir')"   style="padding:7px 12px;border-radius:8px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↻ Sens</button>
+      <button id="lpt_lead" disabled title="Arrive à l'étape suivante" style="padding:7px 12px;border-radius:8px;border:1.5px dashed var(--brd2);background:transparent;color:var(--txt3);cursor:not-allowed;font-size:12px;opacity:.55">🌀 Rentrée (bientôt)</button>
+      <button id="lpt_off"  disabled title="Arrive à l'étape suivante" style="padding:7px 12px;border-radius:8px;border:1.5px dashed var(--brd2);background:transparent;color:var(--txt3);cursor:not-allowed;font-size:12px;opacity:.55">⧉ Décalage (bientôt)</button>
+      <div style="flex:1"></div>
+      <button onclick="closeLaserPaint()" style="padding:7px 18px;border-radius:8px;border:none;background:var(--acc);color:#04240f;cursor:pointer;font-weight:800">✓ Valider</button>
+    </div>
+    <!-- Outils de l'onglet actif -->
+    <div style="padding:8px 12px;background:var(--surf2);border-bottom:1px solid var(--brd);min-height:44px;display:flex;align-items:center">
+      <div id="lpp_paint" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--txt2)">Pot de peinture : clique dans une zone →</span>
+        <button id="lp_chute" onclick="_lpSetTool(1)" style="padding:6px 12px;border-radius:8px;border:none;background:#ef4444;color:#fff;cursor:pointer;font-weight:700">🔴 Chute (tombe)</button>
+        <button id="lp_piece" onclick="_lpSetTool(2)" style="padding:6px 12px;border-radius:8px;border:none;background:#22c55e;color:#04240f;cursor:pointer;font-weight:700">🟢 Pièce (garder)</button>
+        <button id="lp_gomme" onclick="_lpSetTool(0)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer">🧽 Effacer</button>
+        <button onclick="_lpReset()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer">↺ Effacer la peinture</button>
+      </div>
+      <div id="lpp_start" style="display:none;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--txt2)">Clique sur un contour = le laser rentre <b style="color:#00e5ff">ici</b> (point cyan). Re-clic dessus = enlever.</span>
+        <button onclick="_lpClearStarts()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer">✖ Effacer les départs</button>
+      </div>
+      <div id="lpp_dir" style="display:none;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--txt2)"><b>Toutes les coupes :</b></span>
+        <button type="button" id="lcd_auto" onclick="setLaserCutDir('auto')" style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--acc);background:var(--acc);color:#111;cursor:pointer;font-size:12px;font-weight:800">Auto</button>
+        <button type="button" id="lcd_cw"   onclick="setLaserCutDir('cw')"   style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↻ Horaire</button>
+        <button type="button" id="lcd_ccw"  onclick="setLaserCutDir('ccw')"  style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↺ Antihoraire</button>
+        <span style="font-size:11px;color:var(--txt2);margin-left:6px">· <b>Une seule forme :</b> clique sur son contour pour inverser <i>son</i> sens (⇄).</span>
+        <button onclick="_lpClearFlips()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer">✖ Annuler les inversions</button>
+      </div>
     </div>
     <div id="lpViewport" onwheel="_lpWheel(event)" onpointerdown="_lpPanStart(event)" oncontextmenu="return false" style="flex:1;overflow:hidden;position:relative;background:#0d1117;touch-action:none">
       <canvas id="lpCanvas" onclick="_lpClickCanvas(event)" style="position:absolute;left:0;top:0;background:#fff;cursor:crosshair;box-shadow:0 4px 20px rgba(0,0,0,.5)"></canvas>
       <div style="position:absolute;bottom:8px;left:10px;font-size:10px;color:rgba(255,255,255,.45);pointer-events:none">molette = zoom · clic droit/molette pressée glissé = déplacer</div>
     </div>
-    <div style="padding:8px 12px;background:var(--surf);border-top:1px solid var(--brd);font-size:11px;color:var(--txt2)">Tu peux remplir seulement quelques zones (le reste reste automatique) ou tout remplir. Si tu ne touches à rien, ça marche comme avant.</div>
+    <div style="padding:8px 12px;background:var(--surf);border-top:1px solid var(--brd);font-size:11px;color:var(--txt2);display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <span><b style="color:#9333ea">▸ mauve</b> = sens de coupe · <b style="color:#f97316">◠ orange</b> = rentrée (perçage + arc) · <b style="color:#00b8d4">●</b> = départ choisi</span>
+      <span id="lpSummary" style="color:var(--acc);font-weight:700"></span>
+    </div>
   </div>
 </div>
 
