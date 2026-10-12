@@ -161,6 +161,11 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-12 — IB : SIMULATION — la tête revient au zéro en fin de programme
+ [FIX simu] parseGcode ignorait toute ligne commençant par G90/G91 et ne connaissait pas « G01 » : la ligne
+   de fin « G90 G01 X00 Y0 Z0 F5000 » (retour au zéro) n'était pas jouée. Le PROGRAMME était déjà bon ;
+   seul l'affichage est corrigé. Hors zone CIP.
+
 -- 2026-10-12 — IA : SIMULATION 3D plus lente et régulière
  [CHANGÉ] La lecture avance en mm/s (distance réelle) au lieu de « N mouvements par image » : un cercle
    découpé en petits segments ne file plus à toute vitesse. Défaut 20 mm/s (curseur 2..600 mm/s),
@@ -1824,7 +1829,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-IA ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-IB ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -29261,13 +29266,16 @@ function parseGcode(gc){
   const pierces=[];
   for(const raw of lines){
     lineIdx++;
-    const line=raw.split(';')[0].trim().toUpperCase();
+    let line=raw.split(';')[0].trim().toUpperCase();
     if(!line) continue;
+    // « G00/G01/G02/G03 » = « G0/G1/G2/G3 » (le pied TRUMPF écrit « G01 »)
+    line=line.replace(/\bG0+([0-3])\b/g,'G$1');
     // Etat laser (pour colorer la simulation : coupe = laser ON, déplacement = laser OFF)
     if(line.indexOf('TC_LASER_ON')>=0){ laserOn=true; pierceNext=true; pierces.push([x,y,z]); continue; }
     if(line.indexOf('TC_LASER_OFF')>=0){ laserOn=false; continue; }
-    if(line.startsWith('G90')){abs=true;continue;}
-    if(line.startsWith('G91')){abs=false;continue;}
+    // G90/G91 en tête de ligne : on note le mode PUIS on lit le reste de la ligne (ex. « G90 G01 X0 Y0 Z0 »
+    // = retour au zéro en fin de programme ; avant, toute la ligne était ignorée -> la tête ne revenait pas).
+    if(/^G9[01]\b/.test(line)){ abs=line.startsWith('G90'); line=line.replace(/^G9[01]\s*/,''); if(!line) continue; }
     const isG0=line.startsWith('G0 ')||line==='G0';
     const isG1=line.startsWith('G1 ')||line==='G1';
     const isG2=line.startsWith('G2 ')||line==='G2';
