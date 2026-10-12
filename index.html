@@ -161,6 +161,11 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-12 — IC : FIN DE PROGRAMME laser plus sûre (demande Seb)
+ [CHANGÉ] Pied de programme : au lieu de « G90 G01 X00 Y0 Z0 F5000 » (retour en DIAGONALE en descendant au
+   ras de la tôle), on fait : G90 G01 Z10 F5000 (monter) -> G90 G01 X0 Y0 (aller au SET_POS) -> G90 G01 Z0
+   (redescendre). Hors zone CIP.
+
 -- 2026-10-12 — IB : SIMULATION — la tête revient au zéro en fin de programme
  [FIX simu] parseGcode ignorait toute ligne commençant par G90/G91 et ne connaissait pas « G01 » : la ligne
    de fin « G90 G01 X00 Y0 Z0 F5000 » (retour au zéro) n'était pas jouée. Le PROGRAMME était déjà bon ;
@@ -1829,7 +1834,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-IB ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-IC ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -16010,7 +16015,7 @@ function _buildLST(progName, techno, req, body){
   const P=(progName||'PROGRAMME1').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'_')||'PROGRAMME1';
   const T=(techno||'INOX2MM');
   const R=(req===0||req)?req:2;
-  const inner="TC_RESET\n"+'TM_LTTNAME="'+T+'"\n'+"TC_DYNAMIC_LEVEL(0)\n"+";G01 G90 B=0 F2000\n"+"TC_TRAFO_OFF\n"+"SET_POS(0,0,0)\n"+"TC_LASER_REQUEST("+R+")\n\n"+body+"\n\n"+"TC_LASER_REQUEST(0)\n"+"G90 G01 X00 Y0 Z0 F5000\n\n"+"TC_AUX_LIGHT(5,0)\n"+"TC_AUX_LIGHT(6,0)\n"+"TC_OPEN_DOOR(0,1,0,0)\n"+"TC_RESET\n"+"M30";
+  const inner="TC_RESET\n"+'TM_LTTNAME="'+T+'"\n'+"TC_DYNAMIC_LEVEL(0)\n"+";G01 G90 B=0 F2000\n"+"TC_TRAFO_OFF\n"+"SET_POS(0,0,0)\n"+"TC_LASER_REQUEST("+R+")\n\n"+body+"\n\n"+"TC_LASER_REQUEST(0)\n"+"G90 G01 Z10 F5000   ;fin : monter a Z10 (au-dessus de la tole)\n"+"G90 G01 X0 Y0   ;retour au point de depart (SET_POS)\n"+"G90 G01 Z0   ;redescendre a Z0 (hauteur du SET_POS)\n\n"+"TC_AUX_LIGHT(5,0)\n"+"TC_AUX_LIGHT(6,0)\n"+"TC_OPEN_DOOR(0,1,0,0)\n"+"TC_RESET\n"+"M30";
   const _ff=document.getElementById('laserFullFile'); const full=_ff?_ff.checked:true;
   if(full){ return _LST_HEADER.replace(/__PROGNAME__/g,P).replace(/__TECHNO__/g,T)+inner+"\n"+_LST_FOOTER.replace(/__TECHNO__/g,T); }
   return "DA,'"+P+"','HP','',0,0\nSTART_TEXT\n"+inner+"\nSTOP_TEXT\n";
