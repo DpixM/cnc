@@ -161,6 +161,21 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-11 — HW : POINTS DE PERÇAGE MANUELS (laser) — choisir où le laser rentre
+ [AJOUT] Dans la fenêtre « Chute/Pièce », nouveau mode « 📍 Départ » : on clique sur un contour pour
+   poser le point où le laser perce/rentre (reclic dessus = enlève ; bouton « ✖ Départs » = tout
+   effacer). Marqueurs cyan. Stockés dans _laserStarts. Dans buildLaserBody, un départ posé SUR un
+   contour FORCE l'amorce à cet endroit (demi-arc tangent, perçage côté chute) — sinon départ auto
+   comme avant ; un point trop loin d'un contour est ignoré. tryLead remonté (commun manuel/auto).
+   Testé (t_start 4, t_pick 5). Zone dessin, hors zone CIP.
+
+-- 2026-10-11 — HV : SENS DE DÉCOUPE laser (Auto / Horaire / Antihoraire)
+ [AJOUT] Panneau laser : 3 boutons « Sens de découpe ». Auto = comportement actuel. Horaire/Antihoraire
+   orientent TOUS les contours fermés dans le sens choisi (réversion du winding, polyArea), appliqué
+   AVANT le perçage -> marche même perçage auto désactivé ; le cercle reste un cercle (G2/G3 selon le
+   sens). Testé (t_cutdir : chemin CW aire>0, CCW aire<0). Prochaine étape : points de perçage manuels.
+   Zone dessin, hors zone CIP.
+
 -- 2026-10-11 — HU : dock Style DÉPLAÇABLE + REPLIABLE (position mémorisée)
  [UI] Le dock de style (à gauche) a maintenant une poignée ⠿ pour le DÉPLACER où on veut (clampé
    dans le canvas) et un bouton ▾/▸ pour le REPLIER quand on n'en a pas besoin. Position + état repli
@@ -1756,7 +1771,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-11-HU ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-11-HW ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2713,6 +2728,14 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <input type="checkbox" id="laserInvert" onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
       <span><b>Inverser plein/vide</b> — coche si c'est l'inverse qui doit tomber (ex : tu gardes la petite pièce au lieu du tour).</span>
     </label>
+    <!-- SENS DE DÉCOUPE -->
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--txt)"><b>Sens de découpe</b></span>
+      <button type="button" id="lcd_auto" onclick="setLaserCutDir('auto')" style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--acc);background:var(--acc);color:#111;cursor:pointer;font-size:12px;font-weight:800">Auto</button>
+      <button type="button" id="lcd_cw"   onclick="setLaserCutDir('cw')"   style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↻ Horaire</button>
+      <button type="button" id="lcd_ccw"  onclick="setLaserCutDir('ccw')"  style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↺ Antihoraire</button>
+    </div>
+    <div style="font-size:9px;color:var(--txt3);margin-top:4px">Auto = le soft choisit. Sinon tous les contours sont coupés dans le sens choisi (utile pour le côté de la bavure / la compensation G41-G42 à venir).</div>
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
       <input type="checkbox" id="laserFrame" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
       <span><b>Délimitation (contour à vide + pause)</b> — avant de couper, la tête fait le tour du rectangle du dessin <b>sans laser</b>, puis s'arrête (M00). Tu vérifies le placement sur la tôle, tu valides sur la machine, et ça repart couper.</span>
@@ -2722,7 +2745,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <span><b>Fichier complet machine</b> (entête + pied machine TRUMPF). Décoche pour la version simple lisible.</span>
     </label>
     <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <button onclick="openLaserPaint()" style="padding:9px 13px;border-radius:8px;border:1.5px solid var(--acc);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">🎨 Définir chute / pièce (optionnel)</button>
+      <button onclick="openLaserPaint()" style="padding:9px 13px;border-radius:8px;border:1.5px solid var(--acc);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">🎨 Chute / pièce + 📍 départs (optionnel)</button>
       <span id="laserPaintStatus" style="font-size:11px;color:var(--acc)"></span>
     </div>
     <div style="font-size:9px;color:var(--txt3);margin-top:6px">Le nom du tableau techno doit correspondre EXACTEMENT à celui créé dans la machine (puissance/vitesse). « A CHANGER! » = à remplacer par le tien (ex : INOX3MM_S).</div>
@@ -14832,6 +14855,7 @@ function _polyPoleInside(poly){
 // ailleurs, ca reste automatique (pair-impair). S'il ne touche a rien -> comme avant.
 let _laserPaint = null; // {cls:Uint8Array, wall:Uint8Array, W,H, minX,minY,maxX,maxY, scale}
 let _lpTool = 1;        // 1=chute, 2=piece, 0=gomme
+let _lpStartMode = false; // mode "📍 poser les départs" (clique sur un contour)
 function _laserClassAt(xmm,ymm){
   const P=_laserPaint; if(!P||!P.cls) return 0;
   const px=Math.round((xmm-P.minX)*P.scale), py=Math.round((P.maxY-ymm)*P.scale);
@@ -14897,13 +14921,34 @@ function _lpRender(){
     const o=i*4; img.data[o]=r; img.data[o+1]=g; img.data[o+2]=b; img.data[o+3]=255;
   }
   ctx.putImageData(img,0,0);
+  // Marqueurs des DÉPARTS de perçage (cyan) par-dessus
+  if(typeof _laserStarts!=='undefined' && _laserStarts.length){
+    const rad=Math.max(4, P.scale*0.7);
+    for(const s of _laserStarts){ const sx=(s[0]-P.minX)*P.scale, sy=(P.maxY-s[1])*P.scale;
+      ctx.beginPath(); ctx.arc(sx,sy,rad,0,2*Math.PI); ctx.fillStyle='rgba(0,229,255,.9)'; ctx.fill();
+      ctx.lineWidth=1.5; ctx.strokeStyle='#073b45'; ctx.stroke(); }
+  }
 }
-function _lpSetTool(t){ _lpTool=t; const map={1:'lp_chute',2:'lp_piece',0:'lp_gomme'}; ['lp_chute','lp_piece','lp_gomme'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.outline=(id===map[t])?'3px solid #fff':'none'; }); }
+function _lpSetTool(t){ _lpTool=t; _lpStartMode=false; const map={1:'lp_chute',2:'lp_piece',0:'lp_gomme'}; ['lp_chute','lp_piece','lp_gomme'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.outline=(id===map[t])?'3px solid #fff':'none'; }); const bs=document.getElementById('lp_start'); if(bs)bs.style.outline='none'; }
+function _lpSetStartMode(){ _lpStartMode=true; ['lp_chute','lp_piece','lp_gomme'].forEach(id=>{const b=document.getElementById(id);if(b)b.style.outline='none';}); const bs=document.getElementById('lp_start'); if(bs)bs.style.outline='3px solid #fff'; }
+function _lpClearStarts(){ _laserStarts=[]; _lpRender(); }
+// Placer / retirer un point de départ sur le contour le plus proche du clic (coord mm).
+function _lpAddStartAt(mx,my){
+  const polys=_lpContours(); let bd=1e18, bp=null;
+  for(const seg of polys){ for(let i=0;i+1<seg.length;i++){ const a=seg[i],b=seg[i+1]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((mx-a[0])*dx+(my-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy,d=Math.hypot(mx-fx,my-fy); if(d<bd){bd=d;bp=[fx,fy];} } }
+  const tol=(_laserPaint&&_laserPaint.scale)?Math.max(1.2, 10/_laserPaint.scale):3;
+  if(!bp || bd>tol) return;
+  // si on clique près d'un départ existant -> on le retire ; sinon on l'ajoute
+  let ri=-1; for(let i=0;i<_laserStarts.length;i++){ if(Math.hypot(_laserStarts[i][0]-bp[0],_laserStarts[i][1]-bp[1])<tol){ri=i;break;} }
+  if(ri>=0) _laserStarts.splice(ri,1); else _laserStarts.push(bp);
+  _lpRender();
+}
 function _lpClickCanvas(ev){
   const P=_laserPaint; if(!P||!P.wall) return;
   const cv=document.getElementById('lpCanvas'); const r=cv.getBoundingClientRect();
   const px=Math.round((ev.clientX-r.left)/r.width*P.W), py=Math.round((ev.clientY-r.top)/r.height*P.H);
   if(px<0||py<0||px>=P.W||py>=P.H) return;
+  if(_lpStartMode){ _lpAddStartAt(P.minX+px/P.scale, P.maxY-py/P.scale); return; }
   const start=py*P.W+px; if(P.wall[start]) return; // clic sur un trait -> rien
   const tool=_lpTool, cls=P.cls, wall=P.wall, W=P.W, H=P.H;
   const seen=new Uint8Array(W*H); const stack=[start];
@@ -14980,6 +15025,18 @@ function laserCalc(){
   const sg=v=>(v>=0?'+':'')+v.toFixed(3);
   if(msg){ msg.style.color='#ffc23d'; msg.style.fontSize='16px';
     msg.textContent='saignée '+kerf.toFixed(3)+'  ·  X '+sg(ajX)+'  ·  Y '+sg(ajY); }
+  if(typeof wzGenLaser==='function') wzGenLaser();
+}
+// ── SENS DE DÉCOUPE (laser) : 'auto' (le soft choisit) | 'cw' (horaire) | 'ccw' (antihoraire) ──
+let _laserCutDir='auto';
+// ── POINTS DE PERÇAGE MANUELS (laser) : liste de points [x,y] mm posés par l'utilisateur.
+//    Un point qui tombe SUR un contour force l'amorce à cet endroit (sinon choix auto). ──
+let _laserStarts=[];
+function setLaserCutDir(d){
+  _laserCutDir=(d==='cw'||d==='ccw')?d:'auto';
+  ['auto','cw','ccw'].forEach(k=>{ const b=document.getElementById('lcd_'+k); if(b){ const on=(k===_laserCutDir);
+    b.style.background=on?'var(--acc)':'var(--surf)'; b.style.color=on?'#111':'var(--txt)';
+    b.style.borderColor=on?'var(--acc)':'var(--brd2)'; b.style.fontWeight=on?'800':'600'; } });
   if(typeof wzGenLaser==='function') wzGenLaser();
 }
 function buildLaserBody(){
@@ -15087,6 +15144,23 @@ function buildLaserBody(){
     }});
   }
   const blocks=order.map((c,bi)=>{
+    // === SENS DE DÉCOUPE : oriente le contour FERMÉ (horaire / antihoraire) AVANT tout le reste,
+    // pour que ça marche même si le perçage auto est désactivé. polyArea>0 = horaire visuel (Y-bas). ===
+    if(typeof _laserCutDir!=='undefined' && _laserCutDir!=='auto' && c._closed && c.poly && c.poly.length>=3 && typeof polyArea==='function'){
+      let p=c.poly.slice();
+      if(p.length>1 && Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-7) p.pop();
+      if(p.length>=3){
+        const isCW=polyArea(p)>0, wantCW=(_laserCutDir==='cw');
+        if(isCW!==wantCW){
+          p.reverse(); p.push([p[0][0],p[0][1]]);
+          c.poly=p; c.start=[p[0][0],p[0][1]];
+          const uniq=p.slice(0,p.length-1); const _fc=(typeof _fitCircle==='function')?_fitCircle(uniq):null;
+          if(_fc){ const st=p[0], nx2=p[1]||st; const cr=(st[0]-_fc.cx)*(nx2[1]-_fc.cy)-(st[1]-_fc.cy)*(nx2[0]-_fc.cx);
+            c.moves=[(cr>=0?'G3':'G2')+' X'+_lc(st[0])+' Y'+_lc(st[1])+' I'+_lc(_fc.cx-st[0])+' J'+_lc(_fc.cy-st[1])+'   ;cercle (sens choisi)']; }
+          else { c.moves=p.slice(1).map(q=>'G1 X'+_lc(q[0])+' Y'+_lc(q[1])); }
+        }
+      }
+    }
     // Cote CHUTE connue AVANT de choisir le depart.
     let wasteInside=globalWaste(c._c);   // regle pair-impair GLOBALE (+ INV + peinture)
 
@@ -15107,14 +15181,41 @@ function buildLaserBody(){
         // depart par defaut (si pas d'arc) = milieu de la plus longue arete
         let best=-1,nfBk=0; for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB],d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d>best){best=d;nfBk=k;} }
         let nfTp=0.5;
-        // === AMORCE ROBUSTE : demi-cercle du pole vers le point du contour le plus proche ===
-        // S = point le PLUS PROCHE du pole -> la normale y pointe pile vers le pole -> l'arc
-        // tangent est un DEMI-CERCLE de rayon pole.d/2. Il est ENTIEREMENT contenu dans
-        // l'incercle (rayon pole.d) -> donc TOUJOURS dans la chute, garanti geometriquement
-        // (aucune verif necessaire, contrairement a avant ou la verif rejetait a tort de
-        // bons arcs => ligne droite moche). Percage au pole (max de degagement), taille
-        // adaptative, plonge vers l'interieur au lieu de raser le mur. Jamais de droite.
-        if(ARC && c._pole && c._pole.pt && c._pole.d>THR){
+        // Helper amorce (demi-cercle), défini ICI pour servir au DÉPART MANUEL comme à l'auto.
+        const tryLead=(S0,T0,Dir,d,clr)=>{
+          const A=[S0[0]+Dir[0]*d, S0[1]+Dir[1]*d];
+          const r=d/2, O=[S0[0]+Dir[0]*r, S0[1]+Dir[1]*r];
+          const tCCW=[Dir[1],-Dir[0]];
+          const g=(tCCW[0]*T0[0]+tCCW[1]*T0[1]>=0)?'G3':'G2';
+          const aP=Math.atan2(A[1]-O[1],A[0]-O[0]), dir=(g==='G3')?1:-1;
+          const NS=Math.max(24,Math.round(Math.PI*r*10));
+          const mrg=Math.max(0.15, r*0.15);
+          for(let k=1;k<NS;k++){ const ang=aP+dir*Math.PI*k/NS; const px=O[0]+r*Math.cos(ang), py=O[1]+r*Math.sin(ang);
+            if(globalWaste([px,py])!==true){ if(Math.hypot(px-S0[0],py-S0[1])<mrg) continue; return null; } }
+          if(clr>0){ for(const oc of contours){ const bb=oc._bb; if(bb&&(A[0]<bb[0]-clr||A[0]>bb[2]+clr||A[1]<bb[1]-clr||A[1]>bb[3]+clr))continue; const pp=oc.poly; for(let e=0;e+1<pp.length;e++){ const ax=pp[e][0],ay=pp[e][1],bx=pp[e+1][0],by=pp[e+1][1]; const ex=bx-ax,ey=by-ay,L2=ex*ex+ey*ey||1e-9; let tt=((A[0]-ax)*ex+(A[1]-ay)*ey)/L2; tt=Math.max(0,Math.min(1,tt)); const ddx=A[0]-(ax+tt*ex),ddy=A[1]-(ay+tt*ey); if(ddx*ddx+ddy*ddy<clr*clr) return null; } } }
+          return {S:S0,A,O,g};
+        };
+        // === DÉPART MANUEL : un point de perçage posé par l'utilisateur SUR ce contour prime. ===
+        let forced=null;
+        if(typeof _laserStarts!=='undefined' && _laserStarts && _laserStarts.length){
+          let bd=1e18,fbk=0,ft=0.5,fS=null,fT=null;
+          for(const s of _laserStarts){ for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((s[0]-a[0])*dx+(s[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy,dd=Math.hypot(s[0]-fx,s[1]-fy); if(dd<bd){ bd=dd;fbk=k;ft=t;fS=[fx,fy]; const tl=Math.sqrt(L2); fT=[dx/tl,dy/tl]; } } }
+          const TOLmm=Math.max(0.8, c._a>0?Math.sqrt(c._a)*0.05:1.2);
+          if(fS && bd<=TOLmm) forced={bk:fbk,tp:ft,S:fS,T:fT};
+        }
+        // === AMORCE ROBUSTE : demi-cercle du pole vers le point du contour le plus proche (AUTO) ===
+        if(forced){
+          nfBk=forced.bk; nfTp=forced.tp;   // le départ est FORCÉ au point choisi (même sans arc)
+          if(ARC){
+            let N=[forced.T[1],-forced.T[0]]; const eps=0.18;
+            if(globalWaste([forced.S[0]+N[0]*eps, forced.S[1]+N[1]*eps])!==true){ N=[-N[0],-N[1]]; }
+            if(globalWaste([forced.S[0]+N[0]*eps, forced.S[1]+N[1]*eps])===true){
+              const DMAX=Math.max(LEAD*4,5), lim=(c._pole&&c._pole.d)?Math.min(DMAX,c._pole.d):DMAX;
+              for(let d=lim; d>=THR; d*=0.72){ const c2=tryLead(forced.S,forced.T,N,d,0); if(c2){ chosen={bk:forced.bk,tp:forced.tp,...c2}; break; } }
+            }
+          }
+        }
+        else if(ARC && c._pole && c._pole.pt && c._pole.d>THR){
           const P0=c._pole.pt;
           // point du contour le plus proche du pole = bon point de depart
           let bd=1e18,bk=0,bt=0.5,bS=null,bT=null;
@@ -15132,23 +15233,7 @@ function buildLaserBody(){
             // comme le grand cercle exterieur (dont le centre tombe dans le fond a decouper).
             const eps=Math.min(0.2, Math.max(0.05,bd*0.5));
             const scrapVersPole = globalWaste([bS[0]+Nd[0]*eps, bS[1]+Nd[1]*eps])===true;
-            // helper : demi-cercle depuis S0 (tangente T0) en perçant dans la direction Dir,
-            // profondeur d. VERIFIE que tout l'arc reste dans le rebut (sinon on retrecit).
-            // clr = distance mini exigee entre le PERCAGE et tout contour (percage bien degage).
-            const tryLead=(S0,T0,Dir,d,clr)=>{
-              const A=[S0[0]+Dir[0]*d, S0[1]+Dir[1]*d];
-              const r=d/2, O=[S0[0]+Dir[0]*r, S0[1]+Dir[1]*r];
-              const tCCW=[Dir[1],-Dir[0]];
-              const g=(tCCW[0]*T0[0]+tCCW[1]*T0[1]>=0)?'G3':'G2';
-              const aP=Math.atan2(A[1]-O[1],A[0]-O[0]), dir=(g==='G3')?1:-1;
-              const NS=Math.max(24,Math.round(Math.PI*r*10));
-              const mrg=Math.max(0.15, r*0.15); // pres de S0 l'arc TOUCHE son contour (tangence voulue)
-              for(let k=1;k<NS;k++){ const ang=aP+dir*Math.PI*k/NS; const px=O[0]+r*Math.cos(ang), py=O[1]+r*Math.sin(ang);
-                if(globalWaste([px,py])!==true){ if(Math.hypot(px-S0[0],py-S0[1])<mrg) continue; return null; } }
-              if(clr>0){ // le PERCAGE ne doit pas etre colle a une ligne (contour ext epineux)
-                for(const oc of contours){ const bb=oc._bb; if(bb&&(A[0]<bb[0]-clr||A[0]>bb[2]+clr||A[1]<bb[1]-clr||A[1]>bb[3]+clr))continue; const pp=oc.poly; for(let e=0;e+1<pp.length;e++){ const ax=pp[e][0],ay=pp[e][1],bx=pp[e+1][0],by=pp[e+1][1]; const ex=bx-ax,ey=by-ay,L2=ex*ex+ey*ey||1e-9; let tt=((A[0]-ax)*ex+(A[1]-ay)*ey)/L2; tt=Math.max(0,Math.min(1,tt)); const ddx=A[0]-(ax+tt*ex),ddy=A[1]-(ay+tt*ey); if(ddx*ddx+ddy*ddy<clr*clr) return null; } } }
-              return {S:S0,A,O,g};
-            };
+            // (tryLead est défini plus haut, commun au départ manuel et au départ auto)
             if(scrapVersPole){
               // TROU / CHUTE : rebut du cote du pole. Percage vers l'interieur (plafonne DMAX).
               const DMAX=Math.max(LEAD*4,5);
@@ -29628,10 +29713,12 @@ function _s3dStartRender() {
 <div class="modal-bg" id="laserPaintModal" style="align-items:stretch;padding:0">
   <div style="width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg)">
     <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surf);border-bottom:1px solid var(--brd);flex-wrap:wrap">
-      <span style="font-size:13px;color:var(--acc);flex:1;min-width:180px">🎨 Chute / Pièce — clique dans une zone pour la remplir (pot de peinture)</span>
+      <span style="font-size:13px;color:var(--acc);flex:1;min-width:180px">🎨 Chute / Pièce + 📍 Départs — peins les zones, ou pose les points de perçage</span>
       <button id="lp_chute" onclick="_lpSetTool(1)" style="padding:6px 12px;border-radius:8px;border:none;background:#ef4444;color:#fff;cursor:pointer;font-weight:700">🔴 Chute (tombe)</button>
       <button id="lp_piece" onclick="_lpSetTool(2)" style="padding:6px 12px;border-radius:8px;border:none;background:#22c55e;color:#04240f;cursor:pointer;font-weight:700">🟢 Pièce (garder)</button>
       <button id="lp_gomme" onclick="_lpSetTool(0)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer">🧽 Effacer</button>
+      <button id="lp_start" onclick="_lpSetStartMode()" title="Clique sur un contour pour poser le point où le laser rentre (reclique dessus pour l'enlever)" style="padding:6px 12px;border-radius:8px;border:none;background:#00e5ff;color:#073b45;cursor:pointer;font-weight:700">📍 Départ</button>
+      <button onclick="_lpClearStarts()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer">✖ Départs</button>
       <button onclick="_lpReset()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer">↺ Tout effacer</button>
       <button onclick="closeLaserPaint()" style="padding:6px 16px;border-radius:8px;border:none;background:var(--acc);color:#04240f;cursor:pointer;font-weight:700">✓ Valider</button>
     </div>
