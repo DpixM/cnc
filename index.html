@@ -161,6 +161,11 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-12 — IA : SIMULATION 3D plus lente et régulière
+ [CHANGÉ] La lecture avance en mm/s (distance réelle) au lieu de « N mouvements par image » : un cercle
+   découpé en petits segments ne file plus à toute vitesse. Défaut 20 mm/s (curseur 2..600 mm/s),
+   déplacements à vide 8× plus vite, la tête glisse en continu. Aucun changement du programme machine. Hors zone CIP.
+
 -- 2026-10-12 — HZ : POSTE DE PILOTAGE 3D (page G-code laser) + sens « une par une » + plus de flèches sur le dessin
  [AJOUT] Page G-code en mode LASER = on atterrit directement sur la simulation 3D : bandeau (nom du .LST,
    état, chiffres : contours, perçages, mm de coupe, temps estimé, techno, ⬇ Télécharger), rappel orange des
@@ -1819,7 +1824,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-HZ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-IA ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -24987,7 +24992,21 @@ function _s3dRenderCode(){
   el.innerHTML=lines.map((ln,i)=>'<div class="s3d-ln" data-l="'+i+'" onclick="s3dGotoLine('+i+')" style="padding:1px 8px;cursor:pointer;white-space:pre;color:#c9d1d9">'
     +String(i+1).padStart(4,' ')+'  '+String(ln).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('');
 }
-function _s3dSetSpeed(v){ if(_s3d)_s3d.speed=parseInt(v)||4; const l=document.getElementById('s3dSpeedLbl'); if(l)l.textContent='×'+v; }
+// VITESSE DE LECTURE en mm/s (avant : N mouvements par image -> un cercle découpé en petits segments
+// défilait beaucoup trop vite). Curseur 1..300 -> 2..600 mm/s ; par défaut 10 -> 20 mm/s.
+// Les déplacements à vide (laser éteint / G0) vont 8× plus vite pour ne pas faire attendre.
+function _s3dMmps(v){ return Math.max(1,(parseInt(v)||10))*2; }
+function _s3dSetSpeed(v){ if(_s3d)_s3d.speed=parseInt(v)||10; const l=document.getElementById('s3dSpeedLbl'); if(l)l.textContent=_s3dMmps(v)+' mm/s'; }
+function _s3dAdvance(){
+  const now=performance.now(); const dt=Math.min(0.05, Math.max(0,(now-(_s3d._tLast||now))/1000)); _s3d._tLast=now;
+  let budget=(_s3d._acc||0)+_s3dMmps(_s3d.speed)*dt; let i=_s3d.idx; const n=_s3d.moves.length;
+  let part=null;
+  while(i<n){ const m=_s3d.moves[i]; const L=Math.hypot(m.x1-m.x0,m.y1-m.y0,m.z1-m.z0); const fast=(m.rapid||m.laser===false);
+    const cost=Math.max(0.02, fast?L/8:L); if(budget<cost){ part={m,t:budget/cost}; break; } budget-=cost; i++; }
+  _s3d._acc=(i>=n)?0:budget; if(i!==_s3d.idx) _s3dSetIdx(i);
+  // la tête GLISSE le long du mouvement en cours (sinon elle saute d'un coup sur les longs déplacements)
+  if(part && _s3d.mark){ const m=part.m,t=part.t; _s3d.mark.visible=true; _s3d.mark.position.set(m.x0+(m.x1-m.x0)*t, m.y0+(m.y1-m.y0)*t, m.z0+(m.z1-m.z0)*t); }
+}
 function _s3dSetIdx(idx){
   if(!_s3d||!_s3d.combGeo) return;
   const n=_s3d.moves.length;
@@ -25019,7 +25038,7 @@ function s3dSeekTo(pct){ if(!_s3d)return; _s3dSetIdx(pct/100*_s3d.moves.length);
 function s3dTogglePlay(){
   if(!_s3d)return;
   if(!_s3d.playing && _s3d.idx>=_s3d.moves.length) _s3dSetIdx(0);
-  _s3d.playing=!_s3d.playing;
+  _s3d.playing=!_s3d.playing; _s3d._tLast=performance.now(); _s3d._acc=0;
   const b=document.getElementById('s3dPlayBtn'); if(b)b.textContent=_s3d.playing?'⏸':'▶';
 }
 function s3dGotoLine(lineNo){
@@ -30155,7 +30174,7 @@ function _s3dInit(moves) {
     vis: {rapid:true,cut:true,plunge:true,lead:true},
     moves, combGeo, mark, pierceGrp, segTypes:_segTypes, basePos:new Float32Array(_positions),
     idx: moves.length, playing:false,
-    speed:(parseInt(document.getElementById('s3dSpeed')&&document.getElementById('s3dSpeed').value)||4),
+    speed:(parseInt(document.getElementById('s3dSpeed')&&document.getElementById('s3dSpeed').value)||10),
     drag: false, lx:0, ly:0,
     pinch0: 0,
     rafId: null
@@ -30286,7 +30305,7 @@ function _s3dStartRender() {
   function animate() {
     if (!document.getElementById('sim3DModal').classList.contains('open') && !_s3dDocked) return;
     _s3d.rafId = requestAnimationFrame(animate);
-    if (_s3d.playing) { _s3dSetIdx(_s3d.idx + (_s3d.speed||4)); if (_s3d.idx >= _s3d.moves.length) { _s3d.playing=false; const _pb=document.getElementById('s3dPlayBtn'); if(_pb)_pb.textContent='▶'; } }
+    if (_s3d.playing) { _s3dAdvance(); if (_s3d.idx >= _s3d.moves.length) { _s3d.playing=false; const _pb=document.getElementById('s3dPlayBtn'); if(_pb)_pb.textContent='▶'; } }
     const sinPhi = Math.sin(_s3d.phi), cosPhi = Math.cos(_s3d.phi);
     camera.position.set(
       _s3d.cx + _s3d.radius * sinPhi * Math.cos(_s3d.theta),
@@ -30415,8 +30434,8 @@ function _s3dStartRender() {
       <input type="range" id="s3dSeek" min="0" max="100" value="100" style="flex:1;height:22px;accent-color:var(--acc)" onpointerdown="s3dScrub(event)" oninput="s3dSeekTo(parseInt(this.value))">
       <span id="s3dProgress" style="font-family:var(--mono);font-size:11px;color:var(--txt2);min-width:40px">100%</span>
       <span style="font-size:10px;color:var(--txt2)">Vitesse</span>
-      <input type="range" id="s3dSpeed" min="1" max="300" value="4" style="width:90px;accent-color:var(--txt2)" oninput="_s3dSetSpeed(this.value)">
-      <span id="s3dSpeedLbl" style="font-family:var(--mono);font-size:11px;color:var(--txt2);min-width:34px">×4</span>
+      <input type="range" id="s3dSpeed" min="1" max="300" value="10" style="width:90px;accent-color:var(--txt2)" oninput="_s3dSetSpeed(this.value)">
+      <span id="s3dSpeedLbl" style="font-family:var(--mono);font-size:11px;color:var(--txt2);min-width:58px">20 mm/s</span>
     </div>
   </div>
 </div>
