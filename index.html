@@ -161,6 +161,14 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-12 — IE : page G-code laser simplifiée + aide au réglage du correcteur claire
+ [RETIRÉ] Champ « Priorité laser » (toujours 2 = machine n°2 sur la source) et case « Fichier complet »
+   (entête + pied TRUMPF OBLIGATOIRES, sinon la machine ne lit pas le programme) -> toujours mis.
+ [CHANGÉ] Aide au réglage : avant, taper les mesures remplissait la saignée EN DIRECT (même pendant la
+   frappe, ex. « 9 » -> saignée 1 mm) et REMPLAÇAIT la correction en place. Maintenant : aperçu clair de
+   l'écart et de la correction, bouton « ✓ Appliquer », et la correction S'AJOUTE à celle déjà en place
+   (le carré test est coupé avec les réglages actuels). Hors zone CIP.
+
 -- 2026-10-12 — ID : ORDRE DE COUPE « à la suite »
  [CHANGÉ] Plus proche voisin mesuré depuis le CENTRE de chaque pièce (avant : 1er point du trait dessiné ->
    une pièce dont le trait commence au bout d'une queue était sautée puis reprise : la tête repassait
@@ -1840,7 +1848,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-ID ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-IE ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2900,9 +2908,8 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <input id="laserProgName" type="text" value="PROGRAMME1" oninput="wzGenLaser()"></label>
         <label style="flex:2;min-width:150px">Tableau techno — TM_LTTNAME
           <input id="laserTechno" type="text" value="INOX2MM" oninput="wzGenLaser()"></label>
-        <label style="flex:1;min-width:90px">Priorité laser
-          <input id="laserReq" type="number" value="2" min="0" max="9" step="1" oninput="wzGenLaser()"></label>
       </div>
+      <input type="hidden" id="laserReq" value="2"><!-- priorité laser : TOUJOURS 2 (machine n°2 sur la source) -->
       <div style="font-size:9.5px;color:var(--txt3);margin-top:7px">Le nom du tableau techno doit correspondre EXACTEMENT à celui de la machine (ex : INOX3MM_S).</div>
     </div>
     <div class="p10card">
@@ -2914,7 +2921,6 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <input id="laserZlift" type="number" value="5" min="0" max="200" step="1" oninput="wzGenLaser()"></label>
       </div>
       <label class="p10chk"><input type="checkbox" id="laserFrame" checked onchange="wzGenLaser()"><span><b>Délimitation</b> — tour à vide du dessin (laser éteint) puis pause M00 pour vérifier le placement sur la tôle.</span></label>
-      <label class="p10chk"><input type="checkbox" id="laserFullFile" checked onchange="wzGenLaser()"><span><b>Fichier complet machine</b> (entête + pied TRUMPF). Décoche pour une version simple lisible.</span></label>
     </div>
     <details class="p10card" id="kerfBox">
       <summary>📏 Correcteur de dimension (saignée) — <span id="kerfSumTxt" style="color:var(--acc)">aucun</span></summary>
@@ -2927,18 +2933,19 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
         <label style="flex:1;min-width:110px">Ajustement Y (mm)
           <input id="laserAdjY" type="number" value="0" min="-5" max="5" step="0.01" oninput="wzGenLaser();_kerfSum()"></label>
       </div>
-      <div style="margin-top:10px;padding-top:9px;border-top:1px dashed var(--brd2)">
-        <div style="font-size:10px;color:var(--txt2);margin-bottom:5px">🧮 <b>Aide au réglage</b> — découpe un carré, mesure-le, et je calcule la correction :</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-          <label style="font-size:10px;color:var(--txt2)">Carré nominal (mm)
-            <input id="laserCalNom" type="number" value="10" min="1" step="0.1" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
-          <label style="font-size:10px;color:var(--txt2)">Mesuré X (mm)
-            <input id="laserCalX" type="number" min="0" step="0.01" placeholder="9.80" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
-          <label style="font-size:10px;color:var(--txt2)">Mesuré Y (mm)
-            <input id="laserCalY" type="number" min="0" step="0.01" placeholder="9.98" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
-          <span style="font-size:18px;color:var(--txt3);align-self:flex-end;padding-bottom:4px">➜</span>
-          <span id="laserCalMsg" style="font-size:16px;color:#ffc23d;font-weight:800;align-self:flex-end;padding-bottom:3px;white-space:nowrap">—</span>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--brd2)">
+        <div style="font-size:12.5px;font-weight:800;color:var(--txt);margin-bottom:5px">🧮 Aide au réglage (carré test)</div>
+        <div style="font-size:10.5px;color:var(--txt2);line-height:1.55;margin-bottom:8px">① Coupe un carré avec les réglages <b>actuels</b> · ② mesure-le · ③ tape tes mesures · ④ clique « Appliquer ». Le calcul tient compte de la correction déjà en place.</div>
+        <div class="p10f">
+          <label style="flex:1;min-width:95px">Carré dessiné (mm)
+            <input id="laserCalNom" type="number" value="10" min="1" step="0.1" oninput="laserCalc()"></label>
+          <label style="flex:1;min-width:95px">Mesuré en X (mm)
+            <input id="laserCalX" type="number" min="0" step="0.01" placeholder="ex. 9.96" oninput="laserCalc()"></label>
+          <label style="flex:1;min-width:95px">Mesuré en Y (mm)
+            <input id="laserCalY" type="number" min="0" step="0.01" placeholder="ex. 9.98" oninput="laserCalc()"></label>
         </div>
+        <div id="laserCalMsg" style="margin-top:9px;font-size:12px;line-height:1.55;color:var(--txt2)">Tape tes deux mesures pour voir la correction.</div>
+        <button id="laserCalBtn" class="btn btn-p" style="margin-top:8px;width:100%;display:none" onclick="laserCalApply()">✓ Appliquer cette correction</button>
       </div>
     </details>
   </div></div>
@@ -15594,20 +15601,31 @@ function _fitCircle(pts){
 }
 // Aide au réglage du correcteur : à partir d'un carré test mesuré, on décompose
 // l'écart en une saignée uniforme (la part commune X/Y) + un ajustement par axe.
+let _laserCalPending=null;
 function laserCalc(){
-  const g=id=>document.getElementById(id);
+  const g=id=>document.getElementById(id); const f3=v=>(+v.toFixed(3)).toString(); const sg=v=>(v>=0?'+':'−')+f3(Math.abs(v));
   const nom=parseFloat(g('laserCalNom')?.value), mx=parseFloat(g('laserCalX')?.value), my=parseFloat(g('laserCalY')?.value);
-  const msg=g('laserCalMsg');
-  if(isNaN(nom)||nom<=0||isNaN(mx)||mx<=0||isNaN(my)||my<=0){ if(msg){ msg.style.color='var(--txt3)'; msg.style.fontSize='12px'; msg.textContent='…'; } return; }
-  const lossX=nom-mx, lossY=nom-my;                 // ce qu'il manque sur chaque axe (négatif = trop grand)
-  const kerf=Math.max(0, Math.min(lossX, lossY));    // part uniforme = le plus petit manque
-  const ajX=lossX-kerf, ajY=lossY-kerf;              // le reste par axe
-  g('laserKerf').value=kerf.toFixed(3);
-  g('laserAdjX').value=ajX.toFixed(3);
-  g('laserAdjY').value=ajY.toFixed(3);
-  const sg=v=>(v>=0?'+':'')+v.toFixed(3);
-  if(msg){ msg.style.color='#ffc23d'; msg.style.fontSize='16px';
-    msg.textContent='saignée '+kerf.toFixed(3)+'  ·  X '+sg(ajX)+'  ·  Y '+sg(ajY); }
+  const msg=g('laserCalMsg'), btn=g('laserCalBtn'); _laserCalPending=null; if(btn) btn.style.display='none';
+  if(isNaN(nom)||nom<=0||isNaN(mx)||mx<=0||isNaN(my)||my<=0){ if(msg){ msg.style.color='var(--txt2)'; msg.textContent='Tape tes deux mesures pour voir la correction.'; } return; }
+  const dX=mx-nom, dY=my-nom;                                   // écart mesuré (négatif = trop petit)
+  if(Math.abs(dX)>2||Math.abs(dY)>2){ if(msg){ msg.style.color='#ef4444'; msg.textContent='Écart de plus de 2 mm : vérifie tes mesures (ou la taille du carré dessiné).'; } return; }
+  const v=id=>parseFloat(g(id)?.value)||0; const ck=v('laserKerf'), cx=v('laserAdjX'), cy=v('laserAdjY');
+  // correction TOTALE voulue par axe = correction actuelle + ce qui manque encore
+  const tX=ck+cx-dX, tY=ck+cy-dY;
+  const kerf=Math.max(0,Math.min(tX,tY)), ajX=tX-kerf, ajY=tY-kerf;
+  _laserCalPending={kerf,ajX,ajY};
+  const had=(ck||cx||cy);
+  if(msg){ msg.style.color='var(--txt)';
+    msg.innerHTML='Ton carré sort à <b>'+f3(mx)+' × '+f3(my)+'</b> au lieu de '+f3(nom)+' × '+f3(nom)+' → écart <b>'+sg(dX)+'</b> en X, <b>'+sg(dY)+'</b> en Y.<br>'
+      +'Correction '+(had?'totale (actuelle + écart)':'à mettre')+' : <b style="color:#ffc23d">saignée '+f3(kerf)+' · X '+sg(ajX)+' · Y '+sg(ajY)+'</b>'; }
+  if(btn) btn.style.display='';
+}
+function laserCalApply(){
+  const g=id=>document.getElementById(id); const c=_laserCalPending; if(!c) return;
+  g('laserKerf').value=(+c.kerf.toFixed(3)); g('laserAdjX').value=(+c.ajX.toFixed(3)); g('laserAdjY').value=(+c.ajY.toFixed(3));
+  const nom=parseFloat(g('laserCalNom')?.value)||10;
+  g('laserCalX').value=''; g('laserCalY').value=''; _laserCalPending=null; const btn=g('laserCalBtn'); if(btn) btn.style.display='none';
+  const msg=g('laserCalMsg'); if(msg){ msg.style.color='#22c55e'; msg.innerHTML='✓ Correction appliquée au programme. Le prochain carré devrait sortir à <b>'+nom+' × '+nom+'</b>. Recoupe-en un pour vérifier : si besoin, remesure et ré-applique (ça s\'ajoute).'; }
   if(typeof _kerfSum==='function') _kerfSum();
   if(typeof wzGenLaser==='function') wzGenLaser();
 }
@@ -16027,7 +16045,7 @@ function _buildLST(progName, techno, req, body){
   const T=(techno||'INOX2MM');
   const R=(req===0||req)?req:2;
   const inner="TC_RESET\n"+'TM_LTTNAME="'+T+'"\n'+"TC_DYNAMIC_LEVEL(0)\n"+";G01 G90 B=0 F2000\n"+"TC_TRAFO_OFF\n"+"SET_POS(0,0,0)\n"+"TC_LASER_REQUEST("+R+")\n\n"+body+"\n\n"+"TC_LASER_REQUEST(0)\n"+"G90 G01 Z10 F5000   ;fin : monter a Z10 (au-dessus de la tole)\n"+"G90 G01 X0 Y0   ;retour au point de depart (SET_POS)\n"+"G90 G01 Z0   ;redescendre a Z0 (hauteur du SET_POS)\n\n"+"TC_AUX_LIGHT(5,0)\n"+"TC_AUX_LIGHT(6,0)\n"+"TC_OPEN_DOOR(0,1,0,0)\n"+"TC_RESET\n"+"M30";
-  const _ff=document.getElementById('laserFullFile'); const full=_ff?_ff.checked:true;
+  const full=true;   // entête + pied TRUMPF OBLIGATOIRES (sinon la machine ne lit pas le programme)
   if(full){ return _LST_HEADER.replace(/__PROGNAME__/g,P).replace(/__TECHNO__/g,T)+inner+"\n"+_LST_FOOTER.replace(/__TECHNO__/g,T); }
   return "DA,'"+P+"','HP','',0,0\nSTART_TEXT\n"+inner+"\nSTOP_TEXT\n";
 }
