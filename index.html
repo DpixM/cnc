@@ -2193,6 +2193,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <div class="cipNum" style="display:none"><span>Mandrin 90° : bout libre du tube vers</span><select id="cipXDir" onchange="cip_ui('xdir')"><option value="-X">X−</option><option value="+X">X+</option></select></div>
           <div class="cipNum" style="display:none"><span>Origine G54 (le long du tube)</span><select id="cipOrig" onchange="cip_ui('orig')"><option value="bout">Bout libre du tube</option><option value="mors">Face des mors</option><option value="p1">1er point du 1er contour</option></select></div>
           <div class="cipNum" data-tip="Z machine (SCM) quand la tête est tout en haut, à B = 0. Sert à calculer la marge en Z à l'étape « Mise en machine »."><span>Z max machine (mm)</span><input type="number" id="cipZTop" value="401" step="0.1" onchange="cip_ui('ztop')"></div>
+          <div class="cipNum" data-tip="Mandrin à 90° : hauteur (Z machine, SCM) de l'axe du mandrin. Se mesure UNE fois, le soft la garde.\nComment : tête verticale, pointe posée sur le dessus d'un tube de Ø connu → Z affiché − rayon du tube.\nSert seulement à calculer la marge jusqu'au Z max (les dégagements restent en dessous). Vide = pas de calcul de marge."><span>Z de l'axe du mandrin à 90° (mm)</span><input type="number" id="cipAxisZ" step="0.001" placeholder="à mesurer 1 fois" onchange="cip_ui('axisz')"></div>
           <div class="cipNum"><span>SET_G54</span><select id="cipLG54Mode" onchange="cip_ui('g54mode')" style="width:170px"><option value="calc">Calculé (face d'appui mandrin)</option><option value="main">Je le saisis moi-même</option></select></div>
           <div id="cipLG54Calc">
             <div class="cipNum"><span>Mandrin : face d'appui → face avant des mors (mm)</span><input type="number" id="cipLH" step="0.01" placeholder="à mesurer" onchange="cip_ui('g54h')"></div>
@@ -5970,9 +5971,18 @@ function cip_build() {
       C.forEach((c, ci) => {
         if (ci > 0) {
           const _t = performance.now();
-          const rx = $('cipRapMode') && $('cipRapMode').value === 'x' ? rapidXlim(F[F.length - 1], c) : null;
+          // v46 : d'abord le déplacement simple (recul dans l'axe, on va au départ suivant en tournant, on redescend)
+          const hc = homeClean(F[F.length - 1], c);
+          const rx = hc
+            ? null
+            : $('cipRapMode') && $('cipRapMode').value === 'x'
+              ? rapidXlim(F[F.length - 1], c)
+              : null;
           S.tmRx = (S.tmRx || 0) + performance.now() - _t;
-          if (rx) {
+          if (hc) {
+            c.rapX = false;
+            hc.slice(0, -1).forEach(f => push(f[0], f[1], c.TH[0], ci, -1)); // le dernier point = 1er point du passage (poussé juste après)
+          } else if (rx) {
             c.rapX = true;
             rx.forEach(f => push(f[0], f[1], f[2], ci, -1));
           } else {
@@ -6017,8 +6027,14 @@ function cip_build() {
       if (noUnw) {
         S.prog.home = { s0, s1: s, ci, noUnw: true };
       } else {
-        const rx = $('cipRapMode') && $('cipRapMode').value === 'x' ? rapidXlim(F[F.length - 1], home) : null;
-        if (rx) rx.forEach(f => push(f[0], f[1], f[2], ci, -1));
+        const hc = homeClean(F[F.length - 1], c0);
+        const rx = hc
+          ? null
+          : $('cipRapMode') && $('cipRapMode').value === 'x'
+            ? rapidXlim(F[F.length - 1], home)
+            : null;
+        if (hc) hc.forEach(f => push(f[0], f[1], c0.TH[0], ci, -1));
+        else if (rx) rx.forEach(f => push(f[0], f[1], f[2], ci, -1));
         else {
           rapid(F[F.length - 1], home, ci, push, Rs);
           push(hp0, c0.D[0], c0.TH[0], ci, -1);
@@ -6549,6 +6565,54 @@ function cip_build() {
       S.zWarnH = Math.max(S.zWarnH || 0, 999);
     }
     return r;
+  }
+  // RETOUR SIMPLE (v46) : la tête recule dans l'axe de son faisceau, puis va EN UNE FOIS au point d'approche du départ
+  // (30 mm dans l'axe du faisceau de départ) en tournant le mandrin et en remettant le bon angle en même temps
+  // (on tourne autour du tube, jamais à travers), puis redescend dans l'axe sur le départ. Peu de lignes, rapide.
+  // On essaie un recul de 30 mm, puis plus haut si ça touche ; null si rien ne passe (-> ancien chemin dégagé).
+  function homeClean(a, c0) {
+    const P0 = c0.P[0],
+      D0 = c0.D[0];
+    const zmax = Math.max(30, +(($('cipZMax') || {}).value || 40));
+    const Rl = [30, 45, 60, 80, 100].filter(r => r <= Math.max(30, zmax + 5));
+    const cylOf = p => ({ r: Math.hypot(p[0], p[2]), ph: Math.atan2(p[0], p[2]), y: p[1] });
+    const fromCyl = (r, ph, y) => [r * Math.sin(ph), y, r * Math.cos(ph)];
+    const nl = (A, B, t) => V.nrm(A.map((v, i) => v + (B[i] - v) * t));
+    const lin = (A, B, t) => A.map((v, i) => v + (B[i] - v) * t);
+    for (const R of Rl) {
+      const E1 = V.sub(a.p, V.mul(a.d, R)),
+        S1 = V.sub(P0, V.mul(D0, R));
+      const ce = cylOf(E1),
+        cs = cylOf(S1);
+      let dph = cs.ph - ce.ph;
+      while (dph > Math.PI) dph -= 2 * Math.PI;
+      while (dph < -Math.PI) dph += 2 * Math.PI;
+      const n = Math.max(1, Math.ceil(Math.abs(dph) / (12 * DEG)), Math.ceil(Math.abs(cs.y - ce.y) / 40));
+      const L = [[E1, a.d]];
+      for (let k = 1; k < n; k++) {
+        const t = k / n;
+        L.push([fromCyl(ce.r + (cs.r - ce.r) * t, ce.ph + dph * t, ce.y + (cs.y - ce.y) * t), nl(a.d, D0, t)]);
+      }
+      L.push([S1, D0], [P0.slice(), D0]);
+      // contrôle : chaque ligne droite (ce que fait la machine entre 2 points), finement, avec 1 mm de marge
+      let ok = true;
+      const pts = [[a.p, a.d]].concat(L);
+      for (let i = 0; ok && i + 1 < pts.length; i++) {
+        const last = i + 2 === pts.length;
+        for (let q = 1; q <= 8; q++) {
+          const t = q / 8;
+          if ((i === 0 && t < 0.25) || (last && t > 0.75)) continue; // tout près de la pièce : c'est le faisceau, pas la tête
+          const p = lin(pts[i][0], pts[i + 1][0], t),
+            d = nl(pts[i][1], pts[i + 1][1], t);
+          if (clearance(p, d, 'mid') < 1) {
+            ok = false;
+            break;
+          }
+        }
+      }
+      if (ok) return L;
+    }
+    return null;
   }
   function rapid(a, c, ci, push, Rs) {
     const L1 = 30;
@@ -7878,7 +7942,7 @@ function cip_build() {
   }
   function wzAxisZ() {
     try {
-      const v = localStorage.getItem('cipAxisZ_' + S.cfg.chuck);
+      const v = localStorage.getItem('cipAxisZ_vertical'); // seulement le mandrin à 90° (à plat, le tube est le long de Z)
       return v === null || v === '' || isNaN(+v) ? null : +v;
     } catch (e) {
       return null;
@@ -7957,22 +8021,11 @@ function cip_build() {
     ${cur === 1 ? `<div class="cipRow"><button class="cipBtn cipMain" onclick="cip_ui('wz',1)">C'est fait →</button></div>` : ''}</div>`;
     h += `<div class="cipWzS ${st(2)}"><h4><i>${cur > 2 ? '✓' : 2}</i>Oriente la pièce</h4><div class="cipWzT">Mets le mandrin à <span class="cipWzBig">C = 0</span>. La pièce doit être tournée <b>comme sur la 3D</b> (le haut de la 3D = côté tête).</div>
     ${cur === 2 ? `<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',1)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',2)">C'est fait →</button></div>` : ''}</div>`;
-    // Z du point de départ (mandrin à 90° seulement) : = Z de l'axe du mandrin (mesuré UNE fois, gardé) + hauteur du point
-    // au-dessus de l'axe (connue par la pièce). À plat, l'axe du tube EST le Z machine : pas de Z lu.
-    let zRow = '';
-    if (P.ax === 'X') {
-      const hgt = wzHgt(P);
-      const ax = wzAxisZ();
-      const auto = ax !== null ? +(ax + hgt).toFixed(3) : null;
-      const val = S.wz.z != null && S.wz.zKey === P.key ? S.wz.z : auto !== null ? auto : ''; // autre pièce = on recalcule
-      zRow =
-        `<div class="cipNum" data-tip="Z machine (SCM) de la pointe sur le point jaune, tête droite (B = 0).\n= Z de l'axe du mandrin + ${hgt.toFixed(2)} mm (hauteur du point de départ au-dessus de l'axe, connue par ta pièce).\nLe Z de l'axe du mandrin se mesure UNE fois : le soft le retient et remplit cette case tout seul ensuite.\nSert à la marge jusqu'au Z max (${$('cipZTop').value}) : les dégagements restent en dessous."><span>Z du point (B = 0)</span><input type="number" step="0.001" id="cipWzZ" value="${val}" placeholder="ex : 265.15"></div>` +
-        `<div class="cipNote cipWzZn" style="margin:-2px 0 4px">${auto !== null ? `Rempli tout seul : axe du mandrin Z ${ax.toFixed(3)} + ${hgt.toFixed(2)} mm. <b>Rappel</b> : vérifie avec la pointe, et corrige si besoin (le soft retiendra).` : `1re fois : tape le Z lu avec la pointe sur le point jaune (B = 0). Le soft en déduit le Z de l'axe du mandrin (${hgt.toFixed(2)} mm en dessous) et le retient pour les prochaines pièces.`}</div>`;
-    }
+    // v46 : UNE seule valeur à l'étape 3 (celle du SET_G54), aux 2 mandrins. La hauteur du point (pour la marge en Z)
+    // est calculée : Z de l'axe du mandrin (réglé UNE fois dans les réglages avancés) + hauteur du point connue par la pièce.
     h += `<div class="cipWzS ${st(3)}"><h4><i>${cur > 3 ? '✓' : 3}</i>Pose la pointe sur le départ</h4><div class="cipWzT">${Math.abs(+Ctxt) < 0.05 ? 'Le mandrin reste à <span class="cipWzBig">C = 0</span>. Amène' : 'Tourne le mandrin à <span class="cipWzBig">C = ' + Ctxt + '°</span> puis amène'} la pointe <b>pile sur le point jaune qui clignote</b> (départ ${W ? 'de la soudure' : 'de la découpe'}).<br>Tape le <b>${P.ax}</b> affiché par la machine, exactement comme à l'écran (avec le signe) :</div>
     <div class="cipNum"${P.ax === 'Z' ? ' data-tip="De la platine au joint de soudure : c\'est le Z que la machine affiche, la face de la platine étant le 0."' : ''}><span>${P.ax === 'Z' ? 'Z sur la machine — déport par rapport à la face de la platine (0)' : 'X lu sur la machine'}</span><input type="number" step="0.001" id="cipWzX" value="${S.wz.x !== null && S.wz.key === P.key ? S.wz.x : S.wz.xLast != null ? S.wz.xLast : ''}" placeholder="ex : -125.40"></div>
-    ${zRow}
-    ${cur === 3 ? `<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',2)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',3)">Valider →</button></div>` : cur > 3 ? `<div class="cipNote" style="margin:2px 0 0">${ok} SET_G54(${P.ax === 'X' ? S.wz.x + ', 0, 0' : '0, 0, ' + S.wz.x}) — le programme part de ce point.${S.wz.z != null ? `<br>${ok} Marge en Z au-dessus du point : <b>${(+$('cipZTop').value - S.wz.z).toFixed(0)} mm</b> → dégagements limités à ${$('cipZMax').value} mm.` : ''}</div>` : ''}</div>`;
+    ${cur === 3 ? `<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',2)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',3)">Valider →</button></div>` : cur > 3 ? `<div class="cipNote" style="margin:2px 0 0">${ok} SET_G54(${P.ax === 'X' ? S.wz.x + ', 0, 0' : '0, 0, ' + S.wz.x}) — le programme part de ce point.${S.wz.z != null ? `<br>${ok} Marge en Z au-dessus du point : <b>${(+$('cipZTop').value - S.wz.z).toFixed(0)} mm</b> → dégagements limités à ${$('cipZMax').value} mm.` : P.ax === 'X' ? `<br><span style="color:var(--txt2)">Marge en Z pas calculée : règle une fois le « Z de l'axe du mandrin » dans les réglages avancés.</span>` : ''}</div>` : ''}</div>`;
     const nm = $('cipLName').value || '';
     const dry = S.wz.dry !== false;
     h += `<div class="cipWzS ${st(4)}"><h4><i>4</i>Fichier .LST</h4>
@@ -8148,7 +8201,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v45',
+  const CIP_VER = 'CIP v46',
     CIP_DATE = '12/10/2026';
   {
     const e = $('cipVer');
@@ -9772,6 +9825,8 @@ function cip_build() {
   try {
     const zt = localStorage.getItem('cipZTop');
     if (zt && $('cipZTop')) $('cipZTop').value = zt;
+    const az = localStorage.getItem('cipAxisZ_vertical');
+    if (az !== null && $('cipAxisZ')) $('cipAxisZ').value = az;
   } catch (e) {}
   try {
     const m = localStorage.getItem('cipMandrin');
@@ -11804,7 +11859,8 @@ function cip_build() {
       } else {
         B.push(`;----- deplacement vers contour ${ci + 1} (faisceau coupe) -----`);
         rap.forEach((f, k) => {
-          B.push(lstMv(toLst(sh(f), f.d, f.th, o)));
+          // soudure : laser coupé -> on se déplace en f5000 (sinon la machine garde la vitesse de soudure : très lent)
+          B.push(lstMv(toLst(sh(f), f.d, f.th, o), W && k === 0 ? 'f5000 ;deplacement rapide (laser coupe)' : ''));
         });
         B.push(lstMv(Q[0]));
       }
@@ -11834,7 +11890,14 @@ function cip_build() {
       const hm = S.prog.home ? F.filter(f => f.ci === S.prog.home.ci) : [];
       if (hm.length) {
         B.push(';----- retour au point de depart -----');
-        homeLines(hm, o, sh).forEach(l => B.push(l.t ? l.t : lstMv(toLst(sh(l.f), l.f.d, l.f.th, o))));
+        let fset = false;
+        homeLines(hm, o, sh).forEach(l => {
+          if (l.t) return B.push(l.t);
+          // 1re ligne de déplacement du retour : f5000 en soudure (sinon : vitesse de soudure, très lent)
+          const fx = W && !fset ? 'f5000 ;retour rapide (laser coupe)' : '';
+          fset = true;
+          B.push(lstMv(toLst(sh(l.f), l.f.d, l.f.th, o), fx));
+        });
         B.push('');
       } else {
         const fl = F[F.length - 1];
@@ -13051,7 +13114,7 @@ function cip_build() {
     showWork('sim');
   }
   // ---------- réglages d'origine (la pièce et le mandrin restent) ----------
-  const RESET_KEEP = /^(cipProc|cipZTop|cipLH|cipAdvChk|cipLG54Mode|cipLOX|cipLOY|cipLOZ)$/;
+  const RESET_KEEP = /^(cipProc|cipZTop|cipAxisZ|cipLH|cipAdvChk|cipLG54Mode|cipLOX|cipLOY|cipLOZ)$/;
   function fieldReset(e) {
     if (e.type === 'checkbox') e.checked = e.defaultChecked;
     else if (e.tagName === 'SELECT') {
@@ -13553,6 +13616,14 @@ function cip_build() {
           console.warn(e);
         }
         return;
+      } else if (a === 'axisz') {
+        try {
+          const v = $('cipAxisZ').value;
+          if (v === '' || isNaN(+v)) localStorage.removeItem('cipAxisZ_vertical');
+          else localStorage.setItem('cipAxisZ_vertical', (+v).toFixed(3));
+        } catch (e) {}
+        wzMaybe();
+        return;
       } else if (a === 'ztop') {
         try {
           localStorage.setItem('cipZTop', $('cipZTop').value);
@@ -13583,13 +13654,11 @@ function cip_build() {
           try {
             flyTo(0.62, 1.05, 1.05); // vue d'ensemble pour la simulation qui apparaît
           } catch (e) {}
-          const zz = parseFloat(($('cipWzZ') || {}).value);
-          if (!isNaN(zz) && P.ax === 'X') {
+          const axz = P.ax === 'X' ? wzAxisZ() : null;
+          const zz = axz !== null ? axz + wzHgt(P) : NaN; // Z machine de la pointe sur le départ, calculé
+          if (!isNaN(zz)) {
             S.wz.z = +zz.toFixed(3);
             S.wz.zKey = P.key;
-            try {
-              localStorage.setItem('cipAxisZ_' + S.cfg.chuck, (zz - wzHgt(P)).toFixed(3)); // Z de l'axe du mandrin, retenu
-            } catch (e) {}
             const marge = (+$('cipZTop').value || 401) - zz;
             const lim = Math.max(5, Math.floor(marge - 3));
             if ($('cipZMax') && +$('cipZMax').value !== lim) {
