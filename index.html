@@ -161,6 +161,27 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-12 — HY : PAGE « DÉCOUPE » DÉDIÉE (forme par forme) + page G-code rangée + simu 3D directe
+ [NOUVEAU PARCOURS LASER] Mode → Dessin → 🎨 Chute/Pièce (peinture DIRECTEMENT dans la page) → ✂️ Découpe → ⚡ G-code.
+   « Suivant » sans rien toucher = tout automatique comme avant.
+ [AJOUT] Page Découpe (étape 21) : grand dessin + panneau en 4 étapes :
+   ① Choisir : clic DANS une forme ; 🔗 Pareilles = 1 par 1 / même taille / même type (cercles, rectangles…),
+     trous et contour extérieur jamais mélangés. ② Décalage ± valeur : la forme décalée DEVIENT la forme
+     coupée (bleu fin), l'ancienne en gris pointillé ; le dessin n'est pas modifié. ③ Sens par forme (ou toutes).
+   ④ Rentrée : clic = perçage, puis le curseur colle au bord et on clique où l'arc FINIT (= début de coupe) ;
+     arc tangent exact (G2/G3), ou ligne, ou perçage direct. Recopiée sur les formes pareilles (cercles :
+     même angle + même distance au bord). Rouge si perçage côté pièce ou arc qui traverse le contour.
+   Réglages stockés par forme dans _dcCfg (clé = id objet + n° de trait), appliqués dans buildLaserBody.
+   Les réglages auto (perçage au centre, entrée en arc, longueur amorce) sont rangés dans cette page.
+ [FIX IMPORTANT] Cercles avec perçage auto : le départ tombait sur une CORDE du polygone 24 côtés -> le
+   G2/G3 complet avait un rayon R·cos(7,5°) = -0,86 % (Ø18 -> Ø17,85 ; Ø28 -> Ø27,76). Le départ est
+   maintenant ramené SUR le cercle (amorce translatée, toujours tangente). Rayons exacts (testé).
+ [RANGEMENT] Page G-code : résultat + ⬇ Télécharger + 🧊 Simulation 3D en haut, puis cartes Programme /
+   Machine / Correcteur (replié) / programme (replié). « Inverser plein/vide » est sur la page Chute/Pièce.
+ [CHANGÉ] Simulation : plus de 2D, on ouvre directement la vue 3D (tous les boutons ▶).
+ Non-régression : sans cercle, ou perçage auto décoché -> G-code IDENTIQUE à la version précédente.
+ Testé t_hy (35/35, vrai navigateur + vraie souris). Zone dessin/laser, hors zone CIP.
+
 -- 2026-10-12 — HX : FENÊTRE « DÉCOUPE » DÉDIÉE + FLÈCHES MAUVES (sens réel) + inversion par forme
  [AJOUT] La fenêtre Chute/Pièce devient la fenêtre « ✂️ Découpe » avec onglets : 🎨 Chute/Pièce · 📍 Départs ·
    ↻ Sens (+ Rentrée et Décalage grisés = étapes suivantes). Les boutons Sens ont quitté le panneau G-code
@@ -1786,7 +1807,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-HX ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-HY ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2677,91 +2698,186 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 </div>
 </div><!-- /wz-wrap wzp9 -->
 
-<!-- PAGE 10 : G-CODE NORMAL (1 fichier) -->
-<div class="wz-wrap" id="wzp20" style="padding-bottom:90px">
-  <div class="wz-h1">✂️ Découpe <span style="font-size:12px;color:var(--txt3)">(optionnel)</span></div>
-  <div class="wz-sub">Tout ce qui concerne la façon de couper, au même endroit : chute/pièce, points de départ, sens de coupe (bientôt : rentrée et décalage). Si tu ne touches à rien, tout reste automatique comme d'habitude.</div>
-  <button class="btn btn-p" style="width:100%;margin-top:12px;padding:12px" onclick="openLaserPaint()">✂️ Ouvrir la fenêtre Découpe</button>
-  <div id="wzPaintState" style="margin-top:12px;font-size:12px;color:var(--acc)"></div>
-  <div style="font-size:11px;color:var(--txt3);margin-top:12px;line-height:1.6">Les petites flèches <b style="color:#9333ea">mauves</b> montrent le sens réel de coupe ; l'arc <b style="color:#f97316">orange</b> = la rentrée du laser.<br>Molette = zoom · clic droit / molette pressée glissé = déplacer.<br>Clique « Suivant » en bas quand c'est bon.</div>
+<!-- PAGE 20 : CHUTE / PIÈCE (peinture, directement dans la page) -->
+<div class="wz-wrap" id="wzp20" style="padding:10px 12px 72px;gap:8px;overflow:hidden">
+  <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+    <div class="wz-h1">🎨 Chute / Pièce <span style="font-size:12px;color:var(--txt3)">(optionnel)</span></div>
+    <div class="wz-sub" style="margin:0">Pot de peinture : clique dans une zone. <b style="color:#ef4444">Rouge</b> = ça tombe, <b style="color:#22c55e">vert</b> = on garde. Rien à peindre ? → « Suivant », c'est automatique.</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <button id="lp_chute" onclick="_lpSetTool(1)" style="padding:7px 13px;border-radius:8px;border:none;background:#ef4444;color:#fff;cursor:pointer;font-weight:700">🔴 Chute (tombe)</button>
+    <button id="lp_piece" onclick="_lpSetTool(2)" style="padding:7px 13px;border-radius:8px;border:none;background:#22c55e;color:#04240f;cursor:pointer;font-weight:700">🟢 Pièce (garder)</button>
+    <button id="lp_gomme" onclick="_lpSetTool(0)" style="padding:7px 13px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer">🧽 Effacer</button>
+    <button onclick="_lpReset()" style="padding:7px 13px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer">↺ Effacer la peinture</button>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txt);cursor:pointer;margin-left:6px" title="Si c'est l'inverse qui doit tomber (ex : tu gardes la petite pièce au lieu du tour)">
+      <input type="checkbox" id="laserInvert" onchange="wzGenLaser()" style="width:16px;height:16px"> Inverser plein/vide (auto)</label>
+  </div>
+  <div id="lpViewport" onwheel="_lpWheel(event)" onpointerdown="_lpPanStart(event)" oncontextmenu="return false" style="flex:1;min-height:220px;overflow:hidden;position:relative;background:#0d1117;border-radius:10px;touch-action:none">
+    <canvas id="lpCanvas" onclick="_lpClickCanvas(event)" style="position:absolute;left:0;top:0;background:#fff;cursor:crosshair;box-shadow:0 4px 20px rgba(0,0,0,.5)"></canvas>
+    <div style="position:absolute;bottom:8px;left:10px;font-size:10px;color:rgba(255,255,255,.45);pointer-events:none">molette = zoom · clic droit / molette pressée glissé = déplacer</div>
+  </div>
+  <div id="wzPaintState" style="font-size:12px;color:var(--acc)"></div>
 </div>
 
+<!-- PAGE 21 : DÉCOUPE — réglages forme par forme (décalage, sens, rentrée) -->
+<style>
+  .dcb{padding:6px 9px;border-radius:7px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap}
+  .dcb:hover{border-color:var(--acc)}
+  .dcb.on{background:var(--acc);border-color:var(--acc);color:#111;font-weight:800}
+  .dccard{background:var(--surf2);border:1.5px solid var(--brd2);border-radius:10px;padding:9px 10px;display:flex;flex-direction:column;gap:7px}
+  .dct{font-size:13px;font-weight:800;color:var(--txt);display:flex;align-items:center;gap:7px}
+  .dcn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;font-size:11px;font-weight:900;color:#111}
+  .dcs{font-size:10.5px;color:var(--txt2);line-height:1.45}
+  .dcrow{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+  #dcLayout{flex:1;min-height:0;display:flex;gap:10px}
+  #dcPanel{width:310px;flex-shrink:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:2px}
+  @media (max-width:820px){ #dcLayout{flex-direction:column} #dcPanel{width:auto;max-height:46%} }
+</style>
+<div class="wz-wrap" id="wzp21" style="padding:10px 12px 72px;gap:8px;overflow:hidden">
+  <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+    <div class="wz-h1">✂️ Découpe <span style="font-size:12px;color:var(--txt3)">(optionnel)</span></div>
+    <div class="wz-sub" style="margin:0">Pressé ? « Suivant » : tout se fait tout seul. Sinon règle tes formes ici : décalage, sens, et où le laser rentre.</div>
+  </div>
+  <div id="dcLayout">
+    <div style="flex:1;min-width:0;min-height:240px;position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--brd2)">
+      <canvas id="dcCanvas" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none;background:#fbfaf7"></canvas>
+      <div id="dcHint" style="position:absolute;left:10px;top:8px;right:10px;width:fit-content;max-width:calc(100% - 20px);pointer-events:none;background:rgba(17,24,39,.8);color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600"></div>
+      <div style="position:absolute;bottom:6px;left:10px;font-size:10px;color:#6b7280;pointer-events:none">molette = zoom · glisser = déplacer la vue · Échap = annuler</div>
+    </div>
+    <div id="dcPanel">
+      <div class="dccard">
+        <div class="dct"><span class="dcn" style="background:#f59e0b">1</span>Choisir les formes</div>
+        <div class="dcs">Clique <b>DANS</b> une forme (Maj+clic = en ajouter). 🔗 Pareilles :</div>
+        <div class="dcrow">
+          <button class="dcb" id="dcL_one"  onclick="_dcSetLink('one')"  title="Seulement la forme cliquée">1 par 1</button>
+          <button class="dcb" id="dcL_size" onclick="_dcSetLink('size')" title="Toutes les formes identiques (même type ET même taille)">Même taille</button>
+          <button class="dcb on" id="dcL_type" onclick="_dcSetLink('type')" title="Tous les cercles, tous les rectangles…">Même type</button>
+        </div>
+        <div class="dcrow"><button class="dcb" onclick="_dcSelAll()">Tout</button><button class="dcb" onclick="_dcSelNone()">Rien</button></div>
+        <div class="dcs" id="dcSelInfo" style="color:#f59e0b;font-weight:700"></div>
+      </div>
+      <div class="dccard">
+        <div class="dct"><span class="dcn" style="background:#3b82f6;color:#fff">2</span>Décalage <span style="font-weight:600;font-size:10.5px;color:var(--txt2)">(nouvelle forme à couper)</span></div>
+        <div class="dcrow">
+          <button class="dcb" onclick="_dcOffset(-1)" title="Réduire : la forme coupée est plus petite">− Réduire</button>
+          <input id="dcOffVal" type="number" value="0.2" min="0" step="0.01" style="width:70px;padding:6px 7px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:7px;color:var(--txt);font-size:13px;font-weight:700"> <span class="dcs">mm</span>
+          <button class="dcb" onclick="_dcOffset(1)" title="Agrandir : la forme coupée est plus grande">+ Agrandir</button>
+        </div>
+        <div class="dcrow"><button class="dcb" onclick="_dcOffClear()">✖ Retirer le décalage</button></div>
+        <div class="dcs" id="dcOffInfo"></div>
+        <div class="dcs">Ancienne forme = <b style="color:#9ca3af">gris pointillé</b> · nouvelle = <b style="color:#3b82f6">bleu fin</b> (c'est elle qui est coupée). Ton dessin n'est pas modifié.</div>
+      </div>
+      <div class="dccard">
+        <div class="dct"><span class="dcn" style="background:#9333ea;color:#fff">3</span>Sens de coupe <span id="dcDirLbl" style="font-weight:600;font-size:10.5px;color:var(--txt2)"></span></div>
+        <div class="dcrow">
+          <button class="dcb on" id="dcD_auto" onclick="_dcSetDir('auto')">Auto</button>
+          <button class="dcb" id="dcD_cw"  onclick="_dcSetDir('cw')">↻ Horaire</button>
+          <button class="dcb" id="dcD_ccw" onclick="_dcSetDir('ccw')">↺ Antihoraire</button>
+        </div>
+        <div class="dcs">Les petites flèches <b style="color:#9333ea">mauves</b> = le sens réel de coupe.</div>
+      </div>
+      <div class="dccard">
+        <div class="dct"><span class="dcn" style="background:#f97316">4</span>Rentrée du laser</div>
+        <div class="dcrow">
+          <button class="dcb on" id="dcT_arc" onclick="_dcSetLeadType('arc')" title="Arc tangent (le plus propre)">◠ Arc</button>
+          <button class="dcb" id="dcT_line" onclick="_dcSetLeadType('line')" title="Ligne droite">╱ Ligne</button>
+          <button class="dcb" id="dcT_direct" onclick="_dcSetLeadType('direct')" title="Perce directement sur le contour, sans amorce">• Direct</button>
+        </div>
+        <button class="dcb" id="dcLeadBtn" onclick="_dcToggleLeadMode()" style="padding:9px;font-size:13px">📍 Placer la rentrée</button>
+        <div class="dcs">① clique où le laser <b style="color:#f97316">perce</b> · ② glisse le long du bord, clique où l'arc <b style="color:#16a34a">finit</b> (= début de la vraie coupe). Avec 🔗, les formes pareilles sont faites pareil.</div>
+        <div class="dcrow"><button class="dcb" onclick="_dcLeadAuto()">↺ Rentrée auto</button></div>
+        <details style="font-size:11px;color:var(--txt2)">
+          <summary style="cursor:pointer;font-weight:700">Rentrée automatique (formes non réglées)</summary>
+          <label style="display:flex;align-items:flex-start;gap:6px;margin-top:6px;cursor:pointer"><input type="checkbox" id="laserLeadin" checked onchange="_dcBuild()" style="width:15px;height:15px;flex-shrink:0;margin-top:1px"><span><b>Perçage au centre de la chute</b> puis arc vers le contour</span></label>
+          <label style="display:flex;align-items:flex-start;gap:6px;margin-top:5px;cursor:pointer"><input type="checkbox" id="laserArc" checked onchange="_dcBuild()" style="width:15px;height:15px;flex-shrink:0;margin-top:1px"><span><b>Entrée en arc</b> (tangente, si la place le permet)</span></label>
+          <label style="display:flex;align-items:center;gap:6px;margin-top:5px">Longueur amorce (mm) <input id="laserLead" type="number" value="1" min="0.1" max="10" step="0.1" oninput="_dcBuild()" style="width:60px;padding:4px 6px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+        </details>
+      </div>
+      <div class="dccard" style="gap:4px">
+        <div class="dct" style="font-size:12px">🎨 Codes couleur</div>
+        <div class="dcs"><b style="color:#e5e7eb">━</b> coupé · <b style="color:#3b82f6">━</b> nouvelle forme (décalée) · <b style="color:#9ca3af">┅</b> forme d'origine<br>
+          <b style="color:#9333ea">▸</b> sens · <b style="color:#f97316">●</b> perçage · <b style="color:#f97316">◠</b> rentrée à la main · <b style="color:#f97316">┅</b> rentrée auto<br>
+          <b style="color:#16a34a">●</b> début de coupe · <b style="color:#f59e0b">▬</b> sélection · <b style="color:#dc2626">━</b> problème</div>
+      </div>
+      <div class="dcs" id="dcStat" style="padding:0 2px"></div>
+      <button class="dcb" onclick="_dcResetAll()" style="padding:8px">↺ Tout remettre en automatique</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 10 : G-CODE -->
+<style>
+  .p10card{background:var(--surf2);border:1.5px solid var(--brd2);border-radius:10px;padding:11px 12px;margin-bottom:10px}
+  .p10t{font-size:13px;font-weight:800;color:var(--txt);margin-bottom:9px}
+  details.p10card>summary{cursor:pointer;font-size:13px;font-weight:800;color:var(--txt)}
+  .p10f{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .p10f label{font-size:10px;color:var(--txt2)}
+  .p10f input[type=text],.p10f input[type=number]{width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px}
+  .p10chk{display:flex;align-items:flex-start;gap:8px;margin-top:9px;font-size:12px;color:var(--txt);cursor:pointer}
+  .p10chk input{width:16px;height:16px;flex-shrink:0;margin-top:1px}
+</style>
 <div class="wz-wrap" id="wzp10" style="padding-bottom:90px">
   <div class="wz-h1">⚡ G-Code</div>
   <div class="wz-sub" id="p10sub">Usinage normal — 1 fichier</div>
-  <div id="laserCfg" style="display:none;background:var(--surf2);border-radius:10px;border:1.5px solid var(--brd2);padding:12px;margin-bottom:10px">
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-      <label style="flex:2;min-width:150px;font-size:10px;color:var(--txt2)">Nom du programme (unique)
-        <input id="laserProgName" type="text" value="PROGRAMME1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
-      <label style="flex:2;min-width:150px;font-size:10px;color:var(--txt2)">Tableau techno — TM_LTTNAME
-        <input id="laserTechno" type="text" value="INOX2MM" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
-      <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Priorité laser
-        <input id="laserReq" type="number" value="2" min="0" max="9" step="1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
-      <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Levée Z fin de forme (mm)
-        <input id="laserZlift" type="number" value="5" min="0" max="200" step="1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
-      <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Vitesse F (mm/min)
-        <input id="laserFeed" type="number" value="5000" min="1" max="20000" step="50" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
-      <label style="flex:1;min-width:90px;font-size:10px;color:var(--txt2)">Amorce/perçage (mm)
-        <input id="laserLead" type="number" value="1" min="0.1" max="10" step="0.1" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
-    </div>
-    <!-- ▼ CORRECTEUR DE DIMENSION (saignée + ajustement X/Y) ▼ -->
-    <div style="margin-top:12px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:8px;padding:10px">
-      <div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:2px">📏 Correcteur de dimension (saignée)</div>
-      <div style="font-size:10px;color:var(--txt2);margin-bottom:9px">Le laser a une largeur : la pièce sort trop petite. On décale la coupe vers la <b>chute</b> pour que la pièce gardée (en <b style="color:#22c55e">vert</b>) retrouve sa cote. Le dessin à l'écran reste à la cote : la correction est ajoutée dans le programme machine.</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-        <label style="flex:1;min-width:110px;font-size:10px;color:var(--txt2)">Saignée globale (mm)
-          <input id="laserKerf" type="number" value="0" min="0" max="5" step="0.01" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
-        <label style="flex:1;min-width:110px;font-size:10px;color:var(--txt2)">Ajustement X (mm)
-          <input id="laserAdjX" type="number" value="0" min="-5" max="5" step="0.01" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
-        <label style="flex:1;min-width:110px;font-size:10px;color:var(--txt2)">Ajustement Y (mm)
-          <input id="laserAdjY" type="number" value="0" min="-5" max="5" step="0.01" oninput="wzGenLaser()" style="width:100%;margin-top:4px;padding:7px 9px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+  <div id="p10st" class="al al-w">⏳ Génération...</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
+    <div id="gcDlButtons" style="flex:1 1 260px;min-width:0"></div>
+    <button class="btn btn-p" style="flex:1 1 200px" onclick="openGcSimAll()">🧊 Simulation 3D</button>
+  </div>
+  <div id="laserCfg" style="display:none">
+    <div class="p10card">
+      <div class="p10t">🏷️ Programme</div>
+      <div class="p10f">
+        <label style="flex:2;min-width:150px">Nom du programme (unique)
+          <input id="laserProgName" type="text" value="PROGRAMME1" oninput="wzGenLaser()"></label>
+        <label style="flex:2;min-width:150px">Tableau techno — TM_LTTNAME
+          <input id="laserTechno" type="text" value="INOX2MM" oninput="wzGenLaser()"></label>
+        <label style="flex:1;min-width:90px">Priorité laser
+          <input id="laserReq" type="number" value="2" min="0" max="9" step="1" oninput="wzGenLaser()"></label>
       </div>
-      <div style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--brd2)">
+      <div style="font-size:9.5px;color:var(--txt3);margin-top:7px">Le nom du tableau techno doit correspondre EXACTEMENT à celui de la machine (ex : INOX3MM_S).</div>
+    </div>
+    <div class="p10card">
+      <div class="p10t">⚙️ Machine</div>
+      <div class="p10f">
+        <label style="flex:1;min-width:120px">Vitesse F (mm/min)
+          <input id="laserFeed" type="number" value="5000" min="1" max="20000" step="50" oninput="wzGenLaser()"></label>
+        <label style="flex:1;min-width:120px">Levée Z fin de forme (mm)
+          <input id="laserZlift" type="number" value="5" min="0" max="200" step="1" oninput="wzGenLaser()"></label>
+      </div>
+      <label class="p10chk"><input type="checkbox" id="laserFrame" checked onchange="wzGenLaser()"><span><b>Délimitation</b> — tour à vide du dessin (laser éteint) puis pause M00 pour vérifier le placement sur la tôle.</span></label>
+      <label class="p10chk"><input type="checkbox" id="laserFullFile" checked onchange="wzGenLaser()"><span><b>Fichier complet machine</b> (entête + pied TRUMPF). Décoche pour une version simple lisible.</span></label>
+    </div>
+    <details class="p10card" id="kerfBox">
+      <summary>📏 Correcteur de dimension (saignée) — <span id="kerfSumTxt" style="color:var(--acc)">aucun</span></summary>
+      <div style="font-size:10px;color:var(--txt2);margin:9px 0">Le laser a une largeur : la pièce sort trop petite. On décale la coupe vers la <b>chute</b> pour que la pièce gardée retrouve sa cote. Le dessin reste à la cote : la correction est ajoutée dans le programme.</div>
+      <div class="p10f">
+        <label style="flex:1;min-width:110px">Saignée globale (mm)
+          <input id="laserKerf" type="number" value="0" min="0" max="5" step="0.01" oninput="wzGenLaser();_kerfSum()"></label>
+        <label style="flex:1;min-width:110px">Ajustement X (mm)
+          <input id="laserAdjX" type="number" value="0" min="-5" max="5" step="0.01" oninput="wzGenLaser();_kerfSum()"></label>
+        <label style="flex:1;min-width:110px">Ajustement Y (mm)
+          <input id="laserAdjY" type="number" value="0" min="-5" max="5" step="0.01" oninput="wzGenLaser();_kerfSum()"></label>
+      </div>
+      <div style="margin-top:10px;padding-top:9px;border-top:1px dashed var(--brd2)">
         <div style="font-size:10px;color:var(--txt2);margin-bottom:5px">🧮 <b>Aide au réglage</b> — découpe un carré, mesure-le, et je calcule la correction :</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
           <label style="font-size:10px;color:var(--txt2)">Carré nominal (mm)
-            <input id="laserCalNom" type="number" value="10" min="1" step="0.1" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+            <input id="laserCalNom" type="number" value="10" min="1" step="0.1" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
           <label style="font-size:10px;color:var(--txt2)">Mesuré X (mm)
-            <input id="laserCalX" type="number" min="0" step="0.01" placeholder="9.80" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+            <input id="laserCalX" type="number" min="0" step="0.01" placeholder="9.80" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
           <label style="font-size:10px;color:var(--txt2)">Mesuré Y (mm)
-            <input id="laserCalY" type="number" min="0" step="0.01" placeholder="9.98" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+            <input id="laserCalY" type="number" min="0" step="0.01" placeholder="9.98" oninput="laserCalc()" style="width:80px;margin-top:4px;padding:6px 8px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
           <span style="font-size:18px;color:var(--txt3);align-self:flex-end;padding-bottom:4px">➜</span>
           <span id="laserCalMsg" style="font-size:16px;color:#ffc23d;font-weight:800;align-self:flex-end;padding-bottom:3px;white-space:nowrap">—</span>
         </div>
       </div>
-    </div>
-    <!-- ▲ FIN CORRECTEUR ▲ -->
-    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
-      <input type="checkbox" id="laserLeadin" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
-      <span><b>Perçage au centre de la chute</b> — perce au milieu de la partie qui tombe (loin du bord gardé, moins de projections), puis rejoint le contour.</span>
-    </label>
-    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
-      <input type="checkbox" id="laserArc" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
-      <span><b>Entrée en arc</b> (courbe tangente au contour si la place le permet, sinon ligne droite).</span>
-    </label>
-    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
-      <input type="checkbox" id="laserInvert" onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
-      <span><b>Inverser plein/vide</b> — coche si c'est l'inverse qui doit tomber (ex : tu gardes la petite pièce au lieu du tour).</span>
-    </label>
-    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
-      <input type="checkbox" id="laserFrame" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
-      <span><b>Délimitation (contour à vide + pause)</b> — avant de couper, la tête fait le tour du rectangle du dessin <b>sans laser</b>, puis s'arrête (M00). Tu vérifies le placement sur la tôle, tu valides sur la machine, et ça repart couper.</span>
-    </label>
-    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--txt);cursor:pointer">
-      <input type="checkbox" id="laserFullFile" checked onchange="wzGenLaser()" style="width:16px;height:16px;flex-shrink:0">
-      <span><b>Fichier complet machine</b> (entête + pied machine TRUMPF). Décoche pour la version simple lisible.</span>
-    </label>
-    <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <button onclick="openLaserPaint()" style="padding:9px 13px;border-radius:8px;border:1.5px solid var(--acc);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:700">✂️ Fenêtre Découpe (chute/pièce · départs · sens)</button>
-      <span id="laserPaintStatus" style="font-size:11px;color:var(--acc)"></span>
-    </div>
-    <div style="font-size:9px;color:var(--txt3);margin-top:6px">Le nom du tableau techno doit correspondre EXACTEMENT à celui créé dans la machine (puissance/vitesse). « A CHANGER! » = à remplacer par le tien (ex : INOX3MM_S).</div>
+    </details>
   </div>
-  <div id="p10st" class="al al-w">⏳ Génération...</div>
-  <pre class="gc-pre" id="p10gc"></pre>
-  <!-- Boutons G-code dynamiques (un par fichier) -->
-  <div id="gcDlButtons" style="margin-bottom:6px"></div>
-  <button class="btn btn-p" style="width:100%" onclick="openGcSimAll()">▶ Simuler tous les parcours</button>
+  <details class="p10card" id="p10gcBox">
+    <summary>📄 Voir le programme</summary>
+    <pre class="gc-pre" id="p10gc" style="margin-top:9px;max-height:340px"></pre>
+  </details>
 </div>
 
 <!-- PAGE DESSIN (overlay plein écran) -->
@@ -3286,7 +3402,7 @@ let pInited = false;
 // step 10 = page G-code unique (mode normal)
 function wzFlow(){
   if(appMode==='inlay') return [1,0,2,3,11,12,13,9];
-  if(appMode==='laser') return [1,2,20,10]; // laser: mode→dessin→chute/piece→LST
+  if(appMode==='laser') return [1,2,20,21,10]; // laser: mode→dessin→chute/pièce→DÉCOUPE (forme par forme)→LST
   return [1,0,2,3,4,10,9]; // normal: mode→brut→dessin→outils→modeUsinage→gcode→récap
 }
 
@@ -14229,8 +14345,9 @@ function wzOnEnter(step){
   if(step===12){ wzGenInlay(); }
   if(step===13){ /* mâle déjà généré dans step 12 */ }
   if(step===4&&appMode==='normal'){ wzInitMachineMode(); }
-  if(step===20){ const el=document.getElementById('wzPaintState'); if(typeof _lpSummary==='function') _lpSummary(); if(el) el.textContent=document.getElementById('lpSummary')?.textContent||''; }
-  if(step===10){ const _lc=document.getElementById('laserCfg'); if(_lc)_lc.style.display=(appMode==='laser')?'block':'none'; if(appMode==='laser') wzGenLaser(); else wzGenNormal(); }
+  if(step===20){ if(typeof openLaserPaint==='function') openLaserPaint(); if(typeof _lpSummary==='function') _lpSummary(); }
+  if(step===21){ if(typeof _dcEnter==='function') _dcEnter(); }
+  if(step===10){ const _lc=document.getElementById('laserCfg'); if(_lc)_lc.style.display=(appMode==='laser')?'block':'none'; const _gb=document.getElementById('p10gcBox'); if(_gb) _gb.open=(appMode!=='laser'); if(appMode==='laser'){ wzGenLaser(); if(typeof _kerfSum==='function') _kerfSum(); } else wzGenNormal(); }
   if(step===9){ wzRenderRecap(); if(appMode==='inlay') setTimeout(()=>{ if(window.THREE) wz3dInit(); },100); }
 }
 
@@ -14257,7 +14374,7 @@ function wzUpdateBar(){
     bar.appendChild(d);
   });
   // Label
-  const labels={0:'Brut',1:'Mode',2:'Dessin',3:'Outils',9:'Récap',10:'G-code',20:'Chute/Pièce',
+  const labels={0:'Brut',1:'Mode',2:'Dessin',3:'Outils',9:'Récap',10:'G-code',20:'Chute/Pièce',21:'Découpe',
     11:'Paramètres inlay',12:'G-codes Femelle',13:'G-codes Mâle'};
   document.getElementById('wzLbl').textContent=labels[wzStep]||'';
   // Boutons nav
@@ -14269,7 +14386,7 @@ function wzUpdateBar(){
     const nxt=flow[idx+1];
     const nxtLabels={2:'✏️ Dessiner',3:'🔧 Outils',
       11:'⚙️ Paramètres inlay',12:'⚡ Générer G-codes',
-      13:'♂ G-codes Mâle',10:'⚡ Générer G-code',9:'→ Récapitulatif'};
+      13:'♂ G-codes Mâle',10:'⚡ Générer G-code',9:'→ Récapitulatif',21:'✂️ Découpe →'};
     next.textContent=nxtLabels[nxt]||'Suivant →';
   }
 }
@@ -14890,11 +15007,11 @@ function _lpContours(){
 let _lpView={scale:1,tx:0,ty:0};
 function _lpApplyView(){ const cv=document.getElementById('lpCanvas'); if(!cv)return; cv.style.transformOrigin='0 0'; cv.style.transform='translate('+_lpView.tx+'px,'+_lpView.ty+'px) scale('+_lpView.scale+')'; }
 function _lpFitView(){ const P=_laserPaint, vp=document.getElementById('lpViewport'); if(!P||!vp)return; const W=vp.clientWidth||800,H=vp.clientHeight||600; const s=Math.min(W/P.W,H/P.H)*0.92; _lpView.scale=s; _lpView.tx=(W-P.W*s)/2; _lpView.ty=(H-P.H*s)/2; _lpApplyView(); }
-function _lpWheel(e){ e.preventDefault(); const vp=document.getElementById('lpViewport'); const r=vp.getBoundingClientRect(); const mx=e.clientX-r.left, my=e.clientY-r.top; const f=e.deltaY<0?1.15:1/1.15; const ns=Math.max(0.15,Math.min(30,_lpView.scale*f)); _lpView.tx=mx-(mx-_lpView.tx)*(ns/_lpView.scale); _lpView.ty=my-(my-_lpView.ty)*(ns/_lpView.scale); _lpView.scale=ns; _lpApplyView(); _lpRenderSoon(); }
+function _lpWheel(e){ e.preventDefault(); const vp=document.getElementById('lpViewport'); const r=vp.getBoundingClientRect(); const mx=e.clientX-r.left, my=e.clientY-r.top; const f=e.deltaY<0?1.15:1/1.15; const ns=Math.max(0.15,Math.min(30,_lpView.scale*f)); _lpView.tx=mx-(mx-_lpView.tx)*(ns/_lpView.scale); _lpView.ty=my-(my-_lpView.ty)*(ns/_lpView.scale); _lpView.scale=ns; _lpApplyView(); }
 function _lpPanStart(e){ if(e.button!==1 && e.button!==2) return; e.preventDefault(); const sx=e.clientX,sy=e.clientY,ox=_lpView.tx,oy=_lpView.ty; const mv=(ev)=>{ _lpView.tx=ox+(ev.clientX-sx); _lpView.ty=oy+(ev.clientY-sy); _lpApplyView(); }; const up=()=>{ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); }; window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up); }
 function openLaserPaint(){
   const polys=_lpContours();
-  if(!polys.length){ if(typeof toastHist==='function')toastHist('Rien a peindre : importe/dessine une forme.'); return; }
+  if(!polys.length){ const el=document.getElementById('wzPaintState'); if(el) el.textContent='Rien à peindre : dessine ou importe une forme.'; return; }
   let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
   for(const seg of polys) for(const p of seg){ if(p[0]<minX)minX=p[0]; if(p[0]>maxX)maxX=p[0]; if(p[1]<minY)minY=p[1]; if(p[1]>maxY)maxY=p[1]; }
   const pad=8; minX-=pad;minY-=pad;maxX+=pad;maxY+=pad;   // marge : l'arc de rentrée du contour extérieur reste visible
@@ -14913,8 +15030,7 @@ function openLaserPaint(){
   const wd=wx.getImageData(0,0,W,H).data; const wall=new Uint8Array(W*H);
   for(let i=0;i<W*H;i++){ wall[i]=(wd[i*4]<128)?1:0; }
   _laserPaint.wall=wall;
-  document.getElementById('laserPaintModal').classList.add('open');
-  _lpSetTab(_lpTab||'paint'); _lpRefresh();
+  _lpTab='paint'; _lpSetTool(_lpTool); _lpRefresh();
   setTimeout(()=>{ _lpFitView(); _lpRender(); }, 30);
 }
 // ═══ FENÊTRE « DÉCOUPE » DÉDIÉE : onglets Chute/Pièce · Départs · Sens · (Rentrée) · (Décalage) ═══
@@ -14945,7 +15061,7 @@ function _laserSceneSig(){
   let s=paintObjects.length+':'+_lcpNum(paintObjects,0).toFixed(6);
   for(const id of ['laserKerf','laserAdjX','laserAdjY','laserLead']){ const el=document.getElementById(id); s+='|'+(el?el.value:''); }
   for(const id of ['laserLeadin','laserArc','laserInvert']){ const el=document.getElementById(id); s+='|'+(el?(el.checked?1:0):''); }
-  s+='|'+_laserCutDir+'|'+JSON.stringify(_laserStarts)+'|'+JSON.stringify(_laserDirFlips)+'|'+_lpVer;
+  s+='|'+_laserCutDir+'|'+JSON.stringify(_laserStarts)+'|'+JSON.stringify(_laserDirFlips)+'|'+_lpVer+'|'+JSON.stringify(typeof _dcCfg!=='undefined'?_dcCfg:{});
   return s;
 }
 function _laserArrowsMain(){
@@ -14961,7 +15077,7 @@ function _laserArrowsMain(){
   for(const p of (_laserCutPaths||[])){ if(!p||!p.pts||p.pts.length<2) continue; _drawDirArrows(pCtx, p.pts.map(q=>mmToPx(q[0],q[1])), {step:60, size:5.5, color:'rgba(147,51,234,.68)'}); }
 }
 // Recalcule le parcours réel (buildLaserBody remplit _laserCutPaths) puis redessine.
-function _lpRefresh(){ try{ if(typeof buildLaserBody==='function') buildLaserBody(); }catch(e){ _laserCutPaths=[]; } _lpRender(); _lpSummary(); if(typeof redrawCanvas==='function') redrawCanvas(); }
+function _lpRefresh(){ _lpRender(); _lpSummary(); if(typeof redrawCanvas==='function') redrawCanvas(); }
 let _lpRaf=false; function _lpRenderSoon(){ if(_lpRaf) return; _lpRaf=true; requestAnimationFrame(()=>{ _lpRaf=false; _lpRender(); }); }
 function _lpRender(){
   const P=_laserPaint; if(!P) return; const cv=document.getElementById('lpCanvas'); if(!cv) return;
@@ -14974,28 +15090,6 @@ function _lpRender(){
     const o=i*4; img.data[o]=r; img.data[o+1]=g; img.data[o+2]=b; img.data[o+3]=255;
   }
   ctx.putImageData(img,0,0);
-  const k=1/Math.max(0.15,_lpView.scale||1);              // taille constante à l'écran quel que soit le zoom
-  const toPx=q=>[(q[0]-P.minX)*P.scale,(q[1]-P.minY)*P.scale];
-  const paths=(typeof _laserCutPaths!=='undefined'&&_laserCutPaths)?_laserCutPaths:[];
-  // AMORCES (orange) : demi-arc du perçage jusqu'au contour + point de perçage
-  for(const p of paths){
-    if(p.lead){ const L=p.lead, O=L.O, r=Math.hypot(L.A[0]-O[0],L.A[1]-O[1]), a0=Math.atan2(L.A[1]-O[1],L.A[0]-O[0]), dir=(L.g==='G3')?1:-1;
-      ctx.save(); ctx.strokeStyle='rgba(249,115,22,.95)'; ctx.lineWidth=2.2*k; ctx.lineCap='round'; ctx.beginPath();
-      for(let s=0;s<=24;s++){ const an=a0+dir*Math.PI*s/24; const q=toPx([O[0]+r*Math.cos(an),O[1]+r*Math.sin(an)]); if(s===0)ctx.moveTo(q[0],q[1]); else ctx.lineTo(q[0],q[1]); }
-      ctx.stroke(); const A=toPx(L.A); ctx.fillStyle='#f97316'; ctx.beginPath(); ctx.arc(A[0],A[1],3.2*k,0,2*Math.PI); ctx.fill(); ctx.restore(); }
-    else if(p.start && p.closed){ const S=toPx(p.start); ctx.save(); ctx.fillStyle='#f97316'; ctx.beginPath(); ctx.arc(S[0],S[1],3.2*k,0,2*Math.PI); ctx.fill(); ctx.restore(); }
-  }
-  // FLÈCHES MAUVES : le sens réel de coupe, le long de chaque contour
-  for(const p of paths){ _drawDirArrows(ctx, p.pts.map(toPx), {step:55*k, size:5*k, color:'rgba(147,51,234,.6)'}); }
-  // Contours dont le sens a été inversé à la main : petit anneau mauve
-  for(const f of (_laserDirFlips||[])){ const q=toPx(f); ctx.save(); ctx.strokeStyle='rgba(147,51,234,.9)'; ctx.lineWidth=2*k; ctx.beginPath(); ctx.arc(q[0],q[1],6*k,0,2*Math.PI); ctx.stroke(); ctx.font='bold '+(10*k)+'px sans-serif'; ctx.fillStyle='rgba(147,51,234,.95)'; ctx.fillText('⇄',q[0]+7*k,q[1]-6*k); ctx.restore(); }
-  // Marqueurs des DÉPARTS de perçage (cyan) par-dessus
-  if(typeof _laserStarts!=='undefined' && _laserStarts.length){
-    const rad=7*k;
-    for(const s of _laserStarts){ const q=toPx(s);
-      ctx.beginPath(); ctx.arc(q[0],q[1],rad,0,2*Math.PI); ctx.fillStyle='rgba(0,229,255,.9)'; ctx.fill();
-      ctx.lineWidth=1.5*k; ctx.strokeStyle='#073b45'; ctx.stroke(); }
-  }
 }
 function _lpSetTab(t){
   if(t==='lead'||t==='off') return;   // étapes suivantes (pas encore actives)
@@ -15011,9 +15105,7 @@ function _lpClearStarts(){ _laserStarts=[]; _lpRefresh(); }
 function _lpClearFlips(){ _laserDirFlips=[]; _lpRefresh(); }
 // Petit résumé (fenêtre + panneau G-code) : sens, départs, inversions, peinture.
 function _lpSummary(){
-  const dn={auto:'Auto',cw:'↻ Horaire',ccw:'↺ Antihoraire'}[_laserCutDir]||'Auto';
-  const txt='Sens : '+dn+' · Départs posés : '+(_laserStarts.length||0)+' · Contours inversés : '+((_laserDirFlips||[]).length)+(_laserPaintActive()?' · peinture active':'');
-  ['laserPaintStatus','lpSummary'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=txt; });
+  const el=document.getElementById('wzPaintState'); if(el) el.textContent=_laserPaintActive()?'✏️ Peinture active : tes zones peintes priment, le reste est automatique.':'Aucune peinture → détection automatique (pair/impair).';
 }
 // Onglet SENS : clic sur un contour = inverser SON sens (re-clic = annuler).
 function _lpToggleFlipAt(mx,my){
@@ -15042,10 +15134,6 @@ function _lpClickCanvas(ev){
   const cv=document.getElementById('lpCanvas'); const r=cv.getBoundingClientRect();
   const px=Math.round((ev.clientX-r.left)/r.width*P.W), py=Math.round((ev.clientY-r.top)/r.height*P.H);
   if(px<0||py<0||px>=P.W||py>=P.H) return;
-  const mxx=P.minX+px/P.scale, myy=P.minY+py/P.scale;
-  if(_lpTab==='dir'){ _lpToggleFlipAt(mxx,myy); return; }
-  if(_lpStartMode || _lpTab==='start'){ _lpAddStartAt(mxx,myy); return; }
-  if(_lpTab!=='paint') return; // onglets sans action au clic
   const start=py*P.W+px; if(P.wall[start]) return; // clic sur un trait -> rien
   const tool=_lpTool, cls=P.cls, wall=P.wall, W=P.W, H=P.H;
   const seen=new Uint8Array(W*H); const stack=[start];
@@ -15057,7 +15145,242 @@ function _lpClickCanvas(ev){
 }
 function _lpReset(){ if(_laserPaint&&_laserPaint.cls) _laserPaint.cls.fill(0); _lpVer++; _lpRefresh(); }
 function _lpUpdateStatus(){ const el=document.getElementById('laserPaintStatus'); if(el) el.textContent=_laserPaintActive()?'✏️ peinture manuelle active':''; }
-function closeLaserPaint(){ document.getElementById('laserPaintModal').classList.remove('open'); const el=document.getElementById('wzPaintState'); if(typeof wzGenLaser==='function')wzGenLaser(); _lpSummary(); if(el) el.textContent=document.getElementById('lpSummary')?.textContent||''; if(typeof redrawCanvas==='function') redrawCanvas(); }
+function closeLaserPaint(){ _lpSummary(); if(typeof redrawCanvas==='function') redrawCanvas(); }   // (ancienne fenêtre : la peinture est maintenant DANS la page Chute/Pièce)
+// ═══════════ PAGE « DÉCOUPE » (étape 21) : réglages FORME PAR FORME ═══════════
+// Décalage (la forme décalée DEVIENT la forme à couper), sens, rentrée (perçage → arc → début de coupe).
+// 🔗 « Pareilles » : un clic sélectionne toutes les formes du même type (ou de la même taille) et
+// tout ce qu'on règle sur l'une est fait sur les autres. Tout est optionnel : sans réglage, la découpe
+// reste 100 % automatique (G-code identique à avant).
+let _dcCfg={};   // clé contour -> {off, dir, lead:{type,P,S}}   (P,S relatifs au coin bas de la forme d'ORIGINE)
+const _dc={view:{s:4,tx:0,ty:0}, sel:new Set(), link:'type', mode:'select', leadType:'arc', pend:null, hover:null, cur:null, recs:[], raf:false, msg:'', msgT:null};
+
+// Arc tangent : part du perçage P et arrive en S TANGENT au contour (T = sens de coupe en S).
+function _dcArcLead(P,S,T){
+  const d=[P[0]-S[0],P[1]-S[1]], dd=d[0]*d[0]+d[1]*d[1]; if(dd<1e-8) return null;
+  const N=[-T[1],T[0]]; const h=d[0]*N[0]+d[1]*N[1];
+  if(Math.abs(h)<0.02*Math.sqrt(dd)) return null;          // perçage quasi sur la tangente : pas d'arc (-> ligne)
+  const r=dd/(2*h); const O=[S[0]+N[0]*r, S[1]+N[1]*r];
+  const ccw=r>0;                                            // G3 = sens trigo
+  const aA=Math.atan2(P[1]-O[1],P[0]-O[0]), aS=Math.atan2(S[1]-O[1],S[0]-O[0]);
+  let sw=ccw?(aS-aA):(aA-aS); while(sw<=0) sw+=2*Math.PI; while(sw>2*Math.PI) sw-=2*Math.PI;
+  return {A:[P[0],P[1]], O, g:ccw?'G3':'G2', sweep:sw, r:Math.abs(r)};
+}
+function _dcArcPts(L,S){
+  if(!L || !L.O || L.line) return [L.A,S];
+  const r=Math.hypot(L.A[0]-L.O[0],L.A[1]-L.O[1]), a0=Math.atan2(L.A[1]-L.O[1],L.A[0]-L.O[0]), dir=(L.g==='G3')?1:-1, sw=L.sweep||Math.PI;
+  const n=Math.max(8,Math.ceil(sw/(Math.PI/36))); const out=[];
+  for(let i=0;i<=n;i++){ const a=a0+dir*sw*i/n; out.push([L.O[0]+r*Math.cos(a), L.O[1]+r*Math.sin(a)]); }
+  return out;
+}
+// Reconnaissance de la forme : cercle / carré / rectangle / autre (même géométrie = « pareille »).
+function _dcClassify(orig){
+  let p=orig.slice(); if(p.length>1&&Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-7) p.pop();
+  const n=p.length; let per=0; for(let i=0;i<n;i++) per+=Math.hypot(p[(i+1)%n][0]-p[i][0],p[(i+1)%n][1]-p[i][1]);
+  const area=Math.abs(polyArea(p)); const f=v=>(+v.toFixed(2)).toString();
+  const fc=_fitCircle(p);
+  if(fc) return {kind:'cercle', label:'cercle Ø'+f(2*fc.r), typeKey:'cercle', sizeKey:'cercle:'+(2*fc.r).toFixed(2), circ:fc, area, per};
+  if(n===4){ let ok=true;
+    for(let i=0;i<4;i++){ const a=p[i],b=p[(i+1)%4],c=p[(i+2)%4]; const u=[b[0]-a[0],b[1]-a[1]], v=[c[0]-b[0],c[1]-b[1]]; const lu=Math.hypot(u[0],u[1])||1, lv=Math.hypot(v[0],v[1])||1; if(Math.abs((u[0]*v[0]+u[1]*v[1])/(lu*lv))>0.01) ok=false; }
+    if(ok){ const s1=Math.hypot(p[1][0]-p[0][0],p[1][1]-p[0][1]), s2=Math.hypot(p[2][0]-p[1][0],p[2][1]-p[1][1]); const a=Math.max(s1,s2), b=Math.min(s1,s2), sq=Math.abs(a-b)<0.01;
+      return {kind:sq?'carré':'rectangle', label:(sq?'carré ':'rectangle ')+f(a)+(sq?'':'×'+f(b)), typeKey:'rect', sizeKey:'rect:'+a.toFixed(2)+'x'+b.toFixed(2), area, per}; } }
+  return {kind:'forme', label:'forme', typeKey:'forme:'+n+':'+area.toFixed(1)+':'+per.toFixed(1), sizeKey:'forme:'+n+':'+area.toFixed(2)+':'+per.toFixed(2), area, per};
+}
+function _dcCfgFor(k){ return _dcCfg[k]||(_dcCfg[k]={off:0,dir:'auto',lead:null}); }
+function _dcSelRecs(){ return _dc.recs.filter(r=>r.closed && _dc.sel.has(r.key)); }
+function _dcSegs(r){ const p=r.pts, s=[]; for(let k=0;k+1<p.length;k++) s.push([p[k],p[k+1]]);
+  if(r.closed && p.length>2){ const a=p[p.length-1], b=p[0]; if(Math.hypot(a[0]-b[0],a[1]-b[1])>1e-7) s.push([a,b]); } return s; }
+// Point du contour (parcours réel) le plus proche de m, avec la direction de coupe à cet endroit.
+function _dcProj(m,r){ let bd=1e18,out=null;
+  for(const sg of _dcSegs(r)){ const a=sg[0],b=sg[1]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy; if(L2<1e-12) continue;
+    let t=((m[0]-a[0])*dx+(m[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const f=[a[0]+t*dx,a[1]+t*dy], d=Math.hypot(m[0]-f[0],m[1]-f[1]);
+    if(d<bd){ bd=d; const L=Math.sqrt(L2); out={S:f,T:[dx/L,dy/L],d}; } }
+  return out; }
+const _dcM2S=q=>[_dc.view.tx+q[0]*_dc.view.s, _dc.view.ty+q[1]*_dc.view.s];
+const _dcS2M=(x,y)=>[(x-_dc.view.tx)/_dc.view.s, (y-_dc.view.ty)/_dc.view.s];
+
+function _dcBuild(){
+  try{ buildLaserBody(); }catch(e){ console.error('[Découpe]',e); _laserCutPaths=[]; }
+  _dc.recs=(_laserCutPaths||[]).map((p,i)=>{ const r=Object.assign({i},p); const o=(p.orig&&p.orig.length)?p.orig:p.pts;
+    let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18; for(const q of o){ if(q[0]<x0)x0=q[0]; if(q[0]>x1)x1=q[0]; if(q[1]<y0)y0=q[1]; if(q[1]>y1)y1=q[1]; }
+    r.bb=[x0,y0,x1,y1]; if(!r.ob) r.ob=[x0,y0];
+    if(p.closed && o.length>=3){ try{ Object.assign(r,_dcClassify(o)); }catch(e){ r.kind='forme'; r.label='forme'; r.typeKey=r.sizeKey='k'+i; r.area=0; }
+      const role=r.waste?'|trou':'|ext'; r.typeKey+=role; r.sizeKey+=role; if(!r.waste) r.label+=' (contour ext.)'; }
+    else { r.kind='trait'; r.label='trait ouvert'; r.area=0; }
+    return r; });
+  const keys=new Set(_dc.recs.map(r=>r.key)); for(const k of [..._dc.sel]) if(!keys.has(k)) _dc.sel.delete(k);
+  if(_dc.pend && !keys.has(_dc.pend.key)) _dc.pend=null;
+  _dcPanel(); _dcDraw();
+}
+function _dcFit(){
+  const cv=document.getElementById('dcCanvas'); if(!cv) return; const W=cv.clientWidth||800, H=cv.clientHeight||500;
+  let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18;
+  for(const r of _dc.recs){ const all=r.pts.concat(r.lead?[r.lead.A]:[]); for(const q of all){ if(q[0]<x0)x0=q[0]; if(q[0]>x1)x1=q[0]; if(q[1]<y0)y0=q[1]; if(q[1]>y1)y1=q[1]; } }
+  if(!(x1>x0)){ x0=0;y0=0;x1=100;y1=80; }
+  const w=Math.max(1,x1-x0), h=Math.max(1,y1-y0); const s=Math.min((W-70)/w,(H-70)/h);
+  _dc.view.s=Math.max(0.2,s); _dc.view.tx=(W-w*_dc.view.s)/2-x0*_dc.view.s; _dc.view.ty=(H-h*_dc.view.s)/2-y0*_dc.view.s;
+}
+// Forme visée : un trait proche (10 px) sinon la PLUS PETITE forme qui contient le clic (« snap DANS la forme »).
+function _dcPick(m, only){
+  const pool=_dc.recs.filter(r=>r.closed && (!only || only.has(r.key)));
+  const tol=10/_dc.view.s; let best=null,bd=1e18;
+  for(const r of pool){ const pr=_dcProj(m,r); if(pr && pr.d<bd){ bd=pr.d; best=r; } }
+  if(best && bd<=tol) return best;
+  let inn=null; for(const r of pool){ if(_pointInPoly(m,r.pts) && (!inn || r.area<inn.area)) inn=r; }
+  return inn;
+}
+function _dcNearestEdge(m, only){ const pool=_dc.recs.filter(r=>r.closed && (!only||only.has(r.key))); let best=null,bd=1e18; for(const r of pool){ const pr=_dcProj(m,r); if(pr&&pr.d<bd){bd=pr.d;best=r;} } return best; }
+function _dcFamily(r){ if(!r || _dc.link==='one' || !r.typeKey) return [r]; const k=(_dc.link==='size')?'sizeKey':'typeKey'; return _dc.recs.filter(q=>q.closed && q[k]===r[k]); }
+// Formes concernées par une action faite sur « anchor » : la sélection si elle en fait partie, sinon ses pareilles.
+function _dcTargets(anchor){ if(anchor && _dc.sel.has(anchor.key)) return _dcSelRecs(); return _dcFamily(anchor); }
+// Recopie une rentrée d'une forme sur une forme pareille (cercles : même angle + même distance au bord).
+function _dcTransfer(a,b,P,S){
+  if(a.circ && b.circ){ const ca=[a.circ.cx,a.circ.cy], cb=[b.circ.cx,b.circ.cy];
+    const ra=Math.hypot(S[0]-ca[0],S[1]-ca[1]), rb=Math.max(0.05,b.circ.r+(b.off||0));
+    const tS=Math.atan2(S[1]-ca[1],S[0]-ca[0]); const Sb=[cb[0]+rb*Math.cos(tS), cb[1]+rb*Math.sin(tS)];
+    if(!P) return {P:null,S:Sb};
+    const e=ra-Math.hypot(P[0]-ca[0],P[1]-ca[1]); let rho=rb-e; if(e>0 && rho<rb*0.08) rho=rb*0.5;
+    const tP=Math.atan2(P[1]-ca[1],P[0]-ca[0]); return {P:[cb[0]+rho*Math.cos(tP), cb[1]+rho*Math.sin(tP)], S:Sb}; }
+  const aw=Math.max(1e-6,a.bb[2]-a.bb[0]), ah=Math.max(1e-6,a.bb[3]-a.bb[1]), bw=b.bb[2]-b.bb[0], bh=b.bb[3]-b.bb[1];
+  const u=(S[0]-a.bb[0])/aw, v=(S[1]-a.bb[1])/ah; const pr=_dcProj([b.bb[0]+u*bw, b.bb[1]+v*bh], b); if(!pr) return null;
+  return {P:P?[pr.S[0]+(P[0]-S[0]), pr.S[1]+(P[1]-S[1])]:null, S:pr.S};
+}
+function _dcApplyLead(anchor,P,S,type){
+  const T=_dcTargets(anchor); let n=0;
+  for(const t of T){ let Pt=P,St=S; if(t!==anchor){ const tr=_dcTransfer(anchor,t,P,S); if(!tr) continue; Pt=tr.P; St=tr.S; }
+    _dcCfgFor(t.key).lead={type, P:Pt?[Pt[0]-t.ob[0],Pt[1]-t.ob[1]]:null, S:[St[0]-t.ob[0],St[1]-t.ob[1]]}; n++; }
+  _dcSay(n>1?('Rentrée posée sur '+n+' formes pareilles'):'Rentrée posée');
+}
+// Problème d'une rentrée manuelle : perçage côté pièce, ou arc qui traverse le contour.
+function _dcLeadBad(r,A,pts){
+  if(!r||!r.closed||!A) return null; const inA=_pointInPoly(A,r.pts);
+  if(inA!==!!r.waste) return 'perçage côté PIÈCE (il doit être dans la chute)';
+  const S=pts[pts.length-1];
+  for(const q of pts){ if(Math.hypot(q[0]-S[0],q[1]-S[1])<0.25) continue; if(_pointInPoly(q,r.pts)!==inA) return 'l\'arc traverse le contour'; }
+  return null;
+}
+function _dcSay(t){ _dc.msg=t||''; clearTimeout(_dc.msgT); if(t) _dc.msgT=setTimeout(()=>{ _dc.msg=''; _dcHint(); },2600); _dcHint(); }
+function _dcHint(){ const el=document.getElementById('dcHint'); if(!el) return; let t;
+  if(_dc.mode==='lead'){ if(_dc.leadType==='direct') t='Clique sur le BORD de la forme : le laser perce là et commence la coupe.';
+    else if(!_dc.pend) t='① Clique où le laser PERCE (dans la chute, près du bord).';
+    else t='② Glisse le long du bord et clique où l\'arc FINIT (= début de la vraie coupe). Échap = annuler.'; }
+  else t='Clique DANS une forme pour la choisir · Maj+clic = ajouter · 🔗 '+({one:'1 par 1',size:'même taille',type:'même type'}[_dc.link]);
+  if(_dc.bad) t+='  ⚠ '+_dc.bad;
+  if(_dc.msg) t=_dc.msg;
+  el.textContent=t; el.style.background=_dc.bad?'rgba(185,28,28,.9)':(_dc.msg?'rgba(22,101,52,.92)':'rgba(17,24,39,.8)');
+}
+function _dcClick(m,shift){
+  if(_dc.mode==='lead'){
+    if(_dc.leadType==='direct'){ const r=_dcNearestEdge(m, _dc.sel.size?_dc.sel:null); const pr=r?_dcProj(m,r):null;
+      if(!pr || pr.d>14/_dc.view.s){ _dcSay('Clique plus près du bord d\'une forme'); return; }
+      _dcApplyLead(r,null,pr.S,'direct'); _dcBuild(); return; }
+    if(!_dc.pend){ const r=_dcNearestEdge(m, _dc.sel.size?_dc.sel:null); if(!r){ _dcSay('Aucune forme fermée ici'); return; }
+      _dc.pend={key:r.key, P:m}; _dcHint(); _dcDraw(); return; }
+    const r=_dc.recs.find(q=>q.key===_dc.pend.key); const pr=r?_dcProj(m,r):null; if(!pr){ _dc.pend=null; _dcDraw(); return; }
+    _dcApplyLead(r,_dc.pend.P,pr.S,_dc.leadType); _dc.pend=null; _dc.bad=null; _dcBuild(); return;
+  }
+  const r=_dcPick(m);
+  if(!r){ if(!shift) _dc.sel.clear(); }
+  else { const fam=_dcFamily(r);
+    if(shift){ const allIn=fam.every(q=>_dc.sel.has(q.key)); fam.forEach(q=>allIn?_dc.sel.delete(q.key):_dc.sel.add(q.key)); }
+    else { _dc.sel.clear(); fam.forEach(q=>_dc.sel.add(q.key)); } }
+  _dcPanel(); _dcDraw();
+}
+// ── Actions du panneau ──
+function _dcSetLink(l){ _dc.link=l; _dcPanel(); _dcHint(); }
+function _dcSelAll(){ _dc.recs.forEach(r=>{ if(r.closed) _dc.sel.add(r.key); }); _dcPanel(); _dcDraw(); }
+function _dcSelNone(){ _dc.sel.clear(); _dcPanel(); _dcDraw(); }
+function _dcOffset(sign){ const v=Math.abs(parseFloat(document.getElementById('dcOffVal')?.value)); if(!(v>0)){ _dcSay('Mets une valeur de décalage (mm)'); return; }
+  const T=_dcSelRecs(); if(!T.length){ _dcSay('Choisis d\'abord la ou les formes (clique dedans)'); return; }
+  T.forEach(r=>{ _dcCfgFor(r.key).off=sign*v; }); _dcSay((sign>0?'+':'−')+v+' mm sur '+T.length+' forme(s)'); _dcBuild(); }
+function _dcOffClear(){ const T=_dcSelRecs(); (T.length?T:_dc.recs).forEach(r=>{ if(_dcCfg[r.key]) _dcCfg[r.key].off=0; }); _dcBuild(); }
+function _dcSetDir(d){ const T=_dcSelRecs();
+  if(T.length) T.forEach(r=>{ _dcCfgFor(r.key).dir=d; });
+  else { _laserCutDir=(d==='cw'||d==='ccw')?d:'auto'; for(const k in _dcCfg) if(_dcCfg[k]) _dcCfg[k].dir='auto'; }
+  _dcBuild(); }
+function _dcSetLeadType(t){ _dc.leadType=t; _dc.pend=null; _dcPanel(); _dcHint(); _dcDraw(); }
+function _dcToggleLeadMode(){ _dc.mode=(_dc.mode==='lead')?'select':'lead'; _dc.pend=null; _dc.bad=null; _dcPanel(); _dcHint(); _dcDraw(); }
+function _dcLeadAuto(){ const T=_dcSelRecs(); (T.length?T:_dc.recs).forEach(r=>{ if(_dcCfg[r.key]) _dcCfg[r.key].lead=null; }); _dc.pend=null; _dcBuild(); }
+function _dcResetAll(){ _dcCfg={}; _laserCutDir='auto'; _dc.sel.clear(); _dc.pend=null; _dc.mode='select'; _dcBuild(); _dcSay('Tout est revenu en automatique'); }
+function _dcPanel(){
+  const on=(id,v)=>{ const b=document.getElementById(id); if(b) b.classList.toggle('on',!!v); };
+  on('dcL_one',_dc.link==='one'); on('dcL_size',_dc.link==='size'); on('dcL_type',_dc.link==='type');
+  const S=_dcSelRecs();
+  const info=document.getElementById('dcSelInfo');
+  if(info){ if(!S.length) info.textContent='Rien de choisi → Sens et « Rentrée auto » s\'appliquent à TOUTES les formes.';
+    else { const c={}; S.forEach(r=>{ c[r.label]=(c[r.label]||0)+1; }); info.textContent='Choisi : '+Object.keys(c).map(k=>c[k]+' × '+k).join(' · '); } }
+  // sens affiché : celui de la sélection (si uniforme), sinon le réglage global
+  let d=_laserCutDir; if(S.length){ const ds=new Set(S.map(r=>(_dcCfg[r.key]&&_dcCfg[r.key].dir)||'auto')); d=(ds.size===1)?[...ds][0]:'mix'; }
+  on('dcD_auto',d==='auto'); on('dcD_cw',d==='cw'); on('dcD_ccw',d==='ccw');
+  const dl=document.getElementById('dcDirLbl'); if(dl) dl.textContent=S.length?'pour la sélection':'pour TOUTES les formes';
+  const oi=document.getElementById('dcOffInfo'); if(oi){ const offs=new Set(S.map(r=>r.off||0)); oi.textContent=!S.length?'Choisis la ou les formes à décaler.':(offs.size===1?('Décalage actuel : '+([...offs][0]?((([...offs][0])>0?'+':'')+[...offs][0]+' mm'):'aucun')):'Décalages différents dans la sélection'); }
+  on('dcT_arc',_dc.leadType==='arc'); on('dcT_line',_dc.leadType==='line'); on('dcT_direct',_dc.leadType==='direct');
+  on('dcLeadBtn',_dc.mode==='lead'); const lb=document.getElementById('dcLeadBtn'); if(lb) lb.textContent=(_dc.mode==='lead')?'✓ Terminer (retour sélection)':'📍 Placer la rentrée';
+  const st=document.getElementById('dcStat'); if(st){ const cl=_dc.recs.filter(r=>r.closed).length; const man=Object.keys(_dcCfg).filter(k=>{ const c=_dcCfg[k]; return c&&(c.off||c.lead||(c.dir&&c.dir!=='auto')); }).length; st.textContent=cl+' forme(s) fermée(s) · '+man+' réglée(s) à la main'+(_laserCutDir!=='auto'?' · sens global : '+(_laserCutDir==='cw'?'horaire':'antihoraire'):''); }
+  _dcHint();
+}
+// ── Dessin ──
+function _dcDraw(){ if(_dc.raf) return; _dc.raf=true; requestAnimationFrame(()=>{ _dc.raf=false; try{ _dcDrawNow(); }catch(e){ console.error('[Découpe] dessin',e); } }); }
+function _dcDrawNow(){
+  const cv=document.getElementById('dcCanvas'); if(!cv) return; const W=cv.clientWidth, H=cv.clientHeight; if(W<5||H<5) return;
+  const dpr=window.devicePixelRatio||1; if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+  const x=cv.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); x.fillStyle='#fbfaf7'; x.fillRect(0,0,W,H);
+  const path=(pts,close)=>{ x.beginPath(); pts.forEach((q,i)=>{ const s=_dcM2S(q); if(i) x.lineTo(s[0],s[1]); else x.moveTo(s[0],s[1]); }); if(close) x.closePath(); };
+  const dot=(q,col,rad,ring)=>{ const s=_dcM2S(q); x.beginPath(); x.arc(s[0],s[1],rad,0,2*Math.PI); x.fillStyle=col; x.fill(); if(ring){ x.lineWidth=1.5; x.strokeStyle=ring; x.stroke(); } };
+  // 1) sélection (jaune) / survol
+  for(const r of _dc.recs){ const sel=_dc.sel.has(r.key), hov=(_dc.hover===r.key && _dc.mode==='select'); if(!sel&&!hov) continue;
+    x.save(); x.strokeStyle=sel?'rgba(245,158,11,.55)':'rgba(245,158,11,.28)'; x.lineWidth=sel?9:6; x.lineJoin='round'; path(r.pts,r.closed); x.stroke();
+    if(sel && r.closed){ x.fillStyle='rgba(245,158,11,.07)'; x.fill(); } x.restore(); }
+  // 2) forme d'ORIGINE remplacée par un décalage : gris pointillé
+  for(const r of _dc.recs){ if(!r.off||!r.orig) continue; x.save(); x.setLineDash([5,4]); x.strokeStyle='#9ca3af'; x.lineWidth=1.2; path(r.orig,true); x.stroke(); x.restore(); }
+  // 3) ce qui sera COUPÉ : noir, ou BLEU fin = nouvelle forme décalée
+  for(const r of _dc.recs){ x.save(); x.strokeStyle=r.off?'#2563eb':'#111827'; x.lineWidth=r.off?1.3:1.5; x.lineJoin='round'; path(r.pts,r.closed); x.stroke(); x.restore(); }
+  // 4) sens de coupe : petites flèches mauves
+  for(const r of _dc.recs) _drawDirArrows(x, r.pts.map(_dcM2S), {step:56,size:5,color:'rgba(147,51,234,.62)'});
+  // 5) rentrées : orange plein = choisie à la main, orange pointillé = auto ; ● orange = perçage, ● vert = début de coupe
+  _dc.badKeys=new Set();
+  for(const r of _dc.recs){ if(!r.closed) continue; const L=r.lead;
+    if(L){ const pts=_dcArcPts(L,L.S); const bad=L.man?_dcLeadBad(r,L.A,pts):null; if(bad) _dc.badKeys.add(r.key);
+      x.save(); x.strokeStyle=bad?'#dc2626':'#f97316'; x.lineWidth=L.man?2.4:1.6; if(!L.man) x.setLineDash([5,3]); x.lineCap='round'; path(pts,false); x.stroke(); x.restore();
+      dot(L.A, bad?'#dc2626':'#f97316', L.man?4.4:3.4); dot(L.S,'#16a34a',3.8,'#fff'); }
+    else if(r.start){ dot(r.start,'#f97316',4,'#16a34a'); } }
+  // 6) aperçu pendant qu'on pose la rentrée
+  _dc.bad=null;
+  if(_dc.mode==='lead' && _dc.cur){
+    if(_dc.pend){ const r=_dc.recs.find(q=>q.key===_dc.pend.key); const pr=r?_dcProj(_dc.cur,r):null;
+      if(pr){ const P=_dc.pend.P; let pts;
+        if(_dc.leadType==='arc'){ const L=_dcArcLead(P,pr.S,pr.T); pts=L?_dcArcPts(L,pr.S):[P,pr.S]; } else pts=[P,pr.S];
+        _dc.bad=_dcLeadBad(r,P,pts);
+        x.save(); x.strokeStyle=_dc.bad?'#dc2626':'#f97316'; x.lineWidth=2.6; x.lineCap='round'; path(pts,false); x.stroke(); x.restore();
+        dot(P,_dc.bad?'#dc2626':'#f97316',5); dot(pr.S,'#16a34a',6,'#fff');
+        const s=_dcM2S(pr.S); x.save(); x.font='bold 11px sans-serif'; x.fillStyle='#166534'; x.fillText('début de coupe',s[0]+9,s[1]-9); x.restore(); } }
+    else if(_dc.leadType==='direct'){ const r=_dcNearestEdge(_dc.cur,_dc.sel.size?_dc.sel:null); const pr=r?_dcProj(_dc.cur,r):null; if(pr && pr.d<=14/_dc.view.s) dot(pr.S,'#16a34a',6,'#f97316'); }
+    else { dot(_dc.cur,'rgba(249,115,22,.55)',4.5); }
+  }
+  _dcHint();
+}
+function _dcWire(){
+  const cv=document.getElementById('dcCanvas'); if(!cv || cv._dcw) return; cv._dcw=1;
+  cv.addEventListener('contextmenu',e=>e.preventDefault());
+  cv.addEventListener('wheel',e=>{ e.preventDefault(); const b=cv.getBoundingClientRect(); const mx=e.clientX-b.left,my=e.clientY-b.top; const f=e.deltaY<0?1.15:1/1.15; const ns=Math.max(0.2,Math.min(600,_dc.view.s*f));
+    _dc.view.tx=mx-(mx-_dc.view.tx)*(ns/_dc.view.s); _dc.view.ty=my-(my-_dc.view.ty)*(ns/_dc.view.s); _dc.view.s=ns; _dcDraw(); },{passive:false});
+  let down=null;
+  cv.addEventListener('pointerdown',e=>{ if(e.button===1||e.button===2){ e.preventDefault(); down={pan:true,x:e.clientX,y:e.clientY,tx:_dc.view.tx,ty:_dc.view.ty}; try{cv.setPointerCapture(e.pointerId);}catch(_){} return; }
+    if(e.button===0) down={x:e.clientX,y:e.clientY,tx:_dc.view.tx,ty:_dc.view.ty,shift:(e.shiftKey||e.ctrlKey||e.metaKey)}; });
+  cv.addEventListener('pointermove',e=>{ const b=cv.getBoundingClientRect(); const mx=e.clientX-b.left,my=e.clientY-b.top;
+    if(down && !down.pan && Math.hypot(e.clientX-down.x,e.clientY-down.y)>6){ down.pan=true; try{cv.setPointerCapture(e.pointerId);}catch(_){} }   // glisser = déplacer la vue
+    if(down && down.pan){ _dc.view.tx=down.tx+(e.clientX-down.x); _dc.view.ty=down.ty+(e.clientY-down.y); _dcDraw(); return; }
+    _dc.cur=_dcS2M(mx,my); const h=(_dc.mode==='select')?_dcPick(_dc.cur):null; _dc.hover=h?h.key:null; cv.style.cursor=(_dc.mode==='lead')?'crosshair':(h?'pointer':'default'); _dcDraw(); });
+  cv.addEventListener('pointerup',e=>{ if(!down) return; const d=down; down=null; if(d.pan) return; const b=cv.getBoundingClientRect(); _dcClick(_dcS2M(e.clientX-b.left,e.clientY-b.top), d.shift); });
+  cv.addEventListener('pointerleave',()=>{ _dc.hover=null; _dc.cur=null; _dcDraw(); });
+  document.addEventListener('keydown',e=>{ const pg=document.getElementById('wzp21'); if(!pg||!pg.classList.contains('wz-on')) return;
+    if(e.key==='Escape'){ if(_dc.pend){ _dc.pend=null; } else if(_dc.mode==='lead'){ _dc.mode='select'; } else _dc.sel.clear(); _dc.bad=null; _dcPanel(); _dcDraw(); } });
+  window.addEventListener('resize',()=>{ const pg=document.getElementById('wzp21'); if(pg&&pg.classList.contains('wz-on')) _dcDraw(); });
+}
+function _kerfSum(){ const v=id=>parseFloat(document.getElementById(id)?.value)||0; const k=v('laserKerf'),ax=v('laserAdjX'),ay=v('laserAdjY');
+  const el=document.getElementById('kerfSumTxt'); const on=(k||ax||ay); if(el) el.textContent=on?('saignée '+k+' · X '+ax+' · Y '+ay):'aucun';
+  const bx=document.getElementById('kerfBox'); if(bx && on) bx.open=true; }
+function _dcEnter(){ _dcWire(); _dc.pend=null; _dcBuild(); setTimeout(()=>{ _dcFit(); _dcDraw(); },40); }
+
 
 // DELIMITATION : enveloppe convexe des points + decalage vers l'exterieur (~1cm).
 // Grossier mais suffisant : delimite a peu pres la place que prendra la piece.
@@ -15122,6 +15445,7 @@ function laserCalc(){
   const sg=v=>(v>=0?'+':'')+v.toFixed(3);
   if(msg){ msg.style.color='#ffc23d'; msg.style.fontSize='16px';
     msg.textContent='saignée '+kerf.toFixed(3)+'  ·  X '+sg(ajX)+'  ·  Y '+sg(ajY); }
+  if(typeof _kerfSum==='function') _kerfSum();
   if(typeof wzGenLaser==='function') wzGenLaser();
 }
 // ── SENS DE DÉCOUPE (laser) : 'auto' (le soft choisit) | 'cw' (horaire) | 'ccw' (antihoraire) ──
@@ -15159,8 +15483,13 @@ function buildLaserBody(){
   // _prim = contour d'une forme PRIMITIVE toujours fermée (rect/tri/star/oblong/gear/
   // polygone/cercle). objToStrokesRaw rend rect/tri/star SANS point de fermeture, donc
   // _closed y est faux ; _prim permet au correcteur de les refermer proprement (lui seul).
-  const add=(poly,start,moves,closed,prim)=>{ if(moves&&moves.length) contours.push({poly,start,moves,_closed:!!closed,_srcPrim:!!prim}); };
+  // key = identité du contour (id objet + n° de trait) -> sert aux réglages par forme de la page Découpe.
+  // _orig = géométrie d'ORIGINE (avant décalage/saignée), _ob = coin bas de son encadrement.
+  let _kId='?', _kN=0, _kO=0;
+  const add=(poly,start,moves,closed,prim)=>{ if(moves&&moves.length){ let x0=1e18,y0=1e18; for(const q of poly){ if(q[0]<x0)x0=q[0]; if(q[1]<y0)y0=q[1]; }
+    contours.push({poly,start,moves,_closed:!!closed,_srcPrim:!!prim,key:_kId+':'+(_kN++),_orig:poly.map(q=>[q[0],q[1]]),_ob:[x0,y0]}); } };
   for(const o of flat){
+    _kId=(o&&o.id!=null)?String(o.id):('i'+_kO); _kO++; _kN=0;
     if(!o || o.type==='dim' || o.type==='point') continue;
     // Cercle -> un seul G2 (tour complet)
     if((o.type==='ellipse' && Math.abs((o.rx||0)-(o.ry||0))<0.01) || o._circle){
@@ -15194,6 +15523,23 @@ function buildLaserBody(){
       add(s.slice(), [s[0][0],s[0][1]], moves, closed, _prim);
     }
   }
+  // === RÉGLAGES PAR FORME (page Découpe) : _dcCfg[key] = {off, dir, lead} ===
+  const _cfgOf=c=>(typeof _dcCfg!=='undefined' && _dcCfg && c && c.key)?_dcCfg[c.key]:null;
+  // Moves d'un contour fermé depuis son poly (cercle = un seul G2/G3 dans le sens du poly).
+  const _movesFromPoly=(c,np,note)=>{ const uniq=np.slice(0,np.length-1); const _fc=_fitCircle(uniq);
+    if(_fc){ const st=np[0], nx2=np[1]||st; const cr=(st[0]-_fc.cx)*(nx2[1]-_fc.cy)-(st[1]-_fc.cy)*(nx2[0]-_fc.cx);
+      c.moves=[(cr>=0?'G3':'G2')+' X'+_lc(st[0])+' Y'+_lc(st[1])+' I'+_lc(_fc.cx-st[0])+' J'+_lc(_fc.cy-st[1])+'   ;'+note]; }
+    else { c.moves=np.slice(1).map(p=>'G1 X'+_lc(p[0])+' Y'+_lc(p[1])); }
+    c.start=[np[0][0],np[0][1]]; };
+  // DÉCALAGE choisi par l'utilisateur : la forme décalée DEVIENT la forme à couper (+ = agrandir, - = réduire).
+  contours.forEach(c=>{ const cf=_cfgOf(c); const off=cf?(+cf.off||0):0;
+    if(!off || !c.poly || c.poly.length<3 || !(c._closed||c._srcPrim)) return;
+    let np=null; let p0=c.poly.slice(); if(p0.length>1&&Math.hypot(p0[0][0]-p0[p0.length-1][0],p0[0][1]-p0[p0.length-1][1])<1e-7) p0.pop();
+    const fc=_fitCircle(p0);
+    if(fc){ const r=fc.r+off; if(r>0.05){ const ccw=(typeof polyArea==='function')?polyArea(p0)>0:true; np=[]; for(let k=0;k<=72;k++){ const a=(ccw?1:-1)*k/72*2*Math.PI; np.push([fc.cx+r*Math.cos(a), fc.cy+r*Math.sin(a)]); } np[72]=[np[0][0],np[0][1]]; } }
+    else np=_kerfOffset(c.poly, off<0, 2*Math.abs(off), 0, 0);   // _kerfOffset : demi-saignée = |off|, vers l'intérieur si off<0
+    if(np && np.length>=4){ c.poly=np; c._closed=true; c._userOff=off; _movesFromPoly(c,np,'cercle (decalage '+(off>0?'+':'')+_lc(off)+')'); }
+  });
   // ORDRE DE COUPE : profondeur d'imbrication (un contour DANS un autre = coupe avant).
   const cent=c=>{ let sx=0,sy=0; for(const q of c.poly){sx+=q[0];sy+=q[1];} const n=c.poly.length||1; return [sx/n,sy/n]; };
   const _area=poly=>{ let s=0; const n=poly.length; for(let i=0,j=n-1;i<n;j=i++){ s+=(poly[j][0]+poly[i][0])*(poly[j][1]-poly[i][1]); } return Math.abs(s/2); };
@@ -15275,17 +15621,20 @@ function buildLaserBody(){
   }
   // Avant de RÉORIENTER un cercle, on aligne son poly sur le sens réel du code (sinon l'inversion
   // ne change rien). Seulement si on réoriente : en Auto sans inversion, sortie STRICTEMENT identique.
-  contours.forEach(c=>{ const reo=((typeof _laserCutDir!=='undefined' && _laserCutDir!=='auto') || _flipSet.has(c));
+  // Sens effectif d'un contour : réglage de la forme (page Découpe) sinon réglage global.
+  const _effDir=c=>{ const cf=_cfgOf(c); const d=cf&&cf.dir; if(d==='cw'||d==='ccw') return d; return (typeof _laserCutDir!=='undefined')?_laserCutDir:'auto'; };
+  contours.forEach(c=>{ const reo=(_effDir(c)!=='auto' || _flipSet.has(c));
     if(reo && c._closed && _polyVsArc(c)){ let p=c.poly.slice(); if(p.length>1&&Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-7) p.pop(); c.poly=[p[0]].concat(p.slice(1).reverse()).concat([[p[0][0],p[0][1]]]); } });
   const _prev=[];   // parcours réel pour les flèches mauves
   const blocks=order.map((c,bi)=>{
     // === SENS DE DÉCOUPE : oriente le contour FERMÉ (horaire / antihoraire) AVANT tout le reste,
     // pour que ça marche même si le perçage auto est désactivé. polyArea>0 = horaire visuel (Y-bas). ===
-    if(typeof _laserCutDir!=='undefined' && _laserCutDir!=='auto' && c._closed && c.poly && c.poly.length>=3 && typeof polyArea==='function'){
+    const _ed=_effDir(c);
+    if(_ed!=='auto' && c._closed && c.poly && c.poly.length>=3 && typeof polyArea==='function'){
       let p=c.poly.slice();
       if(p.length>1 && Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-7) p.pop();
       if(p.length>=3){
-        const isCW=polyArea(p)>0, wantCW=(_laserCutDir==='cw');
+        const isCW=polyArea(p)>0, wantCW=(_ed==='cw');
         if(isCW!==wantCW) _revContour(c);
       }
     }
@@ -15302,7 +15651,9 @@ function buildLaserBody(){
     // en DEMI-ARC lisse la PLUS PROFONDE (percage au plus pres du coeur). On garde le
     // meilleur -> percage au centre de la zone la plus grosse, entree douce, meme sur
     // une etoile (ou le point le plus proche est un creux qu'on evite ainsi).
-    if(LEADIN && c._closed && c.poly && c.poly.length>=3 && c._c){
+    // Rentrée MANUELLE (page Découpe) : {type:'arc'|'line'|'direct', P:[..], S:[..]} relatifs à _ob (coin de la forme d'origine)
+    const _cfL=_cfgOf(c); const _man=(c._closed && _cfL && _cfL.lead && _cfL.lead.S)?_cfL.lead:null;
+    if((LEADIN || _man) && c._closed && c.poly && c.poly.length>=3 && c._c){
       let pl=c.poly.slice();
       if(Math.hypot(pl[0][0]-pl[pl.length-1][0],pl[0][1]-pl[pl.length-1][1])>1e-6) pl.push(pl[0].slice()); // fermer si besoin
       {
@@ -15333,8 +15684,22 @@ function buildLaserBody(){
           const TOLmm=Math.max(0.8, c._a>0?Math.sqrt(c._a)*0.05:1.2);
           if(fS && bd<=TOLmm) forced={bk:fbk,tp:ft,S:fS,T:fT};
         }
+        // === RENTRÉE MANUELLE : perçage P choisi + fin de l'arc S choisie sur le bord (projetée sur le contour réel) ===
+        let manual=null;
+        if(_man){ const ob=c._ob||[0,0]; const Pm=_man.P?[ob[0]+_man.P[0], ob[1]+_man.P[1]]:null, Sg=[ob[0]+_man.S[0], ob[1]+_man.S[1]];
+          let bd=1e18,mbk=0,mt=0,mS=null,mT=null;
+          for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((Sg[0]-a[0])*dx+(Sg[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy,dd=Math.hypot(Sg[0]-fx,Sg[1]-fy); if(dd<bd){ bd=dd;mbk=k;mt=t;mS=[fx,fy]; const tl=Math.sqrt(L2); mT=[dx/tl,dy/tl]; } }
+          if(mS) manual={bk:mbk,tp:mt,S:mS,T:mT,P:Pm,type:(_man.type||'arc')}; }
+        if(manual){
+          nfBk=manual.bk; nfTp=manual.tp;   // la coupe commence là où l'arc FINIT
+          if(manual.type!=='direct' && manual.P && Math.hypot(manual.P[0]-manual.S[0],manual.P[1]-manual.S[1])>0.05){
+            const L=(manual.type==='arc')?_dcArcLead(manual.P, manual.S, manual.T):null;
+            if(L) chosen={bk:manual.bk,tp:manual.tp,S:manual.S,A:L.A,O:L.O,g:L.g,_man:1,sweep:L.sweep};
+            else chosen={bk:manual.bk,tp:manual.tp,S:manual.S,A:manual.P.slice(),line:true,_man:1};
+          }
+        }
         // === AMORCE ROBUSTE : demi-cercle du pole vers le point du contour le plus proche (AUTO) ===
-        if(forced){
+        else if(forced){
           nfBk=forced.bk; nfTp=forced.tp;   // le départ est FORCÉ au point choisi (même sans arc)
           if(ARC){
             let N=[forced.T[1],-forced.T[0]]; const eps=0.18;
@@ -15383,7 +15748,20 @@ function buildLaserBody(){
           }
         }
         const bk=chosen?chosen.bk:nfBk, tp=chosen?chosen.tp:nfTp;
-        const a=base[bk],b=base[(bk+1)%nB]; const St=chosen?chosen.S:[a[0]+(b[0]-a[0])*tp,a[1]+(b[1]-a[1])*tp];
+        const a=base[bk],b=base[(bk+1)%nB]; let St=chosen?chosen.S:[a[0]+(b[0]-a[0])*tp,a[1]+(b[1]-a[1])*tp];
+        // VRAI CERCLE : le départ doit être SUR le cercle, pas sur une corde du polygone (sinon le G2/G3
+        // complet a un rayon trop petit : R·cos(7,5°) = -0,86 % -> un Ø18 sortait Ø17,85). On ramène le
+        // départ sur le cercle ; l'amorce auto est translatée (reste tangente), l'arc manuel est recalculé.
+        const _fcS=_fitCircle(base);
+        if(_fcS){ const vx=St[0]-_fcS.cx, vy=St[1]-_fcS.cy, vl=Math.hypot(vx,vy)||1;
+          const St2=[_fcS.cx+vx/vl*_fcS.r, _fcS.cy+vy/vl*_fcS.r], dlt=[St2[0]-St[0],St2[1]-St[1]];
+          if(chosen){
+            if(chosen._man && !chosen.line && chosen.A){ const Td=[b[0]-a[0],b[1]-a[1]]; let Tt=[-vy/vl, vx/vl]; if(Tt[0]*Td[0]+Tt[1]*Td[1]<0) Tt=[-Tt[0],-Tt[1]];
+              const L2=_dcArcLead(chosen.A, St2, Tt); chosen=L2?Object.assign({},chosen,{S:St2,O:L2.O,g:L2.g,sweep:L2.sweep}):Object.assign({},chosen,{S:St2,line:true}); }
+            else if(chosen.line){ chosen=Object.assign({},chosen,{S:St2}); }
+            else if(chosen.A && chosen.O){ chosen=Object.assign({},chosen,{S:St2, A:[chosen.A[0]+dlt[0],chosen.A[1]+dlt[1]], O:[chosen.O[0]+dlt[0],chosen.O[1]+dlt[1]]}); }
+          }
+          St=St2; }
         const rot=[St]; for(let k=1;k<=nB;k++) rot.push(base[(bk+k)%nB]); rot.push([St[0],St[1]]);
         c.poly=rot; c.start=[St[0],St[1]];
         // VRAI CERCLE (dessiné, importé ou converti) -> UN SEUL G2 parfait au lieu des facettes.
@@ -15404,7 +15782,19 @@ function buildLaserBody(){
       }
     }
     const S=c.start;
-    if(chosen){
+    if(chosen && chosen.line){
+      head='G1 X'+_lc(chosen.A[0])+' Y'+_lc(chosen.A[1])+Fstr+'   ;percage (rentree choisie a la main)\n'
+          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
+          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+          +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;LEAD droit (rentree manuelle)\n';
+    }
+    else if(chosen && chosen._man){
+      head='G1 X'+_lc(chosen.A[0])+' Y'+_lc(chosen.A[1])+Fstr+'   ;percage (rentree choisie a la main)\n'
+          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
+          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+          +chosen.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(chosen.O[0]-chosen.A[0])+' J'+_lc(chosen.O[1]-chosen.A[1])+'   ;LEAD arc tangent (rentree manuelle)\n';
+    }
+    else if(chosen){
       head='G1 X'+_lc(chosen.A[0])+' Y'+_lc(chosen.A[1])+Fstr+'   ;percage au coeur de la zone (loin du bord)\n'
           +'G1 Z0   ;redescendre sur la tole avant de percer\n'
           +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
@@ -15419,7 +15809,9 @@ function buildLaserBody(){
     }
     // Parcours réel (ordre de passage) pour l'affichage des flèches mauves — n'influence PAS le code.
     try{ let pts=(c.poly||[]).map(q=>[q[0],q[1]]); if(c._closed && _polyVsArc(c)) pts=pts.slice().reverse();
-      _prev.push({pts, closed:!!c._closed, start:S?[S[0],S[1]]:null, lead:chosen?{A:chosen.A.slice(),O:chosen.O.slice(),g:chosen.g}:null}); }catch(e){}
+      _prev.push({pts, closed:!!c._closed, start:S?[S[0],S[1]]:null, key:c.key, orig:c._orig, ob:c._ob, off:c._userOff||0, dir:(c._closed?_effDir(c):'auto'), waste:wasteInside,
+        lead:chosen?{A:chosen.A.slice(),O:chosen.O?chosen.O.slice():null,g:chosen.g||null,line:!!chosen.line,man:!!chosen._man,sweep:(chosen.sweep!=null?chosen.sweep:Math.PI),S:[S[0],S[1]]}:null,
+        manDirect:!!(_man && _man.type==='direct') }); }catch(e){}
     return head + c.moves.join('\n')+'\n'
       +'TC_LASER_OFF(2)\n'
       +'G1 Z'+_lc(ZL)+'   ;lever la tete pour degager la piece coupee';
@@ -24085,6 +24477,8 @@ function openGcSim(gc, gcList){
     }
   }
 
+  // Seb : plus de simulation 2D -> on passe DIRECTEMENT à la vue 3D (mêmes mouvements chargés).
+  if(typeof openSim3D==='function'){ openSim3D(); return; }
   document.getElementById('gcSimModal').classList.add('open');
 
   // Init canvas après affichage du modal
@@ -29842,53 +30236,6 @@ function _s3dStartRender() {
       <div id="simCode" style="flex:1;min-height:140px;max-height:62vh;overflow:auto;font-family:var(--mono);font-size:10px;line-height:1.5;background:#0d1117;border:1px solid var(--brd);border-radius:6px;padding:4px"></div>
     </div><!-- /sim-right -->
     </div><!-- /sim-layout -->
-  </div>
-</div>
-
-<!-- ══ FENÊTRE DÉCOUPE (dédiée) : Chute/Pièce · Départs · Sens · Rentrée · Décalage ══ -->
-<div class="modal-bg" id="laserPaintModal" style="align-items:stretch;padding:0">
-  <div style="width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg)">
-    <!-- Titre + onglets -->
-    <div style="display:flex;align-items:center;gap:6px;padding:9px 12px;background:var(--surf);border-bottom:1px solid var(--brd);flex-wrap:wrap">
-      <span style="font-size:14px;font-weight:800;color:var(--acc);margin-right:6px">✂️ Découpe</span>
-      <button id="lpt_paint" onclick="_lpSetTab('paint')" style="padding:7px 12px;border-radius:8px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">🎨 Chute / Pièce</button>
-      <button id="lpt_start" onclick="_lpSetTab('start')" style="padding:7px 12px;border-radius:8px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">📍 Départs</button>
-      <button id="lpt_dir"   onclick="_lpSetTab('dir')"   style="padding:7px 12px;border-radius:8px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↻ Sens</button>
-      <button id="lpt_lead" disabled title="Arrive à l'étape suivante" style="padding:7px 12px;border-radius:8px;border:1.5px dashed var(--brd2);background:transparent;color:var(--txt3);cursor:not-allowed;font-size:12px;opacity:.55">🌀 Rentrée (bientôt)</button>
-      <button id="lpt_off"  disabled title="Arrive à l'étape suivante" style="padding:7px 12px;border-radius:8px;border:1.5px dashed var(--brd2);background:transparent;color:var(--txt3);cursor:not-allowed;font-size:12px;opacity:.55">⧉ Décalage (bientôt)</button>
-      <div style="flex:1"></div>
-      <button onclick="closeLaserPaint()" style="padding:7px 18px;border-radius:8px;border:none;background:var(--acc);color:#04240f;cursor:pointer;font-weight:800">✓ Valider</button>
-    </div>
-    <!-- Outils de l'onglet actif -->
-    <div style="padding:8px 12px;background:var(--surf2);border-bottom:1px solid var(--brd);min-height:44px;display:flex;align-items:center">
-      <div id="lpp_paint" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--txt2)">Pot de peinture : clique dans une zone →</span>
-        <button id="lp_chute" onclick="_lpSetTool(1)" style="padding:6px 12px;border-radius:8px;border:none;background:#ef4444;color:#fff;cursor:pointer;font-weight:700">🔴 Chute (tombe)</button>
-        <button id="lp_piece" onclick="_lpSetTool(2)" style="padding:6px 12px;border-radius:8px;border:none;background:#22c55e;color:#04240f;cursor:pointer;font-weight:700">🟢 Pièce (garder)</button>
-        <button id="lp_gomme" onclick="_lpSetTool(0)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer">🧽 Effacer</button>
-        <button onclick="_lpReset()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer">↺ Effacer la peinture</button>
-      </div>
-      <div id="lpp_start" style="display:none;align-items:center;gap:8px;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--txt2)">Clique sur un contour = le laser rentre <b style="color:#00e5ff">ici</b> (point cyan). Re-clic dessus = enlever.</span>
-        <button onclick="_lpClearStarts()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer">✖ Effacer les départs</button>
-      </div>
-      <div id="lpp_dir" style="display:none;align-items:center;gap:8px;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--txt2)"><b>Toutes les coupes :</b></span>
-        <button type="button" id="lcd_auto" onclick="setLaserCutDir('auto')" style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--acc);background:var(--acc);color:#111;cursor:pointer;font-size:12px;font-weight:800">Auto</button>
-        <button type="button" id="lcd_cw"   onclick="setLaserCutDir('cw')"   style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↻ Horaire</button>
-        <button type="button" id="lcd_ccw"  onclick="setLaserCutDir('ccw')"  style="padding:6px 11px;border-radius:7px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer;font-size:12px;font-weight:600">↺ Antihoraire</button>
-        <span style="font-size:11px;color:var(--txt2);margin-left:6px">· <b>Une seule forme :</b> clique sur son contour pour inverser <i>son</i> sens (⇄).</span>
-        <button onclick="_lpClearFlips()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--brd2);background:var(--surf);color:var(--txt);cursor:pointer">✖ Annuler les inversions</button>
-      </div>
-    </div>
-    <div id="lpViewport" onwheel="_lpWheel(event)" onpointerdown="_lpPanStart(event)" oncontextmenu="return false" style="flex:1;overflow:hidden;position:relative;background:#0d1117;touch-action:none">
-      <canvas id="lpCanvas" onclick="_lpClickCanvas(event)" style="position:absolute;left:0;top:0;background:#fff;cursor:crosshair;box-shadow:0 4px 20px rgba(0,0,0,.5)"></canvas>
-      <div style="position:absolute;bottom:8px;left:10px;font-size:10px;color:rgba(255,255,255,.45);pointer-events:none">molette = zoom · clic droit/molette pressée glissé = déplacer</div>
-    </div>
-    <div style="padding:8px 12px;background:var(--surf);border-top:1px solid var(--brd);font-size:11px;color:var(--txt2);display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-      <span><b style="color:#9333ea">▸ mauve</b> = sens de coupe · <b style="color:#f97316">◠ orange</b> = rentrée (perçage + arc) · <b style="color:#00b8d4">●</b> = départ choisi</span>
-      <span id="lpSummary" style="color:var(--acc);font-weight:700"></span>
-    </div>
   </div>
 </div>
 
