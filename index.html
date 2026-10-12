@@ -161,6 +161,12 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-12 — ID : ORDRE DE COUPE « à la suite »
+ [CHANGÉ] Plus proche voisin mesuré depuis le CENTRE de chaque pièce (avant : 1er point du trait dessiné ->
+   une pièce dont le trait commence au bout d'une queue était sautée puis reprise : la tête repassait
+   au-dessus de pièces déjà coupées, qui peuvent se relever). Départ depuis le coin du zéro. Règle de
+   sécurité inchangée : intérieurs d'abord, contour extérieur en dernier. Seul l'ORDRE change (aucune cote).
+
 -- 2026-10-12 — IC : FIN DE PROGRAMME laser plus sûre (demande Seb)
  [CHANGÉ] Pied de programme : au lieu de « G90 G01 X00 Y0 Z0 F5000 » (retour en DIAGONALE en descendant au
    ras de la tôle), on fait : G90 G01 Z10 F5000 (monter) -> G90 G01 X0 Y0 (aller au SET_POS) -> G90 G01 Z0
@@ -1834,7 +1840,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-IC ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-12-ID ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -15713,10 +15719,15 @@ function buildLaserBody(){
   // reste donc coupe EN DERNIER (il libere la piece a la fin).
   const _byDepth={}; for(const c of contours){ (_byDepth[c._depth]=_byDepth[c._depth]||[]).push(c); }
   const _depths=Object.keys(_byDepth).map(Number).sort((a,b)=>b-a);
-  const order=[]; let _cur=[0,0];
+  // On mesure depuis le CENTRE de chaque pièce (et plus depuis le 1er point du trait dessiné, qui peut être
+  // au bout d'une queue et faire « sauter » une pièce puis revenir dessus -> la tête repassait au-dessus de
+  // pièces déjà libres, qui peuvent s'être relevées). Départ = le coin du zéro (coin bas des contours).
+  const _ctr=c=>c._bb?[(c._bb[0]+c._bb[2])/2,(c._bb[1]+c._bb[3])/2]:(c._c||c.start||[0,0]);
+  let _mnx=1e18,_mny=1e18; for(const c of contours){ if(c._bb){ if(c._bb[0]<_mnx)_mnx=c._bb[0]; if(c._bb[1]<_mny)_mny=c._bb[1]; } }
+  const order=[]; let _cur=(_mnx<1e17)?[_mnx,_mny]:[0,0];
   for(const d of _depths){ const grp=_byDepth[d].slice();
-    while(grp.length){ let bi=0,bd=1e18; for(let k=0;k<grp.length;k++){ const s=grp[k].start||grp[k]._c||[0,0]; const dd=(s[0]-_cur[0])**2+(s[1]-_cur[1])**2; if(dd<bd){bd=dd;bi=k;} }
-      const nx=grp.splice(bi,1)[0]; order.push(nx); const p=nx.poly; _cur=(p&&p.length)?p[p.length-1]:(nx.start||_cur); } }
+    while(grp.length){ let bi=0,bd=1e18; for(let k=0;k<grp.length;k++){ const s=_ctr(grp[k]); const dd=(s[0]-_cur[0])**2+(s[1]-_cur[1])**2; if(dd<bd-1e-9){bd=dd;bi=k;} }
+      const nx=grp.splice(bi,1)[0]; order.push(nx); _cur=_ctr(nx); } }
   // CHUTE globale : un point est "chute" s'il est a l'interieur d'un nombre PAIR
   // de contours (regle pair-impair). Sert a verifier qu'une amorce ne traverse
   // AUCUN autre trait (ni le contour courant, ni un ilot a garder).
