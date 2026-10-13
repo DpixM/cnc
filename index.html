@@ -161,6 +161,15 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-13 — IH : NESTING — on peut cliquer TOUTES les formes + formes identiques remplacées
+ [FIX] Impossible de choisir sa pièce si le contour n'était pas fermé au centième (SVG importés, tracés dont
+   le dernier point ne retombe pas pile sur le 1er). Maintenant : choix au niveau du TRAIT (un SVG qui contient
+   9 haricots = 9 pièces possibles), tout contour de 3 points ou plus compte (fermé virtuellement ; alerte si
+   le trou dépasse 0,3 mm). Clic dans un trou = la pièce autour.
+ [AJOUT] Formes IDENTIQUES ailleurs dans le dessin (même surface, même tour, mêmes trous) : détectées,
+   « Garder » les remplace aussi (case cochée par défaut) -> plus de pièces en double coupées par-dessus.
+   Le nombre proposé = nombre de pièces identiques trouvées. Hors zone CIP.
+
 -- 2026-10-13 — IG : PAGE « NESTING » (imbrication) — remplace l'Atelier / ciseaux (demande Seb)
  [AJOUT] Parcours laser : Mode → Dessin → 📦 Nesting → Chute/Pièce → Découpe → G-code.
    On clique la pièce (ce qui est dedans suit), nombre (ou « le maximum »), écart entre pièces, tôle =
@@ -1871,7 +1880,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-13-IG ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-13-IH ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2782,7 +2791,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       </div>
       <div class="dccard">
         <div class="dct"><span class="dcn" style="background:#3b82f6;color:#fff">2</span>Combien, et l'écart</div>
-        <div class="dcrow"><span class="dcs">Nombre :</span><input id="nsN" type="number" value="10" min="1" step="1" style="width:70px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:7px;color:var(--txt);font-size:13px;font-weight:700;padding:5px 6px" oninput="_ns.res=null;_nsPanel();_nsDraw()">
+        <div class="dcrow"><span class="dcs">Nombre :</span><input id="nsN" type="number" value="10" min="1" step="1" style="width:70px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:7px;color:var(--txt);font-size:13px;font-weight:700;padding:5px 6px" oninput="_ns.nTouched=true;_ns.res=null;_nsPanel();_nsDraw()">
           <label class="dcs" style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="nsMax" onchange="_ns.res=null;_nsPanel();_nsDraw()"> le maximum possible</label></div>
         <div class="dcrow"><span class="dcs">Écart entre pièces :</span><input id="nsGap" type="number" value="0.2" min="0" step="0.05" style="width:70px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:7px;color:var(--txt);font-size:13px;font-weight:700;padding:5px 6px" oninput="_ns.res=null;_nsPanel();_nsDraw()"><span class="dcs">mm</span></div>
       </div>
@@ -15742,42 +15751,49 @@ async function _nsRun(part, sheet, opts, progress){
 const _ns={view:{s:4,tx:0,ty:0}, recs:[], piece:null, sheetObj:null, pickSheet:false, res:null, busy:false, stop:false, undo:null, hover:null, msg:'', msgT:null};
 const _nsPrimClose=t=>(t==='rect'||t==='tri'||t==='star'||t==='oblong'||t==='gear'||t==='polygon'||t==='ellipse');
 function _nsFlat(){ const out=[]; for(const o of paintObjects){ if(!o) continue; if(o.type==='group'&&o.children){ for(const c of o.children) out.push(c); } else out.push(o); } return out; }
-function _nsStrokes(o){ let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; } const strokes=[],closed=[];
-  for(let s of st){ if(!s||s.length<2) continue; s=s.map(q=>[q[0],q[1]]); const a=s[0],b=s[s.length-1],gap=Math.hypot(a[0]-b[0],a[1]-b[1]); let cl=false;
-    if(_nsPrimClose(o.type)){ if(gap>1e-6) s.push([a[0],a[1]]); cl=true; } else if(o.type==='line'||o._arc) cl=false; else cl=(gap<=0.01&&s.length>3);
-    strokes.push(s); closed.push(cl); } return {strokes,closed}; }
+function _nsStrokes(o){ let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; } const strokes=[],closed=[],gaps=[];
+  for(let s of st){ if(!s||s.length<2) continue; s=s.map(q=>[q[0],q[1]]); const a=s[0],b=s[s.length-1],gap=Math.hypot(a[0]-b[0],a[1]-b[1]);
+    // pour le NESTING, tout trait de 3 points ou plus est vu comme une forme (fermée virtuellement) — sauf traits droits / arcs
+    const cl=!(o.type==='line'||o._arc) && s.length>=3; if(cl && gap>1e-9) s.push([a[0],a[1]]);
+    strokes.push(s); closed.push(cl); gaps.push(_nsPrimClose(o.type)?0:gap); } return {strokes,closed,gaps}; }
 function _nsBuildRecs(){ const recs=[];
-  for(const o of _nsFlat()){ if(o.type==='dim'||o.type==='point'||o.type==='constraint') continue; const {strokes,closed}=_nsStrokes(o); if(!strokes.length) continue;
-    let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18; for(const s of strokes) for(const q of s){ x0=Math.min(x0,q[0]); y0=Math.min(y0,q[1]); x1=Math.max(x1,q[0]); y1=Math.max(y1,q[1]); }
-    let area=0; strokes.forEach((s,i)=>{ if(closed[i]) area=Math.max(area,Math.abs(polyArea(s.slice(0,-1)))); });
-    recs.push({o,strokes,closed,bb:[x0,y0,x1,y1],area,anyClosed:closed.some(Boolean)}); }
+  for(const o of _nsFlat()){ if(o.type==='dim'||o.type==='point'||o.type==='constraint') continue; const {strokes,closed,gaps}=_nsStrokes(o);
+    strokes.forEach((s,si)=>{ if(!closed[si]) return; let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18,per=0; for(let i=0;i<s.length;i++){ const q=s[i]; x0=Math.min(x0,q[0]); y0=Math.min(y0,q[1]); x1=Math.max(x1,q[0]); y1=Math.max(y1,q[1]); if(i) per+=Math.hypot(q[0]-s[i-1][0],q[1]-s[i-1][1]); }
+      recs.push({o, si, nS:strokes.length, pts:s, gap:gaps[si], bb:[x0,y0,x1,y1], area:Math.abs(polyArea(s.slice(0,-1))), per}); }); }
   _ns.recs=recs; }
 const _nsM2S=q=>[_ns.view.tx+q[0]*_ns.view.s, _ns.view.ty+q[1]*_ns.view.s];
 const _nsS2M=(x,y)=>[(x-_ns.view.tx)/_ns.view.s,(y-_ns.view.ty)/_ns.view.s];
 function _nsToPath(s){ const p=[]; const n=(s.length>1&&Math.hypot(s[0][0]-s[s.length-1][0],s[0][1]-s[s.length-1][1])<1e-9)?s.length-1:s.length; for(let i=0;i<n;i++) p.push({X:Math.round(s[i][0]*_NS_S),Y:Math.round(s[i][1]*_NS_S)}); return p; }
-function _nsRegionOuter(rec){ const C=_nsCL(); const paths=rec.strokes.filter((s,i)=>rec.closed[i]).map(_nsToPath); if(!paths.length) return [];
+function _nsRegionOuter(rec){ const C=_nsCL(); const paths=[_nsToPath(rec.pts)]; if(paths[0].length<3) return [];
   const c=new C.Clipper(); c.AddPaths(paths,C.PolyType.ptSubject,true); const o=new C.Paths(); c.Execute(C.ClipType.ctUnion,o,C.PolyFillType.pftEvenOdd,C.PolyFillType.pftEvenOdd);
   return o.filter(p=>C.Clipper.Area(p)>0); }
 function _nsDistStroke(m,s){ let bd=1e18; for(let i=0;i+1<s.length;i++){ const a=s[i],b=s[i+1]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-12; let t=((m[0]-a[0])*dx+(m[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const d=Math.hypot(m[0]-(a[0]+t*dx),m[1]-(a[1]+t*dy)); if(d<bd) bd=d; } return bd; }
 function _nsPick(m){ const tol=10/_ns.view.s; let best=null,bd=1e18;
-  for(const r of _ns.recs) for(const s of r.strokes){ const d=_nsDistStroke(m,s); if(d<bd){bd=d;best=r;} }
-  if(best && bd<=tol && best.anyClosed) return best;
-  let inn=null; for(const r of _ns.recs){ if(!r.anyClosed) continue; if(r.strokes.some((s,i)=>r.closed[i]&&_pointInPoly(m,s)) && (!inn||r.area<inn.area)) inn=r; }
-  return inn; }
-// La pièce = la forme cliquée + tout ce qui est DEDANS (ses trous, ses gravures…)
-function _nsPieceFrom(rec){ const objs=[rec.o]; const outer=rec.strokes.filter((s,i)=>rec.closed[i]);
-  for(const r of _ns.recs){ if(r===rec||r.o===(_ns.sheetObj)) continue; if(r.bb[0]<rec.bb[0]-1e-6||r.bb[1]<rec.bb[1]-1e-6||r.bb[2]>rec.bb[2]+1e-6||r.bb[3]>rec.bb[3]+1e-6) continue;
-    const p=r.strokes[0][0]; if(outer.some(s=>_pointInPoly(p,s))) objs.push(r.o); }
-  return {rec, objs}; }
+  for(const r of _ns.recs){ const d=_nsDistStroke(m,r.pts); if(d<bd){bd=d;best=r;} }
+  let inn=null; for(const r of _ns.recs){ if(_pointInPoly(m,r.pts) && (!inn||r.area<inn.area)) inn=r; }
+  // clic sur un trait : ce trait ; clic dans le vide d'un trou : la PIÈCE autour (pas le trou)
+  if(best && bd<=tol) return _nsOuterOf(best);
+  return inn?_nsOuterOf(inn):null; }
+// remonte au contour EXTÉRIEUR qui contient ce trait (un trou -> sa pièce), hors tôle-chute
+function _nsOuterOf(r){ let cur=r; for(let k=0;k<20;k++){ let up=null; for(const q of _ns.recs){ if(q===cur||_nsIsSheet(q)||q.area<=cur.area) continue; if(_pointInPoly(cur.pts[0],q.pts) && (!up||q.area<up.area)) up=q; } if(!up) break; cur=up; } return cur; }
+function _nsIsSheet(r){ return !!(_ns.sheetObj && r.o===_ns.sheetObj); }
+// La pièce = le contour cliqué + tous les traits DEDANS (trous, gravures…), même s'ils sont dans d'autres objets.
+function _nsInnerOf(rec){ return _ns.recs.filter(r=>r!==rec && !_nsIsSheet(r) && r.area<rec.area && r.bb[0]>=rec.bb[0]-1e-6 && r.bb[1]>=rec.bb[1]-1e-6 && r.bb[2]<=rec.bb[2]+1e-6 && r.bb[3]<=rec.bb[3]+1e-6 && _pointInPoly(r.pts[0],rec.pts)); }
+function _nsPieceFrom(rec){ const items=[rec].concat(_nsInnerOf(rec));
+  // formes IDENTIQUES ailleurs (même surface, même tour, même nombre de trous) -> remplacées aussi au moment de « Garder »
+  const same=[]; for(const r of _ns.recs){ if(items.includes(r)||_nsIsSheet(r)) continue; if(Math.abs(r.area-rec.area)>rec.area*0.005+0.01 || Math.abs(r.per-rec.per)>rec.per*0.005+0.01) continue;
+    if(_ns.recs.some(q=>q!==r&&q.area>r.area&&_pointInPoly(r.pts[0],q.pts)&&!_nsIsSheet(q))) continue;   // pas un trou d'une autre pièce
+    const inn=_nsInnerOf(r); if(inn.length!==items.length-1) continue; if(same.some(g=>g.items.includes(r))) continue; same.push({rec:r, items:[r].concat(inn)}); }
+  return {rec, items, objs:[...new Set(items.map(i=>i.o))], same}; }
 function _nsSay(t){ _ns.msg=t||''; clearTimeout(_ns.msgT); if(t) _ns.msgT=setTimeout(()=>{ _ns.msg=''; _nsHint(); },3000); _nsHint(); }
 function _nsHint(){ const el=document.getElementById('nsHint'); if(!el) return; let t;
   if(_ns.msg) t=_ns.msg; else if(_ns.pickSheet) t='Clique la forme qui représente ta CHUTE (le contour de ta tôle).'; else if(!_ns.piece) t='① Clique DANS ta pièce (ses trous suivent tout seuls).'; else if(!_ns.res) t='② Règle combien, l\'écart et la tôle, puis « 📦 Imbriquer ».'; else t='③ Si ça te va : « ✓ Garder dans le dessin ».';
   el.textContent=t; el.style.background=_ns.msg?'rgba(22,101,52,.92)':'rgba(17,24,39,.8)'; }
 function _nsSheetDef(){
-  if(_ns.sheetObj){ const r=_ns.recs.find(q=>q.o===_ns.sheetObj); if(!r) { _ns.sheetObj=null; return _nsSheetDef(); } const paths=_nsRegionOuter(r); if(!paths.length) return null;
+  if(_ns.sheetObj){ const r=_ns.recs.filter(q=>q.o===_ns.sheetObj).sort((p,q)=>q.area-p.area)[0]; if(!r) { _ns.sheetObj=null; return _nsSheetDef(); } const paths=_nsRegionOuter(r); if(!paths.length) return null;
     return {rect:false, paths, bbmm:r.bb, label:'ta chute dessinée'}; }
   const W=parseFloat(document.getElementById('nsW')?.value)||0, H=parseFloat(document.getElementById('nsH')?.value)||0; if(!(W>0&&H>0)) return null;
-  const pr=_ns.piece?_ns.piece.rec:null; const ox=pr?pr.bb[0]:0, oy=pr?pr.bb[1]:0;   // la tôle se pose là où était la pièce
+  const pr=_ns.piece?_ns.piece.rec:null; if(pr){ _ns.lastO=[pr.bb[0],pr.bb[1]]; } const ox=pr?pr.bb[0]:((_ns.lastO||[0,0])[0]), oy=pr?pr.bb[1]:((_ns.lastO||[0,0])[1]);   // la tôle se pose là où était la pièce (et y reste après « Garder »)
   return {rect:true, W:Math.round(W*_NS_S), H:Math.round(H*_NS_S), ox, oy, Wmm:W, Hmm:H, label:W+' × '+H+' mm'}; }
 function _nsAngles(){ const v=document.getElementById('nsRot')?.value||'15'; const out=[];
   if(v==='0'){ out.push(0); } else if(v==='180'){ out.push(0,Math.PI); } else { const st=+v; for(let a=0;a<360-1e-9;a+=st) out.push(a*Math.PI/180); } return out; }
@@ -15809,9 +15825,16 @@ function _nsCopyObj(o,T){
   if(isCirc){ const c=JSON.parse(JSON.stringify(o)); c.id=_nsNewId(); const p=T(o.x,o.y); c.x=p[0]; c.y=p[1]; return [c]; }
   if(o.type==='line'){ const c=JSON.parse(JSON.stringify(o)); c.id=_nsNewId(); const a=T(o.x1,o.y1),b=T(o.x2,o.y2); c.x1=a[0];c.y1=a[1];c.x2=b[0];c.y2=b[1]; return [c]; }
   if(o.pts && (o.type==='free'||o._poly||o._arc)){ const c=JSON.parse(JSON.stringify(o)); c.id=_nsNewId(); c.pts=o.pts.map(q=>T(q[0],q[1])); if(c._arc){ c._arc.p1=T(o._arc.p1[0],o._arc.p1[1]); c._arc.p2=T(o._arc.p2[0],o._arc.p2[1]); } return [c]; }
-  // autres formes (rectangle tourné, texte, étoile…) : converties en contours libres
-  const {strokes,closed}=_nsStrokes(o); return strokes.map((s,i)=>{ const f={id:_nsNewId(),type:'free',pts:s.map(q=>T(q[0],q[1])),strokeW:o.strokeW||0.2}; if(closed[i]) f._poly=true; if(o.toolId) f.toolId=o.toolId; return f; });
-}
+  const {strokes}=_nsStrokes(o); return strokes.map(s=>_nsFreeFrom(o,s,T)); }
+function _nsFreeFrom(o,s,T){ const f={id:_nsNewId(),type:'free',pts:s.map(q=>T?T(q[0],q[1]):[q[0],q[1]]),strokeW:o.strokeW||0.2}; const a=s[0],b=s[s.length-1]; if(s.length>=3&&Math.hypot(a[0]-b[0],a[1]-b[1])<0.3) f._poly=true; if(o.toolId) f.toolId=o.toolId; return f; }
+// copie des éléments d'une pièce : par objet entier quand c'est possible
+function _nsCopyItems(items,T){ const out=[]; const byObj=new Map(); for(const it of items){ if(!byObj.has(it.o)) byObj.set(it.o,[]); byObj.get(it.o).push(it); }
+  for(const [o,its] of byObj){ if(its.length===its[0].nS) out.push(..._nsCopyObj(o,T)); else for(const it of its) out.push(_nsFreeFrom(o,it.pts,T)); } return out; }
+// retirer des éléments : objet entier si tous ses traits partent, sinon on garde ses AUTRES traits en contours libres
+function _nsRemoveItems(items){ const byObj=new Map(); for(const it of items){ if(!byObj.has(it.o)) byObj.set(it.o,new Set()); byObj.get(it.o).add(it.si); }
+  for(const [o,set] of byObj){ const {strokes,closed}=_nsStrokes(o);
+    if(set.size<strokes.length){ strokes.forEach((s,si)=>{ if(set.has(si)) return; const f=_nsFreeFrom(o,closed[si]?s:s,null); paintObjects.push(f); }); }
+    _nsRemove(o); } }
 function _nsRemove(o){ let i=paintObjects.indexOf(o); if(i>=0) paintObjects.splice(i,1); else { for(const g of paintObjects){ if(g&&g.type==='group'&&g.children){ const j=g.children.indexOf(o); if(j>=0){ g.children.splice(j,1); break; } } } }
   const id=o.id; for(let k=paintObjects.length-1;k>=0;k--){ const d=paintObjects[k]; if(d&&(d.type==='dim'||d.type==='constraint')&&(d.ref===id||d.ref2===id)) paintObjects.splice(k,1); }
   if(typeof _constraints!=='undefined') _constraints=_constraints.filter(c=>String(c.a)!==String(id)&&String(c.b).split('#')[0]!==String(id)); }
@@ -15820,9 +15843,11 @@ function _nsPlacementsMm(){ const R=_ns.res; if(!R||!R.best) return []; const sh
   return R.best.placed.map(p=>({a:p.a, X:ox+p.X/_NS_S, Y:oy+p.Y/_NS_S})); }
 function _nsKeep(){ const R=_ns.res; if(!R||!R.best||!R.best.placed.length){ _nsSay('Rien à garder'); return; }
   _ns.undo=JSON.stringify(paintObjects);
-  const cx=R.part.cx, cy=R.part.cy; const objs=_ns.piece.objs.slice(); const added=[];
-  for(const p of _nsPlacementsMm()){ const T=_nsXform(cx,cy,p.a,p.X,p.Y); for(const o of objs) for(const c of _nsCopyObj(o,T)){ paintObjects.push(c); added.push(c); } }
-  for(const o of objs) _nsRemove(o);                       // la pièce d'origine est remplacée par les copies
+  const cx=R.part.cx, cy=R.part.cy; const added=[]; const items=_ns.piece.items.slice();
+  for(const p of _nsPlacementsMm()){ const T=_nsXform(cx,cy,p.a,p.X,p.Y); for(const c of _nsCopyItems(items,T)){ paintObjects.push(c); added.push(c); } }
+  // la pièce d'origine (et ses copies identiques si coché) sont remplacées par le nesting
+  let rem=items.slice(); const repl=document.getElementById('nsSame'); if(repl && repl.checked) for(const g of _ns.piece.same) rem=rem.concat(g.items);
+  _nsRemoveItems(rem);
   if(_ns.sheetObj){ _nsRemove(_ns.sheetObj); _ns.sheetObj=null; }   // le contour de la chute ne doit PAS être coupé
   if(typeof pushHistory==='function') pushHistory(); if(typeof updateObjCount==='function') updateObjCount(); if(typeof redrawCanvas==='function') redrawCanvas();
   const n=R.best.placed.length; _ns.res=null; _ns.piece=null; _nsBuildRecs(); _nsSay('✓ '+n+' pièces mises dans ton dessin'); _nsPanel(); _nsFitView(); _nsDraw(); }
@@ -15833,7 +15858,9 @@ function _nsClear(){ _ns.res=null; _nsPanel(); _nsFitView(); _nsDraw(); }
 function _nsSheetRect(){ _ns.sheetObj=null; _ns.pickSheet=false; _ns.res=null; _nsPanel(); _nsFitView(); _nsDraw(); }
 function _nsSheetPick(){ _ns.pickSheet=!_ns.pickSheet; _nsPanel(); _nsHint(); }
 function _nsPanel(){
-  const pi=document.getElementById('nsPieceInfo'); if(pi){ if(_ns.piece){ const r=_ns.piece.rec; pi.innerHTML='Pièce : <b>'+(+(r.bb[2]-r.bb[0]).toFixed(2))+' × '+(+(r.bb[3]-r.bb[1]).toFixed(2))+' mm</b>'+(_ns.piece.objs.length>1?(' + '+(_ns.piece.objs.length-1)+' élément(s) dedans'):''); } else pi.textContent='Aucune pièce choisie.'; }
+  const pi=document.getElementById('nsPieceInfo'); if(pi){ if(_ns.piece){ const r=_ns.piece.rec, k=_ns.piece.same.length; pi.innerHTML='Pièce : <b>'+(+(r.bb[2]-r.bb[0]).toFixed(2))+' × '+(+(r.bb[3]-r.bb[1]).toFixed(2))+' mm</b>'+(_ns.piece.items.length>1?(' + '+(_ns.piece.items.length-1)+' élément(s) dedans'):'')
+      +(r.gap>0.3?'<br><span style="color:#f97316">⚠ contour pas fermé (trou de '+(+r.gap.toFixed(2))+' mm) : il sera coupé tel quel</span>':'')
+      +(k?('<br><label style="display:flex;gap:6px;align-items:center;margin-top:5px;color:var(--txt);font-weight:600;cursor:pointer"><input type="checkbox" id="nsSame" checked> Remplacer aussi les <b>'+k+'</b> autre(s) forme(s) identique(s) du dessin</label>'):''); } else pi.textContent='Aucune pièce choisie.'; }
   const nIn=document.getElementById('nsN'), mx=document.getElementById('nsMax'); if(nIn&&mx) nIn.disabled=mx.checked;
   const si=document.getElementById('nsSheetInfo'); if(si) si.innerHTML=_ns.sheetObj?'Tôle = <b>ta chute dessinée</b> <button class="dcb" style="margin-left:6px;padding:3px 8px" onclick="_nsSheetRect()">↺ Rectangle</button>':(_ns.pickSheet?'<b style="color:#f59e0b">Clique ta chute dans le dessin…</b>':'');
   const rb=document.getElementById('nsRectBox'); if(rb) rb.style.opacity=_ns.sheetObj?'.35':'1';
@@ -15871,17 +15898,16 @@ function _nsDrawNow(){
     x.restore(); }
   const res=_ns.res&&_ns.res.best;
   // dessin actuel (estompé quand il y a un résultat)
-  for(const r of _ns.recs){ const isPiece=_ns.piece&&_ns.piece.objs.includes(r.o), isSheet=(_ns.sheetObj===r.o), hov=(_ns.hover===r);
-    if(res && (isPiece||isSheet)) continue;
-    if(isPiece||hov){ x.save(); x.strokeStyle=isPiece?'rgba(245,158,11,.55)':'rgba(245,158,11,.28)'; x.lineWidth=isPiece?9:6; x.lineJoin='round'; for(const s of r.strokes){ path(s); x.stroke(); } x.restore(); }
-    x.save(); x.strokeStyle=isSheet?'#64748b':(res?'rgba(17,24,39,.25)':'#111827'); x.lineWidth=1.5; if(isSheet) x.setLineDash([6,4]); for(const s of r.strokes){ path(s); x.stroke(); } x.restore(); }
+  const pItems=_ns.piece?_ns.piece.items:[]; const sItems=_ns.piece?_ns.piece.same.flatMap(g=>g.items):[];
+  for(const r of _ns.recs){ const isP=pItems.includes(r), isS=sItems.includes(r), isSheet=_nsIsSheet(r), hov=(_ns.hover===r);
+    if(res && (isP||isSheet||(isS&&document.getElementById('nsSame')?.checked))) continue;
+    if(isP||isS||hov){ x.save(); x.strokeStyle=isP?'rgba(245,158,11,.6)':(isS?'rgba(245,158,11,.3)':'rgba(245,158,11,.25)'); x.lineWidth=isP?9:6; x.lineJoin='round'; path(r.pts); x.stroke(); x.restore(); }
+    x.save(); x.strokeStyle=isSheet?'#64748b':(res?'rgba(17,24,39,.25)':'#111827'); x.lineWidth=1.5; if(isSheet) x.setLineDash([6,4]); path(r.pts); x.stroke(); x.restore(); }
   // résultat : les copies (bleu)
-  if(res){ const R=_ns.res; const cx=R.part.cx, cy=R.part.cy; const objs=_ns.piece?_ns.piece.objs:[];
-    const strokesOf=objs.map(o=>_nsStrokes(o));
-    _nsPlacementsMm().forEach((p,k)=>{ const T=_nsXform(cx,cy,p.a,p.X,p.Y);
+  if(res){ const R=_ns.res; const cx=R.part.cx, cy=R.part.cy;
+    _nsPlacementsMm().forEach(p=>{ const T=_nsXform(cx,cy,p.a,p.X,p.Y);
       x.save(); x.strokeStyle='#2563eb'; x.fillStyle='rgba(37,99,235,.10)'; x.lineWidth=1.4; x.lineJoin='round';
-      strokesOf.forEach((so,oi)=>so.strokes.forEach((s,i)=>{ path(s.map(q=>T(q[0],q[1]))); if(oi===0&&so.closed[i]) x.fill(); x.stroke(); }));
-      x.restore(); }); }
+      pItems.forEach((it,k)=>{ path(it.pts.map(q=>T(q[0],q[1]))); if(k===0) x.fill(); x.stroke(); }); x.restore(); }); }
   _nsHint();
 }
 function _nsWire(){ const cv=document.getElementById('nsCanvas'); if(!cv||cv._nsw) return; cv._nsw=1;
@@ -15896,12 +15922,15 @@ function _nsWire(){ const cv=document.getElementById('nsCanvas'); if(!cv||cv._ns
     if(_ns.busy) return; const h=_nsPick(_nsS2M(mx,my)); if(h!==_ns.hover){ _ns.hover=h; cv.style.cursor=h?'pointer':'default'; _nsDraw(); } });
   cv.addEventListener('pointerup',e=>{ if(!down) return; const d=down; down=null; if(d.pan||_ns.busy) return; const b=cv.getBoundingClientRect(); const m=_nsS2M(e.clientX-b.left,e.clientY-b.top); const r=_nsPick(m);
     if(_ns.pickSheet){ if(r){ _ns.sheetObj=r.o; _ns.pickSheet=false; if(_ns.piece&&_ns.piece.objs.includes(r.o)) _ns.piece=null; _ns.res=null; _nsSay('Tôle = ta chute'); } _nsPanel(); _nsFitView(); _nsDraw(); return; }
-    if(r && r.o!==_ns.sheetObj){ _ns.piece=_nsPieceFrom(r); _ns.res=null; } _nsPanel(); _nsDraw(); });
+    if(r && r.o!==_ns.sheetObj){ _ns.piece=_nsPieceFrom(r); _ns.res=null; _nsDefaultN(); } _nsPanel(); _nsDraw(); });
   cv.addEventListener('pointerleave',()=>{ _ns.hover=null; _nsDraw(); });
   window.addEventListener('resize',()=>{ const pg=document.getElementById('wzp22'); if(pg&&pg.classList.contains('wz-on')) _nsDraw(); });
 }
-function _nsEnter(){ _nsWire(); _nsBuildRecs(); if(_ns.piece && !_ns.recs.some(r=>r.o===_ns.piece.rec.o)) _ns.piece=null; if(_ns.sheetObj && !_ns.recs.some(r=>r.o===_ns.sheetObj)) _ns.sheetObj=null; _ns.res=null;
-  if(!_ns.piece){ const cl=_ns.recs.filter(r=>r.anyClosed); const tops=cl.filter(r=>!cl.some(q=>q!==r&&q.area>r.area&&r.strokes[0]&&q.strokes.some((s,i)=>q.closed[i]&&_pointInPoly(r.strokes[0][0],s)))); if(tops.length===1) _ns.piece=_nsPieceFrom(tops[0]); }   // une seule pièce dans le dessin : choisie d'office
+function _nsDefaultN(){ const el=document.getElementById('nsN'); if(el && !_ns.nTouched && _ns.piece) el.value=String(1+_ns.piece.same.length); }
+function _nsEnter(){ _nsWire(); _nsBuildRecs(); if(_ns.sheetObj && !_ns.recs.some(r=>r.o===_ns.sheetObj)) _ns.sheetObj=null; _ns.res=null;
+  if(_ns.piece){ const r=_ns.recs.find(q=>q.o===_ns.piece.rec.o&&q.si===_ns.piece.rec.si); _ns.piece=r?_nsPieceFrom(r):null; }
+  if(!_ns.piece){ const tops=_ns.recs.filter(r=>!_ns.recs.some(q=>q!==r&&q.area>r.area&&_pointInPoly(r.pts[0],q.pts))); if(tops.length>=1){ const p=_nsPieceFrom(tops[0]); if(p.same.length===tops.length-1) _ns.piece=p; } }   // une seule sorte de pièce : choisie d'office
+  _nsDefaultN();
   _nsPanel(); setTimeout(()=>{ _nsFitView(); _nsDraw(); },40); }
 
 function _dcEnter(){ _dcWire(); _dc.pend=null; _dcBuild(); setTimeout(()=>{ _dcFit(); _dcDraw(); },40); }
