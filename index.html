@@ -8317,6 +8317,13 @@ function cip_build() {
       f();
     });
     machReady();
+    if (S.wz.scrollCur) {
+      S.wz.scrollCur = false;
+      requestAnimationFrame(() => {
+        const c = box.querySelector('.cipWzS.cur');
+        if (c) c.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    }
     // étapes faites : repliées (juste le titre + « modifier »), pour que la simulation soit visible juste en dessous
     box.querySelectorAll('.cipWzS.done').forEach((el, k) => {
       const h = el.querySelector('h4');
@@ -8476,7 +8483,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v47',
+  const CIP_VER = 'CIP v48',
     CIP_DATE = '13/10/2026';
   {
     const e = $('cipVer');
@@ -12327,6 +12334,12 @@ function cip_build() {
     const cs = $('cipCodeShow');
     if (cs) cs.style.display = st === 'sim' && S.codeHidden ? '' : 'none';
     if (st === 'mach') machReady();
+    // nouvelle étape : la colonne de gauche repart EN HAUT (sinon on doit remonter à la main pour l'étape 1)
+    if (S._lastStep !== st) {
+      S._lastStep = st;
+      const sd = w.querySelector('.cipSide');
+      if (sd) sd.scrollTop = 0;
+    }
     headG.visible = st !== 'build';
     if (st === 'mach') {
       try {
@@ -13954,6 +13967,7 @@ function cip_build() {
         if (S.prog && !S.prog.frames) rebuildPaths();
         return;
       } else if (a === 'wz') {
+        S.wz.scrollCur = true; // l'étape suivante bien visible
         if (S.prog && S.prog.verify) lstVerifyExit(); // on revient au programme calculé pour l'assistant
         if (v == 1) S.wz.d1 = true;
         else if (v == 2) S.wz.d2 = true;
