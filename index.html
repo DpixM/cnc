@@ -2018,7 +2018,8 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     #cipBody .cipW:not(.cipAdvOn) .cipAdv{display:none!important}
     #cipBody .cipW[data-step="sim"] .cipInMach,#cipBody .cipW[data-step="mach"] .cipInSim,#cipBody .cipW:not(.cipMtMode) [data-wz4]{display:none!important}
     #cipBody .cipW[data-step="mach"]:not(.cipSimReady) #cipSimBox,#cipBody .cipW[data-step="mach"]:not(.cipSimReady) #cipPosBox{display:none!important}
-    #cipBody .cipW[data-step="mach"] .cipSide > *{order:9} #cipBody .cipW[data-step="mach"] .cipSide > #cipStepper{order:0} #cipBody .cipW[data-step="mach"] .cipSide > #cipMachBox{order:1} #cipBody .cipW[data-step="mach"] .cipSide > #cipSimBox{order:2} #cipBody .cipW[data-step="mach"] .cipSide > #cipPosBox{order:3} #cipBody .cipW[data-step="mach"] .cipSide > #cipLstBox{order:4}
+    #cipBody .cipW[data-step="mach"] .cipSide > *{order:9} #cipBody .cipW[data-step="mach"] .cipSide > #cipStepper{order:0} #cipBody .cipW[data-step="mach"] .cipSide > #cipMachBox{order:1} #cipBody .cipW[data-step="mach"] .cipSide > #cipSimBox{order:2} #cipBody .cipW[data-step="mach"] .cipSide > #cipDlBox{order:3;border-color:var(--acc)} #cipBody .cipW[data-step="mach"] .cipSide > #cipPosBox{order:4} #cipBody .cipW[data-step="mach"] .cipSide > #cipLstBox{order:5}
+    #cipBody .cipWzHow{margin:6px 0 2px;padding:6px 8px;border:1px dashed var(--brd2);border-radius:6px;font-size:12.5px;line-height:1.45;background:rgba(245,166,35,.06)}
     #cipBody .cipSide{counter-reset:cipn} #cipBody .cipSide i.cipN::before{counter-increment:cipn;content:counter(cipn)}
     #cipBody .cipW.cipVerOn [data-mtno][data-st~="sim"]{display:none!important}
     #cipBody .cipW.cipProcW [data-only="decoupe"],#cipBody .cipW.cipProcC [data-only="soudure"],#cipBody .cipW.cipHasGen [data-nogen],#cipBody .cipW.cipHasDet [data-nodet],#cipBody .cipW.cipHasGen [data-nodet]{display:none!important}
@@ -2242,6 +2243,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           </div>
           <div class="cipNum" data-tip="Inclinaison de la tête au point de départ, pour tous les passages (B machine).\nVide = automatique (soudure : dans l'angle entre les 2 surfaces ; découpe : perpendiculaire à la surface).\n0 = tête perpendiculaire à l'axe du mandrin. L'écart est gardé sur tout le tour.\nTu peux encore régler chaque passage dans la liste (case B°)."><span>B tête au départ (°)</span><input type="number" id="cipStartB" placeholder="auto" step="1" min="-134.9" max="134.9" onchange="cip_ui('proc')"></div>
           <div class="cipNote" id="cipStartBTxt" style="margin:-2px 0 4px"></div>
+          <div class="cipNum" data-only="soudure" data-tip="Facultatif. B que tu veux à l'OPPOSÉ du départ (à mi-tour de la jonction), en B machine comme sur ton écran.\nVide = même inclinaison tout autour (l'opposé = l'inverse du départ).\nRempli = la tête passe en douceur du B de départ à ce B à mi-tour, puis revient vers le B de départ en fin de tour.\nIl faut aussi remplir « B tête au départ ». La tête reste toujours à l'extérieur du piquage."><span>B tête à l'opposé (°)</span><input type="number" id="cipOppB" placeholder="= inverse" step="1" min="-134.9" max="134.9" onchange="cip_ui('proc')"></div>
           <div class="cipNum" data-only="decoupe"><span>Distance buse / tube (mm)</span><input type="number" id="cipHGap" value="1.5" min="0" max="10" step="0.1" onchange="cip_ui('head')"></div>
           <div class="cipNum"><span>Dégagement entre passages</span><select id="cipRapMode" onchange="cip_ui('rapmode')" style="width:150px"><option value="x">En X (le long du tube)</option><option value="z">Par le dessus (Z)</option></select></div>
           <div class="cipNum" data-tip="Hauteur maxi de la pointe au-dessus du tube pendant les déplacements (entre passages et retour au départ). Le soft cherche d'abord un passage bas en dégageant en X et en tournant C1 ; il ne monte plus haut que s'il n'a pas le choix, et il te prévient."><span>Hauteur max de dégagement (mm au-dessus du tube)</span><input type="number" id="cipZMax" value="40" min="5" step="5" onchange="cip_ui('rapmode')"></div>
@@ -2256,12 +2258,12 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <div class="cipNote" style="margin-top:0">Fais les étapes dans l'ordre : chaque étape débloque la suivante.</div>
           <div id="cipWz" data-mtno></div>
           <div id="cipMtMach" data-mtonly>
-            <div class="cipNote" style="margin-top:0">1. Mandrin à C = 0, pose la pointe pile sur le point de départ (point jaune dans la 3D).<br>2. Tape la valeur affichée par la machine (avec son signe) : elle devient le SET_G54.<br>3. Génère, et passe-le <b>à vide</b> d'abord.</div>
+            <div class="cipNote" style="margin-top:0">1. TRAORI actif avec <b>SET_G54(0, 0, 0)</b>, mandrin à C = 0, pose la pointe pile sur le point de départ (point jaune dans la 3D).<br>2. Écran <b>« Axes de géométrie (SCP) »</b> : tape la valeur lue (avec son signe) : elle devient le SET_G54.<br>3. Génère et regarde la simulation, puis télécharge et passe-le <b>à vide</b> d'abord.</div>
             <div class="cipNum" data-tip="Valeur lue sur la machine quand la pointe est sur le point de départ. Elle devient le SET_G54 (TRAORI : les deux autres valeurs restent à 0, sur l'axe du mandrin)."><span id="cipMtGL">X lu sur la machine</span><input type="number" id="cipMtG" step="0.001" placeholder="ex : -125.40" style="width:110px"></div>
             <div class="cipNum"><span>Nom du programme</span><input id="cipMtName" style="width:150px" placeholder="ex : COUDE-40"></div>
             <div class="cipNum" data-tip="Nom de ta table techno soudure (WTT), comme dans TC_WELD_ON."><span>Techno (WTT)</span><input id="cipMtTech" list="cipLTWl" style="width:150px" placeholder="ex : TUBECOUDE-DORE"></div>
             <label class="cipChk"><input type="checkbox" id="cipMtDry" checked> <b>Test à vide</b> (laser jamais allumé)</label>
-            <div class="cipRow"><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('mtgen')">⬇ Générer et télécharger le .LST</button></div>
+            <div class="cipRow"><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('mtgen')">▶ Générer et simuler le .LST</button></div>
             <div class="cipStat" id="cipMtMsg2"></div>
             <textarea id="cipMtTxt" readonly spellcheck="false" style="display:none;width:100%;height:160px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px;margin-top:4px;white-space:pre"></textarea>
           </div>
@@ -2307,6 +2309,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
           <textarea id="cipGenTxt" readonly spellcheck="false" style="display:none;width:100%;height:160px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px;margin-top:4px;white-space:pre"></textarea>
         </details>
         </div>
+        <div class="cipBox" data-st="mach" id="cipDlBox" style="display:none"></div>
         <div class="cipBox" data-st="mach" id="cipPosBox">
           <h3>Position</h3>
           <dl class="cipRd" id="cipReadout"></dl>
@@ -6150,6 +6153,10 @@ function cip_build() {
   // Le programme a changé : le .LST déjà préparé n'est plus le bon -> on ne le propose plus au téléchargement.
   function lstForget() {
     S.lastGen = null;
+    S.dlMsg = '';
+    try {
+      dlRender();
+    } catch (e) {}
     if (!S.lastLST) return;
     S.lastLST = null;
     ['cipLBtns', 'cipLTxt'].forEach(id => {
@@ -8276,8 +8283,8 @@ function cip_build() {
     ${cur === 2 ? `<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',1)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',2)">C'est fait →</button></div>` : ''}</div>`;
     // v46 : UNE seule valeur à l'étape 3 (celle du SET_G54), aux 2 mandrins. La hauteur du point (pour la marge en Z)
     // est calculée : Z de l'axe du mandrin (réglé UNE fois dans les réglages avancés) + hauteur du point connue par la pièce.
-    h += `<div class="cipWzS ${st(3)}"><h4><i>${cur > 3 ? '✓' : 3}</i>Pose la pointe sur le départ</h4><div class="cipWzT">${Math.abs(+Ctxt) < 0.05 ? 'Le mandrin reste à <span class="cipWzBig">C = 0</span>. Amène' : 'Tourne le mandrin à <span class="cipWzBig">C = ' + Ctxt + '°</span> puis amène'} la pointe <b>pile sur le point jaune qui clignote</b> (départ ${W ? 'de la soudure' : 'de la découpe'}).<br>Tape le <b>${P.ax}</b> affiché par la machine, exactement comme à l'écran (avec le signe) :</div>
-    <div class="cipNum"${P.ax === 'Z' ? ' data-tip="De la platine au joint de soudure : c\'est le Z que la machine affiche, la face de la platine étant le 0."' : ''}><span>${P.ax === 'Z' ? 'Z sur la machine — déport par rapport à la face de la platine (0)' : 'X lu sur la machine'}</span><input type="number" step="0.001" id="cipWzX" value="${S.wz.x !== null && S.wz.key === P.key ? S.wz.x : S.wz.xLast != null ? S.wz.xLast : ''}" placeholder="ex : -125.40"></div>
+    h += `<div class="cipWzS ${st(3)}"><h4><i>${cur > 3 ? '✓' : 3}</i>Pose la pointe sur le départ</h4><div class="cipWzT">${Math.abs(+Ctxt) < 0.05 ? 'Le mandrin reste à <span class="cipWzBig">C = 0</span>. Amène' : 'Tourne le mandrin à <span class="cipWzBig">C = ' + Ctxt + '°</span> puis amène'} la pointe <b>pile sur le point jaune qui clignote</b> (départ ${W ? 'de la soudure' : 'de la découpe'}).<div class="cipWzHow"><b>Quelle valeur lire :</b><br>1. TRAORI actif (TC_SET_TRAFO("${P.ax === 'X' ? 'BA1' : 'Bc1'}") + TRAORI(1)) avec <b>SET_G54(0, 0, 0)</b> — G54 à zéro.<br>2. Pointe pile sur le point jaune.<br>3. Écran <b>« Axes de géométrie (SCP) »</b> (pas SCM) : lis le <b>${P.ax}</b>, avec son signe.<br><span style="color:var(--txt2)">= ${P.ax === 'Z' ? "la distance de la face de la platine au joint, le long de l'axe du mandrin" : "la position du point le long de l'axe du mandrin"}. Ça devient ton SET_G54.</span></div></div>
+    <div class="cipNum"><span>${P.ax} lu en SCP (G54 à 0)</span><input type="number" step="0.001" id="cipWzX" value="${S.wz.x !== null && S.wz.key === P.key ? S.wz.x : S.wz.xLast != null ? S.wz.xLast : ''}" placeholder="ex : -125.40"></div>
     ${cur === 3 ? `<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',2)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',3)">Valider →</button></div>` : cur > 3 ? `<div class="cipNote" style="margin:2px 0 0">${ok} SET_G54(${P.ax === 'X' ? S.wz.x + ', 0, 0' : '0, 0, ' + S.wz.x}) — le programme part de ce point.${S.wz.z != null ? `<br>${ok} Marge en Z au-dessus du point : <b>${(+$('cipZTop').value - S.wz.z).toFixed(0)} mm</b> → dégagements limités à ${$('cipZMax').value} mm.` : P.ax === 'X' ? `<br><span style="color:var(--txt2)">Marge en Z pas calculée : règle une fois le « Z de l'axe du mandrin » dans les réglages avancés.</span>` : ''}</div>` : ''}</div>`;
     const nm = $('cipLName').value || '';
     const dry = S.wz.dry !== false;
@@ -8290,7 +8297,7 @@ function cip_build() {
         : `<div class="cipNum"><span>Techno découpe (LTT)</span><b style="font:13px var(--mono)">${$('cipLTC').textContent}</b></div>`
     }
     <label class="cipChk" data-tip="Test à vide : le laser ne s'allume jamais (allumage en commentaire), fichier « -VIDE ». En découpe, la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint). Toujours passer à vide avant le vrai !"><input type="checkbox" id="cipWzDry" ${dry ? 'checked' : ''}> <b>Test à vide</b> (laser jamais allumé)</label>
-    <div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',3)">←</button><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('wzgen')">⬇ Générer et télécharger</button></div>
+    <div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',3)">←</button><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('wzgen')">▶ Générer et simuler le .LST</button></div>
     <div class="cipStat" id="cipWzMsg">${S.wz.msg || ''}</div></div>`;
     box.innerHTML = h;
     // étape 4 -> réglages avancés en direct (on ne retape rien deux fois)
@@ -8390,16 +8397,16 @@ function cip_build() {
       S.wz.msg = '<span class="cipBad">' + r.err + '</span>';
     } else {
       S.lastLST = r;
-      cip_ui('lstdl');
-      S.wz.msg =
-        `<span class="cipOk">${r.file} téléchargé.</span> ` +
+      S.lastGen = r;
+      S.wz.msg = '';
+      S.dlMsg =
+        `<span class="cipOk">${r.file} prêt.</span> ` +
         (dry && !W ? 'À vide, la buse passe 3 mm au-dessus de la pièce (pas de palpage laser éteint). ' : '') +
         (dry
           ? "Passe-le d'abord à vide : la pointe doit suivre " +
             (W ? 'la jonction' : 'les contours') +
             ". Si c'est bon, décoche « Test à vide » et regénère le vrai."
-          : '<span class="cipWarn">Version AVEC laser.</span>') +
-        VBTN;
+          : '<span class="cipWarn">Version AVEC laser.</span>');
     }
     wzRender();
     if (!r.err)
@@ -8408,6 +8415,21 @@ function cip_build() {
       } catch (e) {
         console.warn(e);
       }
+    S.dlDone = '';
+    dlRender();
+  }
+  // ---------- APRÈS la simulation : le gros bouton pour télécharger le .LST ----------
+  function dlRender() {
+    const box = $('cipDlBox');
+    if (!box) return;
+    const r = S.lastGen || S.lastLST;
+    box.style.display = r ? '' : 'none';
+    if (!r) return;
+    box.innerHTML =
+      `<h3>⬇ Télécharger le programme</h3>` +
+      `<div class="cipNote" style="margin-top:0">Regarde d'abord la simulation au-dessus : elle rejoue <b>ce fichier-là</b>, ligne par ligne (bandeau « Simulation finale »).</div>` +
+      `<button class="cipBtn cipMain" style="width:100%;font-size:17px;padding:13px;margin-top:6px" onclick="cip_ui('dlfile')">⬇ Télécharger ${r.file}</button>` +
+      `<div class="cipStat" style="margin-top:6px">${S.dlDone === r.file ? '<span class="cipOk">✓ ' + r.file + ' téléchargé.</span> ' : ''}${S.dlMsg || ''}</div>`;
   }
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
   // §14. C1 = 0 AU DÉPART
@@ -8454,8 +8476,8 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v46',
-    CIP_DATE = '12/10/2026';
+  const CIP_VER = 'CIP v47',
+    CIP_DATE = '13/10/2026';
   {
     const e = $('cipVer');
     if (e) {
@@ -9820,7 +9842,7 @@ function cip_build() {
   }
   function mtRender() {
     const v = mtVals();
-    if ($('cipMtGL')) $('cipMtGL').textContent = (v.flat ? 'Z' : 'X') + ' lu sur la machine';
+    if ($('cipMtGL')) $('cipMtGL').textContent = (v.flat ? 'Z' : 'X') + ' lu en SCP (G54 à 0)';
     const sv = $('cipMtSvg');
     const sc = Math.min(100 / v.a, 100 / v.b);
     const cx = 118,
@@ -10024,7 +10046,7 @@ function cip_build() {
     const L = lstHead(prog, 'soudure', tech).concat(B, ['STOP_TEXT', 'C', 'ENDE_PROGRAMM', 'C', 'ED']);
     const txt = L.join('\r\n').replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '') + '\r\n';
     if (/NaN|Infinity/.test(txt)) return { err: "Calcul invalide (NaN) : le programme n'est pas généré." };
-    return { txt, file: 'P' + prog + '.LST', n: B.length, Q, o };
+    return { txt, file: prog + '.LST', n: B.length, Q, o };
   }
   function showMiterPage() {
     ['cipStart', 'cipProcPage', 'cipPartPage', 'cipWork'].forEach(id => {
@@ -10720,7 +10742,20 @@ function cip_build() {
       // longueur seulement) : ça marchait au départ puis s'écrasait sur les côtés et à l'opposé (34°, 5°…).
       // angle aigu entre le faisceau et la normale du tube (à plat, B=±55 = 35° du tube, la tête se met du bon côté toute seule)
       const lean = Math.abs(Math.asin(Math.sin(bMachToTube(+b0) * DEG)));
-      o.D = weldLean(o.P, o.D, lean);
+      // v47 : B différent à l'OPPOSÉ (facultatif) -> l'inclinaison passe en douceur de l'une à l'autre
+      // (départ -> opposé à mi-tour -> retour à la valeur du départ en fin de tour)
+      let b1 = S.oppB && S.oppB[o.name];
+      if ((b1 === undefined || b1 === '') && $('cipOppB') && $('cipOppB').value !== '') b1 = $('cipOppB').value;
+      let aOf = lean;
+      if (b1 !== undefined && b1 !== '' && !isNaN(+b1) && isClosed(o)) {
+        const lean1 = Math.abs(Math.asin(Math.sin(bMachToTube(+b1) * DEG)));
+        const cum = [0];
+        for (let i = 1; i < o.P.length; i++) cum.push(cum[i - 1] + V.len(V.sub(o.P[i], o.P[i - 1])));
+        const tot = cum[cum.length - 1] || 1;
+        aOf = i => lean + ((lean1 - lean) * (1 - Math.cos((2 * Math.PI * cum[i]) / tot))) / 2;
+        o.leanOpp = lean1 / DEG;
+      }
+      o.D = weldLean(o.P, o.D, aOf);
       o.leanDeg = lean / DEG;
     } else if (b0 !== undefined && b0 !== '' && !isNaN(+b0)) {
       const off = bMachToTube(+b0) * DEG - decomp(o.D[0]).B; // b0 = B machine
@@ -10767,7 +10802,8 @@ function cip_build() {
       side = V.sub(side, V.mul(ni, V.dot(side, ni)));
       if (V.len(side) < 1e-9) return D[i];
       side = V.nrm(side);
-      return V.nrm(V.add(V.mul(ni, Math.cos(a)), V.mul(side, Math.sin(a))));
+      const ai = typeof a === 'function' ? a(i) : a; // inclinaison constante, ou variable le long du cordon
+      return V.nrm(V.add(V.mul(ni, Math.cos(ai)), V.mul(side, Math.sin(ai))));
     });
   }
   function plen(P, closed) {
@@ -11564,10 +11600,29 @@ function cip_build() {
     {
       const ol = ops.find(x => x.leanDeg !== undefined);
       if (ol) {
-        const d0 = ol.D[0];
-        const B0 = toLst(ol.P[0], d0, decomp(d0).th, lstOpt(true)).B;
+        const Bat = k => {
+          const d = ol.D[k];
+          return toLst(ol.P[k], d, decomp(d).th, lstOpt(true)).B;
+        };
+        const B0 = Bat(0);
+        // point à mi-tour (en longueur) = l'opposé
+        let half = 0;
+        {
+          let L = 0;
+          const cum = [0];
+          for (let i = 1; i < ol.P.length; i++) cum.push((L += V.len(V.sub(ol.P[i], ol.P[i - 1]))));
+          const tour = ol.mOv !== undefined ? cum[ol.mOv] : L;
+          half = cum.findIndex(c => c >= tour / 2);
+          if (half < 0) half = ol.P.length >> 1;
+        }
+        const B1 = Bat(half);
         notes.push(
-          `Tête à ${ol.leanDeg.toFixed(1)}° du tube TOUT AUTOUR de la jonction (départ B = ${B0.toFixed(1)}°, côté opposé = l'inverse). Le signe de B se met tout seul : la tête reste toujours à l'extérieur du piquage.`
+          ol.leanOpp !== undefined
+            ? `Tête inclinée tout autour : départ B = ${B0.toFixed(1)}°, à l'opposé B = ${B1.toFixed(1)}°, et ça passe en douceur de l'un à l'autre (puis revient vers le départ). La tête reste toujours à l'extérieur du piquage.` +
+                (Math.abs(B1 - +$('cipOppB').value) > 1 && $('cipOppB').value !== ''
+                  ? ` <b>Attention</b> : tu as tapé ${(+$('cipOppB').value).toFixed(1)}° à l'opposé, mais là la tête serait de l'autre côté (dans le piquage) : le soft met ${B1.toFixed(1)}° (même inclinaison, côté extérieur).`
+                  : '')
+            : `Même inclinaison tout autour de la jonction : départ B = ${B0.toFixed(1)}°, à l'opposé B = ${B1.toFixed(1)}° (le signe se met tout seul : la tête reste toujours à l'extérieur du piquage). Pour un autre angle à l'opposé, remplis « B tête à l'opposé ».`
         );
       }
     }
@@ -12191,7 +12246,7 @@ function cip_build() {
     const txt = L.join('\r\n').replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '') + '\r\n';
     if (/NaN|Infinity/.test(txt))
       return { err: "Calcul invalide (NaN) : le programme n'est pas généré. Envoie « Copier ce moment pour Claude »." };
-    return { txt, file: 'P' + prog + '.LST', kind, tech, n: C.length, o };
+    return { txt, file: prog + '.LST', kind, tech, n: C.length, o };
   }
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
   // §24. NAVIGATION ENTRE LES ÉCRANS + RÉGLAGES DU .LST
@@ -12413,7 +12468,7 @@ function cip_build() {
     cipSpeed: "Vitesse de la simulation (n'a aucun effet sur la machine).",
     cipGoto: 'Aller directement à un pourcentage du programme.',
     cipLName:
-      "Nom du programme : il devient ProgName dans l'en-tête et le fichier s'appelle P<NOM>.LST (comme tes fichiers).\nLettres, chiffres, - et _ seulement.",
+      "Nom du programme : il devient ProgName dans l'en-tête et le fichier s'appelle <NOM>.LST (sans P devant).\nLettres, chiffres, - et _ seulement.",
     cipLTW:
       'Nom de la table techno soudure (WTT) : celui qui est dans TC_WELD_ON(1, "…", 10, 100).\nC\'est toi qui le choisis (ex. TUBECOUDE-DORE). Il doit exister sur la machine.',
     cipLFg:
@@ -12434,7 +12489,7 @@ function cip_build() {
     cipLOY: 'SET_G54 Y (0 = centre du mandrin).',
     cipLOZ: 'SET_G54 Z.',
     cipLDry:
-      "Version test à vide : même trajet, mais TC_WELD_ON / TC_LASER_ON (et OFF) sont mis en commentaire → le laser ne s'allume JAMAIS.\nLe fichier s'appelle P<NOM>-VIDE.LST.\nÀ faire tourner en premier sur la machine.",
+      "Version test à vide : même trajet, mais TC_WELD_ON / TC_LASER_ON (et OFF) sont mis en commentaire → le laser ne s'allume JAMAIS.\nLe fichier s'appelle <NOM>-VIDE.LST.\nÀ faire tourner en premier sur la machine.",
     cipVec: 'Affiche des petits traits qui montrent la direction du faisceau le long des passages.',
     cipBw: "Points rouges : là où le faisceau ressort et tape la paroi d'en face (à surveiller en découpe).",
     cipParts: 'Afficher / cacher la pièce 3D.',
@@ -13452,6 +13507,19 @@ function cip_build() {
       mine.style.cssText = 'position:fixed;right:12px;bottom:10px;z-index:101;display:none;min-width:200px';
       ($('cipBody') || document.body).appendChild(mine);
     }
+    // le bouton « 🐞 Log » (hors CIP) cachait notre bouton : on le décale à gauche pendant l'onglet CIP, remis comme avant en sortant
+    const lg = document.getElementById('logBtn');
+    if (lg) {
+      if (on && lg.dataset.cipMv !== '1') {
+        lg.dataset.cipPrevR = lg.style.right || '';
+        lg.style.right = '236px';
+        lg.dataset.cipMv = '1';
+      } else if (!on && lg.dataset.cipMv === '1') {
+        lg.style.right = lg.dataset.cipPrevR;
+        delete lg.dataset.cipMv;
+        delete lg.dataset.cipPrevR;
+      }
+    }
     if (on) {
       if (bn && bn.dataset.cipHid !== '1') {
         bn.dataset.cipPrev = bn.style.display || '';
@@ -13482,14 +13550,7 @@ function cip_build() {
           mine.textContent = 'Suivant : mise en machine →';
           mine.onclick = () => cip_ui('gostep', 'mach');
         }
-      } else if (vis && st === 'mach' && !S.miter && (wzCur() === 4 || (S.prog && S.prog.verify))) {
-        mine.style.display = '';
-        if (mine.dataset.m !== 'm') {
-          mine.dataset.m = 'm';
-          mine.textContent = '⬇ Générer le .LST';
-          mine.onclick = () => cip_ui('wzgen');
-        }
-      } else mine.style.display = 'none';
+      } else mine.style.display = 'none'; // mise en machine : générer / télécharger se font dans le panneau (après la simulation)
     } else {
       if (bn && bn.dataset.cipHid === '1') {
         bn.style.display = bn.dataset.cipPrev;
@@ -13837,15 +13898,6 @@ function cip_build() {
           return;
         }
         $('cipMtTxt').value = r.txt;
-        $('cipMtTxt').style.display = '';
-        const u = URL.createObjectURL(new Blob([r.txt], { type: 'application/octet-stream' }));
-        const lk = document.createElement('a');
-        lk.href = u;
-        lk.download = r.file;
-        document.body.appendChild(lk);
-        lk.click();
-        lk.remove();
-        setTimeout(() => URL.revokeObjectURL(u), 2000);
         try {
           if (S.miter) {
             const k = TOTAL ? pos / TOTAL : 0;
@@ -13857,17 +13909,33 @@ function cip_build() {
         // pour la simulation finale du fichier : le .LST onglet a son 0 sur la jonction -> on remet la jonction (Yj) du modèle 3D
         if (S.miter && r.o) r.o = Object.assign({}, r.o, { L: S.miter.Yj });
         S.lastGen = r;
-        $('cipMtMsg2').innerHTML =
+        $('cipMtMsg2').innerHTML = '';
+        S.dlMsg =
           '<span class="cipOk">' +
           r.file +
-          ' téléchargé.</span> ' +
-          ($('cipMtDry').checked ? "Passe-le d'abord à vide." : '<span class="cipWarn">Version AVEC laser.</span>') +
-          VBTN;
+          ' prêt.</span> ' +
+          ($('cipMtDry').checked ? "Passe-le d'abord à vide." : '<span class="cipWarn">Version AVEC laser.</span>');
         try {
           lstVerify();
         } catch (e) {
           console.warn(e);
         }
+        dlRender();
+        return;
+      } else if (a === 'dlfile') {
+        // téléchargement du .LST généré (après la simulation)
+        const r = S.lastGen || S.lastLST;
+        if (!r) return;
+        const u = URL.createObjectURL(new Blob([r.txt], { type: 'application/octet-stream' }));
+        const lk = document.createElement('a');
+        lk.href = u;
+        lk.download = r.file;
+        document.body.appendChild(lk);
+        lk.click();
+        lk.remove();
+        setTimeout(() => URL.revokeObjectURL(u), 2000);
+        S.dlDone = r.file;
+        dlRender();
         return;
       } else if (a === 'axisz') {
         try {
