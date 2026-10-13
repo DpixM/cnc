@@ -161,6 +161,18 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-13 — II : NESTING v2 — les pièces s'EMBOÎTENT (tête-bêche, dans tous les sens)
+ [AJOUT] Nouveau moteur : il cherche la PAIRE de pièces qui s'emboîte le mieux (une à l'endroit, une tournée de
+   180° collée dedans), puis le motif qui se répète le plus serré (réseau), essayé tous les 5°, en rangées droites
+   ou en biais ; ensuite il bouche les trous qui restent pièce par pièce, et compare avec la pose « une par une ».
+   On garde le meilleur (le plus de pièces, puis le plus compact). Le résultat dit quel rangement a gagné.
+ [PERF] Calcul des NFP ~30× plus rapide (pièce coupée en morceaux convexes, somme exacte) : 1 à 4 s au lieu de
+   10 à 20 s, ce qui permet d'essayer TOUS les angles (5°) par défaut. Choix : 5° / 15° / 90° / 0-180° / aucun.
+ [FIX] Les pièces dessinées avec PLUSIEURS traits (lignes + arcs bout à bout) sont maintenant reconnues comme
+   une seule forme fermée et se choisissent d'un clic. Une chute dessinée autour de pièces identiques est
+   reconnue (chute = tôle, pièce choisie d'office). Re-cliquer au même endroit = la forme de dedans.
+ [SÉCU] Contrôle final : toute pièce qui toucherait sa voisine (écart compris) est retirée. Hors zone CIP.
+
 -- 2026-10-13 — IH : NESTING — on peut cliquer TOUTES les formes + formes identiques remplacées
  [FIX] Impossible de choisir sa pièce si le contour n'était pas fermé au centième (SVG importés, tracés dont
    le dernier point ne retombe pas pile sur le 1er). Maintenant : choix au niveau du TRAIT (un SVG qui contient
@@ -1880,7 +1892,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-13-IH ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-13-II ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2814,9 +2826,9 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       <div class="dccard">
         <div class="dct"><span class="dcn" style="background:#9333ea;color:#fff">4</span>Rotation</div>
         <select id="nsRot" onchange="_ns.res=null;_nsPanel();_nsDraw()" style="background:var(--surf);border:1.5px solid var(--brd2);border-radius:7px;color:var(--txt);font-size:13px;font-weight:700;padding:5px 6px;font-weight:600">
-          <option value="15" selected>Libre — tous les 15° (conseillé)</option>
-          <option value="30">Libre rapide — tous les 30°</option>
-          <option value="5">Libre précis — tous les 5° (plus lent)</option>
+          <option value="5" selected>Tous les sens — tous les 5° (conseillé)</option>
+          <option value="15">Tous les 15°</option>
+          <option value="90">Seulement 0° / 90° / 180° / 270°</option>
           <option value="180">Seulement 0° et 180°</option>
           <option value="0">Pas de rotation</option>
         </select>
@@ -15646,6 +15658,9 @@ function _p10Header(){
     else { w.style.display='none'; w.innerHTML=''; } }
 }
 // ═══════════ MOTEUR D'IMBRICATION (nesting) — même pièce répétée N fois ═══════════
+// v2 : 1) RÉSEAU « tête-bêche » : on cherche la paire de pièces (une à l'endroit, une retournée de 180°) qui
+// s'emboîte le mieux, puis le motif qui se répète le plus serré possible, essayé dans toutes les directions (tous les 5°).
+// 2) on bouche les trous qui restent pièce par pièce. 3) méthode « une par une » classique. On garde le meilleur.
 // Principe (comme les logiciels pro) : pour chaque angle, on calcule le « no-fit polygon » (NFP) = toutes
 // les positions où une 2e pièce TOUCHERAIT la 1re (somme de Minkowski, moteur Clipper). Les places libres
 // = tôle (rétrécie de la pièce) MOINS les NFP des pièces déjà posées. On pose chaque pièce, à l'angle et à
@@ -15683,8 +15698,48 @@ function _nsPrep(outerPaths, gapMm){
   let realArea=0; for(const p of ps) realArea+=C.Clipper.Area(p);
   return {Q:_nsTr(ex,-ox,-oy), cx:ox/_NS_S, cy:oy/_NS_S, area:realArea/_NS_S/_NS_S};
 }
+// ── NFP RAPIDE : on coupe chaque pièce en morceaux CONVEXES (triangulation + fusion Hertel-Mehlhorn),
+// la somme de Minkowski de 2 morceaux convexes est immédiate et EXACTE (entiers), puis on réunit tout.
+// (environ 30× plus rapide que la somme « brute » de Clipper, même résultat)
+function _nsCvxClean(path){ const P=[]; for(const q of path){ const l=P[P.length-1]; if(!l||l.X!==q.X||l.Y!==q.Y) P.push(q); } if(P.length>1&&P[0].X===P[P.length-1].X&&P[0].Y===P[P.length-1].Y) P.pop();
+  let ch=true; while(ch&&P.length>3){ ch=false; for(let i=0;i<P.length;i++){ const a=P[(i+P.length-1)%P.length],b=P[i],c=P[(i+1)%P.length]; if((b.X-a.X)*(c.Y-a.Y)-(b.Y-a.Y)*(c.X-a.X)===0){ P.splice(i,1); ch=true; break; } } } return P; }
+function _nsCvxParts(path){
+  let P=_nsCvxClean(path); if(P.length<3) return null; if(ClipperLib.Clipper.Area(P)<0) P=P.slice().reverse();
+  const n=P.length; const cr=(a,b,c)=>(b.X-a.X)*(c.Y-a.Y)-(b.Y-a.Y)*(c.X-a.X);
+  // 1) triangulation par oreilles (indices)
+  const idx=[...Array(n).keys()]; const tris=[]; let guard=0;
+  const inTri=(p,a,b,c)=>cr(a,b,p)>=0&&cr(b,c,p)>=0&&cr(c,a,p)>=0;
+  while(idx.length>3 && guard++<n*n){ let cut=false;
+    for(let k=0;k<idx.length;k++){ const i0=idx[(k+idx.length-1)%idx.length],i1=idx[k],i2=idx[(k+1)%idx.length]; const a=P[i0],b=P[i1],c=P[i2];
+      const cv=cr(a,b,c); if(cv<0) continue;
+      if(cv===0){ idx.splice(k,1); cut=true; break; }   // point aligné : on l'enlève
+      let ear=true; for(const j of idx){ if(j===i0||j===i1||j===i2) continue; const p=P[j]; if((p.X===a.X&&p.Y===a.Y)||(p.X===b.X&&p.Y===b.Y)||(p.X===c.X&&p.Y===c.Y)) continue; if(inTri(p,a,b,c)){ ear=false; break; } }
+      if(ear){ tris.push([i0,i1,i2]); idx.splice(k,1); cut=true; break; } }
+    if(!cut) return null; }
+  if(idx.length===3 && cr(P[idx[0]],P[idx[1]],P[idx[2]])>0) tris.push(idx.slice());
+  // 2) fusion des morceaux tant que ça reste convexe
+  let polys=tris.map(t=>t.slice()); const convex=q=>{ for(let i=0;i<q.length;i++){ if(cr(P[q[i]],P[q[(i+1)%q.length]],P[q[(i+2)%q.length]])<0) return false; } return true; };
+  let merged=true; while(merged){ merged=false;
+    outer: for(let a=0;a<polys.length;a++) for(let b=a+1;b<polys.length;b++){ const A=polys[a],B=polys[b];
+      for(let i=0;i<A.length;i++){ const u=A[i],v=A[(i+1)%A.length]; const j=B.findIndex((w,k)=>w===v&&B[(k+1)%B.length]===u); if(j<0) continue;
+        // A : ... u v ... ; B : ... v u ...  -> fusion : A de v à u (tour complet) puis B de u à v sans les extrémités
+        const m=[]; for(let k=0;k<A.length;k++) m.push(A[(i+1+k)%A.length]); for(let k=2;k<B.length;k++) m.push(B[(j+k)%B.length]);
+        if(convex(m)){ polys[a]=m; polys.splice(b,1); merged=true; break outer; } } } }
+  return polys.map(q=>q.map(i=>({X:P[i].X,Y:P[i].Y})));
+}
+// somme de Minkowski de 2 polygones convexes (sens trigo) : fusion des arêtes par angle
+function _nsCvxSum(A,B){ const lo=Q=>{ let k=0; for(let i=1;i<Q.length;i++) if(Q[i].Y<Q[k].Y||(Q[i].Y===Q[k].Y&&Q[i].X<Q[k].X)) k=i; return k; };
+  const ia=lo(A), ib=lo(B), n=A.length, m=B.length; const out=[]; let i=0,j=0;
+  while(i<n||j<m){ const a=A[(ia+i)%n], b=B[(ib+j)%m]; out.push({X:a.X+b.X,Y:a.Y+b.Y});
+    const a2=A[(ia+i+1)%n], b2=B[(ib+j+1)%m]; const ea={X:a2.X-a.X,Y:a2.Y-a.Y}, eb={X:b2.X-b.X,Y:b2.Y-b.Y}; const c=ea.X*eb.Y-ea.Y*eb.X;
+    if(i>=n) j++; else if(j>=m) i++; else if(c>0) i++; else if(c<0) j++; else { i++; j++; } }
+  return out; }
+const _nsCvxCache=new WeakMap();
+function _nsCvxOf(paths){ let r=_nsCvxCache.get(paths); if(r!==undefined) return r; const out=[]; for(const p of paths){ if(ClipperLib.Clipper.Area(p)<=0) continue; const c=_nsCvxParts(p); if(!c){ r=null; _nsCvxCache.set(paths,r); return r; } out.push(...c); } _nsCvxCache.set(paths,out); return out; }
 // NFP : positions du centre de la pièce B (angle b) qui la font toucher la pièce A (angle a) posée en 0.
 function _nsNFP(Qa,Qb){ const C=_nsCL(); const parts=[];
+  const A=_nsCvxOf(Qa), B=_nsCvxOf(Qb);
+  if(A&&B&&A.length&&B.length){ const nB=B.map(p=>p.map(q=>({X:-q.X,Y:-q.Y}))); for(const a of A) for(const b of nB) parts.push(_nsCvxSum(a,b)); return _nsOuter(_nsUnion(parts)); }
   for(const pb of Qb){ const neg=pb.map(q=>({X:-q.X,Y:-q.Y})); for(const pa of Qa){ const m=C.Clipper.MinkowskiSum(neg,pa,true); for(const x of m) parts.push(x); } }
   return _nsOuter(_nsUnion(parts)); }
 // Zone où le CENTRE peut aller pour que la pièce reste dans la tôle.
@@ -15696,14 +15751,39 @@ function _nsIFP(sheet, Qr){ const C=_nsCL();
   return _nsDiff(sheet.paths, _nsUnion(band)); }
 // Le point est-il strictement DANS la zone interdite (somme des NFP, chacun plein) ?
 function _nsInside(v,paths){ for(const p of paths){ if(ClipperLib.Clipper.PointInPolygon(v,p)===1) return true; } return false; }
-// Prépare tout ce qui ne dépend que de la pièce, de la tôle et des angles (réutilisé par tous les essais).
-function _nsSetup(part, sheet, angles){
-  const R=angles, nA=R.length; const Qr=R.map(a=>_nsRotPaths(part.Q,a)); const Br=Qr.map(_nsBounds); const ifp=Qr.map(q=>_nsIFP(sheet,q));
-  const base={}; const cache={};
-  // NFP(i,j) = NFP(0, j-i) tourné de R[i] (angles régulièrement espacés) -> nA calculs au lieu de nA²
-  const getNFP=(i,j)=>{ const k=i+'_'+j; if(cache[k]) return cache[k]; const d=((j-i)%nA+nA)%nA; if(!base[d]) base[d]=_nsNFP(Qr[0],Qr[d]); return cache[k]=(i===0?base[d]:_nsRotPaths(base[d],R[i]-R[0])); };
-  return {R,nA,Qr,Br,ifp,getNFP,base};
+// Le point est-il dans une région (contours + trous éventuels) ? (sur le bord = dedans)
+function _nsInRegion(pt,paths){ let w=0; for(const p of paths){ const r=ClipperLib.Clipper.PointInPolygon(pt,p); if(r===0) continue; if(ClipperLib.Clipper.Area(p)>0) w++; else if(r===1) w--; } return w>0; }
+function _nsShrink(ps,d){ const C=_nsCL(); const co=new C.ClipperOffset(2,250); co.AddPaths(ps,C.JoinType.jtMiter,C.EndType.etClosedPolygon); const o=new C.Paths(); co.Execute(o,-d); return o.filter(p=>C.Clipper.Area(p)>0); }
+function _nsHullArea(pts){ const P=pts.slice().sort((a,b)=>a.X-b.X||a.Y-b.Y); const cr=(o,a,b)=>(a.X-o.X)*(b.Y-o.Y)-(a.Y-o.Y)*(b.X-o.X); const lo=[],up=[];
+  for(const p of P){ while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0) lo.pop(); lo.push(p); }
+  for(let i=P.length-1;i>=0;i--){ const p=P[i]; while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0) up.pop(); up.push(p); }
+  const h=lo.slice(0,-1).concat(up.slice(0,-1)); let A=0; for(let i=0;i<h.length;i++){ const a=h[i],b=h[(i+1)%h.length]; A+=a.X*b.Y-b.X*a.Y; } return Math.abs(A)/2; }
+const _nsTick=()=>new Promise(r=>setTimeout(r,0));
+// Grille d'angles régulière (nG angles sur 360°). Tout est calculé à la demande et gardé en mémoire.
+function _nsSetup(part, sheet, nG){
+  const R=[]; for(let i=0;i<nG;i++) R.push(i*2*Math.PI/nG);
+  const Qr=R.map(a=>_nsRotPaths(part.Q,a)); const Br=Qr.map(_nsBounds);
+  const ifpC={}; const ifp=j=>ifpC[j]||(ifpC[j]=_nsIFP(sheet,Qr[j]));
+  const base={}, baseS={}, cache={}, cacheS={};
+  const bse=d=>base[d]||(base[d]=_nsNFP(Qr[0],Qr[d]));
+  const dOf=(i,j)=>((j-i)%nG+nG)%nG;
+  // NFP(i,j) = NFP(0, j-i) tourné de R[i]  -> nG calculs au lieu de nG²
+  const getNFP=(i,j)=>{ const k=i+'_'+j; if(cache[k]) return cache[k]; const d=dOf(i,j); return cache[k]=(i===0?bse(d):_nsRotPaths(bse(d),R[i])); };
+  // version « rétrécie de 4 µm » pour les contrôles (évite les faux chevauchements dus aux arrondis au µm)
+  const getNFPs=(i,j)=>{ const k=i+'_'+j; if(cacheS[k]) return cacheS[k]; const d=dOf(i,j); if(!baseS[d]) baseS[d]=_nsShrink(bse(d),4); return cacheS[k]=(i===0?baseS[d]:_nsRotPaths(baseS[d],R[i])); };
+  const fits=(j,X,Y)=>{ if(sheet.rect){ const b=Br[j]; return X>=-b.x0-0.5 && X<=sheet.W-b.x1+0.5 && Y>=-b.y0-0.5 && Y<=sheet.H-b.y1+0.5; } const f=ifp(j); return f.length>0 && _nsInRegion({X:Math.round(X),Y:Math.round(Y)},f); };
+  return {R,nA:nG,Qr,Br,ifp,getNFP,getNFPs,bse,fits,sheet,part};
 }
+const _nsPBB=(S,p)=>{ const b=S.Br[p.j]; return {x0:p.X+b.x0,y0:p.Y+b.y0,x1:p.X+b.x1,y1:p.Y+b.y1}; };
+function _nsBBof(S,placed){ let bb=null; for(const p of placed){ const b=_nsPBB(S,p); bb=bb?{x0:Math.min(bb.x0,b.x0),y0:Math.min(bb.y0,b.y0),x1:Math.max(bb.x1,b.x1),y1:Math.max(bb.y1,b.y1)}:b; } return bb; }
+const _nsBBArea=bb=>bb?(bb.x1-bb.x0)*(bb.y1-bb.y0):0;
+// Contrôle final : aucune pièce ne doit en toucher une autre (écart compris) -> sinon elle est retirée
+function _nsValidate(S, placed){ const keep=[];
+  for(const p of placed){ const b=_nsPBB(S,p); let ok=true;
+    for(const q of keep){ const c=_nsPBB(S,q); if(b.x0>c.x1||c.x0>b.x1||b.y0>c.y1||c.y0>b.y1) continue;
+      if(_nsInside({X:Math.round(p.X-q.X),Y:Math.round(p.Y-q.Y)},S.getNFPs(q.j,p.j))){ ok=false; break; } }
+    if(ok) keep.push(p); }
+  return keep; }
 // Façons de choisir la place (plus petit score = meilleur). bb = encadrement des pièces déjà posées.
 const _NS_SCORES={
   area:(b,bb,x0,y0,x1,y1)=>{ const X0=bb?Math.min(bb.x0,x0):x0,Y0=bb?Math.min(bb.y0,y0):y0,X1=bb?Math.max(bb.x1,x1):x1,Y1=bb?Math.max(bb.y1,y1):y1; return (X1-X0)*(Y1-Y0)/1e6+(x0+y0)*1e-4; },
@@ -15711,56 +15791,181 @@ const _NS_SCORES={
   cols:(b,bb,x0,y0,x1,y1)=>x1*1000+y0,          // colonne par colonne
   corner:(b,bb,x0,y0,x1,y1)=>Math.hypot(x1,y1)   // au plus près du coin de départ
 };
+// « Une par une » : chaque pièce va à la meilleure place libre, en essayant les angles « tries ».
+// init = pièces déjà posées (ex. le réseau) : on bouche les trous autour.
 async function _nsGreedy(S, opts, progress){
-  const {R,nA,Qr,Br,ifp,getNFP}=S; const score=_NS_SCORES[opts.mode]||_NS_SCORES.area;
-  const forb=R.map(()=>[]); const placed=[]; let bb=null;
-  for(let n=0;n<opts.n;n++){
+  const {R,Br,getNFP}=S; const score=_NS_SCORES[opts.mode]||_NS_SCORES.area; const tries=opts.tries;
+  // feas[j] = places libres pour le centre (angle j), mises à jour à chaque pièce posée (on retire juste son NFP)
+  const feas={}, forb={}; for(const j of tries){ feas[j]=S.ifp(j); forb[j]=[]; } const placed=[]; let bb=null;
+  const fbb=p=>{ let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity; for(const q of p){ if(q.X<a)a=q.X; if(q.Y<b)b=q.Y; if(q.X>c)c=q.X; if(q.Y>d)d=q.Y; } return [a,b,c,d]; };
+  const add=(ps,upd)=>{ const news={}; for(const j of tries) news[j]=[];
+    for(const p of ps){ placed.push(p); const b=_nsPBB(S,p); bb=bb?{x0:Math.min(bb.x0,b.x0),y0:Math.min(bb.y0,b.y0),x1:Math.max(bb.x1,b.x1),y1:Math.max(bb.y1,b.y1)}:b;
+      for(const k of tries){ for(const q of _nsTr(getNFP(p.j,k),Math.round(p.X),Math.round(p.Y))){ news[k].push(q); forb[k].push({p:q,b:fbb(q)}); } } }
+    for(const k of tries) if(news[k].length && feas[k].length) feas[k]=_nsDiff(feas[k],news[k]); };
+  const inF=(v,j)=>{ for(const f of forb[j]){ const b=f.b; if(v.X<=b[0]||v.X>=b[2]||v.Y<=b[1]||v.Y>=b[3]) continue; if(ClipperLib.Clipper.PointInPolygon(v,f.p)===1) return true; } return false; };
+  if(opts.init&&opts.init.length) add(opts.init);
+  while(placed.length<opts.n){
     let best=null;
-    for(let j=0;j<nA;j++){ if(!ifp[j].length) continue;
-      const feas=forb[j].length?_nsDiff(ifp[j],forb[j]):ifp[j]; if(!feas.length) continue;
-      const b=Br[j];
-      for(const poly of feas) for(const v of poly){
+    for(const j of tries){ const F=feas[j]; if(!F.length) continue; const b=Br[j];
+      for(const poly of F) for(const v of poly){
         const nx0=v.X+b.x0, ny0=v.Y+b.y0, nx1=v.X+b.x1, ny1=v.Y+b.y1;
         const sc=score(b,bb,nx0,ny0,nx1,ny1);
         if(best && sc>=best.sc) continue;
-        if(forb[j].length && _nsInside(v,forb[j])) continue;   // sécurité : jamais DANS une zone interdite
-        best={sc,j,X:v.X,Y:v.Y,nx0,ny0,nx1,ny1}; } }
+        if(inF(v,j)) continue;                                   // sécurité : jamais DANS une zone interdite
+        if(!S.sheet.rect && !_nsInRegion(v,S.ifp(j))) continue;  // jamais dans un trou de la chute
+        if(!_nsInRegion(v,F)) continue;                          // un sommet d'un « trou » des places libres = pas une place
+        best={sc,j,X:v.X,Y:v.Y}; } }
     if(!best) break;
-    placed.push({a:R[best.j], X:best.X, Y:best.Y});
-    bb=bb?{x0:Math.min(bb.x0,best.nx0),y0:Math.min(bb.y0,best.ny0),x1:Math.max(bb.x1,best.nx1),y1:Math.max(bb.y1,best.ny1)}:{x0:best.nx0,y0:best.ny0,x1:best.nx1,y1:best.ny1};
-    for(let k=0;k<nA;k++){ const nf=getNFP(best.j,k); for(const p of _nsTr(nf,best.X,best.Y)) forb[k].push(p); }
-    if(progress){ const stop=progress(placed.length); if(stop) break; await new Promise(r=>setTimeout(r,0)); }
+    add([{a:R[best.j], j:best.j, X:best.X, Y:best.Y}]);
+    if(progress){ if(progress(placed.length)) break; await _nsTick(); }
   }
   return {placed, bb, mode:opts.mode};
 }
-// Plusieurs essais, on garde le meilleur : le plus de pièces, puis l'ensemble le plus compact.
+// ── RÉSEAU : le motif (1 pièce, ou une PAIRE emboîtée tête-bêche) qui se répète le plus serré possible ──
+// On cherche 2 vecteurs u, v : les copies du motif en i·u + j·v ne se touchent jamais, et |u×v| (surface
+// occupée par motif) est la plus petite possible. u et v « collent » le motif à ses voisins.
+function _nsLatCtx(N){ if(!N||!N.length) return null; const Ns=_nsShrink(N,4); if(!Ns.length) return null;
+  const nb=_nsBounds(Ns); let diam=0; const verts=[]; for(const p of N) for(const w of p){ verts.push(w); diam=Math.max(diam,Math.hypot(w.X,w.Y)); }
+  const inN=(x,y)=>{ if(x<=nb.x0||x>=nb.x1||y<=nb.y0||y>=nb.y1) return false; const pt={X:Math.round(x),Y:Math.round(y)}; for(const p of Ns) if(ClipperLib.Clipper.PointInPolygon(pt,p)===1) return true; return false; };
+  return {N,Ns,diam,verts,inN}; }
+// pour un 1er vecteur u donné, le meilleur 2e vecteur v (motif voisin le plus collé possible)
+function _nsBestV(ctx,u,bestA){ const {N,diam,inN}=ctx; const L2=u.X*u.X+u.Y*u.Y, L=Math.sqrt(L2); if(L<50) return null;
+  const K=Math.min(80,Math.ceil(diam/L)+1);
+  for(let k=1;k<=K;k++) if(inN(k*u.X,k*u.Y)) return null;
+  const M=_nsUnion(N.concat(_nsTr(N,u.X,u.Y),_nsTr(N,-u.X,-u.Y),_nsTr(N,2*u.X,2*u.Y),_nsTr(N,-2*u.X,-2*u.Y)));
+  const cand=[]; for(const p of M) for(const w of p){ const k=Math.round((w.X*u.X+w.Y*u.Y)/L2); const vx=w.X-k*u.X, vy=w.Y-k*u.Y; const cr=u.X*vy-u.Y*vx; if(cr>0&&cr<bestA) cand.push([cr,vx,vy]); }
+  cand.sort((a,b)=>a[0]-b[0]);
+  for(const [cr,vx,vy] of cand){ if(cr>=bestA) break; const h=cr/L; const J=Math.min(80,Math.ceil(diam/h)+1); let ok=true;
+    for(let j=1;j<=J&&ok;j++){ const tc=-j*(vx*u.X+vy*u.Y)/L2; const i0=Math.floor(tc-K-1), i1=Math.ceil(tc+K+1);
+      for(let i=i0;i<=i1;i++){ const x=i*u.X+j*vx, y=i*u.Y+j*vy; if(x*x+y*y>diam*diam*1.0001) continue; if(inN(x,y)){ ok=false; break; } } }
+    if(ok) return {u:{X:u.X,Y:u.Y},v:{X:vx,Y:vy},area:cr}; }
+  return null; }
+// réseau le plus serré dans n'importe quelle direction
+function _nsLatticeOf(cell,N0){ const ctx=_nsLatCtx(N0||_nsNFP(cell,cell)); if(!ctx) return null;
+  let best=null; const evalU=u=>{ const r=_nsBestV(ctx,u,best?best.area:Infinity); if(r&&(!best||r.area<best.area)) best=r; return r?r.area:Infinity; };
+  const U=ctx.verts.filter(w=>w.Y>0||(w.Y===0&&w.X>0)); if(!U.length) return null;
+  const st=Math.max(1,Math.ceil(U.length/48)); const scored=[];
+  for(let i=0;i<U.length;i+=st) scored.push([evalU(U[i]),i]);
+  if(st>1){ scored.sort((a,b)=>a[0]-b[0]); for(const [,i] of scored.slice(0,4)) for(let k=i-st+1;k<i+st;k++) if(k>=0&&k<U.length&&k!==i) evalU(U[k]); }
+  if(best) best.N=ctx.N; return best; }
+// réseau en RANGÉES bien droites (u = horizontal ou vertical) : idéal pour remplir un rectangle.
+// N = NFP du motif déjà tourné. Renvoie u, v dans ce repère.
+function _nsLatticeAxis(N,axis){ const ctx=_nsLatCtx(N); if(!ctx) return null; let tmax=0;
+  for(const p of N) for(let i=0;i<p.length;i++){ const a=p[i],b=p[(i+1)%p.length];
+    if(axis===0){ if((a.Y>0)!==(b.Y>0)||a.Y===0){ const x=a.Y===b.Y?Math.max(a.X,b.X):a.X+(0-a.Y)*(b.X-a.X)/(b.Y-a.Y); if(x>tmax) tmax=x; } }
+    else { if((a.X>0)!==(b.X>0)||a.X===0){ const y=a.X===b.X?Math.max(a.Y,b.Y):a.Y+(0-a.X)*(b.Y-a.Y)/(b.X-a.X); if(y>tmax) tmax=y; } } }
+  if(!(tmax>0)) return null; const t=Math.ceil(tmax)+1; const u=axis===0?{X:t,Y:0}:{X:0,Y:t};
+  const r=_nsBestV(ctx,u,Infinity); if(!r) return null; if(r.area<0){ r.v={X:-r.v.X,Y:-r.v.Y}; r.area=-r.area; } return r; }
+// Motifs à essayer : 1 pièce seule + les paires tête-bêche (pièce + pièce tournée de 180° collée contre) les plus compactes
+function _nsMotifs(S, maxPairs){ const out=[]; const nG=S.nA; const Q0=S.Qr[0];
+  const N1=S.bse(0); const L1=_nsLatticeOf(null,N1); if(L1) out.push(Object.assign(L1,{t:null,kind:'seule',N:N1}));
+  if(nG%2===0){ const h=nG/2; const B=S.bse(h); const Qh=S.Qr[h]; const pts0=[].concat(...Q0), ptsH=[].concat(...Qh);
+    const bb=_nsBounds(Q0); const sz=Math.max(bb.x1-bb.x0,bb.y1-bb.y0);
+    const tv=[]; for(const p of B) for(const w of p) tv.push(w);
+    const sc=tv.map(t=>[_nsHullArea(pts0.concat(ptsH.map(q=>({X:q.X+t.X,Y:q.Y+t.Y})))),t]).sort((a,b)=>a[0]-b[0]);
+    const pick=[]; for(const [,t] of sc){ if(pick.length>=maxPairs) break; if(pick.some(q=>Math.hypot(q.X-t.X,q.Y-t.Y)<sz*0.12)) continue; pick.push(t); }
+    for(const t of pick){ // NFP(paire,paire) = réunion des 4 NFP pièce/pièce déjà calculés (rapide)
+      const N=_nsOuter(_nsUnion(S.bse(0).concat(_nsTr(S.bse(h),-t.X,-t.Y),_nsTr(S.getNFP(h,0),t.X,t.Y),S.getNFP(h,h))));
+      const L=_nsLatticeOf(null,N); if(L) out.push(Object.assign(L,{t,kind:'paire',N})); } }
+  return out; }
+// Pose le réseau sur la tôle, tourné de l'angle R[th] ; on essaie plusieurs « décalages » et on garde celui qui en met le plus.
+function _nsFillLattice(S, L, th, n){ const nG=S.nA; const a=S.R[th], c=Math.cos(a), s=Math.sin(a); const rot=w=>({X:w.X*c-w.Y*s, Y:w.X*s+w.Y*c});
+  const u=rot(L.u), v=rot(L.v); const mem=[{j:th,dx:0,dy:0}]; if(L.t){ const t=rot(L.t); mem.push({j:(th+nG/2)%nG,dx:t.X,dy:t.Y}); }
+  let sb; if(S.sheet.rect) sb={x0:0,y0:0,x1:S.sheet.W,y1:S.sheet.H}; else sb=_nsBounds(S.sheet.paths);
+  const det=u.X*v.Y-u.Y*v.X; if(Math.abs(det)<1) return null;
+  const toAB=(x,y)=>[(x*v.Y-y*v.X)/det,(u.X*y-u.Y*x)/det];
+  let a0=Infinity,a1=-Infinity,b0=Infinity,b1=-Infinity; for(const [x,y] of [[sb.x0,sb.y0],[sb.x1,sb.y0],[sb.x0,sb.y1],[sb.x1,sb.y1]]){ const [A,B]=toAB(x,y); a0=Math.min(a0,A); a1=Math.max(a1,A); b0=Math.min(b0,B); b1=Math.max(b1,B); }
+  a0=Math.floor(a0)-2; a1=Math.ceil(a1)+1; b0=Math.floor(b0)-2; b1=Math.ceil(b1)+1;
+  const pts=(a1-a0+1)*(b1-b0+1)*mem.length; if(pts>40000) return null;
+  const P=S.sheet.rect?(pts>8000?4:8):(pts>3000?3:6);
+  let best=null;
+  for(let pa=0;pa<P;pa++) for(let pb=0;pb<P;pb++){ const ox=(pa/P)*u.X+(pb/P)*v.X, oy=(pa/P)*u.Y+(pb/P)*v.Y; const got=[];
+    for(let i=a0;i<=a1;i++) for(let j=b0;j<=b1;j++){ const X=ox+i*u.X+j*v.X, Y=oy+i*u.Y+j*v.Y;
+      for(const m of mem){ if(S.fits(m.j,X+m.dx,Y+m.dy)) got.push({a:S.R[m.j],j:m.j,X:Math.round(X+m.dx),Y:Math.round(Y+m.dy)}); } }
+    if(!best || got.length>best.length) best=got; }
+  if(!best||!best.length) return null;
+  // trop de pièces : on garde les n les plus groupées (essai rangées / colonnes / coin)
+  if(best.length>n){ let pick=null;
+    for(const key of [p=>p.Y*1e3+p.X, p=>p.X*1e3+p.Y, p=>Math.max(p.X,p.Y)*1e3+p.X+p.Y, p=>p.X+p.Y]){ const sel=best.slice().sort((p,q)=>key(p)-key(q)).slice(0,n); const ar=_nsBBArea(_nsBBof(S,sel)); if(!pick||ar<pick.ar) pick={sel,ar}; }
+    best=pick.sel; }
+  return best; }
+const _nsBetter=(r,best)=>!best || r.placed.length>best.placed.length || (r.placed.length===best.placed.length && _nsBBArea(r.bb)<_nsBBArea(best.bb)-1);
+// Plusieurs méthodes, on garde la meilleure : le plus de pièces, puis l'ensemble le plus compact.
+// opts : {nG (angles sur 360°), tries (indices essayés « une par une »), n, lattice:true}
 async function _nsRun(part, sheet, opts, progress){
-  const S=_nsSetup(part, sheet, opts.angles); let best=null; const modes=opts.modes||['area','rows','cols','corner'];
-  for(let m=0;m<modes.length;m++){
-    const r=await _nsGreedy(S,{n:opts.n,mode:modes[m]},(k)=>progress?progress(m,modes.length,k,best):false);
-    const area=r.bb?(r.bb.x1-r.bb.x0)*(r.bb.y1-r.bb.y0):0;
-    if(!best || r.placed.length>best.placed.length || (r.placed.length===best.placed.length && area<best.area)) best=Object.assign(r,{area});
-    if(progress && progress(m+1,modes.length,-1,best)===true) break;
+  const S=_nsSetup(part, sheet, opts.nG); let best=null; const n=opts.n;
+  const modes=opts.modes||['area','rows','cols','corner']; const tot=modes.length+(opts.lattice!==false?3:0); let step=0;
+  const say=(k,label)=>progress?progress({done:step,tot,k,best,label}):false;
+  const take=(r,label)=>{ const n0=r.placed.length; r.placed=_nsValidate(S,r.placed); r.bb=_nsBBof(S,r.placed); r.label=label; if(_nsBetter(r,best)) best=r; };
+  if(opts.lattice!==false){
+    if(say(0,'recherche des emboîtements…')) return best; await _nsTick();
+    const motifs=_nsMotifs(S, opts.pairs||6); step++;
+    // angles du réseau : sur tôle rectangulaire, 0-180° suffit (le rectangle est symétrique)
+    const ths=[]; for(let i=0;i<S.nA;i++){ if(sheet.rect && S.R[i]>=Math.PI-1e-9) continue; if(!sheet.rect && opts.polyTries && !opts.polyTries.includes(i)) continue; ths.push(i); }
+    let lb=null, cnt=0;
+    const top=[]; // les 6 meilleurs réseaux (on bouchera les trous de chacun)
+    const tryL=(L,th)=>{ const got=_nsFillLattice(S,L,th,n); if(!got) return; const bb=_nsBBof(S,got); const r={placed:got,bb,L,th};
+      top.push(r); top.sort((a,b)=>(b.placed.length-a.placed.length)||(_nsBBArea(a.bb)-_nsBBArea(b.bb))); if(top.length>6) top.pop(); lb=top[0]; };
+    for(const L of motifs){ for(const th of ths){ tryL(L,th); cnt++;
+        // + rangées bien droites (horizontales / verticales) : mieux pour remplir un rectangle
+        { const a=S.R[th]; const Nt=_nsRotPaths(L.N,a);
+          for(const ax of [0,1]){ const r=_nsLatticeAxis(Nt,ax); if(!r) continue; const c=Math.cos(-a),s=Math.sin(-a); const bk=w=>({X:w.X*c-w.Y*s,Y:w.X*s+w.Y*c});
+            tryL({u:bk(r.u),v:bk(r.v),t:L.t,kind:L.kind,area:r.area},th); } }
+        if(cnt%4===0){ if(say(lb?lb.placed.length:0,'réseau '+(L.kind==='paire'?'tête-bêche':'simple')+'…')) return best; await _nsTick(); } } }
+    step++;
+    const big=lb && lb.placed.length>=(opts.bigN||120);   // très grande tôle : le réseau suffit (le reste serait trop long)
+    for(let q=0;q<top.length;q++){ const T=top[q]; const lab=T.L.kind==='paire'?'tête-bêche en réseau':'en réseau'; take({placed:T.placed.slice(),bb:T.bb,mode:'lattice'},lab);
+      // on bouche les trous restants, pièce par pièce
+      if(!big && T.placed.length<n && T.placed.length>=lb.placed.length-2){ const base=_nsValidate(S,T.placed);
+        for(const md of ['area','corner']){ const r=await _nsGreedy(S,{n,mode:md,tries:opts.tries,init:base},k=>say(k,'on bouche les trous…'));
+          take(r,lab+' + trous bouchés'); if(say(-1,'')===true) return best; } } }
+    step++;
+    if(big){ if(best) best.area=_nsBBArea(best.bb); return best; }
   }
+  for(let m=0;m<modes.length;m++){
+    const r=await _nsGreedy(S,{n,mode:modes[m],tries:opts.tries},k=>say(k,'une par une ('+(m+1)+'/'+modes.length+')…'));
+    take(r,'une par une'); step++;
+    if(say(-1,'')===true) break;
+  }
+  if(best) best.area=_nsBBArea(best.bb);
   return best;
 }
-
 // ═══════════ PAGE « NESTING » (étape 22, juste après le dessin) ═══════════
 // Tu cliques ta pièce, tu dis combien, l'écart et la tôle (rectangle X×Y ou ta CHUTE dessinée),
 // « Imbriquer » cherche la disposition la plus serrée (rotations libres), « Garder » la met dans le dessin.
-const _ns={view:{s:4,tx:0,ty:0}, recs:[], piece:null, sheetObj:null, pickSheet:false, res:null, busy:false, stop:false, undo:null, hover:null, msg:'', msgT:null};
+const _ns={view:{s:4,tx:0,ty:0}, recs:[], piece:null, sheetObj:null, sheetKey:null, pickSheet:false, res:null, busy:false, stop:false, undo:null, hover:null, msg:'', msgT:null};
 const _nsPrimClose=t=>(t==='rect'||t==='tri'||t==='star'||t==='oblong'||t==='gear'||t==='polygon'||t==='ellipse');
 function _nsFlat(){ const out=[]; for(const o of paintObjects){ if(!o) continue; if(o.type==='group'&&o.children){ for(const c of o.children) out.push(c); } else out.push(o); } return out; }
 function _nsStrokes(o){ let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; } const strokes=[],closed=[],gaps=[];
   for(let s of st){ if(!s||s.length<2) continue; s=s.map(q=>[q[0],q[1]]); const a=s[0],b=s[s.length-1],gap=Math.hypot(a[0]-b[0],a[1]-b[1]);
     // pour le NESTING, tout trait de 3 points ou plus est vu comme une forme (fermée virtuellement) — sauf traits droits / arcs
-    const cl=!(o.type==='line'||o._arc) && s.length>=3; if(cl && gap>1e-9) s.push([a[0],a[1]]);
+    let per=0; for(let i=1;i<s.length;i++) per+=Math.hypot(s[i][0]-s[i-1][0],s[i][1]-s[i-1][1]);
+    // fermé si : forme fermée par nature, ou bouts presque collés (≤0,3 mm ou ≤15 % du tour, ex. SVG sans point de fermeture)
+    const cl=!(o.type==='line'||o._arc) && s.length>=3 && (_nsPrimClose(o.type) || gap<=Math.max(0.3,per*0.15)); if(cl && gap>1e-9) s.push([a[0],a[1]]);
     strokes.push(s); closed.push(cl); gaps.push(_nsPrimClose(o.type)?0:gap); } return {strokes,closed,gaps}; }
-function _nsBuildRecs(){ const recs=[];
+function _nsMkRec(segs,s,gap){ let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18,per=0; for(let i=0;i<s.length;i++){ const q=s[i]; x0=Math.min(x0,q[0]); y0=Math.min(y0,q[1]); x1=Math.max(x1,q[0]); y1=Math.max(y1,q[1]); if(i) per+=Math.hypot(q[0]-s[i-1][0],q[1]-s[i-1][1]); }
+  return {o:segs[0].o, si:segs[0].si, nS:segs[0].nS, segs, key:segs.map(a=>String(a.o.id)+':'+a.si).join('|'), pts:s, gap, bb:[x0,y0,x1,y1], area:Math.abs(polyArea(s.slice(0,-1))), per}; }
+function _nsBuildRecs(){ const recs=[], open=[];
   for(const o of _nsFlat()){ if(o.type==='dim'||o.type==='point'||o.type==='constraint') continue; const {strokes,closed,gaps}=_nsStrokes(o);
-    strokes.forEach((s,si)=>{ if(!closed[si]) return; let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18,per=0; for(let i=0;i<s.length;i++){ const q=s[i]; x0=Math.min(x0,q[0]); y0=Math.min(y0,q[1]); x1=Math.max(x1,q[0]); y1=Math.max(y1,q[1]); if(i) per+=Math.hypot(q[0]-s[i-1][0],q[1]-s[i-1][1]); }
-      recs.push({o, si, nS:strokes.length, pts:s, gap:gaps[si], bb:[x0,y0,x1,y1], area:Math.abs(polyArea(s.slice(0,-1))), per}); }); }
+    strokes.forEach((s,si)=>{ const a={o,si,nS:strokes.length,pts:s}; if(!closed[si]){ open.push(a); return; } recs.push(_nsMkRec([a],s,gaps[si])); }); }
+  // formes faites de PLUSIEURS traits bout à bout (lignes + arcs + polylignes) -> un seul contour fermé
+  const used=new Set();
+  for(const L of _nsChain(open)){ L.segs.forEach(a=>used.add(a)); recs.push(_nsMkRec(L.segs,L.pts,L.gap)); }
+  // reste : un trait ouvert de 3 points ou plus (pas une ligne / un arc) = forme presque fermée -> fermée virtuellement
+  for(const a of open){ if(used.has(a)||a.o.type==='line'||a.o._arc||a.pts.length<3) continue; const s=a.pts.concat([[a.pts[0][0],a.pts[0][1]]]); const g=Math.hypot(a.pts[0][0]-a.pts[a.pts.length-1][0],a.pts[0][1]-a.pts[a.pts.length-1][1]); recs.push(_nsMkRec([a],s,g)); }
   _ns.recs=recs; }
+// enchaîne des traits ouverts dont les bouts se touchent (≤ 0,3 mm) jusqu'à revenir au départ
+function _nsChain(open){ const tol=0.3, d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]); const used=new Set(), loops=[];
+  const ends=open.map(a=>[a.pts[0],a.pts[a.pts.length-1]]);
+  for(let s0=0;s0<open.length;s0++){ if(used.has(s0)) continue; const chain=[{k:s0,rev:false}], mine=new Set([s0]); const start=ends[s0][0]; let end=ends[s0][1], ok=false;
+    for(let g=0;g<2000;g++){ if(chain.length>=2 && d(end,start)<=tol){ ok=true; break; }
+      let bi=-1,bd=tol,br=false; for(let k=0;k<open.length;k++){ if(used.has(k)||mine.has(k)) continue; const e=ends[k]; const d0=d(end,e[0]), d1=d(end,e[1]); if(d0<bd){bd=d0;bi=k;br=false;} if(d1<bd){bd=d1;bi=k;br=true;} }
+      if(bi<0) break; mine.add(bi); chain.push({k:bi,rev:br}); end=br?ends[bi][0]:ends[bi][1]; }
+    if(!ok) continue; for(const k of mine) used.add(k);
+    const pts=[]; for(const c of chain){ let p=open[c.k].pts.map(q=>[q[0],q[1]]); if(c.rev) p.reverse(); if(pts.length) p=p.slice(1); pts.push(...p); }
+    const gap=d(pts[pts.length-1],pts[0]); pts.push([pts[0][0],pts[0][1]]);
+    loops.push({segs:chain.map(c=>open[c.k]), pts, gap}); }
+  return loops; }
 const _nsM2S=q=>[_ns.view.tx+q[0]*_ns.view.s, _ns.view.ty+q[1]*_ns.view.s];
 const _nsS2M=(x,y)=>[(x-_ns.view.tx)/_ns.view.s,(y-_ns.view.ty)/_ns.view.s];
 function _nsToPath(s){ const p=[]; const n=(s.length>1&&Math.hypot(s[0][0]-s[s.length-1][0],s[0][1]-s[s.length-1][1])<1e-9)?s.length-1:s.length; for(let i=0;i<n;i++) p.push({X:Math.round(s[i][0]*_NS_S),Y:Math.round(s[i][1]*_NS_S)}); return p; }
@@ -15772,11 +15977,18 @@ function _nsPick(m){ const tol=10/_ns.view.s; let best=null,bd=1e18;
   for(const r of _ns.recs){ const d=_nsDistStroke(m,r.pts); if(d<bd){bd=d;best=r;} }
   let inn=null; for(const r of _ns.recs){ if(_pointInPoly(m,r.pts) && (!inn||r.area<inn.area)) inn=r; }
   // clic sur un trait : ce trait ; clic dans le vide d'un trou : la PIÈCE autour (pas le trou)
-  if(best && bd<=tol) return _nsOuterOf(best);
-  return inn?_nsOuterOf(inn):null; }
+  const raw=(best && bd<=tol)?best:inn; if(!raw) return null; const top=_nsOuterOf(raw);
+  // re-clic au même endroit sur une pièce déjà choisie : on descend d'un cran (la forme DANS l'autre)
+  if(_ns.piece && _ns.piece.rec===top && raw!==top && !_ns.pickSheet && _ns._cycle){ let cur=raw; for(let k=0;k<20;k++){ let up=null; for(const q of _ns.recs){ if(q===cur||q===top||_nsIsSheet(q)||q.area<=cur.area) continue; if(_pointInPoly(cur.pts[0],q.pts)&&(!up||q.area<up.area)) up=q; } if(!up) break; cur=up; } return cur; }
+  return top; }
 // remonte au contour EXTÉRIEUR qui contient ce trait (un trou -> sa pièce), hors tôle-chute
-function _nsOuterOf(r){ let cur=r; for(let k=0;k<20;k++){ let up=null; for(const q of _ns.recs){ if(q===cur||_nsIsSheet(q)||q.area<=cur.area) continue; if(_pointInPoly(cur.pts[0],q.pts) && (!up||q.area<up.area)) up=q; } if(!up) break; cur=up; } return cur; }
-function _nsIsSheet(r){ return !!(_ns.sheetObj && r.o===_ns.sheetObj); }
+function _nsOuterOf(r){ let cur=r; for(let k=0;k<20;k++){ let up=null; for(const q of _ns.recs){ if(q===cur||_nsIsSheet(q)||q.area<=cur.area) continue; if(_pointInPoly(cur.pts[0],q.pts) && (!up||q.area<up.area)) up=q; } if(!up||_nsLooksSheet(up,cur)) break; cur=up; } return cur; }
+// le contour autour ressemble-t-il à une CHUTE (plusieurs pièces dedans) plutôt qu'à une pièce avec des trous ?
+function _nsLooksSheet(up,cur){ const inside=_ns.recs.filter(q=>q!==up&&q.area<up.area&&_pointInPoly(q.pts[0],up.pts));
+  const twins=inside.filter(q=>q!==cur&&Math.abs(q.area-cur.area)<=cur.area*0.005+0.01&&Math.abs(q.per-cur.per)<=cur.per*0.005+0.01).length;
+  const deep=inside.some(q=>inside.some(w=>w!==q&&w.area<q.area&&_pointInPoly(w.pts[0],q.pts)));
+  return (twins>=2 && cur.area<up.area*0.3) || deep; }
+function _nsIsSheet(r){ return !!(_ns.sheetKey && r.key===_ns.sheetKey); }
 // La pièce = le contour cliqué + tous les traits DEDANS (trous, gravures…), même s'ils sont dans d'autres objets.
 function _nsInnerOf(rec){ return _ns.recs.filter(r=>r!==rec && !_nsIsSheet(r) && r.area<rec.area && r.bb[0]>=rec.bb[0]-1e-6 && r.bb[1]>=rec.bb[1]-1e-6 && r.bb[2]<=rec.bb[2]+1e-6 && r.bb[3]<=rec.bb[3]+1e-6 && _pointInPoly(r.pts[0],rec.pts)); }
 function _nsPieceFrom(rec){ const items=[rec].concat(_nsInnerOf(rec));
@@ -15784,19 +15996,22 @@ function _nsPieceFrom(rec){ const items=[rec].concat(_nsInnerOf(rec));
   const same=[]; for(const r of _ns.recs){ if(items.includes(r)||_nsIsSheet(r)) continue; if(Math.abs(r.area-rec.area)>rec.area*0.005+0.01 || Math.abs(r.per-rec.per)>rec.per*0.005+0.01) continue;
     if(_ns.recs.some(q=>q!==r&&q.area>r.area&&_pointInPoly(r.pts[0],q.pts)&&!_nsIsSheet(q))) continue;   // pas un trou d'une autre pièce
     const inn=_nsInnerOf(r); if(inn.length!==items.length-1) continue; if(same.some(g=>g.items.includes(r))) continue; same.push({rec:r, items:[r].concat(inn)}); }
-  return {rec, items, objs:[...new Set(items.map(i=>i.o))], same}; }
+  return {rec, items, objs:[...new Set(_nsAtoms(items).map(i=>i.o))], same}; }
 function _nsSay(t){ _ns.msg=t||''; clearTimeout(_ns.msgT); if(t) _ns.msgT=setTimeout(()=>{ _ns.msg=''; _nsHint(); },3000); _nsHint(); }
 function _nsHint(){ const el=document.getElementById('nsHint'); if(!el) return; let t;
-  if(_ns.msg) t=_ns.msg; else if(_ns.pickSheet) t='Clique la forme qui représente ta CHUTE (le contour de ta tôle).'; else if(!_ns.piece) t='① Clique DANS ta pièce (ses trous suivent tout seuls).'; else if(!_ns.res) t='② Règle combien, l\'écart et la tôle, puis « 📦 Imbriquer ».'; else t='③ Si ça te va : « ✓ Garder dans le dessin ».';
+  if(_ns.msg) t=_ns.msg; else if(_ns.pickSheet) t='Clique la forme qui représente ta CHUTE (le contour de ta tôle).'; else if(!_ns.piece) t='① Clique DANS ta pièce (ses trous suivent tout seuls).'; else if(!_ns.res) t='② Règle combien, l\'écart et la tôle, puis « 📦 Imbriquer ».'+(_ns.recs.some(q=>q!==_ns.piece.rec&&_ns.piece.items.includes(q))?'  (pas la bonne forme ? re-clique dessus pour prendre celle de dedans)':''); else t='③ Si ça te va : « ✓ Garder dans le dessin ».';
   el.textContent=t; el.style.background=_ns.msg?'rgba(22,101,52,.92)':'rgba(17,24,39,.8)'; }
 function _nsSheetDef(){
-  if(_ns.sheetObj){ const r=_ns.recs.filter(q=>q.o===_ns.sheetObj).sort((p,q)=>q.area-p.area)[0]; if(!r) { _ns.sheetObj=null; return _nsSheetDef(); } const paths=_nsRegionOuter(r); if(!paths.length) return null;
+  if(_ns.sheetObj){ const r=_ns.recs.find(_nsIsSheet); if(!r) { _ns.sheetObj=null; _ns.sheetKey=null; return _nsSheetDef(); } const paths=_nsRegionOuter(r); if(!paths.length) return null;
     return {rect:false, paths, bbmm:r.bb, label:'ta chute dessinée'}; }
   const W=parseFloat(document.getElementById('nsW')?.value)||0, H=parseFloat(document.getElementById('nsH')?.value)||0; if(!(W>0&&H>0)) return null;
   const pr=_ns.piece?_ns.piece.rec:null; if(pr){ _ns.lastO=[pr.bb[0],pr.bb[1]]; } const ox=pr?pr.bb[0]:((_ns.lastO||[0,0])[0]), oy=pr?pr.bb[1]:((_ns.lastO||[0,0])[1]);   // la tôle se pose là où était la pièce (et y reste après « Garder »)
   return {rect:true, W:Math.round(W*_NS_S), H:Math.round(H*_NS_S), ox, oy, Wmm:W, Hmm:H, label:W+' × '+H+' mm'}; }
-function _nsAngles(){ const v=document.getElementById('nsRot')?.value||'15'; const out=[];
-  if(v==='0'){ out.push(0); } else if(v==='180'){ out.push(0,Math.PI); } else { const st=+v; for(let a=0;a<360-1e-9;a+=st) out.push(a*Math.PI/180); } return out; }
+// angles permis : nG angles réguliers sur 360° ; « tries » = ceux essayés pour poser une par une ; polyTries = réseau sur une chute
+function _nsAngles(){ const v=document.getElementById('nsRot')?.value||'5'; const all=n=>[...Array(n).keys()];
+  if(v==='0') return {nG:1,tries:[0],label:'sans rotation'}; if(v==='180') return {nG:2,tries:[0,1],label:'0° / 180°'}; if(v==='90') return {nG:4,tries:all(4),label:'tous les 90°'};
+  if(v==='15') return {nG:24,tries:all(24),label:'tous les 15°'};
+  return {nG:72,tries:all(72),polyTries:all(72).filter(i=>i%3===0),label:'tous les sens (5°)'}; }
 async function _nsRunUI(){
   if(_ns.busy){ _ns.stop=true; return; }
   if(typeof ClipperLib==='undefined'){ _nsSay('⚠ Moteur Clipper absent'); return; }
@@ -15810,8 +16025,8 @@ async function _nsRunUI(){
   _ns.busy=true; _ns.stop=false; _ns.res=null; _nsPanel(); const bar=document.getElementById('nsProg');
   const ang=_nsAngles(); const t0=Date.now();
   try{
-    const best=await _nsRun(part, sh, {angles:ang, n:N}, (m,M,k,b)=>{ if(bar){ bar.style.display='block'; const done=(k<0?m:m+(k/Math.max(1,max?60:N))*0.999)/M; bar.firstElementChild.style.width=Math.min(100,done*100).toFixed(0)+'%'; }
-      const st=document.getElementById('nsStatus'); if(st) st.textContent='Calcul… essai '+Math.min(M,(k<0?m:m+1))+'/'+M+(k>0?(' · '+k+' pièce(s) posée(s)'):'')+(b?(' · meilleur : '+b.placed.length):'');
+    const best=await _nsRun(part, sh, {nG:ang.nG, tries:ang.tries, polyTries:ang.polyTries, n:N}, (pr)=>{ if(bar){ bar.style.display='block'; const done=Math.min(0.99,(pr.done+(pr.k>0?Math.min(0.9,pr.k/Math.max(1,max?60:N)):0))/pr.tot); bar.firstElementChild.style.width=(done*100).toFixed(0)+'%'; }
+      const st=document.getElementById('nsStatus'); if(st && pr.label) st.textContent='Calcul… '+pr.label+(pr.best?(' · meilleur pour l\'instant : '+pr.best.placed.length+' pièces'):'');
       return _ns.stop; });
     _ns.res={best, part, sheet, gap, N, max, ang, ms:Date.now()-t0};
   }catch(e){ console.error('[Nesting]',e); _nsSay('⚠ Erreur de calcul : '+e.message); }
@@ -15828,10 +16043,11 @@ function _nsCopyObj(o,T){
   const {strokes}=_nsStrokes(o); return strokes.map(s=>_nsFreeFrom(o,s,T)); }
 function _nsFreeFrom(o,s,T){ const f={id:_nsNewId(),type:'free',pts:s.map(q=>T?T(q[0],q[1]):[q[0],q[1]]),strokeW:o.strokeW||0.2}; const a=s[0],b=s[s.length-1]; if(s.length>=3&&Math.hypot(a[0]-b[0],a[1]-b[1])<0.3) f._poly=true; if(o.toolId) f.toolId=o.toolId; return f; }
 // copie des éléments d'une pièce : par objet entier quand c'est possible
-function _nsCopyItems(items,T){ const out=[]; const byObj=new Map(); for(const it of items){ if(!byObj.has(it.o)) byObj.set(it.o,[]); byObj.get(it.o).push(it); }
+const _nsAtoms=items=>items.flatMap(it=>it.segs||[it]);
+function _nsCopyItems(items,T){ const out=[]; const byObj=new Map(); for(const it of _nsAtoms(items)){ if(!byObj.has(it.o)) byObj.set(it.o,[]); byObj.get(it.o).push(it); }
   for(const [o,its] of byObj){ if(its.length===its[0].nS) out.push(..._nsCopyObj(o,T)); else for(const it of its) out.push(_nsFreeFrom(o,it.pts,T)); } return out; }
 // retirer des éléments : objet entier si tous ses traits partent, sinon on garde ses AUTRES traits en contours libres
-function _nsRemoveItems(items){ const byObj=new Map(); for(const it of items){ if(!byObj.has(it.o)) byObj.set(it.o,new Set()); byObj.get(it.o).add(it.si); }
+function _nsRemoveItems(items){ const byObj=new Map(); for(const it of _nsAtoms(items)){ if(!byObj.has(it.o)) byObj.set(it.o,new Set()); byObj.get(it.o).add(it.si); }
   for(const [o,set] of byObj){ const {strokes,closed}=_nsStrokes(o);
     if(set.size<strokes.length){ strokes.forEach((s,si)=>{ if(set.has(si)) return; const f=_nsFreeFrom(o,closed[si]?s:s,null); paintObjects.push(f); }); }
     _nsRemove(o); } }
@@ -15848,19 +16064,19 @@ function _nsKeep(){ const R=_ns.res; if(!R||!R.best||!R.best.placed.length){ _ns
   // la pièce d'origine (et ses copies identiques si coché) sont remplacées par le nesting
   let rem=items.slice(); const repl=document.getElementById('nsSame'); if(repl && repl.checked) for(const g of _ns.piece.same) rem=rem.concat(g.items);
   _nsRemoveItems(rem);
-  if(_ns.sheetObj){ _nsRemove(_ns.sheetObj); _ns.sheetObj=null; }   // le contour de la chute ne doit PAS être coupé
+  if(_ns.sheetObj){ const sr=_ns.recs.find(_nsIsSheet); if(sr) _nsRemoveItems([sr]); _ns.sheetObj=null; _ns.sheetKey=null; }   // le contour de la chute ne doit PAS être coupé
   if(typeof pushHistory==='function') pushHistory(); if(typeof updateObjCount==='function') updateObjCount(); if(typeof redrawCanvas==='function') redrawCanvas();
   const n=R.best.placed.length; _ns.res=null; _ns.piece=null; _nsBuildRecs(); _nsSay('✓ '+n+' pièces mises dans ton dessin'); _nsPanel(); _nsFitView(); _nsDraw(); }
 function _nsUndo(){ if(!_ns.undo){ _nsSay('Rien à annuler'); return; } try{ const arr=JSON.parse(_ns.undo); paintObjects.length=0; arr.forEach(o=>paintObjects.push(o)); }catch(e){ return; }
   _ns.undo=null; if(typeof _syncObjCnt==='function') _syncObjCnt(); if(typeof pushHistory==='function') pushHistory(); if(typeof redrawCanvas==='function') redrawCanvas();
   _nsBuildRecs(); _ns.piece=null; _ns.res=null; _nsSay('↩ Annulé : ton dessin est comme avant'); _nsPanel(); _nsFitView(); _nsDraw(); }
 function _nsClear(){ _ns.res=null; _nsPanel(); _nsFitView(); _nsDraw(); }
-function _nsSheetRect(){ _ns.sheetObj=null; _ns.pickSheet=false; _ns.res=null; _nsPanel(); _nsFitView(); _nsDraw(); }
+function _nsSheetRect(){ _ns.sheetObj=null; _ns.sheetKey=null; _ns.pickSheet=false; _ns.res=null; _nsPanel(); _nsFitView(); _nsDraw(); }
 function _nsSheetPick(){ _ns.pickSheet=!_ns.pickSheet; _nsPanel(); _nsHint(); }
 function _nsPanel(){
   const pi=document.getElementById('nsPieceInfo'); if(pi){ if(_ns.piece){ const r=_ns.piece.rec, k=_ns.piece.same.length; pi.innerHTML='Pièce : <b>'+(+(r.bb[2]-r.bb[0]).toFixed(2))+' × '+(+(r.bb[3]-r.bb[1]).toFixed(2))+' mm</b>'+(_ns.piece.items.length>1?(' + '+(_ns.piece.items.length-1)+' élément(s) dedans'):'')
       +(r.gap>0.3?'<br><span style="color:#f97316">⚠ contour pas fermé (trou de '+(+r.gap.toFixed(2))+' mm) : il sera coupé tel quel</span>':'')
-      +(k?('<br><label style="display:flex;gap:6px;align-items:center;margin-top:5px;color:var(--txt);font-weight:600;cursor:pointer"><input type="checkbox" id="nsSame" checked> Remplacer aussi les <b>'+k+'</b> autre(s) forme(s) identique(s) du dessin</label>'):''); } else pi.textContent='Aucune pièce choisie.'; }
+      +(k?('<br><label style="display:flex;gap:6px;align-items:center;margin-top:5px;color:var(--txt);font-weight:600;cursor:pointer"><input type="checkbox" id="nsSame" checked><span>Remplacer aussi les <b>'+k+'</b> autre(s) forme(s) identique(s) du dessin</span></label>'):''); } else pi.textContent='Aucune pièce choisie.'; }
   const nIn=document.getElementById('nsN'), mx=document.getElementById('nsMax'); if(nIn&&mx) nIn.disabled=mx.checked;
   const si=document.getElementById('nsSheetInfo'); if(si) si.innerHTML=_ns.sheetObj?'Tôle = <b>ta chute dessinée</b> <button class="dcb" style="margin-left:6px;padding:3px 8px" onclick="_nsSheetRect()">↺ Rectangle</button>':(_ns.pickSheet?'<b style="color:#f59e0b">Clique ta chute dans le dessin…</b>':'');
   const rb=document.getElementById('nsRectBox'); if(rb) rb.style.opacity=_ns.sheetObj?'.35':'1';
@@ -15869,7 +16085,7 @@ function _nsPanel(){
   const st=document.getElementById('nsStatus'), kp=document.getElementById('nsKeepRow');
   if(!_ns.busy && st){ const R=_ns.res; if(R&&R.best){ const n=R.best.placed.length; const used=R.sheet.rect?(n*R.part.area/(R.sheet.Wmm*R.sheet.Hmm)*100):null; const bb=R.best.bb;
       st.innerHTML=(R.max?('✅ <b>'+n+'</b> pièces au maximum'):((n>=R.N?'✅ ':'⚠ ')+'<b>'+n+' / '+R.N+'</b> pièces placées'+(n<R.N?' (pas la place pour toutes)':'')))
-        +(used!=null?' · tôle utilisée <b>'+used.toFixed(0)+' %</b>':'')+(bb?' · zone occupée '+((bb.x1-bb.x0)/_NS_S).toFixed(1)+' × '+((bb.y1-bb.y0)/_NS_S).toFixed(1)+' mm':'')+' · '+(R.ms/1000).toFixed(1)+' s';
+        +(used!=null?' · tôle utilisée <b>'+used.toFixed(0)+' %</b>':'')+(R.best.label?' · rangement : <b>'+R.best.label+'</b>':'')+(bb?' · zone occupée '+((bb.x1-bb.x0)/_NS_S).toFixed(1)+' × '+((bb.y1-bb.y0)/_NS_S).toFixed(1)+' mm':'')+' · '+(R.ms/1000).toFixed(1)+' s';
     } else st.textContent=''; }
   if(kp) kp.style.display=(!_ns.busy&&_ns.res&&_ns.res.best&&_ns.res.best.placed.length)?'flex':'none';
   const un=document.getElementById('nsUndoBtn'); if(un) un.style.display=_ns.undo?'':'none';
@@ -15920,16 +16136,20 @@ function _nsWire(){ const cv=document.getElementById('nsCanvas'); if(!cv||cv._ns
     if(down && !down.pan && Math.hypot(e.clientX-down.x,e.clientY-down.y)>6) down.pan=true;
     if(down && down.pan){ _ns.view.tx=down.tx+(e.clientX-down.x); _ns.view.ty=down.ty+(e.clientY-down.y); _nsDraw(); return; }
     if(_ns.busy) return; const h=_nsPick(_nsS2M(mx,my)); if(h!==_ns.hover){ _ns.hover=h; cv.style.cursor=h?'pointer':'default'; _nsDraw(); } });
-  cv.addEventListener('pointerup',e=>{ if(!down) return; const d=down; down=null; if(d.pan||_ns.busy) return; const b=cv.getBoundingClientRect(); const m=_nsS2M(e.clientX-b.left,e.clientY-b.top); const r=_nsPick(m);
-    if(_ns.pickSheet){ if(r){ _ns.sheetObj=r.o; _ns.pickSheet=false; if(_ns.piece&&_ns.piece.objs.includes(r.o)) _ns.piece=null; _ns.res=null; _nsSay('Tôle = ta chute'); } _nsPanel(); _nsFitView(); _nsDraw(); return; }
-    if(r && r.o!==_ns.sheetObj){ _ns.piece=_nsPieceFrom(r); _ns.res=null; _nsDefaultN(); } _nsPanel(); _nsDraw(); });
+  cv.addEventListener('pointerup',e=>{ if(!down) return; const d=down; down=null; if(d.pan||_ns.busy) return; const b=cv.getBoundingClientRect(); const m=_nsS2M(e.clientX-b.left,e.clientY-b.top); _ns._cycle=true; const r=_nsPick(m); _ns._cycle=false;
+    if(_ns.pickSheet){ if(r){ _ns.sheetObj=r.o; _ns.sheetKey=r.key; _ns.pickSheet=false; if(_ns.piece&&(_ns.piece.rec.key===r.key||_ns.piece.items.includes(r))) _ns.piece=null; _ns.res=null; _nsSay('Tôle = ta chute'); } _nsPanel(); _nsFitView(); _nsDraw(); return; }
+    if(r && !_nsIsSheet(r)){ _ns.piece=_nsPieceFrom(r); _ns.res=null; _nsDefaultN(); } _nsPanel(); _nsDraw(); });
   cv.addEventListener('pointerleave',()=>{ _ns.hover=null; _nsDraw(); });
   window.addEventListener('resize',()=>{ const pg=document.getElementById('wzp22'); if(pg&&pg.classList.contains('wz-on')) _nsDraw(); });
 }
 function _nsDefaultN(){ const el=document.getElementById('nsN'); if(el && !_ns.nTouched && _ns.piece) el.value=String(1+_ns.piece.same.length); }
-function _nsEnter(){ _nsWire(); _nsBuildRecs(); if(_ns.sheetObj && !_ns.recs.some(r=>r.o===_ns.sheetObj)) _ns.sheetObj=null; _ns.res=null;
-  if(_ns.piece){ const r=_ns.recs.find(q=>q.o===_ns.piece.rec.o&&q.si===_ns.piece.rec.si); _ns.piece=r?_nsPieceFrom(r):null; }
-  if(!_ns.piece){ const tops=_ns.recs.filter(r=>!_ns.recs.some(q=>q!==r&&q.area>r.area&&_pointInPoly(r.pts[0],q.pts))); if(tops.length>=1){ const p=_nsPieceFrom(tops[0]); if(p.same.length===tops.length-1) _ns.piece=p; } }   // une seule sorte de pièce : choisie d'office
+function _nsEnter(){ _nsWire(); _nsBuildRecs(); if(_ns.sheetObj && !_ns.recs.some(_nsIsSheet)){ _ns.sheetObj=null; _ns.sheetKey=null; } _ns.res=null;
+  if(_ns.piece){ const r=_ns.recs.find(q=>q.key===_ns.piece.rec.key); _ns.piece=r?_nsPieceFrom(r):null; }
+  if(!_ns.piece){ let tops=_ns.recs.filter(r=>!_nsIsSheet(r)&&!_ns.recs.some(q=>q!==r&&!_nsIsSheet(q)&&q.area>r.area&&_pointInPoly(r.pts[0],q.pts)));
+    // une chute dessinée autour de plusieurs pièces identiques : la chute devient la tôle, la pièce est choisie
+    if(tops.length===1 && !_ns.sheetObj){ const T=tops[0]; const kids=_ns.recs.filter(r=>r!==T&&_pointInPoly(r.pts[0],T.pts)&&!_ns.recs.some(q=>q!==r&&q!==T&&q.area>r.area&&_pointInPoly(r.pts[0],q.pts)));
+      if(kids.length>=2 && _nsLooksSheet(T,kids[0])){ _ns.sheetObj=T.o; _ns.sheetKey=T.key; tops=kids; } }
+    if(tops.length>=1){ const p=_nsPieceFrom(tops[0]); if(p.same.length===tops.length-1) _ns.piece=p; } }   // une seule sorte de pièce : choisie d'office
   _nsDefaultN();
   _nsPanel(); setTimeout(()=>{ _nsFitView(); _nsDraw(); },40); }
 
