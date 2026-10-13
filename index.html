@@ -161,6 +161,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-13 — IJ : NESTING de pièces DIFFÉRENTES + on remplit autour de ce qui est déjà posé (demande Seb)
+ [AJOUT] Liste de pièces : chaque clic sur une forme l'AJOUTE (pièce A, B, C… chacune sa couleur), avec son
+   nombre ; « max » sur UNE pièce = elle remplit toute la place qui reste. Les nombres fixes sont posés d'abord
+   (les plus grosses en premier), chaque sorte s'emboîte autour des précédentes (réseau tête-bêche + trous bouchés).
+ [AJOUT] Ce qui est déjà dessiné sur la tôle (ex. un nesting gardé avant) est contourné, écart compris :
+   « Garder », puis clic sur une autre forme -> elle remplit la place qui reste. La tôle reste au même endroit
+   (bouton 📍 pour la remettre sur la pièce A).
+ [FIX] Cliquer une autre forme n'efface plus le résultat affiché : il reste, marqué « à relancer ».
+   Re-clic sur une pièce de la liste = la forme de dedans. Hors zone CIP.
+
 -- 2026-10-13 — II : NESTING v2 — les pièces s'EMBOÎTENT (tête-bêche, dans tous les sens)
  [AJOUT] Nouveau moteur : il cherche la PAIRE de pièces qui s'emboîte le mieux (une à l'endroit, une tournée de
    180° collée dedans), puis le motif qui se répète le plus serré (réseau), essayé tous les 5°, en rangées droites
@@ -1892,7 +1902,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-13-II ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-13-IJ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2796,19 +2806,17 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     <div style="flex:1;min-width:0;min-height:240px;position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--brd2)">
       <canvas id="nsCanvas" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none;background:#fbfaf7"></canvas>
       <div id="nsHint" style="position:absolute;left:10px;top:8px;width:fit-content;max-width:calc(100% - 20px);pointer-events:none;background:rgba(17,24,39,.8);color:#fff;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600"></div>
-      <div style="position:absolute;bottom:6px;left:10px;font-size:10px;color:#6b7280;pointer-events:none">molette = zoom · glisser = déplacer la vue · <b style="color:#2563eb">bleu</b> = pièces placées · <b style="color:#64748b">gris</b> = tôle</div>
+      <div style="position:absolute;bottom:6px;left:10px;font-size:10px;color:#6b7280;pointer-events:none">molette = zoom · glisser = déplacer la vue · <b style="color:#2563eb">couleurs</b> = pièces placées (A, B, C…) · <b style="color:#64748b">gris</b> = tôle · <b style="color:#475569">grisé</b> = déjà sur la tôle (contourné)</div>
     </div>
     <div style="width:310px;flex-shrink:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px">
       <div class="dccard">
-        <div class="dct"><span class="dcn" style="background:#f59e0b">1</span>La pièce</div>
-        <div class="dcs">Clique <b>DANS</b> ta pièce : ses trous et ce qu'il y a dedans suivent tout seuls.</div>
-        <div class="dcs" id="nsPieceInfo" style="color:#f59e0b;font-weight:700"></div>
+        <div class="dct"><span class="dcn" style="background:#f59e0b">1</span>Les pièces</div>
+        <div class="dcs">Clique <b>DANS</b> une pièce pour l'ajouter (ses trous suivent). Tu peux en ajouter <b>plusieurs, différentes</b> : elles s'imbriquent ensemble. Ce qui est déjà sur la tôle est contourné.</div>
+        <div id="nsPieceInfo"></div>
       </div>
       <div class="dccard">
-        <div class="dct"><span class="dcn" style="background:#3b82f6;color:#fff">2</span>Combien, et l'écart</div>
-        <div class="dcrow"><span class="dcs">Nombre :</span><input id="nsN" type="number" value="10" min="1" step="1" style="width:70px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:7px;color:var(--txt);font-size:13px;font-weight:700;padding:5px 6px" oninput="_ns.nTouched=true;_ns.res=null;_nsPanel();_nsDraw()">
-          <label class="dcs" style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="nsMax" onchange="_ns.res=null;_nsPanel();_nsDraw()"> le maximum possible</label></div>
-        <div class="dcrow"><span class="dcs">Écart entre pièces :</span><input id="nsGap" type="number" value="0.2" min="0" step="0.05" style="width:70px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:7px;color:var(--txt);font-size:13px;font-weight:700;padding:5px 6px" oninput="_ns.res=null;_nsPanel();_nsDraw()"><span class="dcs">mm</span></div>
+        <div class="dct"><span class="dcn" style="background:#3b82f6;color:#fff">2</span>L'écart</div>
+        <div class="dcrow"><span class="dcs">Écart entre pièces :</span><input id="nsGap" type="number" value="0.2" min="0" step="0.05" style="width:70px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:7px;color:var(--txt);font-size:13px;font-weight:700;padding:5px 6px" oninput="_nsStale();_nsPanel();_nsDraw()"><span class="dcs">mm</span></div>
       </div>
       <div class="dccard">
         <div class="dct"><span class="dcn" style="background:#64748b;color:#fff">3</span>La tôle</div>
@@ -2828,7 +2836,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
       </div>
       <div class="dccard">
         <div class="dct"><span class="dcn" style="background:#9333ea;color:#fff">4</span>Rotation</div>
-        <select id="nsRot" onchange="_ns.res=null;_nsPanel();_nsDraw()" style="background:var(--surf);border:1.5px solid var(--brd2);border-radius:7px;color:var(--txt);font-size:13px;font-weight:700;padding:5px 6px;font-weight:600">
+        <select id="nsRot" onchange="_nsStale();_nsPanel();_nsDraw()" style="background:var(--surf);border:1.5px solid var(--brd2);border-radius:7px;color:var(--txt);font-size:13px;font-weight:700;padding:5px 6px;font-weight:600">
           <option value="5" selected>Tous les sens — tous les 5° (conseillé)</option>
           <option value="15">Tous les 15°</option>
           <option value="90">Seulement 0° / 90° / 180° / 270°</option>
@@ -15822,7 +15830,9 @@ function _nsCvxOf(paths){ let r=_nsCvxCache.get(paths); if(r!==undefined) return
 function _nsNFP(Qa,Qb){ const C=_nsCL(); const parts=[];
   const A=_nsCvxOf(Qa), B=_nsCvxOf(Qb);
   if(A&&B&&A.length&&B.length){ const nB=B.map(p=>p.map(q=>({X:-q.X,Y:-q.Y}))); for(const a of A) for(const b of nB) parts.push(_nsCvxSum(a,b)); return _nsOuter(_nsUnion(parts)); }
-  for(const pb of Qb){ const neg=pb.map(q=>({X:-q.X,Y:-q.Y})); for(const pa of Qa){ const m=C.Clipper.MinkowskiSum(neg,pa,true); for(const x of m) parts.push(x); } }
+  for(const pb of Qb){ const neg=pb.map(q=>({X:-q.X,Y:-q.Y})); for(const pa of Qa){ const m=C.Clipper.MinkowskiSum(neg,pa,true); for(const x of m) parts.push(x);
+    // + les 2 formes « pleines » (sinon une petite forme ENTIÈREMENT dans une grande passerait inaperçue)
+    parts.push(pa.map(q=>({X:q.X+neg[0].X,Y:q.Y+neg[0].Y}))); parts.push(neg.map(q=>({X:q.X+pa[0].X,Y:q.Y+pa[0].Y}))); } }
   return _nsOuter(_nsUnion(parts)); }
 // Zone où le CENTRE peut aller pour que la pièce reste dans la tôle.
 function _nsIFP(sheet, Qr){ const C=_nsCL();
@@ -15842,28 +15852,41 @@ function _nsHullArea(pts){ const P=pts.slice().sort((a,b)=>a.X-b.X||a.Y-b.Y); co
   const h=lo.slice(0,-1).concat(up.slice(0,-1)); let A=0; for(let i=0;i<h.length;i++){ const a=h[i],b=h[(i+1)%h.length]; A+=a.X*b.Y-b.X*a.Y; } return Math.abs(A)/2; }
 const _nsTick=()=>new Promise(r=>setTimeout(r,0));
 // Grille d'angles régulière (nG angles sur 360°). Tout est calculé à la demande et gardé en mémoire.
-function _nsSetup(part, sheet, nG){
-  const R=[]; for(let i=0;i<nG;i++) R.push(i*2*Math.PI/nG);
-  const Qr=R.map(a=>_nsRotPaths(part.Q,a)); const Br=Qr.map(_nsBounds);
-  const ifpC={}; const ifp=j=>ifpC[j]||(ifpC[j]=_nsIFP(sheet,Qr[j]));
-  const base={}, baseS={}, cache={}, cacheS={};
-  const bse=d=>base[d]||(base[d]=_nsNFP(Qr[0],Qr[d]));
-  const dOf=(i,j)=>((j-i)%nG+nG)%nG;
-  // NFP(i,j) = NFP(0, j-i) tourné de R[i]  -> nG calculs au lieu de nG²
-  const getNFP=(i,j)=>{ const k=i+'_'+j; if(cache[k]) return cache[k]; const d=dOf(i,j); return cache[k]=(i===0?bse(d):_nsRotPaths(bse(d),R[i])); };
+// Mise en place pour PLUSIEURS sortes de pièces (parts[t]) sur une tôle, avec des obstacles fixes (ce qui est
+// déjà dessiné sur la tôle, grossi de écart/2). Grille d'angles régulière (nG angles sur 360°), tout à la demande.
+function _nsSetupM(parts, sheet, nG, obst){
+  const R=[]; for(let i=0;i<nG;i++) R.push(i*2*Math.PI/nG); obst=(obst&&obst.length)?obst:null;
+  const Qr=parts.map(p=>R.map(a=>_nsRotPaths(p.Q,a))); const Br=Qr.map(q=>q.map(_nsBounds));
+  const complex=!sheet.rect || !!obst;
+  const ifpC={}; const ifp=(t,j)=>{ const k=t+'_'+j; if(ifpC[k]) return ifpC[k]; let f=_nsIFP(sheet,Qr[t][j]); if(obst&&f.length) f=_nsDiff(f,_nsNFP(obst,Qr[t][j])); return ifpC[k]=f; };
+  const base={}, baseS={}, cache={}, cacheS={}; const dOf=(i,j)=>((j-i)%nG+nG)%nG;
+  const bse=(a,b,d)=>{ const k=a+'_'+b+'_'+d; return base[k]||(base[k]=_nsNFP(Qr[a][0],Qr[b][d])); };
+  // NFP(a à l'angle i, b à l'angle j) = NFP(a à 0, b à j-i) tourné de R[i]  -> nG calculs au lieu de nG²
+  const nfp=(a,i,b,j)=>{ const k=a+'_'+i+'_'+b+'_'+j; if(cache[k]) return cache[k]; const d=dOf(i,j); const B=bse(a,b,d); return cache[k]=(i===0?B:_nsRotPaths(B,R[i])); };
   // version « rétrécie de 4 µm » pour les contrôles (évite les faux chevauchements dus aux arrondis au µm)
-  const getNFPs=(i,j)=>{ const k=i+'_'+j; if(cacheS[k]) return cacheS[k]; const d=dOf(i,j); if(!baseS[d]) baseS[d]=_nsShrink(bse(d),4); return cacheS[k]=(i===0?baseS[d]:_nsRotPaths(baseS[d],R[i])); };
-  const fits=(j,X,Y)=>{ if(sheet.rect){ const b=Br[j]; return X>=-b.x0-0.5 && X<=sheet.W-b.x1+0.5 && Y>=-b.y0-0.5 && Y<=sheet.H-b.y1+0.5; } const f=ifp(j); return f.length>0 && _nsInRegion({X:Math.round(X),Y:Math.round(Y)},f); };
-  return {R,nA:nG,Qr,Br,ifp,getNFP,getNFPs,bse,fits,sheet,part};
+  const nfpS=(a,i,b,j)=>{ const k=a+'_'+i+'_'+b+'_'+j; if(cacheS[k]) return cacheS[k]; const d=dOf(i,j), kb=a+'_'+b+'_'+d; if(!baseS[kb]) baseS[kb]=_nsShrink(bse(a,b,d),4); return cacheS[k]=(i===0?baseS[kb]:_nsRotPaths(baseS[kb],R[i])); };
+  const pbb=p=>{ const b=Br[p.t][p.j]; return {x0:p.X+b.x0,y0:p.Y+b.y0,x1:p.X+b.x1,y1:p.Y+b.y1}; };
+  const fitsSheet=(t,j,X,Y)=>{ if(!complex){ const b=Br[t][j]; return X>=-b.x0-0.5 && X<=sheet.W-b.x1+0.5 && Y>=-b.y0-0.5 && Y<=sheet.H-b.y1+0.5; } const f=ifp(t,j); return f.length>0 && _nsInRegion({X:Math.round(X),Y:Math.round(Y)},f); };
+  const M={R,nG,parts,Qr,Br,ifp,nfp,nfpS,bse,pbb,fitsSheet,sheet,complex,obst};
+  // « vue » pour UNE sorte de pièce t ; pre = pièces déjà posées (autres sortes) à contourner
+  M.view=(t,pre)=>{ pre=pre||[];
+    const blocked=(j,X,Y)=>{ const b=Br[t][j]; const x0=X+b.x0,y0=Y+b.y0,x1=X+b.x1,y1=Y+b.y1;
+      for(const q of pre){ const c=pbb(q); if(x0>c.x1||c.x0>x1||y0>c.y1||c.y0>y1) continue; if(_nsInside({X:Math.round(X-q.X),Y:Math.round(Y-q.Y)},nfpS(q.t,q.j,t,j))) return true; } return false; };
+    return {M,t,pre,R,nA:nG,Qr:Qr[t],Br:Br[t],sheet,complex,part:parts[t],
+      ifp:j=>ifp(t,j), getNFP:(i,j)=>nfp(t,i,t,j), getNFPs:(i,j)=>nfpS(t,i,t,j), bse:d=>bse(t,t,d), nfpTo:(p,k)=>nfp(p.t,p.j,t,k),
+      fits:(j,X,Y)=>fitsSheet(t,j,X,Y)&&!blocked(j,X,Y), pbb, mk:(j,X,Y)=>({t,a:R[j],j,X:Math.round(X),Y:Math.round(Y)})}; };
+  return M;
 }
-const _nsPBB=(S,p)=>{ const b=S.Br[p.j]; return {x0:p.X+b.x0,y0:p.Y+b.y0,x1:p.X+b.x1,y1:p.Y+b.y1}; };
+// compatibilité : une seule sorte de pièce
+function _nsSetup(part, sheet, nG){ return _nsSetupM([part],sheet,nG,null).view(0,[]); }
+const _nsPBB=(S,p)=>S.pbb(p);
 function _nsBBof(S,placed){ let bb=null; for(const p of placed){ const b=_nsPBB(S,p); bb=bb?{x0:Math.min(bb.x0,b.x0),y0:Math.min(bb.y0,b.y0),x1:Math.max(bb.x1,b.x1),y1:Math.max(bb.y1,b.y1)}:b; } return bb; }
 const _nsBBArea=bb=>bb?(bb.x1-bb.x0)*(bb.y1-bb.y0):0;
-// Contrôle final : aucune pièce ne doit en toucher une autre (écart compris) -> sinon elle est retirée
-function _nsValidate(S, placed){ const keep=[];
-  for(const p of placed){ const b=_nsPBB(S,p); let ok=true;
-    for(const q of keep){ const c=_nsPBB(S,q); if(b.x0>c.x1||c.x0>b.x1||b.y0>c.y1||c.y0>b.y1) continue;
-      if(_nsInside({X:Math.round(p.X-q.X),Y:Math.round(p.Y-q.Y)},S.getNFPs(q.j,p.j))){ ok=false; break; } }
+// Contrôle final : chaque pièce dans la tôle, hors obstacles, et ne touche aucune autre (écart compris) -> sinon retirée
+function _nsValidate(S, placed){ const keep=[]; const M=S.M;
+  for(const p of placed){ if(p.t===S.t && !S.fits(p.j,p.X,p.Y)) continue; const b=M.pbb(p); let ok=true;
+    for(const q of keep){ const c=M.pbb(q); if(b.x0>c.x1||c.x0>b.x1||b.y0>c.y1||c.y0>b.y1) continue;
+      if(_nsInside({X:Math.round(p.X-q.X),Y:Math.round(p.Y-q.Y)},M.nfpS(q.t,q.j,p.t,p.j))){ ok=false; break; } }
     if(ok) keep.push(p); }
   return keep; }
 // Façons de choisir la place (plus petit score = meilleur). bb = encadrement des pièces déjà posées.
@@ -15876,15 +15899,17 @@ const _NS_SCORES={
 // « Une par une » : chaque pièce va à la meilleure place libre, en essayant les angles « tries ».
 // init = pièces déjà posées (ex. le réseau) : on bouche les trous autour.
 async function _nsGreedy(S, opts, progress){
-  const {R,Br,getNFP}=S; const score=_NS_SCORES[opts.mode]||_NS_SCORES.area; const tries=opts.tries;
+  const {R,Br}=S; const score=_NS_SCORES[opts.mode]||_NS_SCORES.area; const tries=opts.tries;
   // feas[j] = places libres pour le centre (angle j), mises à jour à chaque pièce posée (on retire juste son NFP)
   const feas={}, forb={}; for(const j of tries){ feas[j]=S.ifp(j); forb[j]=[]; } const placed=[]; let bb=null;
   const fbb=p=>{ let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity; for(const q of p){ if(q.X<a)a=q.X; if(q.Y<b)b=q.Y; if(q.X>c)c=q.X; if(q.Y>d)d=q.Y; } return [a,b,c,d]; };
   const add=(ps,upd)=>{ const news={}; for(const j of tries) news[j]=[];
     for(const p of ps){ placed.push(p); const b=_nsPBB(S,p); bb=bb?{x0:Math.min(bb.x0,b.x0),y0:Math.min(bb.y0,b.y0),x1:Math.max(bb.x1,b.x1),y1:Math.max(bb.y1,b.y1)}:b;
-      for(const k of tries){ for(const q of _nsTr(getNFP(p.j,k),Math.round(p.X),Math.round(p.Y))){ news[k].push(q); forb[k].push({p:q,b:fbb(q)}); } } }
+      for(const k of tries){ for(const q of _nsTr(S.nfpTo(p,k),Math.round(p.X),Math.round(p.Y))){ news[k].push(q); forb[k].push({p:q,b:fbb(q)}); } } }
     for(const k of tries) if(news[k].length && feas[k].length) feas[k]=_nsDiff(feas[k],news[k]); };
   const inF=(v,j)=>{ for(const f of forb[j]){ const b=f.b; if(v.X<=b[0]||v.X>=b[2]||v.Y<=b[1]||v.Y>=b[3]) continue; if(ClipperLib.Clipper.PointInPolygon(v,f.p)===1) return true; } return false; };
+  // pièces déjà posées d'autres sortes : interdites, mais pas comptées
+  if(S.pre&&S.pre.length){ add(S.pre); placed.length=0; }
   if(opts.init&&opts.init.length) add(opts.init);
   while(placed.length<opts.n){
     let best=null;
@@ -15894,11 +15919,11 @@ async function _nsGreedy(S, opts, progress){
         const sc=score(b,bb,nx0,ny0,nx1,ny1);
         if(best && sc>=best.sc) continue;
         if(inF(v,j)) continue;                                   // sécurité : jamais DANS une zone interdite
-        if(!S.sheet.rect && !_nsInRegion(v,S.ifp(j))) continue;  // jamais dans un trou de la chute
+        if(S.complex && !_nsInRegion(v,S.ifp(j))) continue;      // jamais dans un trou de la chute / un obstacle
         if(!_nsInRegion(v,F)) continue;                          // un sommet d'un « trou » des places libres = pas une place
         best={sc,j,X:v.X,Y:v.Y}; } }
     if(!best) break;
-    add([{a:R[best.j], j:best.j, X:best.X, Y:best.Y}]);
+    add([S.mk(best.j,best.X,best.Y)]);
     if(progress){ if(progress(placed.length)) break; await _nsTick(); }
   }
   return {placed, bb, mode:opts.mode};
@@ -15959,11 +15984,11 @@ function _nsFillLattice(S, L, th, n){ const nG=S.nA; const a=S.R[th], c=Math.cos
   let a0=Infinity,a1=-Infinity,b0=Infinity,b1=-Infinity; for(const [x,y] of [[sb.x0,sb.y0],[sb.x1,sb.y0],[sb.x0,sb.y1],[sb.x1,sb.y1]]){ const [A,B]=toAB(x,y); a0=Math.min(a0,A); a1=Math.max(a1,A); b0=Math.min(b0,B); b1=Math.max(b1,B); }
   a0=Math.floor(a0)-2; a1=Math.ceil(a1)+1; b0=Math.floor(b0)-2; b1=Math.ceil(b1)+1;
   const pts=(a1-a0+1)*(b1-b0+1)*mem.length; if(pts>40000) return null;
-  const P=S.sheet.rect?(pts>8000?4:8):(pts>3000?3:6);
+  const P=!S.complex?(pts>8000?4:8):(pts>3000?3:6);
   let best=null;
   for(let pa=0;pa<P;pa++) for(let pb=0;pb<P;pb++){ const ox=(pa/P)*u.X+(pb/P)*v.X, oy=(pa/P)*u.Y+(pb/P)*v.Y; const got=[];
     for(let i=a0;i<=a1;i++) for(let j=b0;j<=b1;j++){ const X=ox+i*u.X+j*v.X, Y=oy+i*u.Y+j*v.Y;
-      for(const m of mem){ if(S.fits(m.j,X+m.dx,Y+m.dy)) got.push({a:S.R[m.j],j:m.j,X:Math.round(X+m.dx),Y:Math.round(Y+m.dy)}); } }
+      for(const m of mem){ if(S.fits(m.j,X+m.dx,Y+m.dy)) got.push(S.mk(m.j,X+m.dx,Y+m.dy)); } }
     if(!best || got.length>best.length) best=got; }
   if(!best||!best.length) return null;
   // trop de pièces : on garde les n les plus groupées (essai rangées / colonnes / coin)
@@ -15974,8 +15999,8 @@ function _nsFillLattice(S, L, th, n){ const nG=S.nA; const a=S.R[th], c=Math.cos
 const _nsBetter=(r,best)=>!best || r.placed.length>best.placed.length || (r.placed.length===best.placed.length && _nsBBArea(r.bb)<_nsBBArea(best.bb)-1);
 // Plusieurs méthodes, on garde la meilleure : le plus de pièces, puis l'ensemble le plus compact.
 // opts : {nG (angles sur 360°), tries (indices essayés « une par une »), n, lattice:true}
-async function _nsRun(part, sheet, opts, progress){
-  const S=_nsSetup(part, sheet, opts.nG); let best=null; const n=opts.n;
+async function _nsRun(part, sheet, opts, progress){ return _nsRunType(_nsSetup(part,sheet,opts.nG),opts,progress); }
+async function _nsRunType(S, opts, progress){ const sheet=S.sheet; let best=null; const n=opts.n;
   const modes=opts.modes||['area','rows','cols','corner']; const tot=modes.length+(opts.lattice!==false?3:0); let step=0;
   const say=(k,label)=>progress?progress({done:step,tot,k,best,label}):false;
   const take=(r,label)=>{ const n0=r.placed.length; r.placed=_nsValidate(S,r.placed); r.bb=_nsBBof(S,r.placed); r.label=label; if(_nsBetter(r,best)) best=r; };
@@ -15983,7 +16008,7 @@ async function _nsRun(part, sheet, opts, progress){
     if(say(0,'recherche des emboîtements…')) return best; await _nsTick();
     const motifs=_nsMotifs(S, opts.pairs||6); step++;
     // angles du réseau : sur tôle rectangulaire, 0-180° suffit (le rectangle est symétrique)
-    const ths=[]; for(let i=0;i<S.nA;i++){ if(sheet.rect && S.R[i]>=Math.PI-1e-9) continue; if(!sheet.rect && opts.polyTries && !opts.polyTries.includes(i)) continue; ths.push(i); }
+    const ths=[]; for(let i=0;i<S.nA;i++){ if(!S.complex && S.R[i]>=Math.PI-1e-9) continue; if(S.complex && opts.polyTries && !opts.polyTries.includes(i)) continue; ths.push(i); }
     let lb=null, cnt=0;
     const top=[]; // les 6 meilleurs réseaux (on bouchera les trous de chacun)
     const tryL=(L,th)=>{ const got=_nsFillLattice(S,L,th,n); if(!got) return; const bb=_nsBBof(S,got); const r={placed:got,bb,L,th};
@@ -16012,11 +16037,25 @@ async function _nsRun(part, sheet, opts, progress){
   if(best) best.area=_nsBBArea(best.bb);
   return best;
 }
+// PLUSIEURS sortes de pièces : items[t]={n, max}. Les nombres fixes d'abord (les plus grosses en premier), puis
+// celle cochée « max » remplit la place qui reste. Chaque sorte contourne les précédentes et les obstacles.
+async function _nsRunMulti(parts, items, sheet, opts, progress){
+  const M=_nsSetupM(parts, sheet, opts.nG, opts.obst); const ord=parts.map((p,t)=>t).sort((a,b)=>(items[a].max-items[b].max)||(parts[b].area-parts[a].area));
+  const all=[], labels=[], counts=parts.map(()=>0);
+  for(let k=0;k<ord.length;k++){ const t=ord[k]; const S=M.view(t,all.slice());
+    const r=await _nsRunType(S,Object.assign({},opts,{n:items[t].max?500:items[t].n}),pr=>progress?progress(Object.assign({},pr,{done:k*pr.tot+pr.done,tot:ord.length*pr.tot,label:(ord.length>1?('pièce '+(k+1)+'/'+ord.length+' : '):'')+(pr.label||''),best:null})):false);
+    if(r&&r.placed.length){ all.push(...r.placed); counts[t]=r.placed.length; if(r.label) labels.push(r.label); }
+    if(progress && progress({done:(k+1),tot:ord.length,k:-1,label:''})===true) break; }
+  const bb=all.length?_nsBBof(M.view(0,[]),all):null;
+  return {placed:all, bb, area:_nsBBArea(bb), counts, label:[...new Set(labels)].join(' + ')};
+}
 // ═══════════ PAGE « NESTING » (étape 22, juste après le dessin) ═══════════
 // Tu cliques ta pièce, tu dis combien, l'écart et la tôle (rectangle X×Y ou ta CHUTE dessinée),
 // « Imbriquer » cherche la disposition la plus serrée (rotations libres), « Garder » la met dans le dessin.
-const _ns={view:{s:4,tx:0,ty:0}, recs:[], piece:null, sheetObj:null, sheetKey:null, pickSheet:false, res:null, busy:false, stop:false, undo:null, hover:null, msg:'', msgT:null};
+const _ns={view:{s:4,tx:0,ty:0}, recs:[], pieces:[], sheetObj:null, sheetKey:null, pickSheet:false, res:null, busy:false, stop:false, undo:null, hover:null, msg:'', msgT:null};
 const _nsPrimClose=t=>(t==='rect'||t==='tri'||t==='star'||t==='oblong'||t==='gear'||t==='polygon'||t==='ellipse');
+// compatibilité : _ns.piece = la 1re pièce de la liste
+Object.defineProperty(_ns,'piece',{get(){ return _ns.pieces[0]||null; }, set(v){ _ns.pieces=v?[Object.assign(v,{n:v.n||1+v.same.length,max:!!v.max,repl:v.repl!==false})]:[]; }});
 function _nsFlat(){ const out=[]; for(const o of paintObjects){ if(!o) continue; if(o.type==='group'&&o.children){ for(const c of o.children) out.push(c); } else out.push(o); } return out; }
 function _nsStrokes(o){ let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; } const strokes=[],closed=[],gaps=[];
   for(let s of st){ if(!s||s.length<2) continue; s=s.map(q=>[q[0],q[1]]); const a=s[0],b=s[s.length-1],gap=Math.hypot(a[0]-b[0],a[1]-b[1]);
@@ -16061,7 +16100,7 @@ function _nsPick(m){ const tol=10/_ns.view.s; let best=null,bd=1e18;
   // clic sur un trait : ce trait ; clic dans le vide d'un trou : la PIÈCE autour (pas le trou)
   const raw=(best && bd<=tol)?best:inn; if(!raw) return null; const top=_nsOuterOf(raw);
   // re-clic au même endroit sur une pièce déjà choisie : on descend d'un cran (la forme DANS l'autre)
-  if(_ns.piece && _ns.piece.rec===top && raw!==top && !_ns.pickSheet && _ns._cycle){ let cur=raw; for(let k=0;k<20;k++){ let up=null; for(const q of _ns.recs){ if(q===cur||q===top||_nsIsSheet(q)||q.area<=cur.area) continue; if(_pointInPoly(cur.pts[0],q.pts)&&(!up||q.area<up.area)) up=q; } if(!up) break; cur=up; } return cur; }
+  if(_ns.pieces.some(p=>p.rec===top) && raw!==top && !_ns.pickSheet && _ns._cycle){ let cur=raw; for(let k=0;k<20;k++){ let up=null; for(const q of _ns.recs){ if(q===cur||q===top||_nsIsSheet(q)||q.area<=cur.area) continue; if(_pointInPoly(cur.pts[0],q.pts)&&(!up||q.area<up.area)) up=q; } if(!up) break; cur=up; } return cur; }
   return top; }
 // remonte au contour EXTÉRIEUR qui contient ce trait (un trou -> sa pièce), hors tôle-chute
 function _nsOuterOf(r){ let cur=r; for(let k=0;k<20;k++){ let up=null; for(const q of _ns.recs){ if(q===cur||_nsIsSheet(q)||q.area<=cur.area) continue; if(_pointInPoly(cur.pts[0],q.pts) && (!up||q.area<up.area)) up=q; } if(!up||_nsLooksSheet(up,cur)) break; cur=up; } return cur; }
@@ -16080,15 +16119,32 @@ function _nsPieceFrom(rec){ const items=[rec].concat(_nsInnerOf(rec));
     const inn=_nsInnerOf(r); if(inn.length!==items.length-1) continue; if(same.some(g=>g.items.includes(r))) continue; same.push({rec:r, items:[r].concat(inn)}); }
   return {rec, items, objs:[...new Set(_nsAtoms(items).map(i=>i.o))], same}; }
 function _nsSay(t){ _ns.msg=t||''; clearTimeout(_ns.msgT); if(t) _ns.msgT=setTimeout(()=>{ _ns.msg=''; _nsHint(); },3000); _nsHint(); }
-function _nsHint(){ const el=document.getElementById('nsHint'); if(!el) return; let t;
-  if(_ns.msg) t=_ns.msg; else if(_ns.pickSheet) t='Clique la forme qui représente ta CHUTE (le contour de ta tôle).'; else if(!_ns.piece) t='① Clique DANS ta pièce (ses trous suivent tout seuls).'; else if(!_ns.res) t='② Règle combien, l\'écart et la tôle, puis « 📦 Imbriquer ».'+(_ns.recs.some(q=>q!==_ns.piece.rec&&_ns.piece.items.includes(q))?'  (pas la bonne forme ? re-clique dessus pour prendre celle de dedans)':''); else t='③ Si ça te va : « ✓ Garder dans le dessin ».';
+function _nsHint(){ const el=document.getElementById('nsHint'); if(!el) return; let t; const P=_ns.pieces;
+  if(_ns.msg) t=_ns.msg; else if(_ns.pickSheet) t='Clique la forme qui représente ta CHUTE (le contour de ta tôle).'; else if(!P.length) t='① Clique DANS une pièce (ses trous suivent tout seuls). Tu peux en ajouter plusieurs, différentes.';
+  else if(!_ns.res) t='② Règle le nombre de chaque pièce, l\'écart et la tôle, puis « 📦 Imbriquer ».  (clic sur une autre forme = l\'ajouter à la liste · re-clic = la forme de dedans)';
+  else if(_ns.res.stale) t='⚠ La liste a changé : relance « 📦 Imbriquer » (ou « Garder » le résultat affiché).'; else t='③ Si ça te va : « ✓ Garder dans le dessin ».';
   el.textContent=t; el.style.background=_ns.msg?'rgba(22,101,52,.92)':'rgba(17,24,39,.8)'; }
+const _NS_COLS=['#2563eb','#16a34a','#9333ea','#ea580c','#0891b2','#be185d','#ca8a04','#4f46e5'];
+const _nsCol=i=>_NS_COLS[i%_NS_COLS.length];
+function _nsMkPiece(rec){ const p=_nsPieceFrom(rec); p.n=1+p.same.length; p.max=false; p.repl=true; return p; }
+function _nsStale(){ if(_ns.res) _ns.res.stale=true; }
+function _nsSetN(i,v){ const p=_ns.pieces[i]; if(!p) return; p.n=Math.max(1,Math.round(parseFloat(v)||1)); p.nTouched=true; _nsStale(); _nsPanel(); _nsDraw(); }
+function _nsSetMax(i,on){ _ns.pieces.forEach((p,k)=>p.max=(k===i)?!!on:false); _nsStale(); _nsPanel(true); _nsDraw(); }
+function _nsSetRepl(i,on){ const p=_ns.pieces[i]; if(p){ p.repl=!!on; _nsStale(); _nsDraw(); } }
+function _nsDelPiece(i){ _ns.pieces.splice(i,1); _nsStale(); _nsPanel(true); _nsFitView(); _nsDraw(); }
 function _nsSheetDef(){
   if(_ns.sheetObj){ const r=_ns.recs.find(_nsIsSheet); if(!r) { _ns.sheetObj=null; _ns.sheetKey=null; return _nsSheetDef(); } const paths=_nsRegionOuter(r); if(!paths.length) return null;
     return {rect:false, paths, bbmm:r.bb, label:'ta chute dessinée'}; }
   const W=parseFloat(document.getElementById('nsW')?.value)||0, H=parseFloat(document.getElementById('nsH')?.value)||0; if(!(W>0&&H>0)) return null;
-  const pr=_ns.piece?_ns.piece.rec:null; if(pr){ _ns.lastO=[pr.bb[0],pr.bb[1]]; } const ox=pr?pr.bb[0]:((_ns.lastO||[0,0])[0]), oy=pr?pr.bb[1]:((_ns.lastO||[0,0])[1]);   // la tôle se pose là où était la pièce (et y reste après « Garder »)
-  return {rect:true, W:Math.round(W*_NS_S), H:Math.round(H*_NS_S), ox, oy, Wmm:W, Hmm:H, label:W+' × '+H+' mm'}; }
+  // la tôle se pose sur la 1re pièce choisie, puis RESTE au même endroit (on peut ajouter d'autres pièces autour)
+  const pr=_ns.pieces[0]?_ns.pieces[0].rec:null; const o=_ns.lastO||(pr?[pr.bb[0],pr.bb[1]]:[0,0]);
+  return {rect:true, W:Math.round(W*_NS_S), H:Math.round(H*_NS_S), ox:o[0], oy:o[1], Wmm:W, Hmm:H, label:W+' × '+H+' mm'}; }
+// ce qui est DÉJÀ dessiné sur la tôle (hors pièces de la liste et formes qu'elles remplacent) = place occupée
+function _nsObstRecs(sheet){ if(!sheet) return []; const P=_ns.pieces; const skip=new Set();
+  for(const p of P){ p.items.forEach(r=>skip.add(r)); if(p.repl) p.same.forEach(g=>g.items.forEach(r=>skip.add(r))); }
+  const sb=sheet.rect?[sheet.ox,sheet.oy,sheet.ox+sheet.Wmm,sheet.oy+sheet.Hmm]:sheet.bbmm;
+  return _ns.recs.filter(r=>!skip.has(r)&&!_nsIsSheet(r)&&!_ns.recs.some(q=>q!==r&&!_nsIsSheet(q)&&q.area>r.area&&_pointInPoly(r.pts[0],q.pts))
+    && !(r.bb[0]>=sb[2]||r.bb[2]<=sb[0]||r.bb[1]>=sb[3]||r.bb[3]<=sb[1])); }
 // angles permis : nG angles réguliers sur 360° ; « tries » = ceux essayés pour poser une par une ; polyTries = réseau sur une chute
 function _nsAngles(){ const v=document.getElementById('nsRot')?.value||'5'; const all=n=>[...Array(n).keys()];
   if(v==='0') return {nG:1,tries:[0],label:'sans rotation'}; if(v==='180') return {nG:2,tries:[0,1],label:'0° / 180°'}; if(v==='90') return {nG:4,tries:all(4),label:'tous les 90°'};
@@ -16097,20 +16153,24 @@ function _nsAngles(){ const v=document.getElementById('nsRot')?.value||'5'; cons
 async function _nsRunUI(){
   if(_ns.busy){ _ns.stop=true; return; }
   if(typeof ClipperLib==='undefined'){ _nsSay('⚠ Moteur Clipper absent'); return; }
-  if(!_ns.piece){ _nsSay('Clique d\'abord ta pièce'); return; }
+  const P=_ns.pieces.slice(); if(!P.length){ _nsSay('Clique d\'abord une pièce'); return; }
   const sheet=_nsSheetDef(); if(!sheet){ _nsSay('Donne la taille de la tôle (X et Y)'); return; }
+  if(sheet.rect) _ns.lastO=[sheet.ox,sheet.oy];
   const gap=Math.max(0,parseFloat(document.getElementById('nsGap')?.value)||0);
-  const max=document.getElementById('nsMax')?.checked; const N=max?500:Math.max(1,Math.round(parseFloat(document.getElementById('nsN')?.value)||1));
-  const outer=_nsRegionOuter(_ns.piece.rec); const part=_nsPrep(outer,gap); if(!part){ _nsSay('Pièce non fermée : impossible'); return; }
-  // tôle rectangulaire : calcul dans un repère qui commence à 0 ; chute : coordonnées du dessin
+  const parts=[]; for(const p of P){ const pt=_nsPrep(_nsRegionOuter(p.rec),gap); if(!pt){ _nsSay('Pièce non fermée : impossible'); return; } parts.push(pt); }
+  const items=P.map(p=>({n:p.n,max:!!p.max}));
+  // obstacles = ce qui est déjà sur la tôle, grossi de écart/2 (dans le repère du calcul)
+  const dx=sheet.rect?-Math.round(sheet.ox*_NS_S):0, dy=sheet.rect?-Math.round(sheet.oy*_NS_S):0; const obRecs=_nsObstRecs(sheet);
+  let obst=[]; for(const r of obRecs){ const g=_nsPrep(_nsRegionOuter(r),gap); if(g) obst.push(..._nsTr(g.Q,Math.round(g.cx*_NS_S)+dx,Math.round(g.cy*_NS_S)+dy)); }
+  if(obst.length) obst=_nsOuter(_nsUnion(obst));
   const sh=sheet.rect?{rect:true,W:sheet.W,H:sheet.H}:{rect:false,paths:sheet.paths};
   _ns.busy=true; _ns.stop=false; _ns.res=null; _nsPanel(); const bar=document.getElementById('nsProg');
   const ang=_nsAngles(); const t0=Date.now();
   try{
-    const best=await _nsRun(part, sh, {nG:ang.nG, tries:ang.tries, polyTries:ang.polyTries, n:N}, (pr)=>{ if(bar){ bar.style.display='block'; const done=Math.min(0.99,(pr.done+(pr.k>0?Math.min(0.9,pr.k/Math.max(1,max?60:N)):0))/pr.tot); bar.firstElementChild.style.width=(done*100).toFixed(0)+'%'; }
-      const st=document.getElementById('nsStatus'); if(st && pr.label) st.textContent='Calcul… '+pr.label+(pr.best?(' · meilleur pour l\'instant : '+pr.best.placed.length+' pièces'):'');
+    const best=await _nsRunMulti(parts, items, sh, {nG:ang.nG, tries:ang.tries, polyTries:ang.polyTries, obst}, (pr)=>{ if(bar){ bar.style.display='block'; const done=Math.min(0.99,(pr.done+(pr.k>0?Math.min(0.9,pr.k/60):0))/pr.tot); bar.firstElementChild.style.width=(done*100).toFixed(0)+'%'; }
+      const st=document.getElementById('nsStatus'); if(st && pr.label) st.textContent='Calcul… '+pr.label;
       return _ns.stop; });
-    _ns.res={best, part, sheet, gap, N, max, ang, ms:Date.now()-t0};
+    _ns.res={best, parts, part:parts[0], pieces:P.map(p=>Object.assign({},p)), items, sheet, gap, nObst:obRecs.length, ang, ms:Date.now()-t0, stale:false};
   }catch(e){ console.error('[Nesting]',e); _nsSay('⚠ Erreur de calcul : '+e.message); }
   _ns.busy=false; if(bar) bar.style.display='none'; _nsPanel(); _nsFitView(); _nsDraw();
 }
@@ -16138,36 +16198,46 @@ function _nsRemove(o){ let i=paintObjects.indexOf(o); if(i>=0) paintObjects.spli
   if(typeof _constraints!=='undefined') _constraints=_constraints.filter(c=>String(c.a)!==String(id)&&String(c.b).split('#')[0]!==String(id)); }
 // Positions des copies en mm (dessin)
 function _nsPlacementsMm(){ const R=_ns.res; if(!R||!R.best) return []; const sh=R.sheet; const ox=sh.rect?sh.ox:0, oy=sh.rect?sh.oy:0;
-  return R.best.placed.map(p=>({a:p.a, X:ox+p.X/_NS_S, Y:oy+p.Y/_NS_S})); }
+  return R.best.placed.map(p=>({t:p.t||0, a:p.a, X:ox+p.X/_NS_S, Y:oy+p.Y/_NS_S})); }
 function _nsKeep(){ const R=_ns.res; if(!R||!R.best||!R.best.placed.length){ _nsSay('Rien à garder'); return; }
   _ns.undo=JSON.stringify(paintObjects);
-  const cx=R.part.cx, cy=R.part.cy; const added=[]; const items=_ns.piece.items.slice();
-  for(const p of _nsPlacementsMm()){ const T=_nsXform(cx,cy,p.a,p.X,p.Y); for(const c of _nsCopyItems(items,T)){ paintObjects.push(c); added.push(c); } }
-  // la pièce d'origine (et ses copies identiques si coché) sont remplacées par le nesting
-  let rem=items.slice(); const repl=document.getElementById('nsSame'); if(repl && repl.checked) for(const g of _ns.piece.same) rem=rem.concat(g.items);
-  _nsRemoveItems(rem);
+  for(const p of _nsPlacementsMm()){ const pc=R.pieces[p.t], pt=R.parts[p.t]; const T=_nsXform(pt.cx,pt.cy,p.a,p.X,p.Y); for(const c of _nsCopyItems(pc.items,T)) paintObjects.push(c); }
+  // les pièces d'origine (et leurs copies identiques si coché) sont remplacées par le nesting
+  let rem=[]; for(const pc of R.pieces){ rem=rem.concat(pc.items); if(pc.repl) for(const g of pc.same) rem=rem.concat(g.items); }
+  _nsRemoveItems([...new Set(rem)]);
   if(_ns.sheetObj){ const sr=_ns.recs.find(_nsIsSheet); if(sr) _nsRemoveItems([sr]); _ns.sheetObj=null; _ns.sheetKey=null; }   // le contour de la chute ne doit PAS être coupé
   if(typeof pushHistory==='function') pushHistory(); if(typeof updateObjCount==='function') updateObjCount(); if(typeof redrawCanvas==='function') redrawCanvas();
-  const n=R.best.placed.length; _ns.res=null; _ns.piece=null; _nsBuildRecs(); _nsSay('✓ '+n+' pièces mises dans ton dessin'); _nsPanel(); _nsFitView(); _nsDraw(); }
+  const n=R.best.placed.length; _ns.res=null; _ns.pieces=[]; _nsBuildRecs(); _nsSay('✓ '+n+' pièces mises dans ton dessin — tu peux cliquer une autre forme pour remplir la place qui reste'); _nsPanel(true); _nsFitView(); _nsDraw(); }
 function _nsUndo(){ if(!_ns.undo){ _nsSay('Rien à annuler'); return; } try{ const arr=JSON.parse(_ns.undo); paintObjects.length=0; arr.forEach(o=>paintObjects.push(o)); }catch(e){ return; }
   _ns.undo=null; if(typeof _syncObjCnt==='function') _syncObjCnt(); if(typeof pushHistory==='function') pushHistory(); if(typeof redrawCanvas==='function') redrawCanvas();
-  _nsBuildRecs(); _ns.piece=null; _ns.res=null; _nsSay('↩ Annulé : ton dessin est comme avant'); _nsPanel(); _nsFitView(); _nsDraw(); }
+  _nsBuildRecs(); _ns.pieces=[]; _ns.res=null; _nsSay('↩ Annulé : ton dessin est comme avant'); _nsPanel(true); _nsFitView(); _nsDraw(); }
 function _nsClear(){ _ns.res=null; _nsPanel(); _nsFitView(); _nsDraw(); }
-function _nsSheetRect(){ _ns.sheetObj=null; _ns.sheetKey=null; _ns.pickSheet=false; _ns.res=null; _nsPanel(); _nsFitView(); _nsDraw(); }
+function _nsSheetRect(){ _ns.sheetObj=null; _ns.sheetKey=null; _ns.pickSheet=false; _nsStale(); _nsPanel(); _nsFitView(); _nsDraw(); }
 function _nsSheetPick(){ _ns.pickSheet=!_ns.pickSheet; _nsPanel(); _nsHint(); }
-function _nsPanel(){
-  const pi=document.getElementById('nsPieceInfo'); if(pi){ if(_ns.piece){ const r=_ns.piece.rec, k=_ns.piece.same.length; pi.innerHTML='Pièce : <b>'+(+(r.bb[2]-r.bb[0]).toFixed(2))+' × '+(+(r.bb[3]-r.bb[1]).toFixed(2))+' mm</b>'+(_ns.piece.items.length>1?(' + '+(_ns.piece.items.length-1)+' élément(s) dedans'):'')
-      +(r.gap>0.3?'<br><span style="color:#f97316">⚠ contour pas fermé (trou de '+(+r.gap.toFixed(2))+' mm) : il sera coupé tel quel</span>':'')
-      +(k?('<br><label style="display:flex;gap:6px;align-items:center;margin-top:5px;color:var(--txt);font-weight:600;cursor:pointer"><input type="checkbox" id="nsSame" checked><span>Remplacer aussi les <b>'+k+'</b> autre(s) forme(s) identique(s) du dessin</span></label>'):''); } else pi.textContent='Aucune pièce choisie.'; }
-  const nIn=document.getElementById('nsN'), mx=document.getElementById('nsMax'); if(nIn&&mx) nIn.disabled=mx.checked;
-  const si=document.getElementById('nsSheetInfo'); if(si) si.innerHTML=_ns.sheetObj?'Tôle = <b>ta chute dessinée</b> <button class="dcb" style="margin-left:6px;padding:3px 8px" onclick="_nsSheetRect()">↺ Rectangle</button>':(_ns.pickSheet?'<b style="color:#f59e0b">Clique ta chute dans le dessin…</b>':'');
+const _nsInp='background:var(--surf);border:1.5px solid var(--brd2);border-radius:7px;color:var(--txt);font-size:13px;font-weight:700;padding:4px 6px';
+function _nsListHTML(){ const P=_ns.pieces; if(!P.length) return '<div class="dcs" style="color:#f59e0b;font-weight:700">Aucune pièce choisie.</div>';
+  return P.map((p,i)=>{ const r=p.rec, k=p.same.length; const c=_nsCol(i);
+    return '<div style="border:1.5px solid '+c+';border-radius:8px;padding:6px 8px;margin-top:6px">'
+      +'<div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;border-radius:3px;background:'+c+';flex-shrink:0"></span><b style="font-size:12px;color:var(--txt)">Pièce '+String.fromCharCode(65+i)+'</b><span class="dcs">'+(+(r.bb[2]-r.bb[0]).toFixed(2))+' × '+(+(r.bb[3]-r.bb[1]).toFixed(2))+' mm'+(p.items.length>1?(' · '+(p.items.length-1)+' dedans'):'')+'</span>'
+      +'<button class="dcb" title="Retirer de la liste" style="margin-left:auto;padding:1px 7px" onclick="_nsDelPiece('+i+')">✖</button></div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-top:5px"><span class="dcs">Nombre :</span><input id="nsN'+i+'" type="number" min="1" step="1" value="'+p.n+'" '+(p.max?'disabled ':'')+'style="width:62px;'+_nsInp+'" oninput="_nsSetN('+i+',this.value)">'
+      +'<label class="dcs" style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="nsMax'+i+'" '+(p.max?'checked ':'')+'onchange="_nsSetMax('+i+',this.checked)"><span>max (remplit le reste)</span></label></div>'
+      +(r.gap>0.3?'<div class="dcs" style="color:#f97316">⚠ contour pas fermé (trou de '+(+r.gap.toFixed(2))+' mm) : il sera coupé tel quel</div>':'')
+      +(k?('<label class="dcs" style="display:flex;gap:5px;align-items:center;margin-top:4px;cursor:pointer"><input type="checkbox" id="nsSame'+i+'" '+(p.repl?'checked ':'')+'onchange="_nsSetRepl('+i+',this.checked)"><span>Remplacer aussi les <b>'+k+'</b> forme(s) identique(s) du dessin</span></label>'):'')
+      +'</div>'; }).join(''); }
+function _nsPanel(rebuild){
+  const pi=document.getElementById('nsPieceInfo'); if(pi){ const sig=_ns.pieces.map(p=>p.rec.key+(p.max?'M':'')).join(',');
+    if(rebuild||pi._sig!==sig){ pi._sig=sig; pi.innerHTML=_nsListHTML(); } }
+  const si=document.getElementById('nsSheetInfo'); if(si) si.innerHTML=_ns.sheetObj?'Tôle = <b>ta chute dessinée</b> <button class="dcb" style="margin-left:6px;padding:3px 8px" onclick="_nsSheetRect()">↺ Rectangle</button>':(_ns.pickSheet?'<b style="color:#f59e0b">Clique ta chute dans le dessin…</b>':(_ns.lastO&&_ns.pieces.length?'<button class="dcb" style="padding:3px 8px" title="La tôle reste où elle était pour remplir autour. Clique pour la remettre sur la pièce A." onclick="_ns.lastO=null;_nsStale();_nsPanel();_nsFitView();_nsDraw()">📍 Remettre la tôle sur la pièce A</button>':''));
   const rb=document.getElementById('nsRectBox'); if(rb) rb.style.opacity=_ns.sheetObj?'.35':'1';
   const sp=document.getElementById('nsSheetPickBtn'); if(sp) sp.classList.toggle('on',_ns.pickSheet);
   const go=document.getElementById('nsGo'); if(go) go.textContent=_ns.busy?'⏹ Arrêter (garder le meilleur trouvé)':'📦 Imbriquer';
   const st=document.getElementById('nsStatus'), kp=document.getElementById('nsKeepRow');
-  if(!_ns.busy && st){ const R=_ns.res; if(R&&R.best){ const n=R.best.placed.length; const used=R.sheet.rect?(n*R.part.area/(R.sheet.Wmm*R.sheet.Hmm)*100):null; const bb=R.best.bb;
-      st.innerHTML=(R.max?('✅ <b>'+n+'</b> pièces au maximum'):((n>=R.N?'✅ ':'⚠ ')+'<b>'+n+' / '+R.N+'</b> pièces placées'+(n<R.N?' (pas la place pour toutes)':'')))
-        +(used!=null?' · tôle utilisée <b>'+used.toFixed(0)+' %</b>':'')+(R.best.label?' · rangement : <b>'+R.best.label+'</b>':'')+(bb?' · zone occupée '+((bb.x1-bb.x0)/_NS_S).toFixed(1)+' × '+((bb.y1-bb.y0)/_NS_S).toFixed(1)+' mm':'')+' · '+(R.ms/1000).toFixed(1)+' s';
+  if(!_ns.busy && st){ const R=_ns.res; if(R&&R.best){ const B=R.best, cnt=B.counts||[B.placed.length]; let surf=0; cnt.forEach((c,t)=>surf+=c*R.parts[t].area);
+      const used=R.sheet.rect?(surf/(R.sheet.Wmm*R.sheet.Hmm)*100):null; const bb=B.bb; let allOk=true;
+      const parts=cnt.map((c,t)=>{ const it=R.items[t]; const ok=it.max||c>=it.n; if(!ok) allOk=false; return '<b style="color:'+_nsCol(t)+'">'+(cnt.length>1?String.fromCharCode(65+t)+' : ':'')+c+(it.max?' (max)':(' / '+it.n))+'</b>'; });
+      st.innerHTML=(R.stale?'<span style="color:#f59e0b;font-weight:700">⚠ La liste a changé depuis ce calcul : relance « Imbriquer ».</span><br>':'')+(allOk?'✅ ':'⚠ ')+parts.join(' · ')+' pièces'+(allOk?'':' (pas la place pour toutes)')
+        +(used!=null?(R.nObst?' · ces pièces prennent <b>':' · tôle utilisée <b>')+used.toFixed(0)+' %</b>'+(R.nObst?' de la tôle':''):'')+(R.nObst?' · '+R.nObst+' forme(s) déjà sur la tôle contournée(s)':'')+(B.label?' · rangement : <b>'+B.label+'</b>':'')+(bb?' · zone occupée '+((bb.x1-bb.x0)/_NS_S).toFixed(1)+' × '+((bb.y1-bb.y0)/_NS_S).toFixed(1)+' mm':'')+' · '+(R.ms/1000).toFixed(1)+' s';
     } else st.textContent=''; }
   if(kp) kp.style.display=(!_ns.busy&&_ns.res&&_ns.res.best&&_ns.res.best.placed.length)?'flex':'none';
   const un=document.getElementById('nsUndoBtn'); if(un) un.style.display=_ns.undo?'':'none';
@@ -16187,25 +16257,29 @@ function _nsDrawNow(){
   const dpr=window.devicePixelRatio||1; if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
   const x=cv.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); x.fillStyle='#fbfaf7'; x.fillRect(0,0,W,H);
   const path=s=>{ x.beginPath(); s.forEach((q,i)=>{ const p=_nsM2S(q); if(i) x.lineTo(p[0],p[1]); else x.moveTo(p[0],p[1]); }); };
-  const sh=(_ns.res&&_ns.res.sheet)||_nsSheetDef();
+  const R=_ns.res; const sh=(R&&R.sheet)||_nsSheetDef();
   // la tôle (gris)
   if(sh){ x.save(); x.fillStyle='rgba(148,163,184,.16)'; x.strokeStyle='#64748b'; x.lineWidth=1.5; x.setLineDash([6,4]);
     if(sh.rect){ const a=_nsM2S([sh.ox,sh.oy]), b=_nsM2S([sh.ox+sh.Wmm,sh.oy+sh.Hmm]); x.fillRect(a[0],a[1],b[0]-a[0],b[1]-a[1]); x.strokeRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);
       x.setLineDash([]); x.fillStyle='#475569'; x.font='bold 11px sans-serif'; x.fillText('tôle '+sh.Wmm+' × '+sh.Hmm+' mm',a[0]+4,a[1]-6); }
     else { for(const p of sh.paths){ x.beginPath(); p.forEach((q,i)=>{ const s=_nsM2S([q.X/_NS_S,q.Y/_NS_S]); if(i) x.lineTo(s[0],s[1]); else x.moveTo(s[0],s[1]); }); x.closePath(); x.fill(); x.stroke(); } }
     x.restore(); }
-  const res=_ns.res&&_ns.res.best;
-  // dessin actuel (estompé quand il y a un résultat)
-  const pItems=_ns.piece?_ns.piece.items:[]; const sItems=_ns.piece?_ns.piece.same.flatMap(g=>g.items):[];
-  for(const r of _ns.recs){ const isP=pItems.includes(r), isS=sItems.includes(r), isSheet=_nsIsSheet(r), hov=(_ns.hover===r);
-    if(res && (isP||isSheet||(isS&&document.getElementById('nsSame')?.checked))) continue;
-    if(isP||isS||hov){ x.save(); x.strokeStyle=isP?'rgba(245,158,11,.6)':(isS?'rgba(245,158,11,.3)':'rgba(245,158,11,.25)'); x.lineWidth=isP?9:6; x.lineJoin='round'; path(r.pts); x.stroke(); x.restore(); }
-    x.save(); x.strokeStyle=isSheet?'#64748b':(res?'rgba(17,24,39,.25)':'#111827'); x.lineWidth=1.5; if(isSheet) x.setLineDash([6,4]); path(r.pts); x.stroke(); x.restore(); }
-  // résultat : les copies (bleu)
-  if(res){ const R=_ns.res; const cx=R.part.cx, cy=R.part.cy;
-    _nsPlacementsMm().forEach(p=>{ const T=_nsXform(cx,cy,p.a,p.X,p.Y);
-      x.save(); x.strokeStyle='#2563eb'; x.fillStyle='rgba(37,99,235,.10)'; x.lineWidth=1.4; x.lineJoin='round';
-      pItems.forEach((it,k)=>{ path(it.pts.map(q=>T(q[0],q[1]))); if(k===0) x.fill(); x.stroke(); }); x.restore(); }); }
+  const res=R&&R.best;
+  // ce qui est déjà sur la tôle (contourné) : grisé
+  const obs=new Set(_nsObstRecs(sh));
+  // pièces cachées pendant l'aperçu : celles du calcul affiché (et ce qu'elles remplacent)
+  const hid=new Set(); if(res){ for(const pc of R.pieces){ pc.items.forEach(r=>hid.add(r)); if(pc.repl) pc.same.forEach(g=>g.items.forEach(r=>hid.add(r))); } }
+  const pOf=new Map(), sOf=new Map(); _ns.pieces.forEach((pc,i)=>{ pc.items.forEach(r=>pOf.set(r,i)); pc.same.forEach(g=>g.items.forEach(r=>sOf.set(r,i))); });
+  for(const r of _ns.recs){ const isSheet=_nsIsSheet(r), hov=(_ns.hover===r); const pi=pOf.has(r)?pOf.get(r):-1, si=sOf.has(r)?sOf.get(r):-1;
+    if(isSheet && res) continue; if(hid.has(r) && pi<0) continue;
+    if(pi>=0&&hid.has(r)&&!(R&&R.stale)) continue;
+    if(obs.has(r) && pi<0){ x.save(); x.fillStyle='rgba(100,116,139,.28)'; path(r.pts); x.fill(); x.restore(); }
+    if(pi>=0||si>=0||hov){ x.save(); const c=_nsCol(pi>=0?pi:(si>=0?si:0)); x.strokeStyle=hov&&pi<0&&si<0?'rgba(245,158,11,.35)':c; x.globalAlpha=pi>=0?0.55:0.28; x.lineWidth=pi>=0?9:6; x.lineJoin='round'; path(r.pts); x.stroke(); x.restore(); }
+    x.save(); x.strokeStyle=isSheet?'#64748b':(res?'rgba(17,24,39,.3)':'#111827'); x.lineWidth=1.5; if(isSheet) x.setLineDash([6,4]); path(r.pts); x.stroke(); x.restore(); }
+  // résultat : les copies (une couleur par sorte de pièce)
+  if(res){ _nsPlacementsMm().forEach(p=>{ const pc=R.pieces[p.t], pt=R.parts[p.t]; if(!pc||!pt) return; const T=_nsXform(pt.cx,pt.cy,p.a,p.X,p.Y); const c=_nsCol(p.t);
+      x.save(); x.strokeStyle=c; x.fillStyle=c; x.lineWidth=1.4; x.lineJoin='round'; if(R.stale) x.setLineDash([5,3]);
+      pc.items.forEach((it,k)=>{ path(it.pts.map(q=>T(q[0],q[1]))); if(k===0){ x.globalAlpha=0.12; x.fill(); x.globalAlpha=R.stale?0.6:1; } x.stroke(); }); x.restore(); }); }
   _nsHint();
 }
 function _nsWire(){ const cv=document.getElementById('nsCanvas'); if(!cv||cv._nsw) return; cv._nsw=1;
@@ -16219,21 +16293,28 @@ function _nsWire(){ const cv=document.getElementById('nsCanvas'); if(!cv||cv._ns
     if(down && down.pan){ _ns.view.tx=down.tx+(e.clientX-down.x); _ns.view.ty=down.ty+(e.clientY-down.y); _nsDraw(); return; }
     if(_ns.busy) return; const h=_nsPick(_nsS2M(mx,my)); if(h!==_ns.hover){ _ns.hover=h; cv.style.cursor=h?'pointer':'default'; _nsDraw(); } });
   cv.addEventListener('pointerup',e=>{ if(!down) return; const d=down; down=null; if(d.pan||_ns.busy) return; const b=cv.getBoundingClientRect(); const m=_nsS2M(e.clientX-b.left,e.clientY-b.top); _ns._cycle=true; const r=_nsPick(m); _ns._cycle=false;
-    if(_ns.pickSheet){ if(r){ _ns.sheetObj=r.o; _ns.sheetKey=r.key; _ns.pickSheet=false; if(_ns.piece&&(_ns.piece.rec.key===r.key||_ns.piece.items.includes(r))) _ns.piece=null; _ns.res=null; _nsSay('Tôle = ta chute'); } _nsPanel(); _nsFitView(); _nsDraw(); return; }
-    if(r && !_nsIsSheet(r)){ _ns.piece=_nsPieceFrom(r); _ns.res=null; _nsDefaultN(); } _nsPanel(); _nsDraw(); });
+    if(_ns.pickSheet){ if(r){ _ns.sheetObj=r.o; _ns.sheetKey=r.key; _ns.pickSheet=false; _ns.pieces=_ns.pieces.filter(p=>p.rec.key!==r.key&&!p.items.includes(r)); _nsStale(); _nsSay('Tôle = ta chute'); } _nsPanel(true); _nsFitView(); _nsDraw(); return; }
+    if(r && !_nsIsSheet(r)) _nsAddPiece(r); _nsPanel(); _nsDraw(); });
   cv.addEventListener('pointerleave',()=>{ _ns.hover=null; _nsDraw(); });
   window.addEventListener('resize',()=>{ const pg=document.getElementById('wzp22'); if(pg&&pg.classList.contains('wz-on')) _nsDraw(); });
 }
-function _nsDefaultN(){ const el=document.getElementById('nsN'); if(el && !_ns.nTouched && _ns.piece) el.value=String(1+_ns.piece.same.length); }
+// clic sur une forme : on l'AJOUTE à la liste (le résultat affiché reste, marqué « à relancer »)
+function _nsAddPiece(r){ const P=_ns.pieces;
+  if(P.some(p=>p.rec===r)){ _nsSay('Déjà dans la liste'); return; }
+  const host=P.findIndex(p=>p.items.includes(r));                       // re-clic : la forme DANS une pièce de la liste la remplace
+  const twin=P.findIndex(p=>p.same.some(g=>g.rec===r));
+  if(host<0 && twin>=0){ _nsSay('Forme identique à la pièce '+String.fromCharCode(65+twin)+' : déjà dans la liste (change son nombre)'); return; }
+  const np=_nsMkPiece(r); if(host>=0) P[host]=np; else P.push(np);
+  _nsStale(); _nsPanel(true); }
+function _nsDefaultN(){ }
 function _nsEnter(){ _nsWire(); _nsBuildRecs(); if(_ns.sheetObj && !_ns.recs.some(_nsIsSheet)){ _ns.sheetObj=null; _ns.sheetKey=null; } _ns.res=null;
-  if(_ns.piece){ const r=_ns.recs.find(q=>q.key===_ns.piece.rec.key); _ns.piece=r?_nsPieceFrom(r):null; }
-  if(!_ns.piece){ let tops=_ns.recs.filter(r=>!_nsIsSheet(r)&&!_ns.recs.some(q=>q!==r&&!_nsIsSheet(q)&&q.area>r.area&&_pointInPoly(r.pts[0],q.pts)));
+  _ns.pieces=_ns.pieces.map(p=>{ const r=_ns.recs.find(q=>q.key===p.rec.key); if(!r) return null; const np=_nsMkPiece(r); if(p.nTouched){ np.n=p.n; np.nTouched=true; } np.max=p.max; np.repl=p.repl; return np; }).filter(Boolean);
+  if(!_ns.pieces.length){ let tops=_ns.recs.filter(r=>!_nsIsSheet(r)&&!_ns.recs.some(q=>q!==r&&!_nsIsSheet(q)&&q.area>r.area&&_pointInPoly(r.pts[0],q.pts)));
     // une chute dessinée autour de plusieurs pièces identiques : la chute devient la tôle, la pièce est choisie
     if(tops.length===1 && !_ns.sheetObj){ const T=tops[0]; const kids=_ns.recs.filter(r=>r!==T&&_pointInPoly(r.pts[0],T.pts)&&!_ns.recs.some(q=>q!==r&&q!==T&&q.area>r.area&&_pointInPoly(r.pts[0],q.pts)));
       if(kids.length>=2 && _nsLooksSheet(T,kids[0])){ _ns.sheetObj=T.o; _ns.sheetKey=T.key; tops=kids; } }
-    if(tops.length>=1){ const p=_nsPieceFrom(tops[0]); if(p.same.length===tops.length-1) _ns.piece=p; } }   // une seule sorte de pièce : choisie d'office
-  _nsDefaultN();
-  _nsPanel(); setTimeout(()=>{ _nsFitView(); _nsDraw(); },40); }
+    if(tops.length>=1){ const p=_nsMkPiece(tops[0]); if(p.same.length===tops.length-1) _ns.pieces=[p]; } }   // une seule sorte de pièce : choisie d'office
+  _nsPanel(true); setTimeout(()=>{ _nsFitView(); _nsDraw(); },40); }
 
 function _dcEnter(){ _dcWire(); _dc.pend=null; _dcBuild(); setTimeout(()=>{ _dcFit(); _dcDraw(); },40); }
 
