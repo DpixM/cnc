@@ -161,6 +161,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-14 — IN : TRAITS OUVERTS bout à bout (ex. 2 arcs 3 points collés) (demande Seb)
+ [FIX] Découpe : un arc s'affichait en « zigzag » (3 points) -> maintenant le vrai arc.
+ [FIX] Programme : 2 arcs (ou lignes) ouverts collés étaient coupés en 2 fois (la tête se levait entre les deux)
+   -> UNE seule coupe continue, un seul perçage, et les arcs restent de vrais G2/G3.
+ [FIX] Nesting : les formes OUVERTES n'apparaissaient pas -> elles s'affichent, se cliquent et s'imbriquent
+   (prises comme une bande de 0,1 mm + l'écart). Un trait ouvert à l'intérieur d'une pièce la suit.
+ [PERF] Formes très fines et courbes : calcul simplifié un peu plus (sans jamais réduire l'écart) -> 2 min -> ~10 s.
+ [FIX] Un trait ouvert ne compte plus comme une « zone » pour savoir où est la chute (il n'enferme rien).
+   Hors zone CIP.
+
 -- 2026-10-14 — IM : DESSIN — formes fermées faites de plusieurs traits, ⟂ sur une polyligne, Ctrl+clic (demande Seb)
  [AJOUT] Des traits séparés (lignes, arcs 3 points, polylignes) bout à bout qui se referment = UNE forme fermée,
    automatiquement, comme dans Fusion : teintée en bleu clair, un clic DEDANS la sélectionne en entier (glisser =
@@ -1930,7 +1940,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IM ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IN ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -15806,10 +15816,15 @@ function _nsRdp(path,eps){ if(path.length<8) return path; let far=0,fd=-1; for(l
   const out=A.concat(B.slice(1,B.length-1)); return out.length>=3?out:path; }
 // Prépare la pièce : contour extérieur, grossi de écart/2, simplifié (prudemment), centré sur son centre.
 function _nsPrep(outerPaths, gapMm){
-  const C=_nsCL(); const g2=Math.max(0,gapMm)/2*_NS_S, tol=0.03*_NS_S;
+  const C=_nsCL(); const g2=Math.max(0,gapMm)/2*_NS_S;
   let ps=_nsOuter(_nsUnion(outerPaths)); if(!ps.length) return null;
-  const co=new C.ClipperOffset(2,0.005*_NS_S); co.AddPaths(ps,C.JoinType.jtRound,C.EndType.etClosedPolygon); let ex=new C.Paths(); co.Execute(ex,g2+tol+5);   // +5 µm : marge contre les arrondis
-  ex=_nsOuter(ex).map(p=>_nsRdp(p,tol));   // RDP enlève au plus tol -> on a grossi de tol avant : jamais plus petit que la vraie pièce
+  // Forme très « tordue » (fine et courbe : beaucoup de morceaux convexes) -> calcul trop long : on la simplifie un peu
+  // plus (toujours en la grossissant d'autant avant : jamais plus petite que la vraie pièce, l'écart reste garanti).
+  let ex=null;
+  for(const tm of [0.03,0.06,0.12,0.2]){ const tol=tm*_NS_S;
+    const co=new C.ClipperOffset(2,0.005*_NS_S); co.AddPaths(ps,C.JoinType.jtRound,C.EndType.etClosedPolygon); let e=new C.Paths(); co.Execute(e,g2+tol+5);   // +5 µm : marge contre les arrondis
+    e=_nsOuter(e).map(p=>_nsRdp(p,tol));   // RDP enlève au plus tol -> on a grossi de tol avant : jamais plus petit que la vraie pièce
+    ex=e; let np=0; for(const p of e){ const c=_nsCvxParts(p); np+=c?c.length:999; } if(np<=24) break; }
   // centre de gravité (de la vraie pièce)
   let A=0,cx=0,cy=0; for(const p of ps){ for(let i=0,n=p.length;i<n;i++){ const a=p[i],b=p[(i+1)%n]; const cr=a.X*b.Y-b.X*a.Y; A+=cr; cx+=(a.X+b.X)*cr; cy+=(a.Y+b.Y)*cr; } }
   cx/=(3*A); cy/=(3*A); const ox=Math.round(cx), oy=Math.round(cy);
@@ -16183,8 +16198,8 @@ function _nsStrokes(o){ let st; try{ st=objToStrokesRaw(o)||[]; }catch(e){ st=[]
     // fermé si : forme fermée par nature, ou bouts presque collés (≤0,3 mm ou ≤15 % du tour, ex. SVG sans point de fermeture)
     const cl=!(o.type==='line'||o._arc) && s.length>=3 && (_nsPrimClose(o.type) || gap<=Math.max(0.3,per*0.15)); if(cl && gap>1e-9) s.push([a[0],a[1]]);
     strokes.push(s); closed.push(cl); gaps.push(_nsPrimClose(o.type)?0:gap); } return {strokes,closed,gaps}; }
-function _nsMkRec(segs,s,gap){ let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18,per=0; for(let i=0;i<s.length;i++){ const q=s[i]; x0=Math.min(x0,q[0]); y0=Math.min(y0,q[1]); x1=Math.max(x1,q[0]); y1=Math.max(y1,q[1]); if(i) per+=Math.hypot(q[0]-s[i-1][0],q[1]-s[i-1][1]); }
-  return {o:segs[0].o, si:segs[0].si, nS:segs[0].nS, segs, key:segs.map(a=>String(a.o.id)+':'+a.si).join('|'), pts:s, gap, bb:[x0,y0,x1,y1], area:Math.abs(polyArea(s.slice(0,-1))), per}; }
+function _nsMkRec(segs,s,gap,open){ let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18,per=0; for(let i=0;i<s.length;i++){ const q=s[i]; x0=Math.min(x0,q[0]); y0=Math.min(y0,q[1]); x1=Math.max(x1,q[0]); y1=Math.max(y1,q[1]); if(i) per+=Math.hypot(q[0]-s[i-1][0],q[1]-s[i-1][1]); }
+  return {o:segs[0].o, si:segs[0].si, nS:segs[0].nS, segs, key:segs.map(a=>String(a.o.id)+':'+a.si).join('|'), pts:s, gap, bb:[x0,y0,x1,y1], area:open?0:Math.abs(polyArea(s.slice(0,-1))), per, open:!!open}; }
 function _nsBuildRecs(){ const recs=[], open=[];
   for(const o of _nsFlat()){ if(o.type==='dim'||o.type==='point'||o.type==='constraint') continue; const {strokes,closed,gaps}=_nsStrokes(o);
     strokes.forEach((s,si)=>{ const a={o,si,nS:strokes.length,pts:s}; if(!closed[si]){ open.push(a); return; } recs.push(_nsMkRec([a],s,gaps[si])); }); }
@@ -16192,7 +16207,17 @@ function _nsBuildRecs(){ const recs=[], open=[];
   const used=new Set();
   for(const L of _nsChain(open)){ L.segs.forEach(a=>used.add(a)); recs.push(_nsMkRec(L.segs,L.pts,L.gap)); }
   // reste : un trait ouvert de 3 points ou plus (pas une ligne / un arc) = forme presque fermée -> fermée virtuellement
-  for(const a of open){ if(used.has(a)||a.o.type==='line'||a.o._arc||a.pts.length<3) continue; const s=a.pts.concat([[a.pts[0][0],a.pts[0][1]]]); const g=Math.hypot(a.pts[0][0]-a.pts[a.pts.length-1][0],a.pts[0][1]-a.pts[a.pts.length-1][1]); recs.push(_nsMkRec([a],s,g)); }
+  for(const a of open){ if(used.has(a)||a.o.type==='line'||a.o._arc||a.pts.length<3) continue; const s=a.pts.concat([[a.pts[0][0],a.pts[0][1]]]); const g=Math.hypot(a.pts[0][0]-a.pts[a.pts.length-1][0],a.pts[0][1]-a.pts[a.pts.length-1][1]); recs.push(_nsMkRec([a],s,g)); used.add(a); }
+  // traits OUVERTS restants (ex. 2 arcs collés, une ligne) : une forme ouverte aussi -> visible, cliquable, imbriquable
+  const rest=open.filter(a=>!used.has(a)), d=(u,v)=>Math.hypot(u[0]-v[0],u[1]-v[1]), tol=0.3, U=new Set();
+  const E=rest.map(a=>[a.pts[0],a.pts[a.pts.length-1]]);
+  const near=(pt,mine)=>{ let bi=-1,bd=tol,br=false; for(let k=0;k<rest.length;k++){ if(U.has(k)||mine.has(k)) continue; const d0=d(pt,E[k][0]),d1=d(pt,E[k][1]); if(d0<bd){bd=d0;bi=k;br=false;} if(d1<bd){bd=d1;bi=k;br=true;} } return {k:bi,rev:br}; };
+  for(let s0=0;s0<rest.length;s0++){ if(U.has(s0)) continue; const ch=[{k:s0,rev:false}], mine=new Set([s0]); let en=E[s0][1], st=E[s0][0];
+    for(let g=0;g<2000;g++){ const n=near(en,mine); if(n.k<0) break; mine.add(n.k); ch.push(n); en=n.rev?E[n.k][0]:E[n.k][1]; }
+    for(let g=0;g<2000;g++){ const n=near(st,mine); if(n.k<0) break; mine.add(n.k); ch.unshift({k:n.k,rev:!n.rev}); st=n.rev?E[n.k][0]:E[n.k][1]; }
+    for(const k of mine) U.add(k);
+    const pts=[]; for(const c of ch){ let p=rest[c.k].pts.map(q=>[q[0],q[1]]); if(c.rev) p.reverse(); if(pts.length) p=p.slice(1); pts.push(...p); }
+    if(pts.length>=2) recs.push(_nsMkRec(ch.map(c=>rest[c.k]),pts,0,true)); }
   _ns.recs=recs; }
 // enchaîne des traits ouverts dont les bouts se touchent (≤ 0,3 mm) jusqu'à revenir au départ
 function _nsChain(open){ const tol=0.3, d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]); const used=new Set(), loops=[];
@@ -16209,20 +16234,22 @@ function _nsChain(open){ const tol=0.3, d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1])
 const _nsM2S=q=>[_ns.view.tx+q[0]*_ns.view.s, _ns.view.ty+q[1]*_ns.view.s];
 const _nsS2M=(x,y)=>[(x-_ns.view.tx)/_ns.view.s,(y-_ns.view.ty)/_ns.view.s];
 function _nsToPath(s){ const p=[]; const n=(s.length>1&&Math.hypot(s[0][0]-s[s.length-1][0],s[0][1]-s[s.length-1][1])<1e-9)?s.length-1:s.length; for(let i=0;i<n;i++) p.push({X:Math.round(s[i][0]*_NS_S),Y:Math.round(s[i][1]*_NS_S)}); return p; }
-function _nsRegionOuter(rec){ const C=_nsCL(); const paths=[_nsToPath(rec.pts)]; if(paths[0].length<3) return [];
+function _nsRegionOuter(rec){ const C=_nsCL();
+  if(rec.open){ const p=rec.pts.map(q=>({X:Math.round(q[0]*_NS_S),Y:Math.round(q[1]*_NS_S)})); const co=new C.ClipperOffset(2,5); co.AddPath(p,C.JoinType.jtRound,C.EndType.etOpenRound); const o=new C.Paths(); co.Execute(o,50); return o.filter(q=>C.Clipper.Area(q)>0); }   // trait ouvert : sa « bande » de 0,1 mm
+  const paths=[_nsToPath(rec.pts)]; if(paths[0].length<3) return [];
   const c=new C.Clipper(); c.AddPaths(paths,C.PolyType.ptSubject,true); const o=new C.Paths(); c.Execute(C.ClipType.ctUnion,o,C.PolyFillType.pftEvenOdd,C.PolyFillType.pftEvenOdd);
   return o.filter(p=>C.Clipper.Area(p)>0); }
 function _nsDistStroke(m,s){ let bd=1e18; for(let i=0;i+1<s.length;i++){ const a=s[i],b=s[i+1]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-12; let t=((m[0]-a[0])*dx+(m[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const d=Math.hypot(m[0]-(a[0]+t*dx),m[1]-(a[1]+t*dy)); if(d<bd) bd=d; } return bd; }
 function _nsPick(m){ const tol=10/_ns.view.s; let best=null,bd=1e18;
   for(const r of _ns.recs){ const d=_nsDistStroke(m,r.pts); if(d<bd){bd=d;best=r;} }
-  let inn=null; for(const r of _ns.recs){ if(_pointInPoly(m,r.pts) && (!inn||r.area<inn.area)) inn=r; }
+  let inn=null; for(const r of _ns.recs){ if(!r.open && _pointInPoly(m,r.pts) && (!inn||r.area<inn.area)) inn=r; }
   // clic sur un trait : ce trait ; clic dans le vide d'un trou : la PIÈCE autour (pas le trou)
   const raw=(best && bd<=tol)?best:inn; if(!raw) return null; const top=_nsOuterOf(raw);
   // re-clic au même endroit sur une pièce déjà choisie : on descend d'un cran (la forme DANS l'autre)
   if(_ns.pieces.some(p=>p.rec===top) && raw!==top && !_ns.pickSheet && _ns._cycle){ let cur=raw; for(let k=0;k<20;k++){ let up=null; for(const q of _ns.recs){ if(q===cur||q===top||_nsIsSheet(q)||q.area<=cur.area) continue; if(_pointInPoly(cur.pts[0],q.pts)&&(!up||q.area<up.area)) up=q; } if(!up) break; cur=up; } return cur; }
   return top; }
 // remonte au contour EXTÉRIEUR qui contient ce trait (un trou -> sa pièce), hors tôle-chute
-function _nsOuterOf(r){ let cur=r; for(let k=0;k<20;k++){ let up=null; for(const q of _ns.recs){ if(q===cur||_nsIsSheet(q)||q.area<=cur.area) continue; if(_pointInPoly(cur.pts[0],q.pts) && (!up||q.area<up.area)) up=q; } if(!up||_nsLooksSheet(up,cur)) break; cur=up; } return cur; }
+function _nsOuterOf(r){ let cur=r; for(let k=0;k<20;k++){ let up=null; for(const q of _ns.recs){ if(q===cur||q.open||_nsIsSheet(q)||q.area<=cur.area) continue; if(_pointInPoly(cur.pts[0],q.pts) && (!up||q.area<up.area)) up=q; } if(!up||_nsLooksSheet(up,cur)) break; cur=up; } return cur; }
 // le contour autour ressemble-t-il à une CHUTE (plusieurs pièces dedans) plutôt qu'à une pièce avec des trous ?
 function _nsLooksSheet(up,cur){ const inside=_ns.recs.filter(q=>q!==up&&q.area<up.area&&_pointInPoly(q.pts[0],up.pts));
   const twins=inside.filter(q=>q!==cur&&Math.abs(q.area-cur.area)<=cur.area*0.005+0.01&&Math.abs(q.per-cur.per)<=cur.per*0.005+0.01).length;
@@ -16230,7 +16257,7 @@ function _nsLooksSheet(up,cur){ const inside=_ns.recs.filter(q=>q!==up&&q.area<u
   return (twins>=2 && cur.area<up.area*0.3) || deep; }
 function _nsIsSheet(r){ return !!(_ns.sheetKey && r.key===_ns.sheetKey); }
 // La pièce = le contour cliqué + tous les traits DEDANS (trous, gravures…), même s'ils sont dans d'autres objets.
-function _nsInnerOf(rec){ return _ns.recs.filter(r=>r!==rec && !_nsIsSheet(r) && r.area<rec.area && r.bb[0]>=rec.bb[0]-1e-6 && r.bb[1]>=rec.bb[1]-1e-6 && r.bb[2]<=rec.bb[2]+1e-6 && r.bb[3]<=rec.bb[3]+1e-6 && _pointInPoly(r.pts[0],rec.pts)); }
+function _nsInnerOf(rec){ if(rec.open) return []; return _ns.recs.filter(r=>r!==rec && !_nsIsSheet(r) && r.area<rec.area && r.bb[0]>=rec.bb[0]-1e-6 && r.bb[1]>=rec.bb[1]-1e-6 && r.bb[2]<=rec.bb[2]+1e-6 && r.bb[3]<=rec.bb[3]+1e-6 && _pointInPoly(r.pts[0],rec.pts)); }
 function _nsPieceFrom(rec){ const items=[rec].concat(_nsInnerOf(rec));
   // formes IDENTIQUES ailleurs (même surface, même tour, même nombre de trous) -> remplacées aussi au moment de « Garder »
   const same=[]; for(const r of _ns.recs){ if(items.includes(r)||_nsIsSheet(r)) continue; if(Math.abs(r.area-rec.area)>rec.area*0.005+0.01 || Math.abs(r.per-rec.per)>rec.per*0.005+0.01) continue;
@@ -16392,7 +16419,7 @@ function _nsDrawNow(){
   for(const r of _ns.recs){ const isSheet=_nsIsSheet(r), hov=(_ns.hover===r); const pi=pOf.has(r)?pOf.get(r):-1, si=sOf.has(r)?sOf.get(r):-1;
     if(isSheet && res) continue; if(hid.has(r) && pi<0) continue;
     if(pi>=0&&hid.has(r)&&!(R&&R.stale)) continue;
-    if(obs.has(r) && pi<0){ x.save(); x.fillStyle='rgba(100,116,139,.28)'; path(r.pts); x.fill(); x.restore(); }
+    if(obs.has(r) && pi<0 && !r.open){ x.save(); x.fillStyle='rgba(100,116,139,.28)'; path(r.pts); x.fill(); x.restore(); }
     if(pi>=0||si>=0||hov){ x.save(); const c=_nsCol(pi>=0?pi:(si>=0?si:0)); x.strokeStyle=hov&&pi<0&&si<0?'rgba(245,158,11,.35)':c; x.globalAlpha=pi>=0?0.55:0.28; x.lineWidth=pi>=0?9:6; x.lineJoin='round'; path(r.pts); x.stroke(); x.restore(); }
     x.save(); x.strokeStyle=isSheet?'#64748b':(res?'rgba(17,24,39,.3)':'#111827'); x.lineWidth=1.5; if(isSheet) x.setLineDash([6,4]); path(r.pts); x.stroke(); x.restore(); }
   // résultat : les copies (une couleur par sorte de pièce)
@@ -16575,7 +16602,8 @@ function buildLaserBody(){
       if(oa){ const C=_arcCenter(oa), ap=_arcApexPt(oa); const P1=oa._arc.p1, P2=oa._arc.p2;
         if(C&&ap){ add([P1,ap,P2], [P1[0],P1[1]], [_laserArc(C,P1,P2,ap)], false);
           // tracé fin de l'arc (pour l'enchaîner avec les autres traits d'une même forme)
-          if(P&&P.length>=3){ let dn=P.map(q=>[q[0],q[1]]); if(Math.hypot(dn[0][0]-P1[0],dn[0][1]-P1[1])>Math.hypot(dn[dn.length-1][0]-P1[0],dn[dn.length-1][1]-P1[1])) dn.reverse(); dn[0]=[P1[0],P1[1]]; dn[dn.length-1]=[P2[0],P2[1]]; contours[contours.length-1]._dense=dn; }
+          const _lc0=contours[contours.length-1]; _lc0._arcC=C; _lc0._arcAp=ap; _lc0._arcP=[P1,P2];
+          if(P&&P.length>=3){ let dn=P.map(q=>[q[0],q[1]]); if(Math.hypot(dn[0][0]-P1[0],dn[0][1]-P1[1])>Math.hypot(dn[dn.length-1][0]-P1[0],dn[dn.length-1][1]-P1[1])) dn.reverse(); dn[0]=[P1[0],P1[1]]; dn[dn.length-1]=[P2[0],P2[1]]; _lc0._dense=dn; _lc0.poly=dn.map(q=>[q[0],q[1]]); _lc0._orig=dn.map(q=>[q[0],q[1]]); }   // tracé fin (affichage = vrai arc, plus de « zigzag »)
           continue; } } }catch(e){} }
     // Sinon : polyligne FIDELE (meme logique que l'export DXF).
     const _CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon'];
@@ -16614,7 +16642,20 @@ function buildLaserBody(){
       pts[pts.length-1]=[pts[0][0],pts[0][1]];
       let x0=1e18,y0=1e18; for(const q of pts){ if(q[0]<x0)x0=q[0]; if(q[1]<y0)y0=q[1]; }
       made.push({poly:pts,start:[pts[0][0],pts[0][1]],moves:pts.slice(1).map(q=>'G1 X'+_lc(q[0])+' Y'+_lc(q[1])),_closed:true,_srcPrim:false,_chained:ch.length,key:op[ch[0].k].key,_orig:pts.map(q=>[q[0],q[1]]),_ob:[x0,y0]}); }
-    if(made.length){ for(let i=contours.length-1;i>=0;i--) if(gone.has(contours[i])) contours.splice(i,1); contours.push(...made); } }
+    if(made.length){ for(let i=contours.length-1;i>=0;i--) if(gone.has(contours[i])) contours.splice(i,1); contours.push(...made); }
+    // Traits OUVERTS bout à bout (ex. 2 arcs collés) -> UNE seule coupe continue (un perçage, la tête ne se lève plus
+    // entre les traits). Les arcs restent de vrais G2/G3.
+    const op2=contours.filter(c=>!c._closed && !c._srcPrim && c.poly && c.poly.length>=2); const e2=op2.map(c=>{ const p=segPts(c); return [p[0],p[p.length-1]]; }); const used2=new Set(), gone2=new Set(), made2=[];
+    const near=(pt,skip)=>{ let bi=-1,bd=tolJ,br=false; for(let k=0;k<op2.length;k++){ if(used2.has(k)||skip.has(k)) continue; const d0=dd(pt,e2[k][0]), d1=dd(pt,e2[k][1]); if(d0<bd){bd=d0;bi=k;br=false;} if(d1<bd){bd=d1;bi=k;br=true;} } return {k:bi,rev:br}; };
+    const segMoves=(c,rev)=>{ if(!rev) return c.moves.slice(); if(c._arcC) return [_laserArc(c._arcC,c._arcP[1],c._arcP[0],c._arcAp)]; const p=segPts(c).reverse(); return p.slice(1).map(q=>'G1 X'+_lc(q[0])+' Y'+_lc(q[1])); };
+    for(let s0=0;s0<op2.length;s0++){ if(used2.has(s0)) continue; let ch=[{k:s0,rev:false}]; const mine=new Set([s0]);
+      let en=e2[s0][1]; for(let g=0;g<5000;g++){ const n=near(en,mine); if(n.k<0) break; mine.add(n.k); ch.push(n); en=n.rev?e2[n.k][0]:e2[n.k][1]; }
+      let st=e2[s0][0]; for(let g=0;g<5000;g++){ const n=near(st,mine); if(n.k<0) break; mine.add(n.k); ch.unshift({k:n.k,rev:!n.rev}); st=n.rev?e2[n.k][0]:e2[n.k][1]; }
+      if(ch.length<2) continue; for(const k of mine){ used2.add(k); gone2.add(op2[k]); }
+      const pts=[], mv=[]; for(const c of ch){ let p=segPts(op2[c.k]); if(c.rev) p.reverse(); if(pts.length) p=p.slice(1); pts.push(...p); mv.push(...segMoves(op2[c.k],c.rev)); }
+      let x0=1e18,y0=1e18; for(const q of pts){ if(q[0]<x0)x0=q[0]; if(q[1]<y0)y0=q[1]; }
+      made2.push({poly:pts,start:[pts[0][0],pts[0][1]],moves:mv,_closed:false,_srcPrim:false,_chained:ch.length,key:op2[ch[0].k].key,_orig:pts.map(q=>[q[0],q[1]]),_ob:[x0,y0]}); }
+    if(made2.length){ for(let i=contours.length-1;i>=0;i--) if(gone2.has(contours[i])) contours.splice(i,1); contours.push(...made2); } }
   // === RÉGLAGES PAR FORME (page Découpe) : _dcCfg[key] = {off, dir, lead} ===
   const _cfgOf=c=>(typeof _dcCfg!=='undefined' && _dcCfg && c && c.key)?_dcCfg[c.key]:null;
   // Moves d'un contour fermé depuis son poly (cercle = un seul G2/G3 dans le sens du poly).
@@ -16638,7 +16679,7 @@ function buildLaserBody(){
   // _c = point FIABLE a l'interieur (meme concave) ; _pole = point de percage le plus sur.
   contours.forEach(c=>{ c._c=_polyInteriorPoint(c.poly)||cent(c); c._a=_area(c.poly); c._pole=_polyPoleInside(c.poly); let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18; for(const q of c.poly){ if(q[0]<x0)x0=q[0]; if(q[0]>x1)x1=q[0]; if(q[1]<y0)y0=q[1]; if(q[1]>y1)y1=q[1]; } c._bb=[x0,y0,x1,y1]; });
   // A est "dans" B seulement si B est plus GRAND (evite le piege des formes concentriques)
-  contours.forEach((c,i)=>{ let d=0; contours.forEach((o,j)=>{ if(i!==j && o.poly.length>=3 && o._a>c._a+1e-6 && _pointInPoly(c._c,o.poly)) d++; }); c._depth=d; });
+  contours.forEach((c,i)=>{ let d=0; contours.forEach((o,j)=>{ if(i!==j && (o._closed||o._srcPrim) && o.poly.length>=3 && o._a>c._a+1e-6 && _pointInPoly(c._c,o.poly)) d++; }); c._depth=d; });
   // ORDRE DE COUPE : profondeur d'imbrication DECROISSANTE = REGLE DE SECURITE ABSOLUE.
   // Un trou/petit morceau A L'INTERIEUR est coupe AVANT le contour qui le contient : on ne
   // coupe jamais dans une zone deja detachee. DANS un meme niveau (aucune inclusion entre
@@ -16660,7 +16701,7 @@ function buildLaserBody(){
   // CHUTE globale : un point est "chute" s'il est a l'interieur d'un nombre PAIR
   // de contours (regle pair-impair). Sert a verifier qu'une amorce ne traverse
   // AUCUN autre trait (ni le contour courant, ni un ilot a garder).
-  const globalWaste=(pt)=>{ const _mc=_laserClassAt(pt[0],pt[1]); if(_mc===1)return true; if(_mc===2)return false; let cnt=0; for(const oc of contours){ const bb=oc._bb; if(!bb||pt[0]<bb[0]||pt[0]>bb[2]||pt[1]<bb[1]||pt[1]>bb[3])continue; const p=oc.poly; if(p&&p.length>=3&&_pointInPoly(pt,p))cnt++; } let mat=(cnt%2===1); if(INV)mat=!mat; return !mat; };
+  const globalWaste=(pt)=>{ const _mc=_laserClassAt(pt[0],pt[1]); if(_mc===1)return true; if(_mc===2)return false; let cnt=0; for(const oc of contours){ const bb=oc._bb; if(!bb||pt[0]<bb[0]||pt[0]>bb[2]||pt[1]<bb[1]||pt[1]>bb[3])continue; const p=oc.poly; if((oc._closed||oc._srcPrim)&&p&&p.length>=3&&_pointInPoly(pt,p))cnt++; } let mat=(cnt%2===1); if(INV)mat=!mat; return !mat; };
   // === APPLICATION DU CORRECTEUR : décale chaque contour FERMÉ vers la CHUTE ===
   // Le côté chute/pièce vient de globalWaste (peinture vert=pièce/rouge=chute, sinon
   // règle pair-impair). On calcule TOUS les côtés d'abord (sur la géométrie d'origine),
