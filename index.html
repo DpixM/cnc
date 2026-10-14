@@ -161,6 +161,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-14 — IL : DÉCOUPE — formes faites de plusieurs traits + arcs « décalés » (demande Seb, PROGRAMME11)
+ [FIX] Une forme dessinée avec PLUSIEURS traits (lignes + arcs + polylignes bout à bout) était coupée trait par
+   trait : un perçage SUR la pièce à chaque trait, sans amorce, sans sens. Maintenant les traits qui se touchent
+   (≤ 0,05 mm) et reviennent au départ = UNE forme fermée : un seul perçage dans la chute, amorce, sens, décalage.
+ [FIX] Arc étiré / retourné (miroir) : ses données d'arc n'étaient pas mises à jour -> le G-code coupait l'arc à
+   son ANCIENNE place (dans PROGRAMME11 : ~30 mm à côté !). Corrigé à la source + contrôle au moment du G-code
+   (si l'arc n'est plus un vrai arc de cercle, il est coupé en suivant le tracé).
+ [FIX] Tracé main levée presque fermé (bouts à moins de 0,3 mm) = forme fermée -> perçage dans la chute + amorce
+   (avant : percé sur le bord de la pièce, sans amorce). Les ponts (tabs) restent ouverts. Hors zone CIP.
+
 -- 2026-10-14 — IK : NESTING — le bloc est beaucoup plus SERRÉ (demande Seb : « on perd de la place »)
  [AMÉLIO] Avant : chaque sorte de pièce était rangée l'une après l'autre et jugée seule (ex. les « D » en une
    longue rangée au lieu d'aller sous les autres pièces). Maintenant on juge le BLOC ENTIER (toutes les pièces) :
@@ -1911,7 +1921,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IK ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IL ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -16549,8 +16559,15 @@ function buildLaserBody(){
     // Ligne
     if(o.type==='line'){ add([[o.x1,o.y1],[o.x2,o.y2]], [o.x1,o.y1], ['G1 X'+_lc(o.x2)+' Y'+_lc(o.y2)], false); continue; }
     // Arc 3 points -> G2/G3
-    if(o._arc){ try{ const C=_arcCenter(o), ap=_arcApexPt(o); const P1=o._arc.p1, P2=o._arc.p2;
-      if(C&&ap){ add([P1,ap,P2], [P1[0],P1[1]], [_laserArc(C,P1,P2,ap)], false); continue; } }catch(e){} }
+    if(o._arc){ try{ let oa=o; const P=o.pts;
+      // données d'arc pas d'accord avec le tracé (forme étirée / retournée) -> on les recalcule depuis le tracé
+      if(P&&P.length>=3){ const A=o._arc, dd=(u,v)=>Math.hypot(u[0]-v[0],u[1]-v[1]); const e=Math.min(dd(P[0],A.p1)+dd(P[P.length-1],A.p2),dd(P[0],A.p2)+dd(P[P.length-1],A.p1));
+        if(e>0.02){ oa=JSON.parse(JSON.stringify(o)); if(!_arcResync(oa)) oa=null; else { const Cc=_arcCenter(oa); let bad=!Cc; if(Cc) for(const q of P){ if(Math.abs(Math.hypot(q[0]-Cc[0],q[1]-Cc[1])-oa._arc.r)>0.02){ bad=true; break; } } if(bad) oa=null; } } }
+      if(oa){ const C=_arcCenter(oa), ap=_arcApexPt(oa); const P1=oa._arc.p1, P2=oa._arc.p2;
+        if(C&&ap){ add([P1,ap,P2], [P1[0],P1[1]], [_laserArc(C,P1,P2,ap)], false);
+          // tracé fin de l'arc (pour l'enchaîner avec les autres traits d'une même forme)
+          if(P&&P.length>=3){ let dn=P.map(q=>[q[0],q[1]]); if(Math.hypot(dn[0][0]-P1[0],dn[0][1]-P1[1])>Math.hypot(dn[dn.length-1][0]-P1[0],dn[dn.length-1][1]-P1[1])) dn.reverse(); dn[0]=[P1[0],P1[1]]; dn[dn.length-1]=[P2[0],P2[1]]; contours[contours.length-1]._dense=dn; }
+          continue; } } }catch(e){} }
     // Sinon : polyligne FIDELE (meme logique que l'export DXF).
     const _CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon'];
     const _isClosed=_CLOSEDT.includes(o.type)||o._poly;
@@ -16566,11 +16583,29 @@ function buildLaserBody(){
       const _tol=Math.min(0.3,(typeof _tabW!=='undefined'&&_tabW>0?_tabW:0.8)*0.5);
       if(_isClosed && egap<=_tol){ if(egap>1e-6) s=s.concat([[a[0],a[1]]]); closed=true; }
       else if(_prim){ if(egap>1e-6) s=s.concat([[a[0],a[1]]]); closed=true; } // primitive (rect/tri/star…) -> TOUJOURS refermée (sinon carré coupé ouvert)
+      else if(o.type==='free' && !o._arc && s.length>=4 && egap>1e-6 && egap<=_tol){ s=s.concat([[a[0],a[1]]]); closed=true; }   // tracé main levée presque fermé (≤ 0,3 mm) = forme fermée (amorce, sens…)
       else { closed=(s.length>2 && egap<1e-6); }
       const moves=[]; for(let i=1;i<s.length;i++) moves.push('G1 X'+_lc(s[i][0])+' Y'+_lc(s[i][1]));
       add(s.slice(), [s[0][0],s[0][1]], moves, closed, _prim);
     }
   }
+  // === FORMES FAITES DE PLUSIEURS TRAITS (lignes + arcs + polylignes bout à bout) -> UN SEUL contour fermé ===
+  // Avant : chaque trait était coupé à part (un perçage par trait, sur la pièce, sans amorce). Maintenant les traits
+  // dont les bouts se touchent (≤ 0,05 mm) et qui reviennent au départ deviennent une vraie forme fermée.
+  { const tolJ=0.05, dd=(u,v)=>Math.hypot(u[0]-v[0],u[1]-v[1]);
+    const op=contours.filter(c=>!c._closed && !c._srcPrim && c.poly && c.poly.length>=2);
+    const segPts=c=>(c._dense||c.poly).map(q=>[q[0],q[1]]);
+    const ends=op.map(c=>{ const p=segPts(c); return [p[0],p[p.length-1]]; }); const used=new Set(), gone=new Set(), made=[];
+    for(let s0=0;s0<op.length;s0++){ if(used.has(s0)) continue; const ch=[{k:s0,rev:false}], mine=new Set([s0]); const st=ends[s0][0]; let en=ends[s0][1], ok=false;
+      for(let g=0;g<5000;g++){ if(ch.length>=2 && dd(en,st)<=tolJ){ ok=true; break; }
+        let bi=-1,bd=tolJ,br=false; for(let k=0;k<op.length;k++){ if(used.has(k)||mine.has(k)) continue; const e=ends[k]; const d0=dd(en,e[0]), d1=dd(en,e[1]); if(d0<bd){bd=d0;bi=k;br=false;} if(d1<bd){bd=d1;bi=k;br=true;} }
+        if(bi<0) break; mine.add(bi); ch.push({k:bi,rev:br}); en=br?ends[bi][0]:ends[bi][1]; }
+      if(!ok) continue; for(const k of mine){ used.add(k); gone.add(op[k]); }
+      const pts=[]; for(const c of ch){ let p=segPts(op[c.k]); if(c.rev) p.reverse(); if(pts.length) p=p.slice(1); pts.push(...p); }
+      pts[pts.length-1]=[pts[0][0],pts[0][1]];
+      let x0=1e18,y0=1e18; for(const q of pts){ if(q[0]<x0)x0=q[0]; if(q[1]<y0)y0=q[1]; }
+      made.push({poly:pts,start:[pts[0][0],pts[0][1]],moves:pts.slice(1).map(q=>'G1 X'+_lc(q[0])+' Y'+_lc(q[1])),_closed:true,_srcPrim:false,_chained:ch.length,key:op[ch[0].k].key,_orig:pts.map(q=>[q[0],q[1]]),_ob:[x0,y0]}); }
+    if(made.length){ for(let i=contours.length-1;i>=0;i--) if(gone.has(contours[i])) contours.splice(i,1); contours.push(...made); } }
   // === RÉGLAGES PAR FORME (page Découpe) : _dcCfg[key] = {off, dir, lead} ===
   const _cfgOf=c=>(typeof _dcCfg!=='undefined' && _dcCfg && c && c.key)?_dcCfg[c.key]:null;
   // Moves d'un contour fermé depuis son poly (cercle = un seul G2/G3 dans le sens du poly).
@@ -19409,6 +19444,7 @@ function applyBB(o,bb){
   else if(o.type==='free'&&o.pts?.length){
     const ob=getObjBB(o),sx=w/ob.w,sy=h/ob.h;
     o.pts=o.pts.map(([px,py])=>[bb.x+(px-ob.x)*sx,bb.y+(py-ob.y)*sy]);
+    if(o._arc) _arcResync(o);
   }
 }
 
@@ -20966,6 +21002,13 @@ function _arcApexFromR(P1,P2,R,side){
 }
 function _arcApexSgn(P1,P2,R,sgn,big){ const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2, dx=P2[0]-P1[0],dy=P2[1]-P1[1], L=Math.hypot(dx,dy)||1, half=L/2; R=Math.max(R,half+0.01); const nx=-dy/L, ny=dx/L; const k=Math.sqrt(Math.max(0,R*R-half*half)); const s=big?(R+k):(R-k); return [mx+sgn*nx*s, my+sgn*ny*s]; }
 function _arcRegen(o){ if(!o||!o._arc)return; const A=o._arc; const apex=_arcApexSgn(A.p1,A.p2,A.r,A.sgn,A.big); o.pts=_arcPolyline(A.p1,A.p2,apex); }
+// Remet les données d'arc (p1, p2, rayon, côté) d'accord avec le tracé réel (après étirer / miroir…).
+// Sans ça, le G-code coupait l'arc à son ANCIENNE place (bug « forme à 2 arcs qui déconne »).
+function _arcResync(o){ if(!o||!o._arc||!o.pts||o.pts.length<3) return false; const P=o.pts, P1=P[0], P2=P[P.length-1], P3=P[Math.floor(P.length/2)];
+  const c=_arcThrough(P1,P2,P3); if(!c||!(c.r>0)||!isFinite(c.r)) return false;
+  const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2, ndx=-(P2[1]-P1[1]),ndy=(P2[0]-P1[0]); const sgn=((P3[0]-mx)*ndx+(P3[1]-my)*ndy)>=0?1:-1;
+  const tp=2*Math.PI, nm=v=>((v%tp)+tp)%tp; const a1=Math.atan2(P1[1]-c.cy,P1[0]-c.cx); const ds=nm(Math.atan2(P2[1]-c.cy,P2[0]-c.cx)-a1), dm=nm(Math.atan2(P3[1]-c.cy,P3[0]-c.cx)-a1);
+  const sp=(dm<=ds)?ds:(tp-ds); o._arc.p1=[P1[0],P1[1]]; o._arc.p2=[P2[0],P2[1]]; o._arc.r=c.r; o._arc.sgn=sgn; o._arc.big=sp>Math.PI; return true; }
 // Transforme un MORCEAU de contour (points survivants) en vrai ARC (centre+rayon connus),
 // pour que couper un cercle donne un arc "intelligent" au lieu d'une polyligne bête.
 function _segToArc(seg, C, R){
@@ -21338,7 +21381,7 @@ function _mirrorX(o,cx){ const f=x=>2*cx-x;
     case 'rect': case 'tri': case 'star': case 'oblong': case 'text': case 'svg': if(o.x!=null)o.x=f(o.x+(o.w||0)); break;
     case 'ellipse': o.x=f(o.x); break;
     case 'line': o.x1=f(o.x1); o.x2=f(o.x2); break;
-    case 'free': if(o.pts)o.pts=o.pts.map(pt=>[f(pt[0]),pt[1]]); break;
+    case 'free': if(o.pts)o.pts=o.pts.map(pt=>[f(pt[0]),pt[1]]); if(o._arc) _arcResync(o); break;
     case 'point': o.x=f(o.x); break;
     case 'gear': if(o.cx!=null)o.cx=f(o.cx); else if(o.x!=null)o.x=f(o.x+(o.w||0)); if(o.gearPts)o.gearPts=o.gearPts.map(pt=>[-pt[0],pt[1]]); break;
     default: if(o.x!=null)o.x=f(o.x+(o.w||0));
@@ -21349,7 +21392,7 @@ function _mirrorY(o,cy){ const f=y=>2*cy-y;
     case 'rect': case 'tri': case 'star': case 'oblong': case 'text': case 'svg': if(o.y!=null)o.y=f(o.y+(o.h||0)); break;
     case 'ellipse': o.y=f(o.y); break;
     case 'line': o.y1=f(o.y1); o.y2=f(o.y2); break;
-    case 'free': if(o.pts)o.pts=o.pts.map(pt=>[pt[0],f(pt[1])]); break;
+    case 'free': if(o.pts)o.pts=o.pts.map(pt=>[pt[0],f(pt[1])]); if(o._arc) _arcResync(o); break;
     case 'point': o.y=f(o.y); break;
     case 'gear': if(o.cy!=null)o.cy=f(o.cy); else if(o.y!=null)o.y=f(o.y+(o.h||0)); if(o.gearPts)o.gearPts=o.gearPts.map(pt=>[pt[0],-pt[1]]); break;
     default: if(o.y!=null)o.y=f(o.y+(o.h||0));
