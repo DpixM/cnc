@@ -161,6 +161,15 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-14 — IP : DÉPART REMIS COMME AVANT + police = celle de l'écran (demande Seb, URGENT)
+ [ANNULÉ] Le retournement Y de la version IO est RETIRÉ : le programme a exactement le même repère qu'avant IO
+   (0,0 = coin HAUT-GAUCHE du dessin, tour à vide depuis ce coin, mêmes coordonnées). Vue 3D comme avant.
+   Le sens des pièces sera revu seulement après accord de Seb sur le repère de la machine.
+ [FIX] Police : l'écran affichait une police de SECOURS (les noms « IBM Plex Mono / Sans », « Georgia »…
+   n'existaient pas dans le navigateur) alors que la découpe prenait la police intégrée -> « ça coupe pas la
+   police que je vois ». Les polices intégrées sont maintenant aussi celles de l'écran : ce que tu vois = coupé.
+ (Gardé de IO : police importée par l'Inspecteur lue pour la découpe ; police inconnue = tracé de la vraie police.)
+
 -- 2026-10-14 — IO : PIÈCES À L'ENDROIT sur la machine + POLICES importées découpées (demande Seb)
  [FIX MAJEUR] Le programme sortait en MIROIR haut/bas (Seb : « c'est à l'envers ») : l'écran a son Y vers le bas,
    la machine vers le fond. Maintenant (0,0) = coin bas-gauche du dessin tel qu'à l'écran, Y vers le fond :
@@ -1950,7 +1959,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IO ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IP ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3620,6 +3629,12 @@ window.__PARSED_FONTS__={};
     try{window.__PARSED_FONTS__[name]=opentype.parse(b64ToAB(b64));}catch(e){console.error('Police '+name+':',e.message);}
   }
   console.log('Polices chargées:',Object.keys(window.__PARSED_FONTS__).join(', '));
+  // L'aperçu du dessin écrit avec le NOM choisi (« IBM Plex Mono », « Georgia »…). Ces polices n'existaient pas dans
+  // le navigateur -> il affichait une police de secours (genre Times) alors que la découpe prenait la police intégrée.
+  // On déclare donc les polices intégrées sous ces noms : ce que tu vois à l'écran = ce qui est coupé.
+  try{ const alias={mono:['IBM Plex Mono','Mono','mono','monospace'],sans:['IBM Plex Sans','Sans'],serif:['Georgia'],script:['cursive'],display:['fantasy','Bebas Neue']};
+    for(const [k,names] of Object.entries(alias)){ const b64=(window.__EMBEDDED_FONTS__||{})[k]; if(!b64) continue; const ab=b64ToAB(b64);
+      for(const nm of names){ try{ const ff=new FontFace(nm,ab.slice(0)); ff.load().then(f=>{ document.fonts.add(f); if(typeof redrawCanvas==='function') redrawCanvas(); }).catch(()=>{}); }catch(e){} } } }catch(e){ console.warn('polices aperçu:',e.message); }
 })();
 </script>
 <script>
@@ -16977,8 +16992,7 @@ function buildLaserBody(){
     let loop=_frameHullOffset(allp, 10);   // ~1cm autour, grossier (enveloppe convexe)
     if(loop && loop.length>=4){
       const n=loop.length-1;
-      // coin de départ = bas-gauche TEL QU'À L'ÉCRAN (x mini, y maxi : l'écran a son Y vers le bas)
-      let fmx=1e18,fmy=-1e18,_fmy0=1e18; for(let i=0;i<n;i++){ if(loop[i][0]<fmx)fmx=loop[i][0]; if(loop[i][1]>fmy)fmy=loop[i][1]; if(loop[i][1]<_fmy0)_fmy0=loop[i][1]; } window._laserOffInfo={yOld:_fmy0};
+      let fmx=1e18,fmy=1e18; for(let i=0;i<n;i++){ if(loop[i][0]<fmx)fmx=loop[i][0]; if(loop[i][1]<fmy)fmy=loop[i][1]; }
       // demarrer le tour au sommet le PLUS PROCHE du coin (fmx,fmy) -> trajet initial ~nul
       let si=0,sd=1e18; for(let i=0;i<n;i++){ const d=(loop[i][0]-fmx)**2+(loop[i][1]-fmy)**2; if(d<sd){sd=d;si=i;} }
       // le tour PART du coin (fmx,fmy) = le zero (la ou tu poses la tete), fait le tour, revient au coin
@@ -16993,16 +17007,10 @@ function buildLaserBody(){
     }
   }
   // Sans cadre : (0,0) = coin bas-gauche du dessin.
-  if(!haveOff){ let mnx=1e18,mxy=-1e18,mny=1e18; for(const c of contours) for(const q of c.poly){ if(q[0]<mnx)mnx=q[0]; if(q[1]>mxy)mxy=q[1]; if(q[1]<mny)mny=q[1]; } if(isFinite(mnx)){ offX=mnx; offY=mxy; haveOff=true; window._laserOffInfo={yOld:mny}; } }
-  if(window._laserOffInfo){ window._laserOffInfo.x=offX; window._laserOffInfo.y=offY; }   // (pour les tests : comparer à l'ancienne sortie non retournée)
+  if(!haveOff){ let mnx=1e18,mny=1e18; for(const c of contours) for(const q of c.poly){ if(q[0]<mnx)mnx=q[0]; if(q[1]<mny)mny=q[1]; } if(isFinite(mnx)){ offX=mnx; offY=mny; haveOff=true; } }
   let text=frameTxt+blocks.join('\n\n');
-  // RE-ZERO + MIROIR Y (Seb : « c'est à l'envers ») : à l'écran le Y DESCEND, sur la machine il part vers le FOND.
-  // Avant, les pièces sortaient en miroir haut/bas. Maintenant : (0,0) = coin bas-gauche du dessin tel qu'à
-  // l'écran, X vers la droite, Y vers le haut de l'écran = vers le fond de la machine -> la pièce sort comme dessinée.
-  // Un miroir inverse le sens des arcs : G2 <-> G3, et J change de signe (I ne bouge pas).
-  if(haveOff){ text=text.replace(/([XY])(-?\d*\.?\d+)/g, (mm,ax,num)=> ax+_lc(ax==='X'?(parseFloat(num)-offX):(offY-parseFloat(num))) )
-      .replace(/J(-?\d*\.?\d+)/g, (mm,num)=>'J'+_lc(-parseFloat(num)))
-      .replace(/^G([23])(?=\s)/gm, (mm,g)=>'G'+(g==='2'?'3':'2')); }
+  // RE-ZERO : coordonnees ramenees au coin (tout positif). I/J (arcs, relatifs) NON touches.
+  if(haveOff){ text=text.replace(/([XY])(-?\d*\.?\d+)/g, (mm,ax,num)=> ax+_lc(parseFloat(num)-(ax==='X'?offX:offY)) ); }
   _laserCutPaths=_prev;
   return {text, count:contours.length};
 }
@@ -31241,7 +31249,7 @@ function _s3dInit(moves) {
     renderer, scene, camera, pivot, woodMesh,
     cx, cy, cz: czVis,
     cx0: cx, cy0: cy, cz0: czVis,   // centre d'origine (pour recentrer)
-    theta: -Math.PI/2-0.35,   // vue de DEVANT la machine (comme l'opérateur) : X à droite, Y vers le fond
+    theta: Math.PI/4,    // vue de 45°
     phi:   Math.PI/3.5,  // vue légèrement de dessus (~51°)
     tTheta: Math.PI/4, tPhi: Math.PI/3.5,   // cibles (lissage)
     radius: initRadius, tRadius: initRadius,
@@ -31367,7 +31375,7 @@ function _s3dAttachControls(canvas, spanXY) {
   canvas.addEventListener('dblclick', e => {
     e.preventDefault();
     if (_s3d.cx0 !== undefined) { _s3d.cx = _s3d.cx0; _s3d.cy = _s3d.cy0; _s3d.cz = _s3d.cz0; }
-    _s3d.theta = -Math.PI/2-0.35; _s3d.phi = Math.PI / 3.5; _s3d.radius = _s3d.initRadius || _s3d.radius;
+    _s3d.theta = Math.PI / 4; _s3d.phi = Math.PI / 3.5; _s3d.radius = _s3d.initRadius || _s3d.radius;
   });
 
   canvas.addEventListener('wheel', e => {
