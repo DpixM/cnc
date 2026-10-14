@@ -161,6 +161,11 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-14 — IU : petite TÊTE DE DÉCOUPE dans la simulation 3D (demande Seb)
+ [AJOUT] Le point jaune est remplacé par une petite tête laser (buse cuivre, corps, bague orange) dont la pointe suit
+   le parcours ; quand le laser coupe pendant la lecture, un faisceau rouge + une étincelle sortent de la buse.
+   Affichage seulement : le programme ne change pas. Hors zone CIP.
+
 -- 2026-10-14 — IT : tête posée EN HAUT À DROITE, pièces coupées sur la GAUCHE, dessin à l'endroit (Seb)
  [FIX] Retour à la correction de IQ (celle qui colle à ce que Seb voit en vrai) : vu de dessus, la tête se pose
    au coin HAUT-DROIT et les pièces partent vers la GAUCHE et vers le bas, comme avant ; seul le dessin est remis
@@ -1978,7 +1983,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IT ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IU ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -26119,15 +26124,18 @@ function _s3dAdvance(){
     const cost=Math.max(0.02, fast?L/8:L); if(budget<cost){ part={m,t:budget/cost}; break; } budget-=cost; i++; }
   _s3d._acc=(i>=n)?0:budget; if(i!==_s3d.idx) _s3dSetIdx(i);
   // la tête GLISSE le long du mouvement en cours (sinon elle saute d'un coup sur les longs déplacements)
-  if(part && _s3d.mark){ const m=part.m,t=part.t; _s3d.mark.visible=true; _s3d.mark.position.set(m.x0+(m.x1-m.x0)*t, m.y0+(m.y1-m.y0)*t, m.z0+(m.z1-m.z0)*t); }
+  if(part && _s3d.mark){ const m=part.m,t=part.t; _s3d.mark.visible=true; _s3d.mark.position.set(m.x0+(m.x1-m.x0)*t, m.y0+(m.y1-m.y0)*t, m.z0+(m.z1-m.z0)*t); _s3dBeam(m); }
 }
+// faisceau + étincelle à la pointe de la tête : seulement quand le laser COUPE pendant la lecture
+function _s3dBeam(m){ const u=_s3d&&_s3d.mark&&_s3d.mark.userData; if(!u||!u.beam) return; const on=!!(m && (m.laser===true||m.lead) && _s3d.playing);
+  u.beam.visible=on; if(on&&u.glow){ const k=0.8+Math.random()*0.5; u.glow.scale.set(k,k,k); u.glow.material.opacity=0.4+Math.random()*0.35; } }
 function _s3dSetIdx(idx){
   if(!_s3d||!_s3d.combGeo) return;
   const n=_s3d.moves.length;
   idx=Math.max(0,Math.min(n,Math.round(idx)));
   _s3d.idx=idx;
   _s3d.combGeo.setDrawRange(0, idx*2);
-  if(idx>0){ const m=_s3d.moves[idx-1]; _s3d.mark.visible=true; _s3d.mark.position.set(m.x1,m.y1,m.z1); }
+  if(idx>0){ const m=_s3d.moves[idx-1]; _s3d.mark.visible=true; _s3d.mark.position.set(m.x1,m.y1,m.z1); _s3dBeam(m); }
   else if(_s3d.mark) _s3d.mark.visible=false;
   const pct=n?Math.round(idx/n*100):0;
   const sk=document.getElementById('s3dSeek'); if(sk&&document.activeElement!==sk)sk.value=pct;
@@ -31244,7 +31252,15 @@ function _s3dInit(moves) {
   const lineObjs = {}; // compat (filtres masqués)
   // Tête de coupe (marqueur)
   const _mr = Math.max(0.6, spanXY*0.012);
-  const mark = new THREE.Mesh(new THREE.SphereGeometry(_mr,12,12), new THREE.MeshBasicMaterial({color:0xffd24a}));
+  // Petite TÊTE DE DÉCOUPE (buse cuivre + corps + bloc), pointe = le point de coupe ; faisceau rouge quand le laser coupe
+  const mark = new THREE.Group(); { const S=Math.max(1.2, spanXY*0.035);
+    const noz=new THREE.Mesh(new THREE.ConeGeometry(0.32*S,0.8*S,20), new THREE.MeshLambertMaterial({color:0xc98a3c})); noz.rotation.x=-Math.PI/2; noz.position.z=0.4*S+0.15*S; mark.add(noz);
+    const body=new THREE.Mesh(new THREE.CylinderGeometry(0.42*S,0.42*S,1.5*S,20), new THREE.MeshLambertMaterial({color:0xaab3bf})); body.rotation.x=Math.PI/2; body.position.z=0.95*S+0.75*S; mark.add(body);
+    const ring=new THREE.Mesh(new THREE.CylinderGeometry(0.47*S,0.47*S,0.18*S,20), new THREE.MeshLambertMaterial({color:0xf59e0b})); ring.rotation.x=Math.PI/2; ring.position.z=1.1*S; mark.add(ring);
+    const blk=new THREE.Mesh(new THREE.BoxGeometry(1.1*S,1.1*S,0.7*S), new THREE.MeshLambertMaterial({color:0x3b4452})); blk.position.z=2.8*S; mark.add(blk);
+    const beam=new THREE.Group(); const core=new THREE.Mesh(new THREE.CylinderGeometry(0.05*S,0.05*S,0.18*S,8), new THREE.MeshBasicMaterial({color:0xff2a14})); core.rotation.x=Math.PI/2; core.position.z=0.07*S; beam.add(core);
+    const glow=new THREE.Mesh(new THREE.SphereGeometry(0.22*S,14,14), new THREE.MeshBasicMaterial({color:0xff5a1f,transparent:true,opacity:0.55,depthWrite:false})); beam.add(glow);
+    beam.visible=false; mark.add(beam); mark.userData.beam=beam; mark.userData.glow=glow; }
   mark.visible=false;
   pivot.add(mark);
   // Points de PERCAGE : petites boules ROUGES (la ou le laser s'allume).
