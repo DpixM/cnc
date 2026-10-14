@@ -161,6 +161,15 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-14 — IM : DESSIN — formes fermées faites de plusieurs traits, ⟂ sur une polyligne, Ctrl+clic (demande Seb)
+ [AJOUT] Des traits séparés (lignes, arcs 3 points, polylignes) bout à bout qui se referment = UNE forme fermée,
+   automatiquement, comme dans Fusion : teintée en bleu clair, un clic DEDANS la sélectionne en entier (glisser =
+   la déplacer). Plus besoin de « Grouper ». Découpe et nesting la traitent comme une seule pièce (IL).
+ [FIX] Perpendiculaire (et parallèle) entre 2 côtés d'une MÊME polyligne ouverte (ex. un « L ») : un segment
+   disparaissait (le 1er point sautait sur le dernier). Maintenant le coin commun reste en place, l'autre côté
+   pivote ; la contrainte est mémorisée par CÔTÉ (avant : 2 fois le même objet).
+ [AJOUT] Ctrl+clic = ajouter / enlever de la sélection (comme Maj+clic, qui marche toujours). Hors zone CIP.
+
 -- 2026-10-14 — IL : DÉCOUPE — formes faites de plusieurs traits + arcs « décalés » (demande Seb, PROGRAMME11)
  [FIX] Une forme dessinée avec PLUSIEURS traits (lignes + arcs + polylignes bout à bout) était coupée trait par
    trait : un perçage SUR la pièce à chaque trait, sans amorce, sans sens. Maintenant les traits qui se touchent
@@ -1921,7 +1930,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IL ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IM ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -16305,7 +16314,7 @@ function _nsRemoveItems(items){ const byObj=new Map(); for(const it of _nsAtoms(
     _nsRemove(o); } }
 function _nsRemove(o){ let i=paintObjects.indexOf(o); if(i>=0) paintObjects.splice(i,1); else { for(const g of paintObjects){ if(g&&g.type==='group'&&g.children){ const j=g.children.indexOf(o); if(j>=0){ g.children.splice(j,1); break; } } } }
   const id=o.id; for(let k=paintObjects.length-1;k>=0;k--){ const d=paintObjects[k]; if(d&&(d.type==='dim'||d.type==='constraint')&&(d.ref===id||d.ref2===id)) paintObjects.splice(k,1); }
-  if(typeof _constraints!=='undefined') _constraints=_constraints.filter(c=>String(c.a)!==String(id)&&String(c.b).split('#')[0]!==String(id)); }
+  if(typeof _constraints!=='undefined') _constraints=_constraints.filter(c=>String(c.a).split('#')[0]!==String(id)&&String(c.b).split('#')[0]!==String(id)); }
 // Positions des copies en mm (dessin)
 function _nsPlacementsMm(){ const R=_ns.res; if(!R||!R.best) return []; const sh=R.sheet; const ox=sh.rect?sh.ox:0, oy=sh.rect?sh.oy:0;
   return R.best.placed.map(p=>({t:p.t||0, a:p.a, X:ox+p.X/_NS_S, Y:oy+p.Y/_NS_S})); }
@@ -19592,6 +19601,28 @@ function hitTest(o,xm,ym){
 }
 
 function getObj(id){return paintObjects.find(o=>o.id===id);}
+// ── FORMES FERMÉES « PROFILS » (comme Fusion) : des traits séparés (lignes, arcs, polylignes) dont les bouts se
+// touchent et qui se referment = UNE forme. Pas besoin de « Grouper » : elle est teintée en bleu clair, un clic
+// DEDANS la sélectionne en entier (on peut la déplacer), et la découpe / le nesting la traitent comme une seule pièce.
+let _pfCache={key:null,list:[]};
+function _profiles(){ const segs=[];
+  for(const o of paintObjects){ if(!o||o._link) continue; let pts=null;
+    if(o.type==='line') pts=[[o.x1,o.y1],[o.x2,o.y2]];
+    else if(o.type==='free'&&o.pts&&o.pts.length>=2&&!o._poly){ const a=o.pts[0],b=o.pts[o.pts.length-1]; if(o._arc||o.pts.length===2||Math.hypot(a[0]-b[0],a[1]-b[1])>0.3) pts=o.pts; }
+    if(pts) segs.push({id:o.id,pts}); }
+  const f=v=>Math.round(v*1000); const key=segs.map(s=>{ const p=s.pts, m=p[p.length>>1]; return s.id+':'+p.length+':'+f(p[0][0])+','+f(p[0][1])+','+f(m[0])+','+f(m[1])+','+f(p[p.length-1][0])+','+f(p[p.length-1][1]); }).join('|');
+  if(key===_pfCache.key) return _pfCache.list;
+  const tol=0.05, dd=(u,v)=>Math.hypot(u[0]-v[0],u[1]-v[1]); const ends=segs.map(s=>[s.pts[0],s.pts[s.pts.length-1]]); const used=new Set(), list=[];
+  for(let s0=0;s0<segs.length;s0++){ if(used.has(s0)) continue; const ch=[{k:s0,rev:false}], mine=new Set([s0]); const st=ends[s0][0]; let en=ends[s0][1], ok=false;
+    for(let g=0;g<2000;g++){ if(ch.length>=2 && dd(en,st)<=tol){ ok=true; break; }
+      let bi=-1,bd=tol,br=false; for(let k=0;k<segs.length;k++){ if(used.has(k)||mine.has(k)) continue; const e=ends[k]; const d0=dd(en,e[0]), d1=dd(en,e[1]); if(d0<bd){bd=d0;bi=k;br=false;} if(d1<bd){bd=d1;bi=k;br=true;} }
+      if(bi<0) break; mine.add(bi); ch.push({k:bi,rev:br}); en=br?ends[bi][0]:ends[bi][1]; }
+    if(!ok) continue; for(const k of mine) used.add(k);
+    const pts=[]; for(const c of ch){ let p=segs[c.k].pts.map(q=>[q[0],q[1]]); if(c.rev) p.reverse(); if(pts.length) p=p.slice(1); pts.push(...p); }
+    let A=0; for(let i=0,n=pts.length;i<n;i++){ const a=pts[i],b=pts[(i+1)%n]; A+=a[0]*b[1]-b[0]*a[1]; }
+    list.push({ids:ch.map(c=>segs[c.k].id), pts, area:Math.abs(A)/2}); }
+  _pfCache={key,list}; return list; }
+function _profileAt(x,y){ let best=null; for(const p of _profiles()){ if(p.area>0 && _pointInPoly([x,y],p.pts) && (!best||p.area<best.area)) best=p; } return best; }
 
 function objContourSample(o,N=60){
   const pts=[];
@@ -19978,6 +20009,8 @@ function redrawCanvasNow(){
   pCtx.fillStyle='rgba(76,175,80,.7)';pCtx.font='9px monospace';pCtx.textAlign='left';
   pCtx.fillText('G0,0',opx+6,opy-4);
 
+  // ── Formes fermées faites de plusieurs traits (profils) : teinte bleu clair ──
+  try{ const _pfl=_profiles(); if(_pfl.length){ pCtx.save(); pCtx.fillStyle='rgba(37,99,235,.09)'; for(const p of _pfl){ pCtx.beginPath(); p.pts.forEach((q,i)=>{ const pp=mmToPx(q[0],q[1]); if(i) pCtx.lineTo(pp[0],pp[1]); else pCtx.moveTo(pp[0],pp[1]); }); pCtx.closePath(); pCtx.fill(); } pCtx.restore(); } }catch(e){}
   // ── Objects ──
   for(const o of paintObjects){
     const sel=o.id===selObjId;
@@ -21208,6 +21241,15 @@ function _conPickClick(xm,ym){
 }
 function _rotateShapeEdgeTo(eh, targetAng){ if(!eh||!eh.__eh||!eh.o)return false; const s=segOf(eh); if(!s)return false; const ang=Math.atan2(s[3]-s[1],s[2]-s[0]); let d=targetAng-ang; d=d-Math.PI*Math.round(d/Math.PI); const bb=getObjBB(eh.o); if(!bb)return false; _rotateObj(eh.o, bb.x+bb.w/2, bb.y+bb.h/2, d); return true; }
 function _isShapeEdge(o){ return o && o.__eh && o.o && o.o.pts && o.o.pts.length>3; }
+// Oriente un segment à l'angle « ang » en gardant son sens de parcours. 2 côtés VOISINS d'une même polyligne :
+// on pivote autour du coin COMMUN (le coin reste en place, comme dans Fusion), sinon autour du milieu.
+function _setSegAngle(mov,ref,ang){ const s=segOf(mov); if(!s) return; const len=Math.hypot(s[2]-s[0],s[3]-s[1]); const cur=Math.atan2(s[3]-s[1],s[2]-s[0]);
+  let dA=ang-cur; dA=dA-2*Math.PI*Math.round(dA/(2*Math.PI)); if(Math.abs(dA)>Math.PI/2) ang+=Math.PI; const c=Math.cos(ang), sn=Math.sin(ang);
+  if(mov&&ref&&mov.__eh&&ref.__eh&&mov.o===ref.o){ if(mov.i===ref.i+1){ setSeg(mov,[s[0],s[1],s[0]+c*len,s[1]+sn*len]); return; } if(mov.i+1===ref.i){ setSeg(mov,[s[2]-c*len,s[3]-sn*len,s[2],s[3]]); return; } }
+  const mx=(s[0]+s[2])/2,my=(s[1]+s[3])/2,h=len/2; setSeg(mov,[mx-c*h,my-sn*h,mx+c*h,my+sn*h]); }
+function _conAlign(mov,ref,ang){ const same=mov&&ref&&mov.__eh&&ref.__eh&&mov.o===ref.o; if(!same && _isShapeEdge(mov)){ _rotateShapeEdgeTo(mov,ang); return; } _setSegAngle(mov,ref,ang); }
+// référence de contrainte -> objet, ou CÔTÉ d'une polyligne (« id#n »)
+function _conRef(ref){ if(ref==null) return null; if(typeof ref==='string' && ref.indexOf('#')>=0){ const p=ref.split('#'); const o=paintObjects.find(x=>String(x.id)===p[0]); const i=+p[1]; if(!o||!o.pts||!(i>=0)||i+1>=o.pts.length) return null; return {__eh:true,o,i,id:o.id,fixed:o.fixed}; } return getObj(ref); }
 // Un « cercle dessiné en petits segments » (boucle fermée ~ronde, plein de points) : on calcule
 // son centre (barycentre) + rayon moyen pour le TRAITER COMME UN CERCLE dans les contraintes.
 function _loopCenterR(pts){ if(!pts||pts.length<8)return null; let P=pts; if(P.length>2&&Math.hypot(P[0][0]-P[P.length-1][0],P[0][1]-P[P.length-1][1])<1e-6)P=P.slice(0,-1); const n=P.length; if(n<8)return null; let cx=0,cy=0; for(const p of P){cx+=p[0];cy+=p[1];} cx/=n;cy/=n; const rs=P.map(p=>Math.hypot(p[0]-cx,p[1]-cy)); const r=rs.reduce((a,b)=>a+b,0)/n; if(r<0.5)return null; const mn=Math.min.apply(null,rs), mx=Math.max.apply(null,rs); if(mn<r*0.45||mx>r*1.9)return null; return {cx,cy,r}; }
@@ -21255,7 +21297,7 @@ function _applyConstraintNow(type, objs){
     case 'parallel': case 'perp': {
       if(lines.length<2){ T('⚠️ Sélectionne 2 lignes'); return; }
       const a=L(lines[0]); let ang=Math.atan2(a[3]-a[1],a[2]-a[0]); if(type==='perp')ang+=Math.PI/2;
-      if(_isShapeEdge(lines[1])){ _rotateShapeEdgeTo(lines[1], ang); } else { const s=L(lines[1]),m=mid(s),hh=half(s); setL(lines[1],[m[0]-Math.cos(ang)*hh,m[1]-Math.sin(ang)*hh,m[0]+Math.cos(ang)*hh,m[1]+Math.sin(ang)*hh]); } break; }
+      _conAlign(lines[1], lines[0], ang); break; }
     case 'equal': {
       if(lines.length>=2){ const la=half(L(lines[0]))*2; const s=L(lines[1]); const dx=s[2]-s[0],dy=s[3]-s[1],cur=Math.hypot(dx,dy)||1,k=la/cur;
         const _o0e=lines[0].__eh?lines[0].o:lines[0], _o1e=lines[1].__eh?lines[1].o:lines[1];
@@ -21299,7 +21341,8 @@ function _applyConstraintNow(type, objs){
   // Persistance : mémoriser pour le re-solveur au déplacement
   const _add=(ct,a,b)=>{ if(a==null)return; const bb=(b==null?null:b); if(_constraints.some(c=>c.ct===ct&&String(c.a)===String(a)&&String(c.b)===String(bb)))return; _constraints.push({ct,a,b:bb}); };
   // id reel : un arc est resolu en cercle synthetique (__arccenter) -> on prend l'id de la vraie forme (_src)
-  const _rid=(o)=>o?(o.__arccenter?(o._src&&o._src.id):(o.__eh?(o.o&&o.o.id):o.id)):null;
+  // un CÔTÉ de polyligne est mémorisé « id#n » (avant : juste l'id -> 2 côtés de la même polyligne = la même chose)
+  const _rid=(o)=>o?(o.__arccenter?(o._src&&o._src.id):(o.__eh?(o.o&&(o.o.pts&&o.o.pts.length>2?(o.o.id+'#'+o.i):o.o.id)):o.id)):null;
   if(type==='horiz'||type==='vert'){ for(const o of lines)_add(type,_rid(o),null); }
   else if(type==='parallel'||type==='perp'||type==='collinear'){ if(lines.length>=2)_add(type,_rid(lines[0]),_rid(lines[1])); }
   else if(type==='equal'){ if(lines.length>=2)_add('equal',_rid(lines[0]),_rid(lines[1])); else if(circs.length>=2)_add('equal',_rid(circs[0]),_rid(circs[1])); }
@@ -21317,13 +21360,13 @@ function _applyConstraintNow(type, objs){
   T('✅ Contrainte appliquée (persistante)');
 }
 let _constraints = [];  // contraintes persistantes : {ct, a, b}
-function _isAnchor(o, anchorId){ return !o || o.fixed || (anchorId!=null && o.id===anchorId); }
+function _isAnchor(o, anchorId){ const oo=(o&&o.__eh)?o.o:o; return !oo || oo.fixed || (anchorId!=null && oo.id===anchorId); }
 function _applyConstraintStep(c, anchorId){
-  const A=getObj(c.a), B=(c.b!=null?getObj(c.b):null), setL=setSeg, L=segOf;
+  const A=_conRef(c.a), B=(c.b!=null?_conRef(c.b):null), setL=setSeg, L=segOf;
   const pickMove=(a,b)=>{ if(!_isAnchor(a,anchorId)&&_isAnchor(b,anchorId))return[b,a]; return[a,b]; }; // [ref, mov]
   switch(c.ct){
     case 'horiz': case 'vert': { const o=A; if(!o||_isAnchor(o,anchorId))return; const s=L(o); if(!s)return; const mx=(s[0]+s[2])/2,my=(s[1]+s[3])/2,hh=Math.hypot(s[2]-s[0],s[3]-s[1])/2; setL(o, c.ct==='horiz'?[mx-hh,my,mx+hh,my]:[mx,my-hh,mx,my+hh]); break; }
-    case 'parallel': case 'perp': { if(!A||!B)return; const [ref,mov]=pickMove(A,B); if(_isAnchor(mov,anchorId))return; const a=L(ref),s=L(mov); if(!a||!s)return; let ang=Math.atan2(a[3]-a[1],a[2]-a[0]); if(c.ct==='perp')ang+=Math.PI/2; const mx=(s[0]+s[2])/2,my=(s[1]+s[3])/2,hh=Math.hypot(s[2]-s[0],s[3]-s[1])/2; setL(mov,[mx-Math.cos(ang)*hh,my-Math.sin(ang)*hh,mx+Math.cos(ang)*hh,my+Math.sin(ang)*hh]); break; }
+    case 'parallel': case 'perp': { if(!A||!B)return; const [ref,mov]=pickMove(A,B); if(_isAnchor(mov,anchorId))return; const a=L(ref),s=L(mov); if(!a||!s)return; let ang=Math.atan2(a[3]-a[1],a[2]-a[0]); if(c.ct==='perp')ang+=Math.PI/2; _conAlign(mov,ref,ang); break; }
     case 'collinear': { if(!A||!B)return; const [ref,mov]=pickMove(A,B); if(_isAnchor(mov,anchorId))return; const a=L(ref),s=L(mov); if(!a||!s)return; const ang=Math.atan2(a[3]-a[1],a[2]-a[0]),dx=Math.cos(ang),dy=Math.sin(ang),mx=(s[0]+s[2])/2,my=(s[1]+s[3])/2,hh=Math.hypot(s[2]-s[0],s[3]-s[1])/2,tp=((mx-a[0])*dx+(my-a[1])*dy),px=a[0]+dx*tp,py=a[1]+dy*tp; setL(mov,[px-dx*hh,py-dy*hh,px+dx*hh,py+dy*hh]); break; }
     case 'equal': { if(!A||!B)return; const [ref,mov]=pickMove(A,B); if(_isAnchor(mov,anchorId))return;
       if(L(ref)&&L(mov)){ const a=L(ref),la=Math.hypot(a[2]-a[0],a[3]-a[1]),s=L(mov),dx=s[2]-s[0],dy=s[3]-s[1],cur=Math.hypot(dx,dy)||1,k=la/cur; setL(mov,[s[0],s[1],s[0]+dx*k,s[1]+dy*k]); }
@@ -21373,7 +21416,7 @@ function solveSketch(anchorId){
   _log('solve',{anchor:anchorId, cons:_constraints.length});
   if(!_constraints.length)return;
   // nettoyer les contraintes dont un objet a disparu
-  _constraints=_constraints.filter(c=>getObj(c.a)&&(c.b==null||getObj(c.b)||(typeof c.b==='string'&&paintObjects.some(x=>String(x.id)===String(c.b).split('#')[0]))));
+  _constraints=_constraints.filter(c=>_conRef(c.a)&&String(c.a)!==String(c.b)&&(c.b==null||_conRef(c.b)||(typeof c.b==='string'&&paintObjects.some(x=>String(x.id)===String(c.b).split('#')[0]))));
   for(let it=0; it<40; it++){ for(const c of _constraints) _applyConstraintStep(c, anchorId); }
 }
 function _mirrorX(o,cx){ const f=x=>2*cx-x;
@@ -21623,7 +21666,12 @@ function placeDim(spec,px,py){
 }
 // Geometrie d'une cote pilote (calculee depuis la forme referencee)
 function segOf(o){ if(!o)return null; if(o.__eh){ const q=o.o.pts; if(!q||o.i+1>=q.length)return null; return [q[o.i][0],q[o.i][1],q[o.i+1][0],q[o.i+1][1]]; } if(o.type==='line')return[o.x1,o.y1,o.x2,o.y2]; if(o.type==='free'&&o.pts&&o.pts.length===2)return[o.pts[0][0],o.pts[0][1],o.pts[1][0],o.pts[1][1]]; return null; }
-function setSeg(o,s){ if(!o)return; if(o.__eh){ const q=o.o.pts; if(!q)return; q[o.i]=[s[0],s[1]]; q[o.i+1]=[s[2],s[3]]; const n=q.length; if(n>1 && Math.hypot(q[0][0]-q[n-1][0],q[0][1]-q[n-1][1])<1e-6){} if(o.i===0)q[n-1]=[q[0][0],q[0][1]]; if(o.i+1===n-1)q[0]=[q[n-1][0],q[n-1][1]]; if(o.o._arc)delete o.o._arc; return; } if(o.type==='line'){o.x1=s[0];o.y1=s[1];o.x2=s[2];o.y2=s[3];} else if(o.type==='free'){o.pts=[[s[0],s[1]],[s[2],s[3]]];} }
+function setSeg(o,s){ if(!o)return; if(o.__eh){ const q=o.o.pts; if(!q)return; const n=q.length; const wasClosed=(n>2 && Math.hypot(q[0][0]-q[n-1][0],q[0][1]-q[n-1][1])<1e-6);
+    q[o.i]=[s[0],s[1]]; q[o.i+1]=[s[2],s[3]];
+    // on ne recolle le 1er et le dernier point QUE si la polyligne était fermée (avant : une polyligne OUVERTE en « L »
+    // voyait son 1er point sauter sur le dernier -> un segment disparaissait avec ⟂)
+    if(wasClosed){ if(o.i===0)q[n-1]=[q[0][0],q[0][1]]; if(o.i+1===n-1)q[0]=[q[n-1][0],q[n-1][1]]; }
+    if(o.o._arc)delete o.o._arc; return; } if(o.type==='line'){o.x1=s[0];o.y1=s[1];o.x2=s[2];o.y2=s[3];} else if(o.type==='free'){o.pts=[[s[0],s[1]],[s[2],s[3]]];} }
 function edgesOf(o){
   let segs; try{ segs=objToStrokesRaw(o)||[]; }catch(e){ return []; }
   const closed=['rect','ellipse','tri','star','oblong','gear','text','polygon'].includes(o.type);
@@ -22172,6 +22220,15 @@ function handlePointerDown(cpx,cpy){
     // proche du doigt (sinon une grande forme "avale" le clic d'une petite
     // qu'elle contient : ex. le carré de contour et le SVG dedans).
     const allHit=paintObjects.filter(o=>hitTest(o,xm,ym));
+    // Clic DANS une forme fermée faite de plusieurs traits (pas sur un trait) -> toute la forme est sélectionnée
+    { const _pf=(!window._spaceHeld && typeof _profileAt==='function')?_profileAt(xm,ym):null;
+      if(_pf){ const _tolS=10/(BASE_PX*vZoom); const _onStroke=allHit.some(o=>{ try{ return distToObjStroke(o,xm,ym)<=_tolS; }catch(e){ return false; } }); const _others=allHit.some(o=>!_pf.ids.includes(o.id));
+        if(!_onStroke && !_others){ if(!window._shiftHeld) selObjIds.clear(); for(const id of _pf.ids) selObjIds.add(id);
+          const f0=getObj(_pf.ids[0]); selObjId=f0.id; _lastSelX=xm; _lastSelY=ym; _lastSelCpx=cpx; _lastSelCpy=cpy;
+          const origBB=f0.type==='line'?{...f0}:{...getObjBB(f0)}; origBB._pts=(typeof snapPointsOf==='function')?snapPointsOf(f0).map(pt=>[pt[0],pt[1]]):null; if(f0._arc)origBB._arc=JSON.parse(JSON.stringify(f0._arc));
+          dragPending={mode:'mv',obj:f0,cpx,cpy,origBB,startMm:{x:xm,y:ym}};
+          if(typeof toastHist==='function') toastHist('◼ Forme fermée : '+_pf.ids.length+' traits sélectionnés (glisse pour la déplacer)');
+          redrawCanvas(); renderInspector(); return; } } }
     let found=null;
     if(allHit.length>1){
       const nearLast=Math.hypot(cpx-(_lastSelCpx||0),cpy-(_lastSelCpy||0))<24;
@@ -22196,7 +22253,10 @@ function handlePointerDown(cpx,cpy){
     _lastSelCpx=cpx; _lastSelCpy=cpy;
     if(found){
       if(window._shiftHeld){
-        selObjIds.has(found.id)?selObjIds.delete(found.id):selObjIds.add(found.id);
+        // Ctrl/Maj+clic : la forme déjà choisie (clic simple avant) reste dans la sélection
+        if(selObjId!=null && selObjId!==found.id && !selObjIds.has(selObjId) && getObj(selObjId)) selObjIds.add(selObjId);
+        if(selObjIds.has(found.id)){ selObjIds.delete(found.id); selObjId=selObjIds.size?[...selObjIds][selObjIds.size-1]:null; redrawCanvas();renderInspector();return; }
+        selObjIds.add(found.id);
         selObjId=found.id;
         redrawCanvas();renderInspector();return;
       }
@@ -23103,7 +23163,7 @@ function selectAllObjs(){
 
 function groupSel(){
   const ids=getSelIds();
-  if(ids.size<2){alert('Sélectionne au moins 2 objets (Shift+clic)');return;}
+  if(ids.size<2){alert('Sélectionne au moins 2 objets (Ctrl+clic ou Maj+clic)');return;}
   const objs=paintObjects.filter(o=>ids.has(o.id));
   // Compute group bounding box
   let mnx=Infinity,mny=Infinity,mxx=-Infinity,mxy=-Infinity;
@@ -28638,7 +28698,7 @@ function initCanvas(){
   window._shiftHeld=false;
   window._spaceHeld=false;
   document.addEventListener('keydown',e=>{
-    if(e.key==='Shift')window._shiftHeld=true;
+    if(e.key==='Shift'||e.key==='Control'||e.key==='Meta')window._shiftHeld=true;   // Ctrl+clic = ajouter à la sélection (comme Maj+clic)
     if((e.key===' '||e.code==='Space')&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){ window._spaceHeld=true; if(pCanvas)pCanvas.style.cursor='grab'; }
     if((e.key==='Delete'||e.key==='Backspace')&&selObjId!=null
        &&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
@@ -28660,7 +28720,7 @@ function initCanvas(){
     e.preventDefault();deleteSel();
   }
   });
-  document.addEventListener('keyup',e=>{ if(e.key==='Shift')window._shiftHeld=false; if(e.key===' '||e.code==='Space'){ window._spaceHeld=false; if(pCanvas)pCanvas.style.cursor='default'; } });
+  document.addEventListener('keyup',e=>{ if(e.key==='Shift'||e.key==='Control'||e.key==='Meta')window._shiftHeld=false; if(e.key===' '||e.code==='Space'){ window._spaceHeld=false; if(pCanvas)pCanvas.style.cursor='default'; } });
   // SECURITE : si la fenetre perd le focus (Alt+Tab, clic ailleurs...), le keyup d'Espace/Shift
   // peut etre rate -> la touche reste "collee" et chaque glisser devient un PAN (toute la vue
   // glisse comme une capture d'ecran decalee). On relache donc ces touches des qu'on perd le focus.
