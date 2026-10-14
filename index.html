@@ -161,6 +161,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-14 — IO : PIÈCES À L'ENDROIT sur la machine + POLICES importées découpées (demande Seb)
+ [FIX MAJEUR] Le programme sortait en MIROIR haut/bas (Seb : « c'est à l'envers ») : l'écran a son Y vers le bas,
+   la machine vers le fond. Maintenant (0,0) = coin bas-gauche du dessin tel qu'à l'écran, Y vers le fond :
+   la pièce sort comme dessinée. Arcs : G2 <-> G3 et J inversé (sinon ils tourneraient à l'envers). Le tour à
+   vide part de ce coin. « Horaire » / « Antihoraire » veulent maintenant dire ce qu'on voit à l'écran.
+ [AMÉLIO] Vue 3D : regardée depuis DEVANT la machine (comme toi) -> elle ressemble à ton dessin.
+ [FIX] Police importée (Inspecteur > police perso) : seul l'APERÇU l'utilisait, la découpe sortait en police
+   Mono. Maintenant elle est lue pour la découpe (et gardée après un rechargement). Si une police ne peut pas
+   être lue (woff2, police du système), on trace la vraie police affichée au lieu de la Mono. Hors zone CIP.
+
 -- 2026-10-14 — IN : TRAITS OUVERTS bout à bout (ex. 2 arcs 3 points collés) (demande Seb)
  [FIX] Découpe : un arc s'affichait en « zigzag » (3 points) -> maintenant le vrai arc.
  [FIX] Programme : 2 arcs (ou lignes) ouverts collés étaient coupés en 2 fois (la tête se levait entre les deux)
@@ -1940,7 +1950,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IN ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IO ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -16967,7 +16977,8 @@ function buildLaserBody(){
     let loop=_frameHullOffset(allp, 10);   // ~1cm autour, grossier (enveloppe convexe)
     if(loop && loop.length>=4){
       const n=loop.length-1;
-      let fmx=1e18,fmy=1e18; for(let i=0;i<n;i++){ if(loop[i][0]<fmx)fmx=loop[i][0]; if(loop[i][1]<fmy)fmy=loop[i][1]; }
+      // coin de départ = bas-gauche TEL QU'À L'ÉCRAN (x mini, y maxi : l'écran a son Y vers le bas)
+      let fmx=1e18,fmy=-1e18,_fmy0=1e18; for(let i=0;i<n;i++){ if(loop[i][0]<fmx)fmx=loop[i][0]; if(loop[i][1]>fmy)fmy=loop[i][1]; if(loop[i][1]<_fmy0)_fmy0=loop[i][1]; } window._laserOffInfo={yOld:_fmy0};
       // demarrer le tour au sommet le PLUS PROCHE du coin (fmx,fmy) -> trajet initial ~nul
       let si=0,sd=1e18; for(let i=0;i<n;i++){ const d=(loop[i][0]-fmx)**2+(loop[i][1]-fmy)**2; if(d<sd){sd=d;si=i;} }
       // le tour PART du coin (fmx,fmy) = le zero (la ou tu poses la tete), fait le tour, revient au coin
@@ -16982,10 +16993,16 @@ function buildLaserBody(){
     }
   }
   // Sans cadre : (0,0) = coin bas-gauche du dessin.
-  if(!haveOff){ let mnx=1e18,mny=1e18; for(const c of contours) for(const q of c.poly){ if(q[0]<mnx)mnx=q[0]; if(q[1]<mny)mny=q[1]; } if(isFinite(mnx)){ offX=mnx; offY=mny; haveOff=true; } }
+  if(!haveOff){ let mnx=1e18,mxy=-1e18,mny=1e18; for(const c of contours) for(const q of c.poly){ if(q[0]<mnx)mnx=q[0]; if(q[1]>mxy)mxy=q[1]; if(q[1]<mny)mny=q[1]; } if(isFinite(mnx)){ offX=mnx; offY=mxy; haveOff=true; window._laserOffInfo={yOld:mny}; } }
+  if(window._laserOffInfo){ window._laserOffInfo.x=offX; window._laserOffInfo.y=offY; }   // (pour les tests : comparer à l'ancienne sortie non retournée)
   let text=frameTxt+blocks.join('\n\n');
-  // RE-ZERO : coordonnees ramenees au coin (tout positif). I/J (arcs, relatifs) NON touches.
-  if(haveOff){ text=text.replace(/([XY])(-?\d*\.?\d+)/g, (mm,ax,num)=> ax+_lc(parseFloat(num)-(ax==='X'?offX:offY)) ); }
+  // RE-ZERO + MIROIR Y (Seb : « c'est à l'envers ») : à l'écran le Y DESCEND, sur la machine il part vers le FOND.
+  // Avant, les pièces sortaient en miroir haut/bas. Maintenant : (0,0) = coin bas-gauche du dessin tel qu'à
+  // l'écran, X vers la droite, Y vers le haut de l'écran = vers le fond de la machine -> la pièce sort comme dessinée.
+  // Un miroir inverse le sens des arcs : G2 <-> G3, et J change de signe (I ne bouge pas).
+  if(haveOff){ text=text.replace(/([XY])(-?\d*\.?\d+)/g, (mm,ax,num)=> ax+_lc(ax==='X'?(parseFloat(num)-offX):(offY-parseFloat(num))) )
+      .replace(/J(-?\d*\.?\d+)/g, (mm,num)=>'J'+_lc(-parseFloat(num)))
+      .replace(/^G([23])(?=\s)/gm, (mm,g)=>'G'+(g==='2'?'3':'2')); }
   _laserCutPaths=_prev;
   return {text, count:contours.length};
 }
@@ -25043,7 +25060,9 @@ function textToOutlines(text,hMm2,x0,y0,fontFamily,fontWeight,fontStyle){
   const key=map[fontFamily]||'mono';
   const parsed=window.__PARSED_FONTS__||{};
   // Police importée par l'utilisateur : utiliser directement son nom
-  const font=parsed[fontFamily]||parsed[key];
+  // Police choisie mais pas lisible par opentype (importée en woff2, police du système…) : on trace la VRAIE police
+  // (rendu du navigateur) au lieu de retomber sur la police Mono (avant : « ça me sort juste une lettre normale »).
+  const font=parsed[fontFamily]||((fontFamily&&!map[fontFamily])?null:parsed[key]);
   if(!font){
     // La police opentype n'est pas dispo : on trace via le rendu canvas
     // de la VRAIE police (FontFace) plutôt que de retomber sur Mono.
@@ -29021,7 +29040,11 @@ function iChange(oid,key,val){
       inp.onchange=async e=>{
         const file=e.target.files[0];if(!file)return;
         const name='Font_'+file.name.replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9]/g,'_');
-        const url=URL.createObjectURL(file);
+        const buf=await file.arrayBuffer();
+        // vraies lettres pour la DÉCOUPE (avant : seulement l'aperçu -> découpe en police Mono)
+        try{ window.__PARSED_FONTS__=window.__PARSED_FONTS__||{}; window.__PARSED_FONTS__[name]=opentype.parse(buf); }catch(err){ console.warn('opentype:',err.message); }
+        try{ const bytes=new Uint8Array(buf); let bin=''; for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]); const store=JSON.parse(localStorage.getItem('cnc9_fontdata')||'{}'); store[name]=btoa(bin); localStorage.setItem('cnc9_fontdata',JSON.stringify(store)); window._importedFonts=window._importedFonts||[]; if(!window._importedFonts.includes(name)) window._importedFonts.push(name); localStorage.setItem('cnc9_fonts',JSON.stringify(window._importedFonts)); }catch(err){ console.warn('sauvegarde police:',err.message); }
+        const url=URL.createObjectURL(new Blob([buf]));
         const ff=new FontFace(name,`url(${url})`);
         try{
           await ff.load();document.fonts.add(ff);
@@ -31218,7 +31241,7 @@ function _s3dInit(moves) {
     renderer, scene, camera, pivot, woodMesh,
     cx, cy, cz: czVis,
     cx0: cx, cy0: cy, cz0: czVis,   // centre d'origine (pour recentrer)
-    theta: Math.PI/4,    // vue de 45°
+    theta: -Math.PI/2-0.35,   // vue de DEVANT la machine (comme l'opérateur) : X à droite, Y vers le fond
     phi:   Math.PI/3.5,  // vue légèrement de dessus (~51°)
     tTheta: Math.PI/4, tPhi: Math.PI/3.5,   // cibles (lissage)
     radius: initRadius, tRadius: initRadius,
@@ -31344,7 +31367,7 @@ function _s3dAttachControls(canvas, spanXY) {
   canvas.addEventListener('dblclick', e => {
     e.preventDefault();
     if (_s3d.cx0 !== undefined) { _s3d.cx = _s3d.cx0; _s3d.cy = _s3d.cy0; _s3d.cz = _s3d.cz0; }
-    _s3d.theta = Math.PI / 4; _s3d.phi = Math.PI / 3.5; _s3d.radius = _s3d.initRadius || _s3d.radius;
+    _s3d.theta = -Math.PI/2-0.35; _s3d.phi = Math.PI / 3.5; _s3d.radius = _s3d.initRadius || _s3d.radius;
   });
 
   canvas.addEventListener('wheel', e => {
