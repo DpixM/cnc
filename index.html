@@ -161,6 +161,15 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-14 — IK : NESTING — le bloc est beaucoup plus SERRÉ (demande Seb : « on perd de la place »)
+ [AMÉLIO] Avant : chaque sorte de pièce était rangée l'une après l'autre et jugée seule (ex. les « D » en une
+   longue rangée au lieu d'aller sous les autres pièces). Maintenant on juge le BLOC ENTIER (toutes les pièces) :
+   on garde celui qui prend le moins de place (le plus petit rectangle autour de tout).
+ [AJOUT] « Toutes mélangées » : les pièces de toutes les sortes sont posées une par une dans plusieurs ordres
+   (grosses d'abord, en alternance, au hasard…) et 5 façons de ranger (dont « remplir les creux »), ~10 s max.
+ [AJOUT] « On serre le bloc » : les pièces du bord sont retirées puis reposées plus près du coin tant que le bloc
+   rétrécit. Le « max » remplit ensuite le reste comme avant. Écart toujours garanti. Hors zone CIP.
+
 -- 2026-10-13 — IJ : NESTING de pièces DIFFÉRENTES + on remplit autour de ce qui est déjà posé (demande Seb)
  [AJOUT] Liste de pièces : chaque clic sur une forme l'AJOUTE (pièce A, B, C… chacune sa couleur), avec son
    nombre ; « max » sur UNE pièce = elle remplit toute la place qui reste. Les nombres fixes sont posés d'abord
@@ -1902,7 +1911,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">CNC 3018</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-13-IJ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IK ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -15846,6 +15855,11 @@ function _nsInside(v,paths){ for(const p of paths){ if(ClipperLib.Clipper.PointI
 // Le point est-il dans une région (contours + trous éventuels) ? (sur le bord = dedans)
 function _nsInRegion(pt,paths){ let w=0; for(const p of paths){ const r=ClipperLib.Clipper.PointInPolygon(pt,p); if(r===0) continue; if(ClipperLib.Clipper.Area(p)>0) w++; else if(r===1) w--; } return w>0; }
 function _nsShrink(ps,d){ const C=_nsCL(); const co=new C.ClipperOffset(2,250); co.AddPaths(ps,C.JoinType.jtMiter,C.EndType.etClosedPolygon); const o=new C.Paths(); co.Execute(o,-d); return o.filter(p=>C.Clipper.Area(p)>0); }
+function _nsHull(pts){ const P=pts.slice().sort((a,b)=>a.X-b.X||a.Y-b.Y); const cr=(o,a,b)=>(a.X-o.X)*(b.Y-o.Y)-(a.Y-o.Y)*(b.X-o.X); const lo=[],up=[];
+  for(const p of P){ while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0) lo.pop(); lo.push(p); }
+  for(let i=P.length-1;i>=0;i--){ const p=P[i]; while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0) up.pop(); up.push(p); }
+  return lo.slice(0,-1).concat(up.slice(0,-1)); }
+const _nsPolyA=h=>{ let A=0; for(let i=0;i<h.length;i++){ const a=h[i],b=h[(i+1)%h.length]; A+=a.X*b.Y-b.X*a.Y; } return Math.abs(A)/2; };
 function _nsHullArea(pts){ const P=pts.slice().sort((a,b)=>a.X-b.X||a.Y-b.Y); const cr=(o,a,b)=>(a.X-o.X)*(b.Y-o.Y)-(a.Y-o.Y)*(b.X-o.X); const lo=[],up=[];
   for(const p of P){ while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0) lo.pop(); lo.push(p); }
   for(let i=P.length-1;i>=0;i--){ const p=P[i]; while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0) up.pop(); up.push(p); }
@@ -15854,12 +15868,12 @@ const _nsTick=()=>new Promise(r=>setTimeout(r,0));
 // Grille d'angles régulière (nG angles sur 360°). Tout est calculé à la demande et gardé en mémoire.
 // Mise en place pour PLUSIEURS sortes de pièces (parts[t]) sur une tôle, avec des obstacles fixes (ce qui est
 // déjà dessiné sur la tôle, grossi de écart/2). Grille d'angles régulière (nG angles sur 360°), tout à la demande.
-function _nsSetupM(parts, sheet, nG, obst){
+function _nsSetupM(parts, sheet, nG, obst, share){
   const R=[]; for(let i=0;i<nG;i++) R.push(i*2*Math.PI/nG); obst=(obst&&obst.length)?obst:null;
   const Qr=parts.map(p=>R.map(a=>_nsRotPaths(p.Q,a))); const Br=Qr.map(q=>q.map(_nsBounds));
   const complex=!sheet.rect || !!obst;
   const ifpC={}; const ifp=(t,j)=>{ const k=t+'_'+j; if(ifpC[k]) return ifpC[k]; let f=_nsIFP(sheet,Qr[t][j]); if(obst&&f.length) f=_nsDiff(f,_nsNFP(obst,Qr[t][j])); return ifpC[k]=f; };
-  const base={}, baseS={}, cache={}, cacheS={}; const dOf=(i,j)=>((j-i)%nG+nG)%nG;
+  share=share||{base:{},baseS:{},cache:{},cacheS:{}}; const {base,baseS,cache,cacheS}=share; const dOf=(i,j)=>((j-i)%nG+nG)%nG;   // NFP gardés d'une tôle à l'autre (même pièces)
   const bse=(a,b,d)=>{ const k=a+'_'+b+'_'+d; return base[k]||(base[k]=_nsNFP(Qr[a][0],Qr[b][d])); };
   // NFP(a à l'angle i, b à l'angle j) = NFP(a à 0, b à j-i) tourné de R[i]  -> nG calculs au lieu de nG²
   const nfp=(a,i,b,j)=>{ const k=a+'_'+i+'_'+b+'_'+j; if(cache[k]) return cache[k]; const d=dOf(i,j); const B=bse(a,b,d); return cache[k]=(i===0?B:_nsRotPaths(B,R[i])); };
@@ -15867,7 +15881,7 @@ function _nsSetupM(parts, sheet, nG, obst){
   const nfpS=(a,i,b,j)=>{ const k=a+'_'+i+'_'+b+'_'+j; if(cacheS[k]) return cacheS[k]; const d=dOf(i,j), kb=a+'_'+b+'_'+d; if(!baseS[kb]) baseS[kb]=_nsShrink(bse(a,b,d),4); return cacheS[k]=(i===0?baseS[kb]:_nsRotPaths(baseS[kb],R[i])); };
   const pbb=p=>{ const b=Br[p.t][p.j]; return {x0:p.X+b.x0,y0:p.Y+b.y0,x1:p.X+b.x1,y1:p.Y+b.y1}; };
   const fitsSheet=(t,j,X,Y)=>{ if(!complex){ const b=Br[t][j]; return X>=-b.x0-0.5 && X<=sheet.W-b.x1+0.5 && Y>=-b.y0-0.5 && Y<=sheet.H-b.y1+0.5; } const f=ifp(t,j); return f.length>0 && _nsInRegion({X:Math.round(X),Y:Math.round(Y)},f); };
-  const M={R,nG,parts,Qr,Br,ifp,nfp,nfpS,bse,pbb,fitsSheet,sheet,complex,obst};
+  const M={R,nG,parts,Qr,Br,ifp,nfp,nfpS,bse,pbb,fitsSheet,sheet,complex,obst,share};
   // « vue » pour UNE sorte de pièce t ; pre = pièces déjà posées (autres sortes) à contourner
   M.view=(t,pre)=>{ pre=pre||[];
     const blocked=(j,X,Y)=>{ const b=Br[t][j]; const x0=X+b.x0,y0=Y+b.y0,x1=X+b.x1,y1=Y+b.y1;
@@ -16003,7 +16017,8 @@ async function _nsRun(part, sheet, opts, progress){ return _nsRunType(_nsSetup(p
 async function _nsRunType(S, opts, progress){ const sheet=S.sheet; let best=null; const n=opts.n;
   const modes=opts.modes||['area','rows','cols','corner']; const tot=modes.length+(opts.lattice!==false?3:0); let step=0;
   const say=(k,label)=>progress?progress({done:step,tot,k,best,label}):false;
-  const take=(r,label)=>{ const n0=r.placed.length; r.placed=_nsValidate(S,r.placed); r.bb=_nsBBof(S,r.placed); r.label=label; if(_nsBetter(r,best)) best=r; };
+  const take=(r,label)=>{ const n0=r.placed.length; r.placed=_nsValidate(S,r.placed); r.bb=_nsBBof(S,(S.pre||[]).concat(r.placed));   // encadrement de TOUT (pièces déjà posées comprises) : le plus serré gagne
+ r.label=label; if(_nsBetter(r,best)) best=r; };
   if(opts.lattice!==false){
     if(say(0,'recherche des emboîtements…')) return best; await _nsTick();
     const motifs=_nsMotifs(S, opts.pairs||6); step++;
@@ -16037,17 +16052,102 @@ async function _nsRunType(S, opts, progress){ const sheet=S.sheet; let best=null
   if(best) best.area=_nsBBArea(best.bb);
   return best;
 }
-// PLUSIEURS sortes de pièces : items[t]={n, max}. Les nombres fixes d'abord (les plus grosses en premier), puis
-// celle cochée « max » remplit la place qui reste. Chaque sorte contourne les précédentes et les obstacles.
+// Contrôle final (plusieurs sortes) : dans la tôle, hors obstacles, et aucune pièce ne touche une autre
+function _nsValidateM(M, placed){ const keep=[];
+  for(const p of placed){ if(!M.fitsSheet(p.t,p.j,p.X,p.Y)) continue; const b=M.pbb(p); let ok=true;
+    for(const q of keep){ const c=M.pbb(q); if(b.x0>c.x1||c.x0>b.x1||b.y0>c.y1||c.y0>b.y1) continue;
+      if(_nsInside({X:Math.round(p.X-q.X),Y:Math.round(p.Y-q.Y)},M.nfpS(q.t,q.j,p.t,p.j))){ ok=false; break; } }
+    if(ok) keep.push(p); }
+  return keep; }
+// TOUTES SORTES MÉLANGÉES, une par une dans l'ordre « seq » (liste de sortes) : chaque pièce va à la meilleure
+// place libre parmi tous les angles « tries », en tenant compte de TOUTES les pièces déjà posées.
+async function _nsMixGreedy(M, seq, opts, tick){
+  const score=_NS_SCORES[opts.mode]||_NS_SCORES.area; const tries=opts.tries; const placed=[]; let bb=null; const FS={};
+  const fbb=p=>{ let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity; for(const q of p){ if(q.X<a)a=q.X; if(q.Y<b)b=q.Y; if(q.X>c)c=q.X; if(q.Y>d)d=q.Y; } return [a,b,c,d]; };
+  // places libres de la sorte t à l'angle k, mises à jour seulement quand on en a besoin
+  const mat=(t,k)=>{ const K=t+'_'+k; let st=FS[K]; if(!st) st=FS[K]={feas:M.ifp(t,k),forb:[],n:0};
+    if(st.n<placed.length){ const news=[]; for(let q=st.n;q<placed.length;q++){ const p=placed[q]; for(const path of _nsTr(M.nfp(p.t,p.j,t,k),p.X,p.Y)){ news.push(path); st.forb.push({p:path,b:fbb(path)}); } }
+      st.n=placed.length; if(news.length&&st.feas.length) st.feas=_nsDiff(st.feas,news); }
+    return st; };
+  const inF=(v,st)=>{ for(const f of st.forb){ const b=f.b; if(v.X<=b[0]||v.X>=b[2]||v.Y<=b[1]||v.Y>=b[3]) continue; if(ClipperLib.Clipper.PointInPolygon(v,f.p)===1) return true; } return false; };
+  let miss=0; const hullM=opts.mode==='hull'; let H=[]; const PH={}; const ph=(t,k)=>PH[t+'_'+k]||(PH[t+'_'+k]=_nsHull([].concat(...M.Qr[t][k])));
+  for(let s=0;s<seq.length;s++){ const t=seq[s]; let best=null;
+    for(const k of tries){ const st=mat(t,k); const F=st.feas; if(!F.length) continue; const b=M.Br[t][k]; const hp=hullM?ph(t,k):null;
+      for(const poly of F) for(const v of poly){
+        // « hull » : la place qui grossit le moins l'enveloppe du tas (remplit les creux)
+        const sc=hullM?(_nsPolyA(_nsHull(H.concat(hp.map(q=>({X:q.X+v.X,Y:q.Y+v.Y})))))/1e6+(v.X+v.Y)*1e-5):score(b,bb,v.X+b.x0,v.Y+b.y0,v.X+b.x1,v.Y+b.y1);
+        if(best && sc>=best.sc) continue;
+        if(inF(v,st)) continue; if(M.complex && !_nsInRegion(v,M.ifp(t,k))) continue; if(!_nsInRegion(v,F)) continue;
+        best={sc,k,X:v.X,Y:v.Y}; } }
+    if(!best){ miss++; continue; }
+    const p={t,a:M.R[best.k],j:best.k,X:best.X,Y:best.Y}; placed.push(p); const pb=M.pbb(p); if(hullM) H=_nsHull(H.concat(ph(t,best.k).map(q=>({X:q.X+p.X,Y:q.Y+p.Y}))));
+    bb=bb?{x0:Math.min(bb.x0,pb.x0),y0:Math.min(bb.y0,pb.y0),x1:Math.max(bb.x1,pb.x1),y1:Math.max(bb.y1,pb.y1)}:pb;
+    if(tick && s%2===1){ if(tick(s)) break; await _nsTick(); } }
+  return {placed, miss}; }
+// SERRER un bloc : on prend les pièces les plus loin du coin, on les retire et on les repose à la place libre qui
+// rend le bloc plus petit (ou au moins la pièce plus près du coin). On recommence tant que ça gagne.
+async function _nsCompact(M, placed, opts, tick){ const tries=opts.tries, ax=opts.ax||0;
+  const bbOf=pl=>{ let bb=null; for(const p of pl){ const b=M.pbb(p); bb=bb?{x0:Math.min(bb.x0,b.x0),y0:Math.min(bb.y0,b.y0),x1:Math.max(bb.x1,b.x1),y1:Math.max(bb.y1,b.y1)}:b; } return bb; };
+  const far=b=>ax===0?(b.x1*1+b.y1*0.01):(b.y1*1+b.x1*0.01);
+  for(let pass=0;pass<30;pass++){ let improved=false; const bbAll=bbOf(placed); const A0=_nsBBArea(bbAll);
+    const ord=placed.map((p,i)=>i).sort((i,j)=>far(M.pbb(placed[j]))-far(M.pbb(placed[i])));
+    for(const i of ord.slice(0,Math.min(ord.length,8))){ if(Date.now()>opts.deadline) return placed;
+      const p=placed[i]; const others=placed.filter((_,k)=>k!==i); const bbO=bbOf(others); const curA=_nsBBArea(bbOf(placed)), curF=far(M.pbb(p));
+      let best=null;
+      for(const k of tries){ const nf=[]; const nb=[]; for(const o of others){ for(const path of _nsTr(M.nfp(o.t,o.j,p.t,k),o.X,o.Y)){ nf.push(path); nb.push(_nsBounds([path])); } }
+        let F=M.ifp(p.t,k); if(!F.length) continue; if(nf.length) F=_nsDiff(F,nf); const b=M.Br[p.t][k];
+        for(const poly of F) for(const v of poly){ const cb={x0:v.X+b.x0,y0:v.Y+b.y0,x1:v.X+b.x1,y1:v.Y+b.y1};
+          const nbb=bbO?{x0:Math.min(bbO.x0,cb.x0),y0:Math.min(bbO.y0,cb.y0),x1:Math.max(bbO.x1,cb.x1),y1:Math.max(bbO.y1,cb.y1)}:cb; const A=_nsBBArea(nbb), F2=far(cb);
+          if(A>curA+1 || (A>=curA-1 && F2>=curF-50)) continue;          // il faut gagner : bloc plus petit, ou pièce ≥ 0,05 mm plus près
+          if(best && (A>best.A+1 || (A>=best.A-1 && F2>=best.F))) continue;
+          let bad=false; for(let q=0;q<nf.length;q++){ const bq=nb[q]; if(v.X<=bq.x0||v.X>=bq.x1||v.Y<=bq.y0||v.Y>=bq.y1) continue; if(ClipperLib.Clipper.PointInPolygon(v,nf[q])===1){ bad=true; break; } }
+          if(bad) continue; if(M.complex && !_nsInRegion(v,M.ifp(p.t,k))) continue; if(!_nsInRegion(v,F)) continue;
+          best={A,F:F2,k,X:v.X,Y:v.Y}; } }
+      if(best){ placed=placed.slice(); placed[i]={t:p.t,a:M.R[best.k],j:best.k,X:best.X,Y:best.Y}; improved=true; }
+      if(tick){ if(tick()) return placed; await _nsTick(); } }
+    if(!improved) break; }
+  return placed; }
+// PLUSIEURS sortes de pièces : items[t]={n, max}. Les nombres fixes : on essaie 1) chaque sorte à son tour
+// (réseaux tête-bêche) et 2) toutes MÉLANGÉES une par une, dans plusieurs ordres et façons de ranger ; on garde
+// le bloc le plus SERRÉ (le plus de pièces, puis le plus petit encadrement). Puis la sorte « max » remplit le reste.
 async function _nsRunMulti(parts, items, sheet, opts, progress){
-  const M=_nsSetupM(parts, sheet, opts.nG, opts.obst); const ord=parts.map((p,t)=>t).sort((a,b)=>(items[a].max-items[b].max)||(parts[b].area-parts[a].area));
-  const all=[], labels=[], counts=parts.map(()=>0);
-  for(let k=0;k<ord.length;k++){ const t=ord[k]; const S=M.view(t,all.slice());
-    const r=await _nsRunType(S,Object.assign({},opts,{n:items[t].max?500:items[t].n}),pr=>progress?progress(Object.assign({},pr,{done:k*pr.tot+pr.done,tot:ord.length*pr.tot,label:(ord.length>1?('pièce '+(k+1)+'/'+ord.length+' : '):'')+(pr.label||''),best:null})):false);
-    if(r&&r.placed.length){ all.push(...r.placed); counts[t]=r.placed.length; if(r.label) labels.push(r.label); }
-    if(progress && progress({done:(k+1),tot:ord.length,k:-1,label:''})===true) break; }
-  const bb=all.length?_nsBBof(M.view(0,[]),all):null;
-  return {placed:all, bb, area:_nsBBArea(bb), counts, label:[...new Set(labels)].join(' + ')};
+  const M=_nsSetupM(parts, sheet, opts.nG, opts.obst); const T=parts.length, t0=Date.now(), budget=opts.budgetMs||9000;
+  const V0=M.view(0,[]); const bbA=pl=>_nsBBArea(_nsBBof(V0,pl));
+  const fixed=[...Array(T).keys()].filter(t=>!items[t].max), maxT=[...Array(T).keys()].find(t=>items[t].max);
+  let stop=false; const say=(frac,label)=>{ if(progress && progress({done:Math.min(99,frac*100),tot:100,k:0,label})===true) stop=true; return stop; };
+  let best=null; const consider=(pl,label)=>{ pl=_nsValidateM(M,pl); const ar=bbA(pl); if(!best || pl.length>best.placed.length || (pl.length===best.placed.length && ar<best.area-1)) best={placed:pl,area:ar,label}; };
+  const fixedTot=fixed.reduce((s,t)=>s+items[t].n,0); const share=maxT!=null?0.6:1;
+  if(fixed.length){
+    // 1) chaque sorte à son tour (la plus grosse d'abord), chacune s'emboîte autour des précédentes
+    const ord=fixed.slice().sort((a,b)=>parts[b].area-parts[a].area); const seqPl=[], labs=[];
+    for(let k=0;k<ord.length&&!stop;k++){ const t=ord[k];
+      const r=await _nsRunType(M.view(t,seqPl.slice()),Object.assign({},opts,{n:items[t].n}),pr=>say(share*0.35*(k+pr.done/Math.max(1,pr.tot))/ord.length,(T>1?'chaque sorte à son tour… ':'')+(pr.label||'')));
+      if(r&&r.placed.length){ seqPl.push(...r.placed); if(r.label) labs.push(r.label); } }
+    consider(seqPl,T>1?'chaque sorte à son tour ('+[...new Set(labs)].join(' + ')+')':([...new Set(labs)].join(' + ')));
+    // 2) toutes mélangées, une par une : plusieurs ordres × façons de ranger, tant qu'il reste du temps
+    if(fixedTot<=80 && !stop){ const units=[]; for(const t of ord) for(let i=0;i<items[t].n;i++) units.push(t);
+      const rr=[]; { const q=ord.map(t=>items[t].n); let left=units.length; while(left>0){ for(let i=0;i<ord.length;i++) if(q[i]>0){ rr.push(ord[i]); q[i]--; left--; } } }
+      const dim=t=>{ const b=M.Br[t][0]; return Math.max(b.x1-b.x0,b.y1-b.y0); };
+      const byDim=units.slice().sort((a,b)=>dim(b)-dim(a));
+      let seed=12345; const rnd=()=>{ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; };
+      const shuf=()=>{ const a=units.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+      const orders=[units,rr,byDim]; for(let i=0;i<8;i++) orders.push(shuf());
+      const combos=[]; for(const o of orders) for(const m of ['area','hull','cols','rows','corner']) combos.push([o,m]);
+      const mt=opts.mixTries||opts.tries; const tB=Date.now();
+      for(let c=0;c<combos.length&&!stop;c++){ if(c>=4 && Date.now()-t0>budget) break;
+        const [o,m]=combos[c]; const r=await _nsMixGreedy(M,o,{mode:m,tries:mt},()=>say(share*(0.35+0.65*Math.min(1,(Date.now()-tB)/Math.max(1,budget-(tB-t0)))),'toutes mélangées, essai '+(c+1)+'…'));
+        consider(r.placed,T>1?'toutes mélangées':'une par une'); }
+      // 3) on SERRE : chaque pièce du bord est retirée puis reposée plus près du coin si ça rétrécit le bloc
+      if(best && best.placed.length===fixedTot && !stop){ const sb=sheet.rect?{x0:0,y0:0,x1:sheet.W,y1:sheet.H}:_nsBounds(sheet.paths); const ax=((sb.x1-sb.x0)>=(sb.y1-sb.y0))?0:1;
+        const cands=[best.placed]; const c2=await _nsCompact(M,best.placed.slice(),{tries:mt,ax,deadline:t0+budget+(opts.squeezeMs||6000)},()=>say(share*0.99,'on serre le bloc…'));
+        const ar=bbA(c2); if(ar<best.area-1){ const v=_nsValidateM(M,c2); if(v.length===fixedTot) best={placed:v,area:bbA(v),label:best.label+', bloc serré'}; } } }
+  }
+  const all=best?best.placed.slice():[]; const labels=best&&best.label?[best.label]:[];
+  if(maxT!=null && !stop){ const r=await _nsRunType(M.view(maxT,all.slice()),Object.assign({},opts,{n:500}),pr=>say(share+(1-share)*pr.done/Math.max(1,pr.tot),(T>1?'on remplit le reste… ':'')+(pr.label||'')));
+    if(r&&r.placed.length){ all.push(...r.placed); if(r.label) labels.push(r.label); } }
+  const counts=parts.map(()=>0); for(const p of all) counts[p.t]++;
+  const bb=all.length?_nsBBof(V0,all):null;
+  return {placed:all, bb, area:_nsBBArea(bb), counts, label:labels.join(' + ')};
 }
 // ═══════════ PAGE « NESTING » (étape 22, juste après le dessin) ═══════════
 // Tu cliques ta pièce, tu dis combien, l'écart et la tôle (rectangle X×Y ou ta CHUTE dessinée),
@@ -16167,7 +16267,7 @@ async function _nsRunUI(){
   _ns.busy=true; _ns.stop=false; _ns.res=null; _nsPanel(); const bar=document.getElementById('nsProg');
   const ang=_nsAngles(); const t0=Date.now();
   try{
-    const best=await _nsRunMulti(parts, items, sh, {nG:ang.nG, tries:ang.tries, polyTries:ang.polyTries, obst}, (pr)=>{ if(bar){ bar.style.display='block'; const done=Math.min(0.99,(pr.done+(pr.k>0?Math.min(0.9,pr.k/60):0))/pr.tot); bar.firstElementChild.style.width=(done*100).toFixed(0)+'%'; }
+    const best=await _nsRunMulti(parts, items, sh, {nG:ang.nG, tries:ang.tries, polyTries:ang.polyTries, mixTries:ang.polyTries||ang.tries, obst}, (pr)=>{ if(bar){ bar.style.display='block'; const done=Math.min(0.99,(pr.done+(pr.k>0?Math.min(0.9,pr.k/60):0))/pr.tot); bar.firstElementChild.style.width=(done*100).toFixed(0)+'%'; }
       const st=document.getElementById('nsStatus'); if(st && pr.label) st.textContent='Calcul… '+pr.label;
       return _ns.stop; });
     _ns.res={best, parts, part:parts[0], pieces:P.map(p=>Object.assign({},p)), items, sheet, gap, nObst:obRecs.length, ang, ms:Date.now()-t0, stale:false};
