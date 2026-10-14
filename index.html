@@ -161,23 +161,24 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
--- 2026-10-14 — IS : PIÈCES À L'ENDROIT, DÉPART AU MÊME ENDROIT (Seb : X+ = droite, Y+ = fond)
- [FIX] Repère vérifié sur la machine par Seb : X+ vers la DROITE, Y+ vers le FOND. Le programme mettait le HAUT du
-   dessin près de l'opérateur -> pièce retournée haut/bas (le F à l'envers). Maintenant Y = ymax - y : la pièce
-   sort comme dessinée. Arcs : G2 <-> G3 et J inversé.
-   DÉPART INCHANGÉ : (0,0) au même coin physique, le tour à vide couvre EXACTEMENT la même surface qu'avant
-   (X de 0 à largeur, Y de 0 à hauteur) et revient au même point avant la pause M00.
- [AJOUT] Vue 3D du laser vue de DEVANT la machine (comme toi) + cube de vue (DROITE X+, FOND Y+, AVANT Y−,
-   DESSUS Z+ ; clic = vue de ce côté) + 🏠 = vue de départ. L'ancienne vue regardait depuis le fond-droit de la
-   machine : c'est pour ça que le départ y paraissait « en haut à droite » et le F à l'envers. Hors zone CIP.
+-- 2026-10-14 — IT : tête posée EN HAUT À DROITE, pièces coupées sur la GAUCHE, dessin à l'endroit (Seb)
+ [FIX] Retour à la correction de IQ (celle qui colle à ce que Seb voit en vrai) : vu de dessus, la tête se pose
+   au coin HAUT-DROIT et les pièces partent vers la GAUCHE et vers le bas, comme avant ; seul le dessin est remis
+   à l'endroit (plus de F en miroir). Même départ, même surface, même tour à vide qu'avant.
+ [FIX] Cube de vue déplacé en bas à droite (il cachait le bouton Reset). Hors zone CIP.
 
--- 2026-10-14 — IR : RETOUR au programme d'avant (IQ annulé) + accueil par machine + nom KERF (Seb)
- [ANNULÉ] Le retournement gauche/droite de IQ est RETIRÉ : Seb a vérifié que X+ part vers la DROITE sur la
-   machine, donc l'hypothèse de IQ (X+ à gauche) était fausse. Programme laser = EXACTEMENT celui d'avant
-   (IP = IN : (0,0) au coin haut-gauche du dessin). Vue 3D comme avant. Le sens sera corrigé seulement quand
-   le repère complet de la machine (sens du Y+) sera confirmé.
- [GARDÉ] Accueil « Quelle machine ? » (TRUMPF : Découpe laser + CIP / CNC 3018 : Usinage + Incrustation),
-   plus d'écran « Dimensions du brut » au chargement, nom KERF. Hors zone CIP.
+-- 2026-10-14 — IQ : SENS DES PIÈCES corrigé SANS bouger le départ + vue 3D « de devant » + rangement par machine (Seb)
+ [FIX] Pièces en MIROIR gauche/droite sur la TruLaser. Le repère de la machine vu de devant : X+ part vers la
+   GAUCHE, Y+ vient vers toi, Z+ en haut (le même que l'onglet CIP : AVANT = Y+, DROITE = X−). Le programme faisait
+   X = x - xmin -> miroir. Maintenant X = xmax - x : la pièce sort comme dessinée.
+   DÉPART INCHANGÉ : la tête se pose au MÊME endroit physique qu'avant, le cadre (tour à vide) couvre EXACTEMENT
+   la même surface (X de 0 à largeur, Y de 0 à hauteur, comme avant). Dans le dessin, ce coin est le coin
+   HAUT-DROIT (il l'a toujours été physiquement : X+ part à gauche). Arcs : G2 <-> G3, I inversé (J inchangé).
+ [AJOUT] Vue 3D du laser : regardée de DEVANT la machine (là où tu es) -> tu vois la tôle comme en vrai.
+   Cube de vue (AVANT Y+, DROITE X−, DESSUS Z+… clic = vue de ce côté) + bouton 🏠 = vue de départ.
+ [RANGEMENT] Page d'accueil = « Quelle machine ? » : section TRUMPF (Découpe laser + CIP) et section CNC 3018
+   (Usinage normal + Incrustation). L'écran « Dimensions du brut » (3018) ne s'affiche plus au chargement.
+ [NOM] Le soft s'appelle KERF (la saignée = la largeur du trait de coupe). Hors zone CIP.
 
 -- 2026-10-14 — IP : DÉPART REMIS COMME AVANT + police = celle de l'écran (demande Seb, URGENT)
  [ANNULÉ] Le retournement Y de la version IO est RETIRÉ : le programme a exactement le même repère qu'avant IO
@@ -1977,7 +1978,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IS ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IT ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -17018,9 +17019,10 @@ function buildLaserBody(){
     let loop=_frameHullOffset(allp, 10);   // ~1cm autour, grossier (enveloppe convexe)
     if(loop && loop.length>=4){
       const n=loop.length-1;
-      // Coin de départ = coin BAS-GAUCHE du dessin à l'écran (x mini, y maxi) : sur la machine (X+ à droite, Y+ vers
-      // le fond) c'est EXACTEMENT le même coin physique qu'avant -> la tête démarre au même endroit, même surface.
-      let fmx=1e18,fmy=-1e18,_fmy0=1e18; for(let i=0;i<n;i++){ if(loop[i][0]<fmx)fmx=loop[i][0]; if(loop[i][1]>fmy)fmy=loop[i][1]; if(loop[i][1]<_fmy0)_fmy0=loop[i][1]; } window._laserOffInfo={yOld:_fmy0};
+      // Coin de départ = coin HAUT-DROIT du dessin (x maxi, y mini) = là où la tête est posée sur la machine
+      // (la machine a son X+ vers la GAUCHE quand on est devant : c'est ce coin-là qui est physiquement au même
+      // endroit qu'avant -> la tête démarre EXACTEMENT au même endroit, le cadre couvre la même surface).
+      let fmx=-1e18,fmy=1e18,_fx0=1e18; for(let i=0;i<n;i++){ if(loop[i][0]>fmx)fmx=loop[i][0]; if(loop[i][0]<_fx0)_fx0=loop[i][0]; if(loop[i][1]<fmy)fmy=loop[i][1]; } window._laserOffInfo={xOld:_fx0};
       // demarrer le tour au sommet le PLUS PROCHE du coin (fmx,fmy) -> trajet initial ~nul
       let si=0,sd=1e18; for(let i=0;i<n;i++){ const d=(loop[i][0]-fmx)**2+(loop[i][1]-fmy)**2; if(d<sd){sd=d;si=i;} }
       // le tour PART du coin (fmx,fmy) = le zero (la ou tu poses la tete), fait le tour, revient au coin
@@ -17035,16 +17037,16 @@ function buildLaserBody(){
     }
   }
   // Sans cadre : (0,0) = coin bas-gauche du dessin.
-  if(!haveOff){ let mnx=1e18,mxy=-1e18,mny=1e18; for(const c of contours) for(const q of c.poly){ if(q[0]<mnx)mnx=q[0]; if(q[1]>mxy)mxy=q[1]; if(q[1]<mny)mny=q[1]; } if(isFinite(mnx)){ offX=mnx; offY=mxy; haveOff=true; window._laserOffInfo={yOld:mny}; } }
-  if(window._laserOffInfo){ window._laserOffInfo.x=offX; window._laserOffInfo.y=offY; }   // (pour les tests : comparer à l'ancienne sortie)
+  if(!haveOff){ let mxx=-1e18,mnx=1e18,mny=1e18; for(const c of contours) for(const q of c.poly){ if(q[0]>mxx)mxx=q[0]; if(q[0]<mnx)mnx=q[0]; if(q[1]<mny)mny=q[1]; } if(isFinite(mxx)){ offX=mxx; offY=mny; haveOff=true; window._laserOffInfo={xOld:mnx}; } }
+  if(window._laserOffInfo){ window._laserOffInfo.x=offX; }   // (pour les tests : comparer à l'ancienne sortie)
   let text=frameTxt+blocks.join('\n\n');
-  // RE-ZERO + SENS MACHINE (TruLaser vérifié par Seb : X+ vers la DROITE, Y+ vers le FOND, Z+ en haut).
-  // Avant : Y = y - ymin -> le HAUT du dessin était coupé près de toi : pièce retournée haut/bas (« le F à l'envers »).
-  // Maintenant : Y = ymax - y. Tout reste positif, MÊME surface, MÊME coin de départ physique (devant à gauche
-  // des pièces), seul l'intérieur est remis à l'endroit. Miroir haut/bas -> arcs : G2 <-> G3 et J inversé.
+  // RE-ZERO + SENS MACHINE. TruLaser (vue de devant) : X+ vers la GAUCHE, Y+ vers TOI, Z+ en haut.
+  // Avant : X = x - xmin -> la pièce sortait en MIROIR gauche/droite (Seb : « c'est à l'envers »).
+  // Maintenant : X = xmax - x (tout reste positif, même surface, même coin de départ physique), Y inchangé.
+  // Un miroir gauche/droite inverse le sens des arcs : G2 <-> G3, et I change de signe (J ne bouge pas).
   if(haveOff){ text=text.split('\n').map(L=>{ const k=L.indexOf(';'); let c=k>=0?L.slice(0,k):L; const cm=k>=0?L.slice(k):'';
-      c=c.replace(/([XY])(-?\d*\.?\d+)/g,(mm,ax,num)=>ax+_lc(ax==='X'?(parseFloat(num)-offX):(offY-parseFloat(num))));
-      if(/^G[23]\s/.test(c)){ c=c.replace(/J(-?\d*\.?\d+)/,(mm,num)=>'J'+_lc(-parseFloat(num))).replace(/^G([23])/,(mm,g)=>'G'+(g==='2'?'3':'2')); }
+      c=c.replace(/([XY])(-?\d*\.?\d+)/g,(mm,ax,num)=>ax+_lc(ax==='X'?(offX-parseFloat(num)):(parseFloat(num)-offY)));
+      if(/^G[23]\s/.test(c)){ c=c.replace(/I(-?\d*\.?\d+)/,(mm,num)=>'I'+_lc(-parseFloat(num))).replace(/^G([23])/,(mm,g)=>'G'+(g==='2'?'3':'2')); }
       return c+cm; }).join('\n'); }
   _laserCutPaths=_prev;
   return {text, count:contours.length};
@@ -31149,9 +31151,9 @@ function s3dToggleWood(){
   if(btn) btn.style.opacity=_s3d.woodMesh.visible?'1':'0.35';
 }
 
-// Laser TRUMPF : la caméra se met DEVANT la machine, là où tu es (X+ à droite, Y+ vers le fond) -> tu vois la
-// tôle comme en vrai, ton dessin à l'endroit, et ta tête (le zéro) au coin où tu la poses. 3018 : 45° comme avant.
-function _s3dHomeTheta(){ return (typeof appMode!=='undefined' && appMode==='laser') ? (-Math.PI/2-0.3) : Math.PI/4; }
+// Laser TRUMPF : la caméra se met DEVANT la machine, là où tu es (Y+ vient vers toi, X+ part à gauche) ->
+// tu vois la tôle comme sur la machine, et ton dessin à l'endroit. 3018 : vue de 45° comme avant.
+function _s3dHomeTheta(){ return (typeof appMode!=='undefined' && appMode==='laser') ? (Math.PI/2+0.32) : Math.PI/4; }
 function s3dResetView() {
   if (!_s3d) return;
   if (_s3d.cx0 !== undefined) { _s3d.cx = _s3d.cx0; _s3d.cy = _s3d.cy0; _s3d.cz = _s3d.cz0; }
@@ -31448,16 +31450,16 @@ let _s3dCube=null;
 function _s3dCubeInit(){ const host=document.getElementById('sim3DContainer'); if(!host||typeof THREE==='undefined') return;
   let wrap=document.getElementById('s3dCubeWrap'); if(wrap) wrap.remove(); _s3dCube=null;
   if(typeof appMode==='undefined'||appMode!=='laser') return;
-  wrap=document.createElement('div'); wrap.id='s3dCubeWrap'; wrap.style.cssText='position:absolute;right:10px;top:8px;width:120px;height:120px;z-index:5';
+  wrap=document.createElement('div'); wrap.id='s3dCubeWrap'; wrap.style.cssText='position:absolute;right:12px;bottom:96px;width:120px;height:120px;z-index:5';
   const cv=document.createElement('canvas'); cv.style.cssText='width:120px;height:120px;cursor:pointer'; wrap.appendChild(cv);
-  const hb=document.createElement('button'); hb.textContent='🏠'; hb.title='Vue de départ (devant la machine)'; hb.style.cssText='position:absolute;left:-40px;top:4px;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#fff;padding:3px 7px;cursor:pointer;font-size:14px'; hb.onclick=()=>s3dResetView(); wrap.appendChild(hb);
+  const hb=document.createElement('button'); hb.textContent='🏠'; hb.title='Vue de départ (devant la machine)'; hb.style.cssText='position:absolute;left:-40px;bottom:4px;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#fff;padding:3px 7px;cursor:pointer;font-size:14px'; hb.onclick=()=>s3dResetView(); wrap.appendChild(hb);
   host.appendChild(wrap);
   const r=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true}); r.setPixelRatio(devicePixelRatio); r.setSize(120,120,false);
   const sc=new THREE.Scene(); const cam=new THREE.OrthographicCamera(-1.6,1.6,1.6,-1.6,0.1,20); sc.add(new THREE.AmbientLight(0xffffff,0.9)); const dl=new THREE.DirectionalLight(0xffffff,0.4); dl.position.set(2,3,5); sc.add(dl);
   // ordre des faces d'un cube three.js : +X, -X, +Y, -Y, +Z, -Z  (repère MACHINE TruLaser vue de devant)
   // (cube construit « Y en haut » puis couché de 90° : les écritures restent droites) -> faces dans l'ordre :
   // +X, -X, dessus(+Z), dessous(-Z), fond(-Y), avant(+Y). [nom, axe, angle caméra autour de Z, inclinaison]
-  const F=[['DROITE','X+',0,Math.PI/2],['GAUCHE','X−',Math.PI,Math.PI/2],['DESSUS','Z+',null,0.02],['DESSOUS','Z−',null,Math.PI-0.02],['AVANT','Y−',-Math.PI/2,Math.PI/2],['FOND','Y+',Math.PI/2,Math.PI/2]];
+  const F=[['GAUCHE','X+',0,Math.PI/2],['DROITE','X−',Math.PI,Math.PI/2],['DESSUS','Z+',null,0.02],['DESSOUS','Z−',null,Math.PI-0.02],['FOND','Y−',-Math.PI/2,Math.PI/2],['AVANT','Y+',Math.PI/2,Math.PI/2]];
   const tex=(t,ax,hl)=>{ const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d'); if(t==='DESSUS'||t==='DESSOUS'){ g.translate(128,128); g.rotate(Math.PI); } g.fillStyle=hl?'#f59e0b':'#2b3440'; g.fillRect(0,0,128,128); g.strokeStyle='#94a3b8'; g.lineWidth=5; g.strokeRect(3,3,122,122); g.fillStyle=hl?'#111':'#e8edf1'; g.font='bold '+(t.length>6?20:24)+'px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(t,64,52); g.font='bold 28px sans-serif'; g.fillStyle=hl?'#111':'#f5a623'; g.fillText(ax,64,90); return new THREE.CanvasTexture(c); };
   const M=F.map(f=>new THREE.MeshLambertMaterial({map:tex(f[0],f[1],false)})), MH=F.map(f=>new THREE.MeshLambertMaterial({map:tex(f[0],f[1],true)}));
   // pour que les écritures soient droites vues de face, le cube est dans le repère machine (Z en haut)
@@ -31472,7 +31474,6 @@ function _s3dCubeInit(){ const host=document.getElementById('sim3DContainer'); i
   _s3dCube={r,sc,cam}; }
 function _s3dCubeRender(){ if(!_s3dCube||!_s3d) return; const {r,sc,cam}=_s3dCube; const sp=Math.sin(_s3d.phi), cp=Math.cos(_s3d.phi);
   cam.position.set(6*sp*Math.cos(_s3d.theta),6*sp*Math.sin(_s3d.theta),6*cp); cam.up.set(0,0,1); cam.lookAt(0,0,0); r.render(sc,cam); }
-
 
 </script>
 
