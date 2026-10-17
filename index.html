@@ -111,13 +111,16 @@
     PAGE "MODE D'USINAGE"  (préfixe mm*)
       wzInitMachineMode, mmDrawCanvas, mmShowPanel, mmSetMode, mmSetPlate
     V-CARVE / INLAY  (l'autre mode de l'app)
-      genFemaleFinish, genMaleFinish, genIslandSpirals
+      genFemaleRough/Finish, genMaleRough/Finish -> moteur _IL.* (IV, 2026-10-17)
+      (les anciennes versions sont gardées sous le nom *_v1, plus appelées)
 
   ⚠️  ZONES DANGEREUSES — NE PAS MODIFIER SANS COMPRENDRE
   ─────────────────────────────────────────────────────────────────────────────
-    1. genFemaleFinish / genMaleFinish / genIslandSpirals
-       Algorithmes V-carve inlay VALIDÉS contre des fichiers Aspire réels.
-       Ils fonctionnent. Voir le mémo détaillé plus bas.
+    1. Moteur incrustation _IL (IV) : refait le 2026-10-17 et COMPARÉ aux 4 fichiers
+       Aspire de Seb (étoile, V-bit 20°, fraise 3, poche 5, colle 0.3, planches 0.5) :
+       mêmes surfaces (écart médian < 0,01 mm) et le bouchon s'enfonce pareil.
+       Avant d'y toucher : relire le mémo « INCRUSTATION v2 » plus bas et re-simuler
+       l'emboîtement (femelle + mâle retourné) — c'est le seul vrai test.
 
     2. Fin de G-code (10 endroits, tous identiques) :
            G4 P0 / G0 Z{safeZ} / G4 P0 / G0 X0 Y0 / M5 / M30
@@ -160,6 +163,16 @@
    Depot GitHub : DpixM/cnc (branche main). GitHub Pages = Deploy from branch main /root.
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
+
+-- 2026-10-17 — IV : INCRUSTATION (V-carve inlay 3018) REFAITE — calée sur les fichiers Aspire de Seb
+ [FIX] Le bouchon mâle rentre enfin : le V du mâle démarre à (poche − jeu colle) comme Aspire (« start depth »),
+   le haut du bouchon est plus étroit et descend dans le V de la femelle (avant : il butait à 0.3 mm).
+ [FIX] Ébauche femelle : la fraise reste à R + z·tan du bord -> les murs restent en V (avant : murs droits).
+ [FIX] Ébauche mâle : plus AUCUN G0 dans le bois (avant ~70 rapides en pleine matière qui arrachaient le bouchon).
+ [FIX] Mâle usiné en MIROIR (on retourne la pièce pour coller) ; formes l'une dans l'autre = trou (pair-impair).
+ [AJOUT] Finition V-bit avec reprise automatique : pointes, coins, lettres trop fines pour la fraise, fond.
+ [CHANGE] Réglages par défaut = ceux de l'Aspire de Seb : V 20°, poche 5, colle 0.3, jeu entre planches 0.5.
+ Vérifié en simulation (emboîtement femelle + mâle retourné) et comparé aux .tap Aspire. Hors zone CIP.
 
 -- 2026-10-14 — IU : petite TÊTE DE DÉCOUPE dans la simulation 3D (demande Seb)
  [AJOUT] Le point jaune est remplacé par une petite tête laser (buse cuivre, corps, bague orange) dont la pointe suit
@@ -1574,6 +1587,36 @@ MEMO POUR LA PROCHAINE SESSION - text-to-cnc.html
 ================================================================================
 
 PROJET : App CNC 3018 V-carve inlay (poche femelle + plug mâle)
+═══════════════════════════════════════════════════════════════
+
+INCRUSTATION v2 (IV, 2026-10-17) — remplace TOUT l'ancien mémo ci-dessous (périmé) :
+  Preuve : les 4 .tap Aspire de Seb (oct. 2026) analysés + simulés au 1/20 mm.
+  Aspire : V-bit 20°, fraise 3 mm, poche femelle 5, mâle « start depth » 4.7 (= 5 − 0.3),
+  mâle dégagé à 5.2 (= 4.7 + 0.5), passes V fixes de 1.25/1.3, fraise à R + z·tan du bord.
+  L'ANCIENNE appli était FAUSSE : mâle sans start depth (le bouchon ne rentrait que de
+  0.3 mm), ébauche femelle à R du bord (murs droits), G0 dans le bois sur l'ébauche mâle
+  (fraise en rapide dans la matière, ça arrachait le bouchon), mâle pas en miroir,
+  formes l'une dans l'autre creusées toutes les deux, lettres fines jamais vidées.
+  MOTEUR : un seul champ u(p) = « profondeur idéale × tanA »
+     femelle u = distance au bord (dedans) ; mâle u = Ds·tanA + distance signée (+ dehors),
+     limitée par une boîte (marge 6 mm) ; mâle calculé sur le dessin EN MIROIR.
+     Masque = tous les objets en PAIR-IMPAIR (un rond dans un rond = anneau).
+  ÉBAUCHE fraise plate : couches de rMaxD, centre autorisé si u ≥ z·tanA + R (+0.03),
+     anneaux = isocourbes de u (pas 0.45·D), de l'intérieur vers l'extérieur,
+     liaisons en profondeur SEULEMENT si tout le segment reste dans la zone autorisée.
+  FINITION V-bit : (1) murs : pointe sur l'isocourbe u = z·tanA à Z = −z, niveaux ≤ 1.3 mm,
+     + 2 tours au pied du mur au fond ; (2) REPRISE en 2 tours : on simule ce qui a été creusé
+     (fraise + V), on trouve le bois restant (pointes, coins, lettres fines, fond) et on passe
+     des isocourbes fines (Z = −u/tanA, pointe toujours posée sur la surface idéale -> ne peut
+     PAS trop creuser) découpées à ces endroits, + une passe sous chaque crête.
+  Sorties : jamais de G0 dans le bois ; petits sauts à Z+1, grands à Z sécurité ;
+     fin GRBL avec les G4 P0 conservée.
+  Tests (scratchpad Claude) : simulateur hauteur (cône 20° + fraise plate) + test
+     d'EMBOÎTEMENT (femelle + mâle retourné) : étoile 4.45/4.70, rect 4.63, anneau 4.59,
+     texte 4.46 — Aspire lui-même donne 4.60 dans le même simulateur.
+
+(ANCIEN MÉMO — PÉRIMÉ, gardé pour l'historique)
+
 OUTIL  : V-bit 60° (demi-angle 30°, tanA=0.5774), fraise plate 3mm
 MACHINE: CNC 3018, DDCS V4.1
 
@@ -1983,7 +2026,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-14-IU ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-17-IV ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2744,26 +2787,26 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
     <div style="font-size:10px;color:var(--grn);font-weight:700;letter-spacing:1px;margin-bottom:8px">📐 PROFONDEURS (3 paramètres clés)</div>
     <div class="g2">
       <div class="fld"><label style="display:flex;align-items:center;gap:4px">Profondeur femelle A (mm)
-          <span onclick="alert('Profondeur totale de la poche = FD (Flat Depth). Recommandé: 2-4mm pour CNC 3018.')" style="width:16px;height:16px;border-radius:50%;background:var(--acc);color:#000;font-size:9px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">?</span>
+          <span onclick="alert('Profondeur de la poche femelle (fond plat). Ton réglage Aspire : 5 mm.')" style="width:16px;height:16px;border-radius:50%;background:var(--acc);color:#000;font-size:9px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">?</span>
         </label>
-        <input type="number" id="inlay_pocketDepth" value="3" min="0.5" max="8" step="0.5" inputmode="decimal"
+        <input type="number" id="inlay_pocketDepth" value="5" min="0.5" max="8" step="0.5" inputmode="decimal"
           oninput="inlayCalcPreview()" style="font-size:16px;font-weight:700;text-align:center;color:var(--grn)">
-        <div style="font-size:9px;color:var(--txt3);margin-top:2px">Max 3mm recommandé pour 3018</div>
+        <div style="font-size:9px;color:var(--txt3);margin-top:2px">5 mm = ton réglage Aspire</div>
       </div>
       <div class="fld"><label style="display:flex;align-items:center;gap:4px">Jeu colle C (mm)
-          <span onclick="alert('Espace au fond = FD♀ - SD♂. La colle s'accumule ici. 0.2-0.5mm recommandé.')" style="width:16px;height:16px;border-radius:50%;background:var(--acc);color:#000;font-size:9px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">?</span>
+          <span onclick="alert('Espace laissé au fond de la poche sous le bouchon (la colle va là). Le V du mâle commence à (profondeur − jeu colle). 0.3 mm = ton Aspire.')" style="width:16px;height:16px;border-radius:50%;background:var(--acc);color:#000;font-size:9px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">?</span>
         </label>
         <input type="number" id="inlay_glueGap" value="0.3" min="0.1" max="1" step="0.1" inputmode="decimal"
           oninput="inlayCalcPreview()" style="font-size:16px;font-weight:700;text-align:center">
         <div style="font-size:9px;color:var(--txt3);margin-top:2px">Espace pour la colle</div>
       </div>
     </div>
-    <div class="fld" style="margin-top:6px"><label style="display:flex;align-items:center;gap:4px">Épaisseur sciable mâle B (mm)
-          <span onclick="alert('Matière qui dépasse au-dessus après collage. À scier/raboter après séchage. 1.5-3mm.')" style="width:16px;height:16px;border-radius:50%;background:var(--acc);color:#000;font-size:9px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">?</span>
+    <div class="fld" style="margin-top:6px"><label style="display:flex;align-items:center;gap:4px">Jeu entre planches B (mm)
+          <span onclick="alert('Écart qui reste entre la planche mâle et la planche femelle une fois le bouchon enfoncé. Le mâle est dégagé à plat à (profondeur − jeu colle + B). 0.5 mm = ton Aspire. Après séchage tu rabotes/ponces tout à fleur.')" style="width:16px;height:16px;border-radius:50%;background:var(--acc);color:#000;font-size:9px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">?</span>
         </label>
-      <input type="number" id="inlay_surfaceGap" value="2" min="0.5" max="5" step="0.5" inputmode="decimal"
+      <input type="number" id="inlay_surfaceGap" value="0.5" min="0" max="5" step="0.1" inputmode="decimal"
         oninput="inlayCalcPreview()">
-      <div style="font-size:9px;color:var(--txt3);margin-top:2px">Matière au-dessus du mâle à scier après collage</div>
+      <div style="font-size:9px;color:var(--txt3);margin-top:2px">Les 2 planches ne se touchent pas : c'est le bouchon qui serre dans le V</div>
     </div>
     <!-- Résumé calculé -->
     <div id="inlayParamsPreview" style="margin-top:10px;padding:8px;background:var(--surf);border-radius:6px;font-size:11px;font-family:var(--mono);color:var(--grn);line-height:1.8"></div>
@@ -2857,11 +2900,13 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 
   <div class="al al-ok" style="font-size:10px;line-height:1.6">
     💡 <b>Ordre d'usinage mâle :</b><br>
-    1. Fixer l'érable sur la CNC<br>
+    1. Fixer l'érable sur la CNC (même zéro que la femelle)<br>
     2. Lancer ébauche (fraise plate)<br>
     3. Changer pour le V-bit, re-zéro Z<br>
     4. Lancer finition (V-bit)<br>
-    5. Scier l'érable pour séparer le plug
+    5. Scier la pièce mâle DANS la bande creusée à plat autour du bouchon (le reste de la planche toucherait la femelle)<br>
+    6. Retourner la pièce gauche↔droite (comme une page) : le dessin est usiné en miroir exprès<br>
+    7. Colle, presse, puis raboter/poncer à fleur
   </div>
 </div>
 
@@ -27153,9 +27198,9 @@ function inlayGetParams(){
     rFxy:        parseFloat(document.getElementById('inlay_rFxy')?.value)||600,
     rFz:         parseFloat(document.getElementById('inlay_rFz')?.value)||150,
     rSpin:       parseFloat(document.getElementById('inlay_rSpin')?.value)||12000,
-    pocketDepth: parseFloat(document.getElementById('inlay_pocketDepth')?.value)||3,
+    pocketDepth: parseFloat(document.getElementById('inlay_pocketDepth')?.value)||5,
     glueGap:     parseFloat(document.getElementById('inlay_glueGap')?.value)||0.3,
-    surfaceGap:  parseFloat(document.getElementById('inlay_surfaceGap')?.value)||2,
+    surfaceGap:  (()=>{ const v=parseFloat(document.getElementById('inlay_surfaceGap')?.value); return isFinite(v)?v:0.5; })(),
     safeZ:       parseFloat(document.getElementById('inlay_safeZ')?.value)||5,
   };
 }
@@ -27164,19 +27209,16 @@ function inlayCalcPreview(){
   const p = inlayGetParams();
   const el = document.getElementById('inlayParamsPreview');
   if(!el) return;
-  const alpha = (p.vAngle/2) * Math.PI/180;
-  const tanA = Math.tan(alpha);
-  const maleStartDepth = p.pocketDepth - p.glueGap;
-  const maleFlatDepth  = p.surfaceGap;
-  // Largeur max usinable sans dépasser pocketDepth
-  const maxWidth = p.pocketDepth / tanA * 2;
+  const tanA = Math.tan((p.vAngle/2) * Math.PI/180);
+  const Ds = Math.max(0, p.pocketDepth - p.glueGap);
+  const Dm = Ds + p.surfaceGap;
   el.innerHTML = [
-    `♀ Femelle  : creuse à ${p.pocketDepth}mm de profondeur`,
-    `♂ Mâle     : commence à ${maleStartDepth.toFixed(2)}mm (= profondeur - jeu colle)`,
-    `  Jeu colle: ${p.glueGap}mm → colle s'accumule au fond`,
-    `  Surplus  : ${p.surfaceGap}mm au-dessus → scier après collage`,
-    `V-bit ${p.vAngle}° → largeur max usable = ${maxWidth.toFixed(1)}mm`,
-    `Surcote ébauche = ${(p.rDia/2 + 0.2).toFixed(1)}mm`,
+    `♀ Femelle : poche ${p.pocketDepth} mm, murs en V ${p.vAngle}°`,
+    `♂ Mâle    : le V démarre à ${Ds.toFixed(2)} mm (= ${p.pocketDepth} − ${p.glueGap})`,
+    `            dégagé à plat à ${Dm.toFixed(2)} mm, dessin en MIROIR`,
+    `Bouchon enfoncé : ${p.glueGap} mm de colle au fond, ${p.surfaceGap} mm entre planches`,
+    `Traits plus fins que ${(2*p.pocketDepth*tanA).toFixed(2)} mm : le V n'atteint pas le fond (normal)`,
+    `Fraise Ø${p.rDia} : passe dans les zones > ${(p.rDia+2*p.pocketDepth*tanA).toFixed(1)} mm, le V-bit fait le reste`,
   ].join('<br>');
 }
 
@@ -27204,6 +27246,370 @@ function inlayPickRough(id){
   document.querySelectorAll('[id^="inlayRg_"]').forEach(d=>
     d.style.borderColor = d.id===`inlayRg_${id}`?'var(--acc)':'var(--brd2)');
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INCRUSTATION v2 (IV) — moteur unique « champ de distance + isocourbes »
+// Logique VÉRIFIÉE contre les fichiers Aspire de Seb (étoile, V-bit 20°, fraise 3mm,
+// poche 5, jeu colle 0.3, jeu planches 0.5) :
+//   • femelle : profondeur idéale = min(A, d/tanA)          (d = distance au bord, dedans)
+//   • mâle    : profondeur idéale = clamp(Ds + e/tanA, 0, Dm) (e = distance signée, + dehors)
+//               Ds = A − jeu colle (= « start depth » Aspire), Dm = Ds + jeu planches
+//               → à faible profondeur la pointe passe DEDANS le dessin : le haut du bouchon
+//                 est plus étroit, il rentre dans le V de la femelle.
+//   • le mâle est dessiné en MIROIR (on retourne la planche gauche↔droite pour coller).
+//   • les formes l'une dans l'autre font des TROUS (pair-impair entre objets).
+// Un seul moteur pour les 2 : u(p) = « profondeur idéale × tanA » (1-lipschitzienne)
+//   ébauche fraise plate : centre autorisé si u ≥ z·tanA + R  (la fraise ne touche jamais le V)
+//   finition V-bit       : pointe sur l'isocourbe u = z·tanA à Z = −z  (posée sur la surface idéale
+//                          → ne peut pas creuser trop), + zones étroites (isocourbes fines,
+//                          Z variable) + fond (anneaux serrés là où la fraise n'est pas passée).
+// Jamais de G0 dans la matière : chaque liaison en profondeur est vérifiée, sinon on remonte.
+// ═══════════════════════════════════════════════════════════════════════════
+const _IL = {debug:false};
+
+// --- distance euclidienne exacte (Felzenszwalb) sur une grille, renvoie d² en px² ---
+_IL.edt = function(inside, W, H, target){ // distance de chaque pixel au plus proche pixel où inside==target
+  const INF = 1e20, f = new Float64Array(Math.max(W,H)), d = new Float64Array(Math.max(W,H));
+  const v = new Int32Array(Math.max(W,H)), z = new Float64Array(Math.max(W,H)+1);
+  const g = new Float64Array(W*H);
+  for (let i=0;i<W*H;i++) g[i] = (inside[i]===target) ? 0 : INF;
+  const pass = (n) => { let k=0; v[0]=0; z[0]=-INF; z[1]=INF;
+    for (let q=1;q<n;q++){ let s; for(;;){ const r=v[k]; s=((f[q]+q*q)-(f[r]+r*r))/(2*q-2*r); if(s<=z[k]){ k--; if(k<0){k=0;break;} } else break; }
+      k++; v[k]=q; z[k]=s; z[k+1]=INF; }
+    k=0; for (let q=0;q<n;q++){ while(z[k+1]<q) k++; const r=v[k]; d[q]=(q-r)*(q-r)+f[r]; } };
+  for (let x=0;x<W;x++){ for(let y=0;y<H;y++) f[y]=g[y*W+x]; pass(H); for(let y=0;y<H;y++) g[y*W+x]=d[y]; }
+  for (let y=0;y<H;y++){ const o=y*W; for(let x=0;x<W;x++) f[x]=g[o+x]; pass(W); for(let x=0;x<W;x++) g[o+x]=d[x]; }
+  return g;
+};
+
+// --- masque global (pair-impair entre objets), éventuellement en miroir gauche↔droite ---
+_IL.mask = function(objects, SCwant, padMm, scPad){
+  let SC = SCwant;
+  const rs = [];
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for (const o of objects){
+    let r=null; try{ r = rasterizeObject(o, SC); }catch(e){ r=null; }
+    if (!r || !r.pixels) continue;
+    const sc = r.SC || SC; let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity, any=false;
+    for (let py=0;py<r.H;py++) for (let px=0;px<r.W;px++) if (r.pixels[py*r.W+px]){ any=true; if(px<a)a=px; if(px>c)c=px; if(py<b)b=py; if(py>d)d=py; }
+    if (!any) continue;
+    const mx0=r.minX+(a-r.pad)/sc, mx1=r.minX+(c+1-r.pad)/sc, my0=r.minY+(b-r.pad)/sc, my1=r.minY+(d+1-r.pad)/sc;
+    rs.push({r,sc,mx0,mx1,my0,my1});
+    x0=Math.min(x0,mx0); x1=Math.max(x1,mx1); y0=Math.min(y0,my0); y1=Math.max(y1,my1);
+  }
+  if (!rs.length) return null;
+  const wMm=(x1-x0)+2*padMm, hMm=(y1-y0)+2*padMm;
+  // résolution : jusqu'à 40 px/mm pour les petits dessins (lettres fines), 20 px/mm normal, moins si énorme.
+  // MÊME résolution pour la femelle et le mâle (calculée sur la grille du mâle, la plus grande) -> ils collent.
+  const sp=(scPad==null)?padMm:scPad, aMm=((x1-x0)+2*sp)*((y1-y0)+2*sp);
+  SC = Math.max(SCwant, Math.min(40, Math.floor(Math.sqrt(1.3e6/aMm))));
+  const MAXPX = 2.5e6; if (aMm*SC*SC > MAXPX) SC = Math.max(4, Math.floor(Math.sqrt(MAXPX/aMm)));
+  const W=Math.ceil(wMm*SC)+2, H=Math.ceil(hMm*SC)+2;
+  // grille centrée sur le dessin (le miroir du mâle tombe pile au même endroit)
+  const X0=(x0+x1)/2-W/(2*SC), Y0=(y0+y1)/2-H/(2*SC);   // centre du pixel i : x = X0 + (i+0.5)/SC
+  const m=new Uint8Array(W*H);
+  for (const it of rs){ const {r,sc}=it;
+    const i0=Math.max(0,Math.floor((it.mx0-X0)*SC)-1), i1=Math.min(W-1,Math.ceil((it.mx1-X0)*SC)+1);
+    const j0=Math.max(0,Math.floor((it.my0-Y0)*SC)-1), j1=Math.min(H-1,Math.ceil((it.my1-Y0)*SC)+1);
+    for (let j=j0;j<=j1;j++){ const y=Y0+(j+0.5)/SC; const py=Math.floor((y-r.minY)*sc+r.pad); if(py<0||py>=r.H) continue;
+      for (let i=i0;i<=i1;i++){ const x=X0+(i+0.5)/SC; const px=Math.floor((x-r.minX)*sc+r.pad); if(px<0||px>=r.W) continue;
+        if (r.pixels[py*r.W+px]) m[j*W+i]^=1; } }
+  }
+  return {m,W,H,SC,X0,Y0,bx0:x0,by0:y0,bx1:x1,by1:y1};
+};
+
+// distance signée en mm (négative dedans), précision ~±0,35 px
+_IL.signed = function(G){
+  const {m,W,H,SC}=G; const dIn=_IL.edt(m,W,H,1), dOut=_IL.edt(m,W,H,0);
+  const e=new Float32Array(W*H);
+  for (let k=0;k<W*H;k++) e[k] = m[k] ? -(Math.sqrt(dOut[k])-0.5)/SC : (Math.sqrt(dIn[k])-0.5)/SC;
+  return e;
+};
+
+// --- isocourbes (marching squares interpolé) → boucles fermées en mm ---
+_IL.contours = function(u, W, H, c, X0, Y0, SC, win){
+  const i0=win?Math.max(0,win[0]):0, j0=win?Math.max(0,win[1]):0, i1=win?Math.min(W-2,win[2]):W-2, j1=win?Math.min(H-2,win[3]):H-2;
+  const segs = new Map(); // clé d'arête -> [voisin1, voisin2]
+  const pt = new Map();
+  const hk=(i,j)=>j*W+i, vk=(i,j)=>W*H+j*W+i;
+  const P=(k,x,y)=>{ if(!pt.has(k)) pt.set(k,[X0+(x+0.5)/SC, Y0+(y+0.5)/SC]); return k; };
+  const eH=(i,j)=>{ const a=u[j*W+i]-c, b=u[j*W+i+1]-c; return P(hk(i,j), i + a/(a-b), j); };
+  const eV=(i,j)=>{ const a=u[j*W+i]-c, b=u[(j+1)*W+i]-c; return P(vk(i,j), i, j + a/(a-b)); };
+  const link=(a,b)=>{ (segs.get(a)||segs.set(a,[]).get(a)).push(b); (segs.get(b)||segs.set(b,[]).get(b)).push(a); };
+  for (let j=j0;j<=j1;j++) for (let i=i0;i<=i1;i++){
+    const tl=u[j*W+i]>c, tr=u[j*W+i+1]>c, br=u[(j+1)*W+i+1]>c, bl=u[(j+1)*W+i]>c;
+    const idx=(tl?8:0)|(tr?4:0)|(br?2:0)|(bl?1:0);
+    if (idx===0||idx===15) continue;
+    const T=()=>eH(i,j), B=()=>eH(i,j+1), L=()=>eV(i,j), R=()=>eV(i+1,j);
+    switch(idx){
+      case 1: case 14: link(L(),B()); break;
+      case 2: case 13: link(B(),R()); break;
+      case 3: case 12: link(L(),R()); break;
+      case 4: case 11: link(T(),R()); break;
+      case 6: case 9:  link(T(),B()); break;
+      case 7: case 8:  link(L(),T()); break;
+      case 5: case 10: { const mid=(u[j*W+i]+u[j*W+i+1]+u[(j+1)*W+i+1]+u[(j+1)*W+i])/4>c;
+        if ((idx===5)===mid){ link(L(),T()); link(B(),R()); } else { link(L(),B()); link(T(),R()); } break; }
+    }
+  }
+  const loops=[]; const used=new Set();
+  const walk=(k0,closed)=>{ const loop=[]; let prev=-1, cur=k0;
+    while(cur!==undefined && !used.has(cur)){ used.add(cur); loop.push(pt.get(cur)); const nb=segs.get(cur)||[]; const nx=nb[0]!==prev?nb[0]:nb[1]; prev=cur; cur=nx; }
+    if (closed){ if(loop.length>=3){ loop.push(loop[0]); loops.push(loop); } } else if (loop.length>=2){ loop._open=true; loops.push(loop); } };
+  for (const [k0,nb] of segs) if(nb.length===1 && !used.has(k0)) walk(k0,false);   // morceaux ouverts (bord de fenêtre) : depuis un bout
+  for (const [k0] of segs) if(!used.has(k0)) walk(k0,true);
+  return loops;
+};
+
+_IL.rdp = function(pts, tol){
+  if (pts.length<3) return pts.slice();
+  const keep=new Uint8Array(pts.length); keep[0]=keep[pts.length-1]=1; const st=[[0,pts.length-1]];
+  while(st.length){ const [a,b]=st.pop(); const ax=pts[a][0],ay=pts[a][1],bx=pts[b][0],by=pts[b][1];
+    const dx=bx-ax, dy=by-ay, L=Math.hypot(dx,dy)||1e-12; let md=-1, mi=-1;
+    for(let k=a+1;k<b;k++){ const d = L<1e-9 ? Math.hypot(pts[k][0]-ax,pts[k][1]-ay) : Math.abs(dy*(pts[k][0]-ax)-dx*(pts[k][1]-ay))/L; if(d>md){md=d;mi=k;} }
+    if (md>tol){ keep[mi]=1; st.push([a,mi],[mi,b]); } }
+  return pts.filter((_,k)=>keep[k]);
+};
+_IL.simplifyLoop = function(loop, tol){ // boucle fermée : on coupe en 2 moitiés
+  if (loop._open) return _IL.rdp(loop,tol);
+  if (loop.length<6) return loop;
+  const n=loop.length-1, h=Math.floor(n/2);
+  const A=_IL.rdp(loop.slice(0,h+1),tol), B=_IL.rdp(loop.slice(h),tol);
+  return A.concat(B.slice(1));
+};
+
+// valeur de u (bilinéaire) en mm
+_IL.at = function(F, x, y){ const {u,W,H,X0,Y0,SC}=F; const fx=(x-X0)*SC-0.5, fy=(y-Y0)*SC-0.5;
+  const i=Math.max(0,Math.min(W-2,Math.floor(fx))), j=Math.max(0,Math.min(H-2,Math.floor(fy))); const a=fx-i, b=fy-j;
+  return u[j*W+i]*(1-a)*(1-b)+u[j*W+i+1]*a*(1-b)+u[(j+1)*W+i]*(1-a)*b+u[(j+1)*W+i+1]*a*b; };
+// liaison en profondeur autorisée si tout le segment reste où u ≥ cmin
+_IL.linkOk = function(F, p, q, cmin, cmin2){ const L=Math.hypot(q[0]-p[0],q[1]-p[1]); if (L>25) return false; const c2=(cmin2===undefined)?cmin:cmin2;
+  const n=Math.max(2,Math.ceil(L*F.SC*2)); for(let k=0;k<=n;k++){ const t=k/n; if(_IL.at(F,p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t) < cmin+(c2-cmin)*t-0.003) return false; } return true; };
+
+// --- écrivain G-code (F seulement quand il change, jamais de G0 en matière) ---
+_IL.writer = function(p, org, safeZ, fxy, fz){
+  const out=[]; let F=null, cz=safeZ, cx=null, cy=null, up=true;
+  const HOP=Math.min(1, safeZ);           // petits sauts : 1 mm au-dessus du bois
+  const f3=v=>(Math.abs(v)<5e-4?0:v).toFixed(3);
+  const W={ out,
+    feed(f){ if(F!==f){ F=f; return ' F'+f; } return ''; },
+    retract(h){ const z=(h===undefined)?safeZ:h; if(!up || cz<z-1e-6){ out.push('G0 Z'+f3(z)); up=true; cz=z; } },
+    rapidTo(x,y){ const far = cx===null || Math.hypot(x-cx,y-cy)>15; W.retract(far?safeZ:HOP); out.push('G0 X'+f3(x-org.x)+' Y'+f3(y-org.y)); cx=x; cy=y; },
+    plunge(z){ if(cz>HOP+1e-6){ out.push('G0 Z'+f3(HOP)); cz=HOP; } out.push('G1 Z'+f3(z)+W.feed(fz)); cz=z; up=false; },
+    cut(x,y,z){ let s='G1 X'+f3(x-org.x)+' Y'+f3(y-org.y); if(z!==undefined && Math.abs(z-cz)>5e-4){ s+=' Z'+f3(z); cz=z; } out.push(s+W.feed(fxy)); cx=x; cy=y; },
+    get pos(){ return cx===null?null:[cx,cy]; }, get isUp(){ return up; }, get z(){ return cz; }
+  };
+  return W;
+};
+
+// faire démarrer une boucle fermée au sommet le plus proche de pos
+_IL.rotate = function(loop, pos){ if(!pos) return loop; const n=loop.length-1; let bi=0,bd=Infinity;
+  for(let k=0;k<n;k++){ const d=(loop[k][0]-pos[0])**2+(loop[k][1]-pos[1])**2; if(d<bd){bd=d;bi=k;} }
+  const r=loop.slice(bi,n).concat(loop.slice(0,bi)); r.push(r[0]); return r; };
+
+// suivre une liste de chemins à profondeur fixe (ou Z par point), en liant si sûr
+_IL.emitPaths = function(Wr, F, paths, zOf, cminLink, closed){
+  let rest=paths.slice();
+  while(rest.length){
+    const pos=Wr.pos; let bi=0, bd=Infinity;
+    if(pos) rest.forEach((pth,k)=>{ const d=(pth[0][0]-pos[0])**2+(pth[0][1]-pos[1])**2; let dd=d;
+      if(closed){ for(const q of pth){ const e=(q[0]-pos[0])**2+(q[1]-pos[1])**2; if(e<dd) dd=e; } } if(dd<bd){bd=dd;bi=k;} });
+    let pth=rest.splice(bi,1)[0]; if(closed) pth=_IL.rotate(pth,pos);
+    const z0=zOf(pth[0]);
+    if (!Wr.isUp && pos && cminLink!==null && _IL.linkOk(F,pos,pth[0],cminLink(pth))) { Wr.cut(pth[0][0],pth[0][1],z0); }
+    else { Wr.rapidTo(pth[0][0],pth[0][1]); Wr.plunge(z0); }
+    for (let k=1;k<pth.length;k++) Wr.cut(pth[k][0],pth[k][1],zOf(pth[k]));
+  }
+};
+
+// --- construction du champ u pour femelle / mâle ---
+_IL.field = function(objects, p, male){
+  const tanA=Math.tan((p.vAngle/2)*Math.PI/180);
+  const Ds=Math.max(0.1,p.pocketDepth-p.glueGap), Dm=Ds+Math.max(0,p.surfaceGap);
+  const mMargin = Math.max(p.maleMargin||6, p.rDia+1, Dm*tanA+p.rDia+1);
+  const margin = male ? mMargin : 0;
+  const G=_IL.mask(objects, p.SC||20, margin+1.5, mMargin+1.5);
+  if(!G) return null;
+  const {W,H,SC}=G;
+  if (male){ // miroir gauche↔droite : on retourne la planche pour coller
+    const m2=new Uint8Array(W*H); for(let j=0;j<H;j++) for(let i=0;i<W;i++) m2[j*W+i]=G.m[j*W+(W-1-i)]; G.m=m2;
+    // la grille est symétrique autour de son centre → le dessin miroir reste au même endroit
+  }
+  const e=_IL.signed(G); const u=new Float32Array(W*H); let umax=-Infinity;
+  if (!male){ for(let k=0;k<W*H;k++){ u[k]=-e[k]; if(u[k]>umax) umax=u[k]; } }
+  else {
+    const bx0=G.bx0-margin, bx1=G.bx1+margin, by0=G.by0-margin, by1=G.by1+margin;
+    for(let j=0;j<H;j++){ const y=G.Y0+(j+0.5)/SC; for(let i=0;i<W;i++){ const x=G.X0+(i+0.5)/SC;
+      const box=Math.min(x-bx0, bx1-x, y-by0, by1-y); const k=j*W+i; u[k]=Math.min(Ds*tanA+e[k], box); if(u[k]>umax) umax=u[k]; } }
+  }
+  return {u,W,H,SC,X0:G.X0,Y0:G.Y0,umax,tanA,Ds,Dm,Dmax: male?Dm:p.pocketDepth, male, margin};
+};
+
+// --- ÉBAUCHE fraise plate ---
+_IL.rough = function(F, p, Wr){
+  const R=p.rDia/2, t=F.tanA, allow=0.03, n=Math.max(1,Math.ceil(F.Dmax/p.rMaxD-1e-9)), dz=F.Dmax/n, so=p.rDia*0.45;
+  let nb=0;
+  for (let j=1;j<=n;j++){
+    const z=j*dz, base=z*t+R+allow; if (base>F.umax) break;
+    Wr.out.push(`; --- couche ${j}/${n}  Z=-${z.toFixed(3)}  (fraise à ${(base).toFixed(2)}mm du bord idéal)`);
+    const levels=[]; for(let L=base; L<=F.umax; L+=so) levels.push(L);
+    // de l'intérieur vers l'extérieur, liaisons en profondeur quand c'est sûr
+    for (let li=levels.length-1; li>=0; li--){
+      const loops=_IL.contours(F.u,F.W,F.H,levels[li],F.X0,F.Y0,F.SC).map(l=>_IL.simplifyLoop(l,0.01));
+      _IL.emitPaths(Wr,F,loops,()=>-z,()=>base,true); nb+=loops.length;
+    }
+  }
+  return nb;
+};
+
+// composantes 4-connexes de {u>c} (étiquettes Int32, max de u par composante)
+_IL.comps = function(F, c, eight){ const {u,W,H}=F; const lab=new Int32Array(W*H).fill(-1); const mx=[], bb=[]; const st=new Int32Array(W*H);
+  for(let s=0;s<W*H;s++){ if(lab[s]!==-1||!(u[s]>c)) continue; const id=mx.length; let m=-Infinity, sp=0, b=[1e9,1e9,-1,-1]; st[sp++]=s; lab[s]=id;
+    while(sp){ const k=st[--sp]; const i=k%W, j=(k-i)/W; if(u[k]>m) m=u[k]; if(i<b[0])b[0]=i; if(j<b[1])b[1]=j; if(i>b[2])b[2]=i; if(j>b[3])b[3]=j;
+      const nb=eight?[i>0?k-1:-1,i<W-1?k+1:-1,j>0?k-W:-1,j<H-1?k+W:-1,(i>0&&j>0)?k-W-1:-1,(i<W-1&&j>0)?k-W+1:-1,(i>0&&j<H-1)?k+W-1:-1,(i<W-1&&j<H-1)?k+W+1:-1]:[i>0?k-1:-1,i<W-1?k+1:-1,j>0?k-W:-1,j<H-1?k+W:-1]; for(const q of nb){ if(q>=0&&lab[q]===-1&&u[q]>c){ lab[q]=id; st[sp++]=q; } } }
+    mx.push(m); bb.push(b); }
+  return {lab,mx,bb}; };
+
+// --- FINITION V-bit : murs par niveaux + « reprise » partout où il reste du bois ---
+_IL.finish = function(F, p, Wr, roughUsed){
+  const t=F.tanA, Dmax=F.Dmax, nV=Math.max(1,Math.ceil(Dmax/1.3-1e-9)), R=p.rDia/2;
+  const {u,W,H,SC,X0,Y0}=F, N=W*H;
+  const cN=Dmax*t;
+  let nb=0;
+  // profondeur idéale et profondeur déjà creusée (simulée) en chaque pixel
+  const ideal=new Float32Array(N); for(let k=0;k<N;k++) ideal[k]=Math.min(Dmax,Math.max(0,u[k]/t));
+  const h=new Float32Array(N);
+  if (roughUsed){ const n=Math.max(1,Math.ceil(Dmax/p.rMaxD-1e-9)), dz=Dmax/n;
+    for(let j=1;j<=n;j++){ const z=j*dz, base=z*t+R+0.03; if(base>F.umax) break;
+      const inC=new Uint8Array(N); for(let k=0;k<N;k++) if(u[k]>=base) inC[k]=1;
+      const d2=_IL.edt(inC,W,H,1); const r2=(R*SC-0.3)**2; for(let k=0;k<N;k++) if(d2[k]<=r2 && h[k]<z) h[k]=z; } }
+  const stamp=(x,y,D)=>{ if(D<=0) return; const rp=D*t*SC, ci=(x-X0)*SC-0.5, cj=(y-Y0)*SC-0.5;
+    const i0=Math.max(0,Math.floor(ci-rp)), i1=Math.min(W-1,Math.ceil(ci+rp)), j0=Math.max(0,Math.floor(cj-rp)), j1=Math.min(H-1,Math.ceil(cj+rp));
+    const k1=1/(t*SC);
+    for(let j=j0;j<=j1;j++){ const dy=j-cj; for(let i=i0;i<=i1;i++){ const dx=i-ci; const v=D-Math.sqrt(dx*dx+dy*dy)*k1; const k=j*W+i; if(v>h[k]) h[k]=v; } } };
+  const stampPath=(pth,zOf)=>{ for(let s=1;s<pth.length;s++){ const a=pth[s-1], b=pth[s]; const n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])*SC*1.5));
+    for(let q=0;q<=n;q++){ const x=a[0]+(b[0]-a[0])*q/n, y=a[1]+(b[1]-a[1])*q/n; stamp(x,y,-zOf([x,y])); } } };
+  // 1) MURS : à chaque niveau, la pointe suit u = z·tanA à Z = −z (posée pile sur la surface idéale)
+  for (let k=1;k<=nV;k++){
+    const z=k*Dmax/nV, c=z*t; if(c>F.umax) break;
+    Wr.out.push(`; --- mur  Z=-${z.toFixed(3)}`);
+    const loops=_IL.contours(u,W,H,c,X0,Y0,SC).map(l=>_IL.simplifyLoop(l,0.01));
+    Wr.retract(); _IL.emitPaths(Wr,F,loops,()=>-z,()=>c,true); nb+=loops.length;
+    for(const l of loops) stampPath(l,()=>-z);
+    if (k===nV){ // pied du mur : 2 tours de plus au fond (raccord avec la fraise plate)
+      const sfw=Math.max(0.02, 2*t*Math.min(0.15, 0.5*Math.max(0.1,p.glueGap)));
+      for (let j=1;j<=2;j++){ const c2=c+j*sfw; if(c2>F.umax) break; const l2=_IL.contours(u,W,H,c2,X0,Y0,SC).map(l=>_IL.simplifyLoop(l,0.01));
+        _IL.emitPaths(Wr,F,l2,()=>-z,()=>c,true); nb+=l2.length; for(const l of l2) stampPath(l,()=>-z); } }
+  }
+  // 2) REPRISE (2 tours : normal puis fin) : pointes, zones étroites, coins et fond
+  const hAllow=Math.min(0.15, 0.5*Math.max(0.1,p.glueGap)); const sf=Math.max(0.02, 2*t*hAllow);
+  for (let it=0; it<2; it++){
+    let tol=it===0?0.1:0.08; const delta=Math.max(0.004,Math.min(0.04,Math.max(0.01,0.1*t))/(it===0?1:3));
+    const left=new Uint8Array(N); let nl=0, lo=Infinity, hi=-Infinity, bi0=W, bj0=H, bi1=0, bj1=0;
+    for(let k=0;k<N;k++) if(ideal[k]>=0.2 && ideal[k]-h[k]>(u[k]>=cN-1e-6?hAllow+0.05:tol)){ left[k]=1; nl++; if(u[k]<lo) lo=u[k]; if(u[k]>hi) hi=u[k]; const i=k%W, j=(k-i)/W; if(i<bi0)bi0=i; if(i>bi1)bi1=i; if(j<bj0)bj0=j; if(j>bj1)bj1=j; }
+    if (!nl) break;
+    { // ignorer les miettes (moins de 8 px ≈ 0,02 mm²) : le bois s'écrase, inutile d'y retourner
+      const uu=new Float32Array(N); for(let k=0;k<N;k++) uu[k]=left[k]?1:-1;
+      const C0=_IL.comps({u:uu,W,H},0,true); const cnt=new Int32Array(C0.mx.length), er=new Float32Array(C0.mx.length);
+      for(let k=0;k<N;k++) if(C0.lab[k]>=0){ cnt[C0.lab[k]]++; const e2=ideal[k]-h[k]; if(e2>er[C0.lab[k]]) er[C0.lab[k]]=e2; }
+      nl=0; lo=Infinity; hi=-Infinity; bi0=W; bj0=H; bi1=0; bj1=0;
+      for(let k=0;k<N;k++){ if(!left[k]) continue; if(cnt[C0.lab[k]]<8 && er[C0.lab[k]]<0.35){ left[k]=0; continue; } nl++; if(u[k]<lo) lo=u[k]; if(u[k]>hi) hi=u[k]; const i=k%W, j=(k-i)/W; if(i<bi0)bi0=i; if(i>bi1)bi1=i; if(j<bj0)bj0=j; if(j>bj1)bj1=j; }
+      if (!nl) break; }
+    if (_IL.debug){ const hs={}; for(let k=0;k<N;k++) if(left[k]){ const b=(u[k]/t).toFixed(1); hs[b]=(hs[b]||0)+1; } Wr.out.push('; dbg it'+it+' nl='+nl+' u/t: '+JSON.stringify(hs)); }
+    const d2=_IL.edt(left,W,H,1); const near=new Uint8Array(N); for(let k=0;k<N;k++) if(d2[k]<=9) near[k]=1; // ±3 px
+    const isNear=(q)=>{ const i=Math.max(0,Math.min(W-1,Math.round((q[0]-X0)*SC-0.5))), j=Math.max(0,Math.min(H-1,Math.round((q[1]-Y0)*SC-0.5))); return near[j*W+i]===1; };
+    const keyOf=(c)=>c<cN?Math.round(c/delta):'f'+Math.round((c-cN)/sf);
+    const hist=new Set(); for(let k=0;k<N;k++) if(left[k]) hist.add(keyOf(u[k]));
+    const lv=[];
+    for(let k=Math.max(1,Math.floor(lo/delta)); k*delta<cN && k*delta<=hi+delta; k++){ if(hist.has(k-1)||hist.has(k)||hist.has(k+1)) lv.push(k*delta); }
+    for(let k=1; cN+k*sf<=hi+sf; k++){ if(hist.has('f'+(k-1))||hist.has('f'+k)||hist.has('f'+(k+1))) lv.push(cN+k*sf); }
+    const win=[bi0-6,bj0-6,bi1+6,bj1+6];
+    const paths=[];
+    const crest=[];
+    if (it===1){ // 2e tour : une passe juste sous le sommet de chaque crête étroite restante
+      const uu=new Float32Array(N); for(let k=0;k<N;k++) uu[k]=left[k]?u[k]:-1;
+      const C=_IL.comps({u:uu,W,H},0,true); const cnt=new Int32Array(C.mx.length); for(let k=0;k<N;k++) if(C.lab[k]>=0) cnt[C.lab[k]]++;
+      C.mx.forEach((m,id)=>{ if(cnt[id]>=3){ const b=C.bb[id]; crest.push([m-0.002,[b[0]-4,b[1]-4,b[2]+4,b[3]+4]]); } }); }
+    else if (hi<cN) lv.push(hi-0.002);
+    for (const [c,w] of lv.map(c=>[c,win]).concat(crest)){
+      const zc=-Math.min(Dmax,c/t);
+      for (const l of _IL.contours(u,W,H,c,X0,Y0,SC,w)){
+        // morceaux qui passent près du bois restant (+ petits ponts : sur l'isocourbe c'est toujours sûr)
+        let run=[], gap=[], gl=0;
+        const flush=()=>{ if(run.length>1){ const s2=_IL.rdp(run,0.01); s2._z=zc; s2._c=c; paths.push(s2);} run=[]; };
+        for(let k=0;k<l.length;k++){ const q=l[k];
+          if(isNear(q)){ if(run.length&&gap.length){ if(gl<2) run.push(...gap); else { flush(); } } gap=[]; gl=0; run.push(q); }
+          else if(run.length){ if(gap.length) gl+=Math.hypot(q[0]-gap[gap.length-1][0],q[1]-gap[gap.length-1][1]); gap.push(q); if(gl>=2){ flush(); gap=[]; gl=0; } } }
+        flush();
+      }
+    }
+    if (!paths.length) break;
+    Wr.out.push(`; --- reprise ${it+1} : ${paths.length} passes (pointes, zones étroites, coins, fond)`);
+    Wr.retract(); 
+    // regrouper par îlot de bois restant (composantes du masque « près »), puis par profondeur croissante
+    const lab=new Int32Array(N).fill(-1); let nlab=0; { const st=new Int32Array(N);
+      for(let s0=0;s0<N;s0++){ if(!near[s0]||lab[s0]!==-1) continue; let sp=0; st[sp++]=s0; lab[s0]=nlab;
+        while(sp){ const k=st[--sp]; const i=k%W; const nbs=[i>0?k-1:-1,i<W-1?k+1:-1,k-W,k+W]; for(const q of nbs){ if(q>=0&&q<N&&near[q]&&lab[q]===-1){ lab[q]=nlab; st[sp++]=q; } } } nlab++; } }
+    const labOf=(q)=>{ const i=Math.max(0,Math.min(W-1,Math.round((q[0]-X0)*SC-0.5))), j=Math.max(0,Math.min(H-1,Math.round((q[1]-Y0)*SC-0.5))); return lab[j*W+i]; };
+    const groups=new Map(); for(const pth of paths){ let g=labOf(pth[0]); if(g<0) g=labOf(pth[pth.length-1]); if(!groups.has(g)) groups.set(g,[]); groups.get(g).push(pth); }
+    let gl=[...groups.values()];
+    let lastC=null;
+    while(gl.length){
+      const pos=Wr.pos; let gi=0, gd=Infinity;
+      gl.forEach((g,k)=>{ for(const pth of g){ const d=pos?Math.min((pth[0][0]-pos[0])**2+(pth[0][1]-pos[1])**2,(pth[pth.length-1][0]-pos[0])**2+(pth[pth.length-1][1]-pos[1])**2):0; if(d<gd){gd=d;gi=k;} } });
+      const rest=gl.splice(gi,1)[0].sort((a,b)=>a._c-b._c);
+      while(rest.length){ const pos2=Wr.pos; const c0=rest[0]._c; let bi=0,bd=Infinity;
+        rest.forEach((pth,k)=>{ if(pth._c>c0+1e-9) return; const d=pos2?Math.min((pth[0][0]-pos2[0])**2+(pth[0][1]-pos2[1])**2,(pth[pth.length-1][0]-pos2[0])**2+(pth[pth.length-1][1]-pos2[1])**2):0; if(d<bd){bd=d;bi=k;} });
+        let pth=rest.splice(bi,1)[0];
+        if(pos2 && (pth[pth.length-1][0]-pos2[0])**2+(pth[pth.length-1][1]-pos2[1])**2 < (pth[0][0]-pos2[0])**2+(pth[0][1]-pos2[1])**2){ const z=pth._z,c=pth._c; pth=pth.slice().reverse(); pth._z=z; pth._c=c; }
+        const cs=Math.min(pth._c,cN), cl2=lastC===null?0:Math.min(lastC,cN);
+        if(!Wr.isUp && pos2 && lastC!==null && _IL.linkOk(F,pos2,pth[0],cl2,cs)) Wr.cut(pth[0][0],pth[0][1],pth._z);
+        else { Wr.rapidTo(pth[0][0],pth[0][1]); Wr.plunge(pth._z); }
+        for(let k=1;k<pth.length;k++) Wr.cut(pth[k][0],pth[k][1],pth._z);
+        lastC=pth._c; nb++;
+        stampPath(pth,()=>pth._z);
+      }
+    }
+  }
+  if(_IL.debug) _IL._dbg={h,ideal,W,H,X0,Y0,SC};
+  return nb;
+};
+
+_IL.head = function(title, p, lines){ return [`; ════ ${title} ════`, ...lines.map(s=>'; '+s), 'G21','G90','G17']; };
+_IL.tail = function(Wr, safeZ){ Wr.retract(); Wr.out.push('G4 P0', 'G0 Z'+safeZ, 'G4 P0', 'G0 X0 Y0', 'M5', 'M30'); };
+
+_IL.gen = function(objects, p, date, male, rough){
+  const t0=performance.now();
+  const P=Object.assign({}, p);
+  if (P.maleMargin==null) P.maleMargin=6;
+  const F=_IL.field(objects, P, male); const org=getOriginMm();
+  const tanA=Math.tan((P.vAngle/2)*Math.PI/180);
+  const Ds=Math.max(0.1,P.pocketDepth-P.glueGap), Dm=Ds+Math.max(0,P.surfaceGap);
+  const name = (male?'♂ MÂLE':'♀ FEMELLE')+' '+(rough?'ÉBAUCHE (fraise plate Ø'+P.rDia+')':'FINITION (V-bit '+P.vAngle+'°)');
+  const info = male
+    ? [`profondeur départ V (start depth) = ${Ds.toFixed(2)} mm = poche ${P.pocketDepth} − jeu colle ${P.glueGap}`,
+       `dégagement à plat = ${Dm.toFixed(2)} mm (jeu entre planches ${P.surfaceGap}), marge autour = ${(F?F.margin:0).toFixed(1)} mm`,
+       `DESSIN EN MIROIR : retourner la planche gauche↔droite pour coller`]
+    : [`poche ${P.pocketDepth} mm, murs en V ${P.vAngle}°`];
+  const lines=[...info, `${date}`];
+  const Wr=_IL.writer(P, org, P.safeZ, rough?P.rFxy:P.vFxy, rough?P.rFz:P.vFz);
+  const out=_IL.head('INLAY '+name, P, lines);
+  if (!F){ return out.concat(['; (aucune forme)','M30']).join('\n')+'\n'; }
+  out.push('G0 Z'+P.safeZ, 'M3 S'+(rough?P.rSpin:P.vSpin), 'G4 P2');
+  let nb = rough ? _IL.rough(F,P,Wr) : _IL.finish(F,P,Wr,true);
+  _IL.tail(Wr, P.safeZ);
+  if (!rough && nb===0) Wr.out.unshift('; (rien à faire en V-bit)');
+  if (rough && nb===0) Wr.out.unshift(`; (fraise Ø${P.rDia} trop grosse : rien à dégrossir, le V-bit fera tout)`);
+  const res=out.concat(Wr.out).join('\n')+'\n';
+  _IL.last=_IL.last||{}; _IL.last[(male?'m':'f')+(rough?'r':'f')]={ms:Math.round(performance.now()-t0), W:F.W, H:F.H, SC:F.SC};
+  return res;
+};
+
+function genFemaleRough(objects, p, date){ return _IL.gen(objects, p, date, false, true); }
+function genFemaleFinish(objects, p, date){ return _IL.gen(objects, p, date, false, false); }
+function genMaleRough(objects, p, date){ return _IL.gen(objects, p, date, true, true); }
+function genMaleFinish(objects, p, date){ return _IL.gen(objects, p, date, true, false); }
+
 
 function inlaySimAll(){
   const combined = [
@@ -27246,7 +27652,7 @@ function getDilatedContour(pixels, W, H, sc, minX, minY, pad, org, offsetMm, max
   return traceMaskContour(ring, W, H, sc, minX, minY, pad, org);
 }
 
-function genFemaleRough(objects, p, date) {
+function genFemaleRough_v1(objects, p, date) { // ANCIENNE version (avant IV) — gardée pour mémoire, plus appelée
   const safeZ = p.safeZ;
   const tanA  = Math.tan((p.vAngle / 2) * Math.PI / 180);
   const nPass = Math.max(1, Math.ceil(p.pocketDepth / p.rMaxD));
@@ -27307,7 +27713,7 @@ function genFemaleRough(objects, p, date) {
   return gc;
 }
 
-function genFemaleFinish(objects, p, date) {
+function genFemaleFinish_v1(objects, p, date) { // ANCIENNE version (avant IV) — gardée pour mémoire, plus appelée
   // ═══════════════════════════════════════════════════════════════
   // LOGIQUE CONFIRMÉE par analyse femelle_finition.tap Aspire :
   //
@@ -27569,7 +27975,7 @@ function genIslandSpirals(objects, p, SC_in, tanA, profMax, isMale) {
   return gc;
 }
 
-function genMaleRough(objects, p, date) {
+function genMaleRough_v1(objects, p, date) { // ANCIENNE version (avant IV) — gardée pour mémoire, plus appelée
   const safeZ   = p.safeZ;
   const tanA    = Math.tan((p.vAngle / 2) * Math.PI / 180);
   const maleSD  = p.pocketDepth - p.glueGap;
@@ -27691,7 +28097,7 @@ function genMaleRough(objects, p, date) {
   return gc;
 }
 
-function genMaleFinish(objects, p, date) {
+function genMaleFinish_v1(objects, p, date) { // ANCIENNE version (avant IV) — gardée pour mémoire, plus appelée
   const safeZ  = p.safeZ;
   const tanA   = Math.tan((p.vAngle / 2) * Math.PI / 180);
   const maleSD = p.pocketDepth - p.glueGap; // profondeur max du mâle
