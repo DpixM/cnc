@@ -164,6 +164,9 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-18 — IX : 🪵 Les bois — on CLIQUE une forme de l'aperçu (ou sa pastille) pour l'incruster ou l'ignorer
+ [AJOUT] Forme ignorée = hachurée grise, pas usinée (cadre, trait de construction…). Garde le réglage avec le projet.
+
 -- 2026-10-18 — IW : INCRUSTATION — les 3 écrans refaits (demande Seb : « c'est le bordel »)
  [REFAIT] 🪵 Les bois : on choisit UN bois pour la femelle (planche creusée) et UN pour le mâle (bouchons),
    avec un aperçu du résultat veiné. Fini le femelle/mâle par forme (qui ne marchait pas et n'avait pas de sens :
@@ -2052,7 +2055,12 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 .ilw-prev{background:var(--surf2);border-radius:12px;padding:10px;border:1.5px solid var(--brd2)}
 .ilw-pt{font-size:12px;font-weight:800;color:var(--txt);margin-bottom:6px}
 .ilw-pt span{font-weight:500;color:var(--txt2);font-size:11px;margin-left:6px}
-#ilWoodPreview{width:100%;height:300px;display:block;border-radius:8px;background:#0a0c10}
+#ilWoodPreview{width:100%;height:300px;display:block;border-radius:8px;background:#0a0c10;cursor:pointer}
+.ilw-hint{font-size:12px;color:var(--acc);margin:0 0 6px}
+.ilw-shapes{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ilw-chip{padding:6px 10px;border-radius:999px;border:1.5px solid #4caf5088;background:var(--surf);color:var(--txt);font-size:12px;cursor:pointer}
+.ilw-chip b{font-weight:700;margin-left:4px;color:var(--grn)}
+.ilw-chip.off{border-color:var(--brd2);color:var(--txt3)}.ilw-chip.off b{color:var(--txt3)}
 .ilw-note{font-size:10px;color:var(--txt3);margin-top:6px}
 
 .ilp-grid{display:grid;grid-template-columns:minmax(300px,1fr) minmax(300px,1fr);gap:12px;margin-top:10px;align-items:start}
@@ -2129,7 +2137,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-IW ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-IX ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2657,8 +2665,10 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 
   <div class="ilw-prev">
     <div class="ilw-pt">Aperçu du résultat <span id="ilwInfo"></span></div>
+    <div class="ilw-hint">👆 Clique une forme (ou sa pastille) pour l'<b>incruster</b> ou l'<b>ignorer</b> (cadre, trait de construction…)</div>
     <canvas id="ilWoodPreview"></canvas>
-    <div class="ilw-note">Les formes l'une dans l'autre font un trou (un rond dans un rond = un anneau).</div>
+    <div class="ilw-shapes" id="ilwShapes"></div>
+    <div class="ilw-note">Les formes incrustées l'une dans l'autre font un trou (un rond dans un rond = un anneau). Les formes ignorées (hachurées) ne sont pas usinées.</div>
   </div>
 </div>
 
@@ -25914,9 +25924,9 @@ function wzGenInlay(){
   };
   setStatus('p12st', false, '⏳ Génération en cours...');
 
-  const allObjs = paintObjects.filter(o=>o.type!=='free'||o.pts?.length>1);
+  const allObjs = paintObjects.filter(o=>(o.type!=='free'||o.pts?.length>1) && !o._inlayOff);   // IX : formes « ignorées » exclues
   if(!allObjs.length){
-    setStatus('p12st', false, '❌ Aucun objet dessiné'); return;
+    setStatus('p12st', false, '❌ Aucune forme à incruster (toutes ignorées ?)'); return;
   }
   // IW : le même dessin est creusé dans la planche ♀ et découpé en bouchons dans la planche ♂
   const fObjs = allObjs, mObjs = allObjs;
@@ -27689,35 +27699,77 @@ function ilWoodsInit(keepInputs){
   for (const g of ['female','male']){ const S=g==='female'?'F':'M'; const box=document.getElementById('ilwSw'+S); if(!box) continue; const cur=ilWood(g);
     box.innerHTML=WOOD_PRESETS.map(w=>`<button class="ilw-b${cur.id===w.id?' on':''}" style="background:${w.color};color:${_ilTextOn(w.color)}" onclick="ilWoodPick('${g}','${w.id}')">${w.name}</button>`).join('');
     if(!keepInputs){ const n=document.getElementById('ilwName'+S), c=document.getElementById('ilwCol'+S); if(n) n.value=cur.id==='custom'?cur.name:''; if(c) c.value=cur.color; } }
+  const cv=document.getElementById('ilWoodPreview'); if(cv && !cv._ilc){ cv._ilc=1; cv.addEventListener('click',_ilPrevClick); }
   requestAnimationFrame(ilWoodPreviewDraw);
 }
-function _ilObjs(){ return (typeof paintObjects!=='undefined'?paintObjects:[]).filter(o=>o.type!=='free'||o.pts?.length>1); }
 // petit motif de veinage (même pour l'aperçu et la 3D)
 function _ilGrain(x, y, ang){ const u=x*Math.cos(ang)+y*Math.sin(ang), v=-x*Math.sin(ang)+y*Math.cos(ang);
   return 0.86+0.09*Math.sin(v*1.7+2.2*Math.sin(u*0.13)+0.8*Math.sin(u*0.031))+0.05*Math.sin(v*5.3+u*0.4); }
 function _ilRGB(hex){ const h=(hex||'#888').replace('#',''); return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)]; }
+function _ilAllObjs(){ return (typeof paintObjects!=='undefined'?paintObjects:[]).filter(o=>o.type!=='free'||o.pts?.length>1); }
+function _ilObjs(){ return _ilAllObjs().filter(o=>!o._inlayOff); }      // formes incrustées (les « ignorées » sont exclues)
+function _ilShapeName(o){ const n={rect:'Rectangle',star:'Étoile',line:'Trait',text:'Texte',polygon:'Polygone',tri:'Triangle',oblong:'Oblong',gear:'Engrenage',arc:'Arc',svg:'Image',free:'Forme libre'};
+  if(o.type==='ellipse') return o._circle?'Cercle':'Ellipse'; if(o.type==='text') return 'Texte « '+String(o.text||'').slice(0,12)+' »'; return n[o.type]||o.type; }
+function _ilShapeIco(o){ return {rect:'▭',star:'★',line:'—',text:'T',ellipse:'◯',polygon:'⬠',tri:'△',free:'✎',arc:'◠',oblong:'⬭',gear:'⚙'}[o.type]||'◆'; }
+// rasters des formes (cache par dessin) dans un repère commun
+let _ilPrev=null;
+function _ilPrevBuild(SC){
+  const per=[]; let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const o of _ilAllObjs()){ let r=null; try{ r=rasterizeObject(o,SC); }catch(e){} if(!r||!r.pixels) continue; const sc=r.SC||SC;
+    let a=1e9,b=1e9,c=-1,d=-1; for(let py=0;py<r.H;py++) for(let px=0;px<r.W;px++) if(r.pixels[py*r.W+px]){ if(px<a)a=px; if(px>c)c=px; if(py<b)b=py; if(py>d)d=py; }
+    if(c<0) continue; const it={o,r,sc,mx0:r.minX+(a-r.pad)/sc,mx1:r.minX+(c+1-r.pad)/sc,my0:r.minY+(b-r.pad)/sc,my1:r.minY+(d+1-r.pad)/sc,area:0};
+    for(let q=0;q<r.pixels.length;q++) if(r.pixels[q]) it.area++; per.push(it);
+    x0=Math.min(x0,it.mx0); x1=Math.max(x1,it.mx1); y0=Math.min(y0,it.my0); y1=Math.max(y1,it.my1); }
+  if(!per.length) return null; const pad=6; const X0=x0-pad, Y0=y0-pad, W=Math.ceil((x1-x0+2*pad)*SC), H=Math.ceil((y1-y0+2*pad)*SC);
+  const at=(it,x,y)=>{ const px=Math.floor((x-it.r.minX)*it.sc+it.r.pad), py=Math.floor((y-it.r.minY)*it.sc+it.r.pad); return px>=0&&py>=0&&px<it.r.W&&py<it.r.H&&it.r.pixels[py*it.r.W+px]===1; };
+  const m=new Uint8Array(W*H), off=new Uint8Array(W*H);
+  for(const it of per){ const i0=Math.max(0,Math.floor((it.mx0-X0)*SC)-1), i1=Math.min(W-1,Math.ceil((it.mx1-X0)*SC)+1), j0=Math.max(0,Math.floor((it.my0-Y0)*SC)-1), j1=Math.min(H-1,Math.ceil((it.my1-Y0)*SC)+1);
+    for(let j=j0;j<=j1;j++){ const y=Y0+(j+0.5)/SC; for(let i=i0;i<=i1;i++){ const x=X0+(i+0.5)/SC; if(at(it,x,y)){ if(it.o._inlayOff) off[j*W+i]=1; else m[j*W+i]^=1; } } } }
+  return {SC,X0,Y0,W,H,m,off,per,at};
+}
 function ilWoodPreviewDraw(){
   const cv=document.getElementById('ilWoodPreview'); if(!cv) return;
-  const W=Math.max(200,Math.round(cv.clientWidth*(window.devicePixelRatio||1))), H=Math.max(120,Math.round(cv.clientHeight*(window.devicePixelRatio||1)));
+  const dpr=window.devicePixelRatio||1; const W=Math.max(200,Math.round(cv.clientWidth*dpr)), H=Math.max(120,Math.round(cv.clientHeight*dpr));
   cv.width=W; cv.height=H; const ctx=cv.getContext('2d');
-  const objs=_ilObjs(); const info=document.getElementById('ilwInfo');
-  ctx.fillStyle='#0a0c10'; ctx.fillRect(0,0,W,H);
-  if(!objs.length){ ctx.fillStyle='#888'; ctx.font=(14*(window.devicePixelRatio||1))+'px sans-serif'; ctx.textAlign='center'; ctx.fillText('Dessine d\'abord tes formes',W/2,H/2); if(info) info.textContent=''; return; }
-  // masque pair-impair, résolution adaptée à l'aperçu
-  let G=null; try{ G=_IL.mask(objs, 8, 6, null, true); }catch(e){ G=null; }
-  if(!G){ if(info) info.textContent=''; return; }
+  const all=_ilAllObjs(), on=_ilObjs(); const info=document.getElementById('ilwInfo');
+  ctx.fillStyle='#0a0c10'; ctx.fillRect(0,0,W,H); _ilPrev=null;
+  if(!all.length){ ctx.fillStyle='#888'; ctx.font=(14*dpr)+'px sans-serif'; ctx.textAlign='center'; ctx.fillText('Dessine d\'abord tes formes',W/2,H/2); if(info) info.textContent=''; ilShapeChips(); return; }
+  // résolution de l'aperçu : ~ la taille de l'écran
+  let bw=0,bh=0; { const t=_ilPrevBuild(2); if(t){ bw=t.W/2; bh=t.H/2; } }
+  const SC=Math.max(2,Math.min(16,Math.round(Math.min(W/Math.max(1,bw),H/Math.max(1,bh))*0.6)));
+  const G=_ilPrevBuild(SC); if(!G){ ilShapeChips(); return; }
   const wMm=G.W/G.SC, hMm=G.H/G.SC; const k=Math.min(W/wMm, H/hMm)*0.94; const ox=(W-wMm*k)/2, oy=(H-hMm*k)/2;
+  _ilPrev={G,k,ox,oy,dpr};
   const img=ctx.createImageData(W,H); const F=_ilRGB(ilWood('female').color), M=_ilRGB(ilWood('male').color);
   for(let py=0;py<H;py++){ const ym=(py-oy)/k; const j=Math.floor(ym*G.SC);
     for(let px=0;px<W;px++){ const xm=(px-ox)/k; const i=Math.floor(xm*G.SC); const o=(py*W+px)*4;
       if(i<0||j<0||i>=G.W||j>=G.H){ img.data[o]=10; img.data[o+1]=12; img.data[o+2]=16; img.data[o+3]=255; continue; }
-      const inS=G.m[j*G.W+i]===1; const c=inS?M:F; const gr=_ilGrain(xm*3,ym*3,inS?0.5:0);
-      // liseré à la frontière
-      let edge=false; if(i>0&&j>0&&i<G.W-1&&j<G.H-1){ const a=G.m[j*G.W+i]; edge=(G.m[j*G.W+i+1]!==a||G.m[j*G.W+i-1]!==a||G.m[(j+1)*G.W+i]!==a||G.m[(j-1)*G.W+i]!==a); }
-      const s=edge?0.55:gr; img.data[o]=Math.min(255,c[0]*s); img.data[o+1]=Math.min(255,c[1]*s); img.data[o+2]=Math.min(255,c[2]*s); img.data[o+3]=255; } }
+      const q=j*G.W+i, inS=G.m[q]===1; const c=inS?M:F; const gr=_ilGrain(xm*3,ym*3,inS?0.5:0);
+      let edge=false; if(i>0&&j>0&&i<G.W-1&&j<G.H-1){ const a=G.m[q]; edge=(G.m[q+1]!==a||G.m[q-1]!==a||G.m[q+G.W]!==a||G.m[q-G.W]!==a); }
+      let r=c[0]*(edge?0.55:gr), g=c[1]*(edge?0.55:gr), b=c[2]*(edge?0.55:gr);
+      if(G.off[q] && !inS){ const st=((px+py)>>2)&1; r=r*0.45+(st?150:90)*0.55; g=g*0.45+(st?150:90)*0.55; b=b*0.45+(st?160:100)*0.55; }   // forme ignorée : hachurée grise
+      img.data[o]=Math.min(255,r); img.data[o+1]=Math.min(255,g); img.data[o+2]=Math.min(255,b); img.data[o+3]=255; } }
   ctx.putImageData(img,0,0);
-  if(info) info.textContent=`— ${objs.length} forme${objs.length>1?'s':''} · fond ${ilWood('female').name} · bouchons ${ilWood('male').name}`;
+  const nOff=all.length-on.length;
+  if(info) info.textContent=`— ${on.length} forme${on.length>1?'s':''} incrustée${on.length>1?'s':''}${nOff?' · '+nOff+' ignorée'+(nOff>1?'s':''):''} · fond ${ilWood('female').name} · bouchons ${ilWood('male').name}`;
+  ilShapeChips();
 }
+// clic dans l'aperçu : la plus petite forme sous le doigt bascule incrustée ↔ ignorée
+function _ilPrevClick(e){ const P=_ilPrev; if(!P) return; const cv=e.currentTarget, r=cv.getBoundingClientRect();
+  const px=(e.clientX-r.left)*P.dpr, py=(e.clientY-r.top)*P.dpr; const tol=Math.max(1, 6*P.dpr/P.k);   // ~6 px écran de tolérance (traits fins)
+  const xm=(px-P.ox)/P.k+P.G.X0, ym=(py-P.oy)/P.k+P.G.Y0; let best=null;
+  for(const it of P.G.per){ let hit=P.G.at(it,xm,ym);
+    if(!hit) for(const [dx,dy] of [[tol,0],[-tol,0],[0,tol],[0,-tol],[tol,tol],[-tol,-tol],[tol,-tol],[-tol,tol]]) if(P.G.at(it,xm+dx,ym+dy)){ hit=true; break; }
+    if(hit && (!best || it.area<best.area)) best=it; }
+  if(best) ilShapeToggle(best.o.id);
+}
+function ilShapeToggle(id){ const o=_ilAllObjs().find(x=>x.id===id); if(!o) return; o._inlayOff=!o._inlayOff; ilWoodPreviewDraw(); }
+function ilShapeChips(){ const box=document.getElementById('ilwShapes'); if(!box) return; const all=_ilAllObjs();
+  const has=new Set(_ilPrev?_ilPrev.G.per.map(it=>it.o.id):all.map(o=>o.id));
+  box.innerHTML=all.map(o=>!has.has(o.id)?`<span class="ilw-chip off" title="Trait ouvert : pas de surface à creuser">${_ilShapeIco(o)} ${_ilShapeName(o)} <b>pas de surface</b></span>`
+    :`<button class="ilw-chip${o._inlayOff?' off':''}" onclick="ilShapeToggle(${JSON.stringify(o.id)})" title="Cliquer pour ${o._inlayOff?'incruster':'ignorer'}">${_ilShapeIco(o)} ${_ilShapeName(o)} <b>${o._inlayOff?'🚫 ignorée':'✅ incrustée'}</b></button>`).join(''); }
+(function(){ const bind=()=>{ const cv=document.getElementById('ilWoodPreview'); if(cv && !cv._ilc){ cv._ilc=1; cv.addEventListener('click',_ilPrevClick); } };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind(); setTimeout(bind,500); })();
 window.addEventListener('resize',()=>{ const p=document.getElementById('wzp3'); if(p&&p.classList.contains('wz-on')) ilWoodPreviewDraw(); });
 
 // ---------- 2) RÉGLAGES : schéma vivant en coupe ----------
