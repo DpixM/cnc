@@ -164,6 +164,14 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-18 — JB : Atelier 3D fichier par fichier + nom du projet
+ [FIX] Le 🧊 d'un fichier montrait l'ébauche ET la finition à la suite. Maintenant 1 onglet par fichier :
+   ♀ FEMELLE 1 · Ébauche / 2 · Finition — ♂ MÂLE 3 · Ébauche / 4 · Finition. La finition part du bois déjà ébauché
+   (c'est ce que la machine trouve) mais n'anime QUE la finition. Gros titre ♀/♂ + bois + nom du fichier en haut.
+ [AJOUT] « Nom du projet » (page des 4 G-codes, mémorisé) : nom_1_femelle_ebauche.nc … + ZIP nom.zip
+   + ligne « ; Projet : nom » dans l'en-tête de chaque G-code (aucun mouvement modifié).
+ [AJOUT] Rappel « ♀ Femelle = bois / ♂ Mâle = bois » + bouton ⇄ inverser sur Les bois, Réglages et les 4 G-codes.
+
 -- 2026-10-18 — JA : les 4 G-codes incrustation sur UNE page (♀ ébauche + finition, ♂ ébauche + finition)
  [FIX] Seb ne trouvait que 2 fichiers : les 2 mâles étaient sur une page à part. Maintenant 1 page, 4 cartes avec
    un mini-aperçu du bois après chaque fichier (on voit tout de suite poche ♀ / bouchon ♂), nom du fichier sur le bouton.
@@ -2175,6 +2183,26 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 .ilf-tip{font-size:11px;color:var(--txt2);line-height:1.5}
 .ilf-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.ilf-act .btn{flex:1;min-width:200px}
 .ilw-warn{font-size:12px;color:#ffb74d;background:#ff980018;border:1px solid #ff980055;border-radius:8px;padding:7px 10px;margin-top:8px;display:none}
+/* JB */
+.ilr-recap{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 10px;font-size:12.5px}
+.ilr-recap:empty{display:none}
+.ilr-recap>span{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:9px;background:var(--surf2);border:1.5px solid var(--brd2)}
+.ilr-f{border-color:#4caf5088!important}.ilr-m{border-color:#42a5f588!important}
+.ilr-sw{display:inline-block;width:16px;height:16px;border-radius:4px;border:1px solid #fff5}
+.ilr-x{padding:5px 10px;border-radius:9px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--txt);font-weight:700;font-size:12px;cursor:pointer}
+.ilf-proj{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:4px 0 6px;padding:8px 10px;border-radius:10px;background:var(--surf2);border:1.5px solid var(--acc)}
+.ilf-proj label{font-weight:800;font-size:13px}
+.ilf-proj input{flex:1;min-width:160px;max-width:320px;padding:7px 10px;border-radius:8px;border:1.5px solid var(--brd2);background:var(--bg,#0b0d10);color:var(--txt);font-size:14px;font-weight:700}
+.ilf-ph{font-size:11px;color:var(--txt2)}
+.ilv-grp{display:inline-flex;align-items:center;gap:5px;padding:3px 6px 3px 9px;border-radius:11px;border:1.5px solid}
+.ilv-grp b{font-size:12px;font-weight:900;margin-right:2px}
+.ilv-gf{border-color:#4caf5088}.ilv-gf b{color:#81c784}.ilv-gm{border-color:#42a5f588}.ilv-gm b{color:#64b5f6}
+.ilv-big{background:#000c;border:1.5px solid var(--brd2);border-radius:11px;padding:8px 12px;font-size:16px;font-weight:900;color:#fff;pointer-events:auto;max-width:calc(100vw - 150px)}
+.ilv-bs{padding:2px 8px;border-radius:7px;color:#000}.ilv-bs.f{background:#81c784}.ilv-bs.m{background:#64b5f6}
+.ilv-bw{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:var(--txt2)}
+.ilv-bw i{display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid #fff6}
+.ilv-fn{font-size:11px;font-weight:600;color:var(--txt2);margin-top:3px}
+@media(max-width:600px){.ilv-big{font-size:13px;padding:6px 9px}.ilv-tab{padding:6px 9px}}
 </style>
 
 </head>
@@ -2184,7 +2212,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JA ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JB ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2710,6 +2738,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
     </div>
   </div>
 
+  <div class="ilr-recap"></div>
   <div class="ilw-prev">
     <div class="ilw-pt">Aperçu du résultat <span id="ilwInfo"></span></div>
     <div class="ilw-hint">👆 Clique une forme (ou sa pastille) pour l'<b>incruster</b> ou l'<b>ignorer</b> (cadre, trait de construction…)</div>
@@ -2872,6 +2901,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <div class="wz-wrap" id="wzp11">
   <div class="wz-h1">⚙️ Réglages de l'incrustation</div>
   <div class="wz-sub">Touche un réglage — ou clique directement une cote orange sur les dessins pour la changer</div>
+  <div class="ilr-recap"></div>
 
   <div class="ilp-grid">
     <!-- Schéma vivant -->
@@ -2947,30 +2977,32 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <div class="wz-wrap" id="wzp12">
   <div class="wz-h1">📄 Tes 4 fichiers G-code</div>
   <div class="wz-sub" id="p12sub">2 fichiers pour la planche ♀, 2 pour la planche ♂ — à usiner dans l'ordre 1 → 2, puis 3 → 4</div>
+  <div class="ilf-proj"><label for="ilProj">📝 Nom du projet</label><input type="text" id="ilProj" placeholder="ex : plateau étoile" oninput="ilProjSet(this.value)"><span class="ilf-ph">ajouté devant chaque fichier : <b>nom_1_femelle_ebauche.nc</b>…</span></div>
+  <div class="ilr-recap"></div>
   <div id="p12st" class="al al-w">⏳ Génération...</div>
   <div class="ilf-grid">
     <div class="ilf-col ilf-f">
       <div class="ilf-h">♀ Planche creusée — <span id="ilfWF">Noyer</span></div>
       <div class="ilf-card"><canvas class="ilf-mini" id="ilfMini_inlay_female_rough"></canvas><div class="ilf-info">
         <div class="ilf-n">1 · Ébauche ♀</div><div class="ilf-d">Fraise plate — vide le gros de la poche</div><div id="p12st1" class="ilf-st">⏳</div>
-        <div class="ilf-btns"><button class="ilf-dl" onclick="wzDlInlay2('inlay_female_rough')">💾 1_femelle_ebauche.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_female_rough')">📄</button><button class="ilf-b" title="Atelier 3D" onclick="ilvOpen('f')">🧊</button></div></div></div>
+        <div class="ilf-btns"><button class="ilf-dl" data-ilk="inlay_female_rough" onclick="wzDlInlay2('inlay_female_rough')">💾 1_femelle_ebauche.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_female_rough')">📄</button><button class="ilf-b" title="Voir CE fichier en 3D" onclick="ilvOpen('f',0)">🧊</button></div></div></div>
       <div class="ilf-card"><canvas class="ilf-mini" id="ilfMini_inlay_female_finish"></canvas><div class="ilf-info">
         <div class="ilf-n">2 · Finition ♀</div><div class="ilf-d">V-bit — murs en V, pointes, coins</div><div id="p12st2" class="ilf-st">⏳</div>
-        <div class="ilf-btns"><button class="ilf-dl" onclick="wzDlInlay2('inlay_female_finish')">💾 2_femelle_finition.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_female_finish')">📄</button><button class="ilf-b" title="Atelier 3D" onclick="ilvOpen('f')">🧊</button></div></div></div>
+        <div class="ilf-btns"><button class="ilf-dl" data-ilk="inlay_female_finish" onclick="wzDlInlay2('inlay_female_finish')">💾 2_femelle_finition.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_female_finish')">📄</button><button class="ilf-b" title="Voir CE fichier en 3D" onclick="ilvOpen('f',1)">🧊</button></div></div></div>
       <div class="ilf-tip">Entre 1 et 2 : change pour le V-bit et refais le zéro Z.</div>
     </div>
     <div class="ilf-col ilf-m">
       <div class="ilf-h">♂ Bouchons — <span id="ilfWM">Érable</span></div>
       <div class="ilf-card"><canvas class="ilf-mini" id="ilfMini_inlay_male_rough"></canvas><div class="ilf-info">
         <div class="ilf-n">3 · Ébauche ♂</div><div class="ilf-d">Fraise plate — dégage autour des bouchons</div><div id="p13st1" class="ilf-st">⏳</div>
-        <div class="ilf-btns"><button class="ilf-dl" onclick="wzDlInlay2('inlay_male_rough')">💾 3_male_ebauche.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_male_rough')">📄</button><button class="ilf-b" title="Atelier 3D" onclick="ilvOpen('m')">🧊</button></div></div></div>
+        <div class="ilf-btns"><button class="ilf-dl" data-ilk="inlay_male_rough" onclick="wzDlInlay2('inlay_male_rough')">💾 3_male_ebauche.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_male_rough')">📄</button><button class="ilf-b" title="Voir CE fichier en 3D" onclick="ilvOpen('m',0)">🧊</button></div></div></div>
       <div class="ilf-card"><canvas class="ilf-mini" id="ilfMini_inlay_male_finish"></canvas><div class="ilf-info">
         <div class="ilf-n">4 · Finition ♂</div><div class="ilf-d">V-bit — flancs des bouchons</div><div id="p13st2" class="ilf-st">⏳</div>
-        <div class="ilf-btns"><button class="ilf-dl" onclick="wzDlInlay2('inlay_male_finish')">💾 4_male_finition.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_male_finish')">📄</button><button class="ilf-b" title="Atelier 3D" onclick="ilvOpen('m')">🧊</button></div></div></div>
+        <div class="ilf-btns"><button class="ilf-dl" data-ilk="inlay_male_finish" onclick="wzDlInlay2('inlay_male_finish')">💾 4_male_finition.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_male_finish')">📄</button><button class="ilf-b" title="Voir CE fichier en 3D" onclick="ilvOpen('m',1)">🧊</button></div></div></div>
       <div class="ilf-tip">Le mâle est usiné EN MIROIR (normal : tu retournes la pièce pour coller). Même zéro que la femelle. Après usinage, scie la pièce dans la bande creusée à plat.</div>
     </div>
   </div>
-  <div class="ilf-act"><button class="btn btn-p" onclick="ilvOpen('fit')">🧊 Atelier 3D : vérifier l'emboîtement</button><button class="btn" onclick="wzZip()">📦 Les 4 fichiers en ZIP</button></div>
+  <div class="ilf-act"><button class="btn btn-p" onclick="ilvOpen('fit')">🧊 Atelier 3D : vérifier l'emboîtement</button><button class="btn" onclick="wzZip()">📦 Les 4 fichiers en ZIP · <span id="ilZipName">incrustation.zip</span></button></div>
 </div>
 
 <!-- PAGE 13 : G-CODES MÂLE ♂ -->
@@ -17579,12 +17611,12 @@ const WZ_NAMES={inlay_female_rough:'1_femelle_ebauche',inlay_female_finish:'2_fe
 
 function wzDl(key){
   const gc=generatedGcodes[key]; if(!gc){alert('G-code non disponible');return;}
-  saveGcodeFile(gc, `inlay_${WZ_NAMES[key]}.nc`);
+  saveGcodeFile(ilWithProj(gc), ilFileName(key));
 }
 function wzShare(key){
   const gc=generatedGcodes[key]; if(!gc){alert('G-code non disponible');return;}
   if(navigator.share){
-    const f=new File([gc],`inlay_${WZ_NAMES[key]}.nc`,{type:'text/plain'});
+    const f=new File([ilWithProj(gc)],ilFileName(key),{type:'text/plain'});
     navigator.share({files:[f]}).catch(()=>navigator.clipboard?.writeText(gc));
   } else { navigator.clipboard?.writeText(gc).then(()=>alert('✅ Copié!')); }
 }
@@ -17592,12 +17624,12 @@ async function wzZip(){
   if(typeof JSZip==='undefined'){alert('JSZip non chargé');return;}
   const zip=new JSZip();
   Object.entries(WZ_NAMES).forEach(([key,name])=>{
-    if(generatedGcodes[key]) zip.file(`${name}.nc`, generatedGcodes[key]);   // 4 fichiers incrustation
+    if(generatedGcodes[key]) zip.file(ilFileName(key), ilWithProj(generatedGcodes[key]));   // 4 fichiers incrustation (+ nom du projet)
   });
   const blob=await zip.generateAsync({type:'blob'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='inlay_gcodes.zip'; a.click();
+  a.download=(ilProjName()||'incrustation')+'.zip'; a.click();
 }
 
 // ── Récap ──
@@ -17637,9 +17669,9 @@ function wzRenderRecap(){
   const _wf=(typeof ilWood==='function')?ilWood('female').name:'noyer', _wm=(typeof ilWood==='function')?ilWood('male').name:'érable';
   const items=[
     {key:'inlay_female_rough',  col:'var(--grn)', sym:'♀', n:'Ébauche Femelle',  d:'Fraise plate · '+_wf, t:'f'},
-    {key:'inlay_female_finish', col:'var(--grn)', sym:'♀', n:'Finition Femelle', d:'V-bit · '+_wf, t:'f'},
-    {key:'inlay_male_rough',    col:'var(--blu)', sym:'♂', n:'Ébauche Mâle',     d:'Fraise plate · '+_wm, t:'m'},
-    {key:'inlay_male_finish',   col:'var(--blu)', sym:'♂', n:'Finition Mâle',    d:'V-bit · '+_wm, t:'m'},
+    {key:'inlay_female_finish', col:'var(--grn)', sym:'♀', n:'Finition Femelle', d:'V-bit · '+_wf, t:'f', fi:1},
+    {key:'inlay_male_rough',    col:'var(--blu)', sym:'♂', n:'Ébauche Mâle',     d:'Fraise plate · '+_wm, t:'m', fi:0},
+    {key:'inlay_male_finish',   col:'var(--blu)', sym:'♂', n:'Finition Mâle',    d:'V-bit · '+_wm, t:'m', fi:1},
   ];
   el.innerHTML=items.map((it,i)=>{
     const gc=generatedGcodes[it.key];
@@ -17653,7 +17685,7 @@ function wzRenderRecap(){
       </div>
       <div class="rc-btns">
         <button class="btn-ic" style="color:${it.col}" onclick="wzDlInlay2('${it.key}')">💾</button>
-        <button class="btn-ic" style="color:var(--txt2)" onclick="ilvOpen('${it.t}')">▶</button>
+        <button class="btn-ic" style="color:var(--txt2)" onclick="ilvOpen('${it.t}',${it.fi||0})">▶</button>
       </div>
     </div>`;
   }).join('')+`<button class="btn btn-p" style="width:100%;margin-top:8px" onclick="ilvOpen('fit')">🧊 Atelier 3D : bois creusé + emboîtement</button>`;
@@ -26019,7 +26051,7 @@ function wzDlInlay2(key){
     inlay_male_rough:'3_male_ebauche',
     inlay_male_finish:'4_male_finition',
   };
-  saveGcodeFile(gc, (names[key]||key) + '.nc');
+  saveGcodeFile(ilWithProj(gc), ilFileName(key));   // JB : nom du projet devant + dans l'en-tête
 }
 
 function gcPolylineFixedZ(poly, z, safeZ, fxy, fz) {
@@ -27741,6 +27773,13 @@ let inlayWoods = (function(){ try{ const s=JSON.parse(localStorage.getItem('kerf
   return {female:{id:'noyer',name:'Noyer',color:'#5C3317'}, male:{id:'erable',name:'Érable',color:'#F0DDB0'}}; })();
 function ilWood(g){ return (inlayWoods&&inlayWoods[g]) || (g==='male'?{name:'Érable',color:'#F0DDB0'}:{name:'Noyer',color:'#5C3317'}); }
 function _ilSaveWoods(){ try{ localStorage.setItem('kerf_inlayWoods', JSON.stringify(inlayWoods)); }catch(e){} }
+// JB : inverser les 2 bois + rappel « ♀ = … / ♂ = … » sur chaque page
+function ilWoodSwap(){ const f=ilWood('female'), m=ilWood('male'); inlayWoods={female:m, male:f}; _ilSaveWoods(); ilWoodsInit(); ilWoodRecap(); if(typeof ilSchemaDraw==='function'&&document.getElementById('ilSchema')) ilSchemaDraw();
+  if(typeof ilFilesPreview==='function' && generatedGcodes.inlay_female_finish) ilFilesPreview(); }
+function ilWoodRecap(){ const f=ilWood('female'), m=ilWood('male');
+  const sw=w=>`<i class="ilr-sw" style="background:${w.color}"></i>`;
+  const html=`<span class="ilr-f">♀ Femelle (planche creusée) = ${sw(f)}<b>${f.name}</b></span><span class="ilr-m">♂ Mâle (bouchons) = ${sw(m)}<b>${m.name}</b></span><button class="ilr-x" onclick="ilWoodSwap()" title="Échanger les deux bois">⇄ inverser</button>`;
+  document.querySelectorAll('.ilr-recap').forEach(el=>{ if(el._h!==html){ el.innerHTML=html; el._h=html; } }); }
 function _ilTextOn(hex){ const h=(hex||'#888').replace('#',''); const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16); return (0.299*r+0.587*g+0.114*b)>140?'#1a1206':'#fff'; }
 function ilWoodPick(g, id){ const w=WOOD_PRESETS.find(x=>x.id===id); if(!w) return; inlayWoods[g]={id:w.id,name:w.name,color:w.color}; _ilSaveWoods(); ilWoodsInit(); }
 function ilWoodCustom(g){ const S=g==='female'?'F':'M'; const n=document.getElementById('ilwName'+S), c=document.getElementById('ilwCol'+S);
@@ -27751,7 +27790,7 @@ function ilWoodsInit(keepInputs){
     box.innerHTML=WOOD_PRESETS.map(w=>`<button class="ilw-b${cur.id===w.id?' on':''}" style="background:${w.color};color:${_ilTextOn(w.color)}" onclick="ilWoodPick('${g}','${w.id}')">${w.name}</button>`).join('');
     if(!keepInputs){ const n=document.getElementById('ilwName'+S), c=document.getElementById('ilwCol'+S); if(n) n.value=cur.id==='custom'?cur.name:''; if(c) c.value=cur.color; } }
   const cv=document.getElementById('ilWoodPreview'); if(cv && !cv._ilc){ cv._ilc=1; cv.addEventListener('click',_ilPrevClick); }
-  requestAnimationFrame(ilWoodPreviewDraw);
+  requestAnimationFrame(ilWoodPreviewDraw); ilWoodRecap();
 }
 // petit motif de veinage (même pour l'aperçu et la 3D)
 function _ilGrain(x, y, ang){ const u=x*Math.cos(ang)+y*Math.sin(ang), v=-x*Math.sin(ang)+y*Math.cos(ang);
@@ -28020,8 +28059,12 @@ ILV.grid=function(maxCells){ const all=[]; let xc=null;
   const area=2*hw*(y1-y0); const res=Math.max(maxCells?0.04:0.08, Math.sqrt(area/(maxCells||170000)));
   const nx=Math.ceil(2*hw/res)|1, ny=Math.ceil((y1-y0)/res)+1;
   return {xc, X0:xc-(nx-1)/2*res, Y0:y0, res, nx, ny}; };
-ILV.newSide=function(side, G){ const files=ILV.files(side); const mv=[]; files.forEach((f,fi)=>{ for(const m of ILV.parse(f.gc).mv){ m.fi=fi; mv.push(m); } });
-  return {side, files, mv, idx:0, sub:0, h:new Float32Array(G.nx*G.ny), G, dirty:true, head:[0,0,5], fi:0, done:false}; };
+// only : undefined = les 2 fichiers à la suite (emboîtement) · 0 = ébauche seule · 1 = finition seule (l'ébauche est déjà faite au départ)
+ILV.newSide=function(side, G, only){ const files=ILV.files(side); const mv=[]; files.forEach((f,fi)=>{ if(only!=null && fi!==only) return; for(const m of ILV.parse(f.gc).mv){ m.fi=fi; mv.push(m); } });
+  const S={side, only, files, mv, idx:0, sub:0, h:new Float32Array(G.nx*G.ny), G, dirty:true, head:[0,0,5], fi:only||0, fi0:only||0, done:false, base:null};
+  if(only===1){ const pre={files, mv:[], idx:0, sub:0, h:S.h, G, head:[0,0,0], fi:0}; for(const m of ILV.parse(files[0].gc).mv){ m.fi=0; pre.mv.push(m); } ILV.advance(pre, Infinity); S.base=new Float32Array(S.h); }
+  return S; };
+ILV.reset=function(S){ if(S.base) S.h.set(S.base); else S.h.fill(0); S.idx=0; S.sub=0; S.fi=S.fi0; S.done=false; S.dirty=true; };
 ILV.stamp=function(S, x, y, z, tool){ if(z>=0) return; const G=S.G, D=-z; const r=tool.type==='v'?Math.min(D*tool.t+(tool.w||0)/2, 12):tool.R; const rp=r/G.res;
   const ci=(x-G.X0)/G.res, cj=(y-G.Y0)/G.res; const i0=Math.max(0,Math.floor(ci-rp)), i1=Math.min(G.nx-1,Math.ceil(ci+rp)), j0=Math.max(0,Math.floor(cj-rp)), j1=Math.min(G.ny-1,Math.ceil(cj+rp));
   const h=S.h; if(tool.type==='v'){ const k1=G.res/tool.t, w2=(tool.w||0)/2/G.res; for(let j=j0;j<=j1;j++){ const dy=j-cj; for(let i=i0;i<=i1;i++){ const dx=i-ci; const v=D-Math.max(0,Math.sqrt(dx*dx+dy*dy)-w2)*k1; const q=j*G.nx+i; if(v>h[q]) h[q]=v; } } }
@@ -28040,13 +28083,13 @@ ILV.build=function(){
   if(document.getElementById('ilvModal')) return;
   const d=document.createElement('div'); d.id='ilvModal';
   d.innerHTML=`<div class="ilv-top"><span class="ilv-title">🧊 Atelier 3D</span>
-      <button class="ilv-tab" data-t="f" onclick="ilvTab('f')">♀ Femelle</button>
-      <button class="ilv-tab" data-t="m" onclick="ilvTab('m')">♂ Mâle</button>
+      <span class="ilv-grp ilv-gf"><b>♀ FEMELLE</b><button class="ilv-tab" data-t="f0" onclick="ilvTab('f0')">1 · Ébauche</button><button class="ilv-tab" data-t="f1" onclick="ilvTab('f1')">2 · Finition</button></span>
+      <span class="ilv-grp ilv-gm"><b>♂ MÂLE</b><button class="ilv-tab" data-t="m0" onclick="ilvTab('m0')">3 · Ébauche</button><button class="ilv-tab" data-t="m1" onclick="ilvTab('m1')">4 · Finition</button></span>
       <button class="ilv-tab" data-t="fit" onclick="ilvTab('fit')">🧩 Emboîtement</button>
       <button class="ilv-x" onclick="ilvClose()">✕</button></div>
     <div class="ilv-body">
       <canvas id="ilvCanvas"></canvas>
-      <div class="ilv-hud" id="ilvHud"><div class="ilv-steps" id="ilvSteps"></div><div class="ilv-chip" id="ilvInfo"></div></div>
+      <div class="ilv-hud" id="ilvHud"><div class="ilv-big" id="ilvBig"></div><div class="ilv-steps" id="ilvSteps"></div><div class="ilv-chip" id="ilvInfo"></div></div>
       <div class="ilv-opts" id="ilvOpts">
         <button class="ilv-opt" id="ilvOptPaths" onclick="ilvTogglePaths()">〰 Trajets</button>
         <button class="ilv-opt" onclick="ilvView('top')">⬒ Vue dessus</button>
@@ -28137,11 +28180,14 @@ ILV.frame=function(){ ILV.resize(); const S=ILV.side; if(!S||ILV.tab==='fit'){ r
   ILV.camUpdate(); ILV.renderer.render(ILV.world,ILV.cam); ILV.info(); };
 ILV.info=function(){ const S=ILV.side; if(!S) return; const el=document.getElementById('ilvInfo'); const m=S.mv[Math.min(S.idx,S.mv.length-1)];
   const pr=S.mv.length?S.idx/S.mv.length:1; const pg=document.getElementById('ilvProg'); if(pg && !ILV._seeking) pg.value=Math.round(pr*1000);
-  if(el) el.innerHTML=`${S.side==='f'?'♀ '+ilWood('female').name:'♂ '+ilWood('male').name+' (dessin en miroir : normal)'} · ${S.done?'terminé ✅':S.files[S.fi].label} · Z ${S.head[2].toFixed(2)} · ligne ${m?m.line:'-'}`;
-  const st=document.getElementById('ilvSteps'); if(st){ const html=S.files.map((f,i)=>`<span class="ilv-step${S.fi===i&&!S.done?' on':''}${(S.fi>i||S.done)?' done':''}">${i+1}. ${f.label}</span>`).join(''); if(st._h!==html){ st.innerHTML=html; st._h=html; } } };
+  if(el) el.innerHTML=`${S.done?'terminé ✅':'en cours'} · Z ${S.head[2].toFixed(2)} · ligne ${m?m.line:'-'} / ${S.mv.length?S.mv[S.mv.length-1].line:'-'}${S.side==='m'?' · dessin en miroir (normal)':''}`;
+  const bg=document.getElementById('ilvBig'); if(bg){ const n=S.side==='f'?(S.fi0===1?2:1):(S.fi0===1?4:3), fem=S.side==='f', w=ilWood(fem?'female':'male');
+    const html=`<span class="ilv-bs ${fem?'f':'m'}">${fem?'♀ FEMELLE':'♂ MÂLE'}</span> <span>${n} · ${S.files[S.fi0].label}</span> <span class="ilv-bw"><i style="background:${w.color}"></i>${w.name}</span><div class="ilv-fn">💾 ${ilFileName(S.files[S.fi0].key)}</div>`;
+    if(bg._h!==html){ bg.innerHTML=html; bg._h=html; } }
+  const st=document.getElementById('ilvSteps'); if(st){ const html=S.only===1?`<span class="ilv-step done">départ : ébauche ${S.side==='f'?'1':'3'} déjà faite</span>`:''; if(st._h!==html){ st.innerHTML=html; st._h=html; st.style.display=html?'':'none'; } } };
 ILV.ui=function(){ const b=document.getElementById('ilvPlay'); if(b) b.textContent=ILV.playing?'⏸':'▶'; };
 
-function ilvOpen(tab){
+function ilvOpen(tab, fi){ if(tab==='f'||tab==='m') tab=tab+(fi?1:0);
   if(!generatedGcodes.inlay_female_finish){ alert('Génère d\'abord les G-codes'); return; }
   ILV.build(); document.getElementById('ilvModal').classList.add('open');
   if(!window.THREE){ document.getElementById('ilvInfo').textContent='3D indisponible (THREE manquant)'; return; }
@@ -28152,7 +28198,8 @@ function ilvOpen(tab){
     if(ILV.heads){ ILV.scene.remove(ILV.heads.v); ILV.scene.remove(ILV.heads.f); ILV.heads=null; }
     ILV.sides={}; ILV.fit=null; ILV.sig=sig; ILV.G=ILV.grid(); }
   if(!ILV.G){ document.getElementById('ilvInfo').textContent='Rien à afficher'; return; }
-  ILV.headFor(); ilvTab(tab||'f');
+  ILV.headFor(); const tt=document.querySelector('#ilvModal .ilv-title'); if(tt){ const p=ilProjName(); tt.textContent='🧊 Atelier 3D'+(p?' — '+p:''); }
+  ilvTab(tab||'f0');
 }
 function ilvClose(){ ILV.playing=false; ILV.ui(); const m=document.getElementById('ilvModal'); if(m) m.classList.remove('open'); }
 function ilvTab(t){ ILV.tab=t; document.querySelectorAll('#ilvModal .ilv-tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
@@ -28160,16 +28207,16 @@ function ilvTab(t){ ILV.tab=t; document.querySelectorAll('#ilvModal .ilv-tab').f
   fit.classList.toggle('on',t==='fit'); bar.style.display=t==='fit'?'none':''; hud.style.display=opts.style.display=t==='fit'?'none':''; ILV.cv.style.visibility=t==='fit'?'hidden':'visible';
   if(t==='fit'){ ILV.playing=false; ILV.ui(); ilvFitCompute(); return; }
   for(const s of Object.values(ILV.sides)){ if(s.grp) s.grp.visible=false; if(s.paths) s.paths.visible=false; }
-  if(!ILV.sides[t]){ ILV.sides[t]=ILV.newSide(t, ILV.G); }
+  if(!ILV.sides[t]){ ILV.sides[t]=ILV.newSide(t[0], ILV.G, +t[1]); }
   const S=ILV.side=ILV.sides[t]; ILV.meshFor(S); ILV.pathsFor(S); S.grp.visible=true; S.paths.visible=ILV.showPaths;
   ilvView('iso'); ILV.ui();
 }
 function ilvPlay(){ const S=ILV.side; if(!S) return; if(S.done){ ilvRestart(); } ILV.playing=!ILV.playing; ILV.ui(); }
-function ilvRestart(){ const S=ILV.side; if(!S) return; S.h.fill(0); S.idx=0; S.sub=0; S.fi=0; S.done=false; S.dirty=true; ILV.playing=false; ILV.ui(); }
+function ilvRestart(){ const S=ILV.side; if(!S) return; ILV.reset(S); ILV.playing=false; ILV.ui(); }
 function ilvEnd(){ const S=ILV.side; if(!S) return; const b=document.getElementById('ilvBusy'); b.classList.add('on');
   setTimeout(()=>{ ILV.advance(S, Infinity); S.dirty=true; ILV.playing=false; ILV.ui(); b.classList.remove('on'); },20); }
 function ilvSeek(f){ const S=ILV.side; if(!S) return; const target=Math.round(f*S.mv.length); ILV._seeking=true;
-  if(target<S.idx){ S.h.fill(0); S.idx=0; S.sub=0; }
+  if(target<S.idx){ ILV.reset(S); }
   while(S.idx<target){ const before=S.idx; ILV.advance(S, 50); if(S.idx===before) break; } S.dirty=true; ILV._seeking=false; }
 function ilvTogglePaths(){ ILV.showPaths=!ILV.showPaths; const S=ILV.side; if(S&&S.paths) S.paths.visible=ILV.showPaths; const b=document.getElementById('ilvOptPaths'); if(b) b.classList.toggle('on',ILV.showPaths); }
 function ilvView(v){ const G=ILV.G; if(!G) return; const w=(G.nx-1)*G.res, h=(G.ny-1)*G.res; const o=ILV.orbit; o.tx=G.X0+w/2; o.ty=-(G.Y0+h/2); o.tz=-2; const asp=(ILV.cv&&ILV.cv.clientWidth)?ILV.cv.clientWidth/Math.max(1,ILV.cv.clientHeight):1.6; o.r=1.25*Math.max(1.37*h, 1.37*w/asp);
@@ -28236,7 +28283,7 @@ function ilvFitDraw(){ const R=ILV.fit; if(!R) return; const G=R.G, n=G.nx*G.ny;
 // ---------- mini-aperçus des 4 fichiers (vue de dessus du bois après ce fichier) ----------
 function ilFilesPreview(){
   const P=inlayGetParams(); const t=Math.tan((P.vAngle/2)*Math.PI/180);
-  const ef=document.getElementById('ilfWF'), em=document.getElementById('ilfWM'); if(ef) ef.textContent=ilWood('female').name; if(em) em.textContent=ilWood('male').name;
+  const ef=document.getElementById('ilfWF'), em=document.getElementById('ilfWM'); if(ef) ef.textContent=ilWood('female').name; if(em) em.textContent=ilWood('male').name; ilWoodRecap(); ilProjInit();
   const keys=[['inlay_female_rough','female',null],['inlay_female_finish','female','inlay_female_rough'],['inlay_male_rough','male',null],['inlay_male_finish','male','inlay_male_rough']];
   for(const [key,g,prev] of keys){ const cv=document.getElementById('ilfMini_'+key); if(!cv) continue; const gc=generatedGcodes[key]; if(!gc) continue;
     const files=[]; if(prev && generatedGcodes[prev]) files.push({gc:generatedGcodes[prev], tool:{type:'flat',R:P.rDia/2}}); files.push({gc, tool:key.endsWith('rough')?{type:'flat',R:P.rDia/2}:{type:'v',t,w:Math.max(0,+P.vTip||0)}});
@@ -28254,6 +28301,19 @@ function ilFilesPreview(){
       img.data[o]=col[0]*f; img.data[o+1]=col[1]*f; img.data[o+2]=col[2]*f; img.data[o+3]=255; } }
     ctx.putImageData(img,0,0); }
 }
+
+// ---------- JB : nom du projet (tapé une fois, ajouté devant les noms des fichiers + dans l'en-tête G-code) ----------
+const IL_FNAMES={inlay_female_rough:'1_femelle_ebauche',inlay_female_finish:'2_femelle_finition',inlay_male_rough:'3_male_ebauche',inlay_male_finish:'4_male_finition'};
+function ilProjRaw(){ try{ return localStorage.getItem('kerf_ilProj')||''; }catch(e){ return window._ilProj||''; } }
+function ilProjName(){ return String(ilProjRaw()).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,'_').replace(/[^A-Za-z0-9_\-]/g,'').slice(0,40); }
+function ilFileName(key){ const p=ilProjName(); return (p?p+'_':'')+(IL_FNAMES[key]||key)+'.nc'; }
+function ilProjSet(v){ window._ilProj=v; try{ localStorage.setItem('kerf_ilProj', v); }catch(e){} ilProjLabels(); }
+function ilProjLabels(){ document.querySelectorAll('[data-ilk]').forEach(b=>{ b.textContent='💾 '+ilFileName(b.dataset.ilk); });
+  const z=document.getElementById('ilZipName'); if(z){ const p=ilProjName(); z.textContent=(p||'incrustation')+'.zip'; } }
+function ilProjInit(){ const i=document.getElementById('ilProj'); if(i && document.activeElement!==i) i.value=ilProjRaw(); ilProjLabels(); }
+// en-tête : « ; Projet : xxx » ajouté juste après la 1re ligne (sans toucher aux mouvements)
+function ilWithProj(gc){ const p=String(ilProjRaw()).trim(); if(!p || !gc) return gc; if(gc.indexOf('; Projet : ')>=0) return gc.replace(/; Projet : .*\n/, '; Projet : '+p+'\n');
+  const k=gc.indexOf('\n'); return k<0? gc+'\n; Projet : '+p : gc.slice(0,k+1)+'; Projet : '+p+'\n'+gc.slice(k+1); }
 
 function inlaySimAll(){ if(typeof ilvOpen==='function') return ilvOpen('f');
   const combined = [
