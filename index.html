@@ -164,6 +164,14 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-18 — JI : TEXTE en vrai V-carve + cercles lisses (incrustation seulement, laser/CNC normal pas touchés)
+ [FIX] Texte incrusté : l'ancien rendu prenait une autre police / position que la page dessin. Maintenant le texte est
+   redessiné EXACTEMENT comme à l'écran (même police, haut à o.x/o.y, étirement), et ses vrais contours sont tirés de ce
+   rendu -> dernier passage V-carve + coins vifs aussi pour les lettres. Simulation « Seb » : bouchon 4,38 -> 4,60 mm.
+ [FIX] Cercles / ellipses : 256 côtés au lieu de 24 pour l'incrustation, et les petits virages (courbes) sont passés en
+   douceur -> plus de petites remontées à chaque sommet (JG en faisait 24 sur un cercle !). Anneau 4,69 mm.
+ [FIX] Un contour à petits segments (cercle intérieur) pouvait être oublié par le dernier passage.
+
 -- 2026-10-18 — JH : Réglages incrustation : BULLES D'AIDE (survol d'une cote orange sur les dessins, ou le « ? » à côté de
    chaque réglage, ou en touchant le champ) : à quoi ça sert + valeur conseillée, en mots simples. Affichage seulement.
 
@@ -2304,7 +2312,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JH ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JI ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -27528,12 +27536,44 @@ _IL.edt = function(inside, W, H, target){ // distance de chaque pixel au plus pr
 };
 
 // --- masque global (pair-impair entre objets), éventuellement en miroir gauche↔droite ---
+// --- JI : TEXTE et ELLIPSES dessinés comme à l'écran ---
+// Le texte de la page dessin = fillText (police entre guillemets, haut à o.x/o.y, étirement _scaleX). L'ancien raster
+// prenait une autre police / position -> l'incrustation ne ressemblait pas au dessin. On le redessine pareil, et on
+// en tire de VRAIS contours (isocourbe 50 % de l'anticrénelage) pour le dernier passage V-carve et les coins vifs.
+_IL.textCanvas = function(o, SCwant){
+  const txt=String(o.text||'').trimEnd(); if(!txt) return null; const h=o.h||10, sx=o._scaleX||1;
+  const ff=o.fontFamily||'IBM Plex Mono', fw=o.fontWeight||'normal', fi=o.fontItalic?'italic':'normal';
+  const m0=document.createElement('canvas').getContext('2d'); m0.font=`${fi} ${fw} 100px "${ff}"`; const mm=m0.measureText(txt);
+  const wMm=Math.max(mm.width, (mm.actualBoundingBoxLeft||0)+(mm.actualBoundingBoxRight||0))/100*h*sx + h*0.6;
+  let SC=SCwant; const MAXW=8000; if((wMm+h)*SC>MAXW) SC=Math.max(4, Math.floor(MAXW/(wMm+h)));
+  const pad=Math.ceil(0.3*h*SC)+4, W=Math.ceil(wMm*SC)+2*pad, H=Math.ceil(h*1.6*SC)+2*pad;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const ctx=cv.getContext('2d');
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); ctx.save(); ctx.translate(pad,pad); ctx.scale(sx,1);
+  ctx.font=`${fi} ${fw} ${h*SC}px "${ff}"`; ctx.textBaseline='top'; ctx.textAlign='left'; ctx.fillStyle='#fff'; ctx.fillText(txt,0,0); ctx.restore();
+  const img=ctx.getImageData(0,0,W,H).data; const alpha=new Float32Array(W*H), pixels=new Uint8Array(W*H);
+  for(let i=0;i<W*H;i++){ const a=img[i*4]/255; alpha[i]=a; pixels[i]=a>0.5?1:0; }
+  return {pixels, alpha, W, H, minX:o.x, minY:o.y, SC, pad}; };
+_IL.ellipsePts = function(o, n){ n=n||256; const pts=[]; for(let i=0;i<n;i++){ const a=i/n*Math.PI*2; pts.push([o.x+o.rx*Math.cos(a), o.y+o.ry*Math.sin(a)]); } return pts; };
+_IL.fillPolys = function(polys, SC){ let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity; for(const P of polys) for(const q of P){ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); y0=Math.min(y0,q[1]); y1=Math.max(y1,q[1]); }
+  if(!isFinite(x0)) return null; let sc=SC; if((x1-x0)*sc>6000||(y1-y0)*sc>6000) sc=Math.max(4,Math.floor(6000/Math.max(x1-x0,y1-y0)));
+  const pad=4, W=Math.ceil((x1-x0)*sc)+2*pad+2, H=Math.ceil((y1-y0)*sc)+2*pad+2; const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const ctx=cv.getContext('2d');
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); ctx.fillStyle='#fff'; ctx.beginPath(); for(const P of polys){ P.forEach((q,i)=>{ const X=(q[0]-x0)*sc+pad, Y=(q[1]-y0)*sc+pad; if(i) ctx.lineTo(X,Y); else ctx.moveTo(X,Y); }); ctx.closePath(); } ctx.fill('evenodd');
+  const img=ctx.getImageData(0,0,W,H).data; const pixels=new Uint8Array(W*H); for(let i=0;i<W*H;i++) pixels[i]=img[i*4]>127?1:0; return {pixels,W,H,minX:x0,minY:y0,SC:sc,pad}; };
+_IL.raster = function(o, SC){
+  if(o.type==='text') return _IL.textCanvas(o, SC);
+  if(o.type==='ellipse' && o.rx>0 && o.ry>0) return _IL.fillPolys([_IL.ellipsePts(o)], SC);
+  return rasterizeObject(o, SC); };
+_IL.textPolys = function(o){ const k='t|'+[o.text,o.h,o._scaleX,o.fontFamily,o.fontWeight,o.fontItalic,o.x,o.y].join('|'); _IL._tpc=_IL._tpc||{}; if(_IL._tpc[k]) return _IL._tpc[k];
+  const r=_IL.textCanvas(o, 40); if(!r) return []; const X0=o.x-r.pad/r.SC, Y0=o.y-r.pad/r.SC;
+  const loops=_IL.contours(r.alpha, r.W, r.H, 0.5, X0, Y0, r.SC).filter(l=>!l._open).map(l=>_IL.simplifyLoop(l, 0.006));
+  const out=loops.map(l=>l.slice(0,-1)).filter(l=>l.length>=3); _IL._tpc={}; _IL._tpc[k]=out; return out; };
+
 _IL.mask = function(objects, SCwant, padMm, scPad, fixedSC){
   let SC = SCwant;
   const rs = [];
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
   for (const o of objects){
-    let r=null; try{ r = rasterizeObject(o, SC); }catch(e){ r=null; }
+    let r=null; try{ r = _IL.raster(o, SC); }catch(e){ r=null; }
     if (!r || !r.pixels) continue;
     const sc = r.SC || SC; let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity, any=false;
     for (let py=0;py<r.H;py++) for (let px=0;px<r.W;px++) if (r.pixels[py*r.W+px]){ any=true; if(px<a)a=px; if(px>c)c=px; if(py<b)b=py; if(py>d)d=py; }
@@ -27726,7 +27766,8 @@ _IL.vecPolys = function(objs){ // contours VECTEUR des formes (mêmes coordonné
   const out=[]; const closeT={rect:1,tri:1,star:1,oblong:1,gear:1,polygon:1,ellipse:1};
   for (const o of (objs||[])){ let st=[];
     try{ if(o.type==='svg' && o.paths){ const scX=(o.svgW&&o.svgW>0)?o.w/o.svgW:1, scY=(o.svgH&&o.svgH>0)?o.h/o.svgH:1; st=o.paths.map(pp=>pp.map(q=>[o.x+q[0]*scX, o.y+q[1]*scY])); st._closed=true; }
-         else if(o.type==='text'){ st=[]; }   // texte : rendu canvas ≠ contours opentype → pas de coins vecteur (la reprise s'en charge)
+         else if(o.type==='text'){ st=_IL.textPolys(o); st._closed=true; }   // JI : contours tirés du même rendu que l'écran
+         else if(o.type==='ellipse' && o.rx>0 && o.ry>0){ st=[_IL.ellipsePts(o)]; st._closed=true; }
          else if(typeof objToStrokesRaw==='function') st=objToStrokesRaw(o)||[]; }catch(e){ st=[]; }
     for (const s0 of st){ if(!s0||s0.length<3) continue; const pts=[]; for(const q of s0){ const l=pts[pts.length-1]; if(!l||Math.hypot(q[0]-l[0],q[1]-l[1])>1e-4) pts.push([q[0],q[1]]); }
       let closed=!!st._closed || !!closeT[o.type]; if(pts.length>2 && Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])<1e-3){ pts.pop(); closed=true; }
@@ -27789,32 +27830,47 @@ _IL.vtrace = function(F, wTip){
     const nSeg=closed?p0.length:p0.length-1; const base=segBase; segBase+=nSeg;
     if(!closed) continue; let pts=p0.map(q=>F.male?[mirX(q[0]),q[1]]:[q[0],q[1]]); const n=pts.length; if(n<3) continue;
     // sens : la normale « vers la zone usinée »
-    let side=0; for(let k=0;k<n && !side;k++){ const a=pts[k], b=pts[(k+1)%n]; const L=Math.hypot(b[0]-a[0],b[1]-a[1]); if(L<0.3) continue; const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2, nx=-(b[1]-a[1])/L, ny=(b[0]-a[0])/L;
+    let side=0; for(let k=0;k<n && !side;k++){ const a=pts[k], b=pts[(k+1)%n]; const L=Math.hypot(b[0]-a[0],b[1]-a[1]); if(L<0.02) continue; const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2, nx=-(b[1]-a[1])/L, ny=(b[0]-a[0])/L;
       const dp=dist(mx+nx*0.1,my+ny*0.1), dm=dist(mx-nx*0.1,my-ny*0.1); if(Math.abs(dp-dm)>0.1) side=dp>dm?1:-1; }
     if(!side) continue;
     const nrm=(a,b)=>{ const L=Math.hypot(b[0]-a[0],b[1]-a[1])||1; return [-(b[1]-a[1])/L*side,(b[0]-a[0])/L*side]; };
-    const path=[]; const pushC=(x,y,r,onB)=>{ if(!onB){ if(path.length){ out.push(path.splice(0)); } return; } path.push([x,y,u0+r]); };
+    // virage à chaque sommet (positif = coin saillant pour la zone usinée)
+    const turnAt=(k)=>{ const A=pts[(k-1+n)%n], V=pts[k], B=pts[(k+1)%n]; const cr=(V[0]-A[0])*(B[1]-V[1])-(V[1]-A[1])*(B[0]-V[0]); return Math.atan2(cr*side, (V[0]-A[0])*(B[0]-V[0])+(V[1]-A[1])*(B[1]-V[1])); };
+    const TURN=pts.map((_,k)=>turnAt(k));
+    // près d'un sommet « doux » (courbe découpée en segments), le cercle tangent toucherait le segment voisin -> fausses petites remontées.
+    // On ne prend pas d'échantillon dans cette petite zone (taille = cap·tan(virage/2)) : le sommet lui-même est traité en douceur.
+    const soft=(tr)=> (tr>0 && tr<0.4) ? capR*Math.tan(tr/2)+0.004 : 0;
+    // échantillons (point du bord P, normale n, rayon r) ; au moment d'écrire, on lisse les toutes petites vibrations de r
+    // (jamais plus profond : on garde le plus petit des voisins, et seulement si l'écart est minuscule)
+    const path=[]; const flush=()=>{ if(!path.length) return; const S=path.splice(0); const R2=S.map(q=>q.r);
+      for(let i=0;i<S.length;i++){ if(S[i].fixed) continue; for(const j of [i-1,i+1]){ const q=S[j]; if(!q||q.fixed) continue; if(Math.hypot(q.P[0]-S[i].P[0],q.P[1]-S[i].P[1])<0.15 && Math.abs(q.r-S[i].r)<0.02) R2[i]=Math.min(R2[i],q.r); } }
+      out.push(S.map((q,i)=>q.fixed?[q.C[0],q.C[1],u0+q.r]:[q.P[0]+q.n[0]*R2[i], q.P[1]+q.n[1]*R2[i], u0+R2[i]])); };
+    const pushS=(P,nv,r,onB,C)=>{ if(!onB){ flush(); return; } path.push(C?{fixed:true,C,r}:{P,n:nv,r}); };
     const onBoundary=(x,y)=>Math.abs(dist(x,y))<Math.max(3*px,0.1);
     for (let k=0;k<n;k++){
       const A=pts[(k-1+n)%n], V=pts[k], B=pts[(k+1)%n];
       const n1=nrm(A,V), n2=nrm(V,B); const cr=(V[0]-A[0])*(B[1]-V[1])-(V[1]-A[1])*(B[0]-V[0]); const turn=Math.atan2(cr*side, (V[0]-A[0])*(B[0]-V[0])+(V[1]-A[1])*(B[1]-V[1]));
       // au sommet V
-      if (Math.abs(turn)>0.02){
-        if (turn>0){ // coin saillant pour la zone usinée : la pointe va jusqu'au coin (sur la bissectrice, cercle de rayon rMin)
+      if (Math.abs(turn)>0.02 && Math.abs(turn)<0.4){ // petit changement de direction (courbe découpée en segments) : on passe en douceur
+        const bx=n1[0]+n2[0], by=n1[1]+n2[1], bl=Math.hypot(bx,by)||1; const nx=bx/bl, ny=by/bl; const r=rAt(V[0],V[1],nx,ny,new Set([base+((k-1+n)%n), base+k]));
+        if(r>=rMin-1e-6) pushS(V,[nx,ny],r,onBoundary(V[0],V[1]));
+      } else if (Math.abs(turn)>=0.4){
+        if (turn>0){ // vrai coin saillant pour la zone usinée : la pointe va jusqu'au coin (sur la bissectrice, cercle de rayon rMin)
           const bx=n1[0]+n2[0], by=n1[1]+n2[1], bl=Math.hypot(bx,by)||1; const sb=Math.max(0.05, Math.sin((Math.PI-Math.abs(turn))/2));
-          const s=rMin/sb; pushC(V[0]+bx/bl*s, V[1]+by/bl*s, rMin, onBoundary(V[0],V[1]));
+          const s=rMin/sb; pushS(null,null,rMin,onBoundary(V[0],V[1]),[V[0]+bx/bl*s, V[1]+by/bl*s]);
         } else { // coin rentrant : arc autour du coin
           const a1=Math.atan2(n1[1],n1[0]); let da=Math.atan2(n2[1],n2[0])-a1; while(da>Math.PI) da-=2*Math.PI; while(da<-Math.PI) da+=2*Math.PI;
           const sk=new Set([base+((k-1+n)%n), base+k]);
-          const m=Math.max(1,Math.ceil(Math.abs(da)/0.08)); for(let q=0;q<=m;q++){ const a=a1+da*q/m, nx=Math.cos(a), ny=Math.sin(a); const r=rAt(V[0],V[1],nx,ny,sk); if(r>=rMin-1e-6) pushC(V[0]+nx*r,V[1]+ny*r,r,onBoundary(V[0],V[1])); }
+          const m=Math.max(1,Math.ceil(Math.abs(da)/0.08)); for(let q=0;q<=m;q++){ const a=a1+da*q/m, nx=Math.cos(a), ny=Math.sin(a); const r=rAt(V[0],V[1],nx,ny,sk); if(r>=rMin-1e-6) pushS(V,[nx,ny],r,onBoundary(V[0],V[1])); }
         }
       }
       // le long du côté V -> B
       const L=Math.hypot(B[0]-V[0],B[1]-V[1]); const m=Math.max(1,Math.ceil(L/ds));
       const skS=new Set([base+k]);
-      for (let q=1;q<m;q++){ const f=q/m, x=V[0]+(B[0]-V[0])*f, y=V[1]+(B[1]-V[1])*f; const r=rAt(x,y,n2[0],n2[1],skS); if(r<rMin-1e-6) continue; pushC(x+n2[0]*r, y+n2[1]*r, r, onBoundary(x,y)); }
+      const zA=soft(TURN[k]), zB=soft(TURN[(k+1)%n]);
+      for (let q=1;q<m;q++){ const f=q/m; if(f*L<zA || (1-f)*L<zB) continue; const x=V[0]+(B[0]-V[0])*f, y=V[1]+(B[1]-V[1])*f; const r=rAt(x,y,n2[0],n2[1],skS); if(r<rMin-1e-6) continue; pushS([x,y],n2,r,onBoundary(x,y)); }
     }
-    if(path.length){ if(out.length && closed){ /* on referme sur le début si le contour était entier */ } path.push(path[0].slice()); out.push(path.splice(0)); }
+    if(path.length){ const o0=out.length; flush(); const P=out[out.length-1]; if(out.length>o0 && P && P.length) P.push(P[0].slice()); }
   }
   // simplification 3D (tolérance 4 µm en XY, 3 µm en profondeur) — garde les biais des coins
   const simp=(P)=>{ if(P.length<3) return P; const keep=new Uint8Array(P.length); keep[0]=keep[P.length-1]=1; const st=[[0,P.length-1]];
@@ -27888,7 +27944,7 @@ _IL.finish = function(F, p, Wr, roughUsed){
   const stampPath=(pth,zOf)=>{ for(let s=1;s<pth.length;s++){ const a=pth[s-1], b=pth[s]; const n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])*SC*1.5));
     for(let q=0;q<=n;q++){ const x=a[0]+(b[0]-a[0])*q/n, y=a[1]+(b[1]-a[1])*q/n; stamp(x,y,-zOf([x,y])); } } };
   // 0) le dernier passage en vrai V-carve (si les formes ont des vecteurs) : calculé maintenant, écrit EN DERNIER
-  const trace = (p.vtrace!==false && F.objs && F.objs.every(o=>o.type!=='text')) ? _IL.vtrace(F, wTip) : null;
+  const trace = (p.vtrace!==false && F.objs && F.objs.length) ? _IL.vtrace(F, wTip) : null;
   const isBoxLoop=(l)=>{ if(!F.boxm) return false; let nbx=0; for(const q of l){ const i=Math.max(0,Math.min(W-1,Math.round((q[0]-X0)*SC-0.5))), j=Math.max(0,Math.min(H-1,Math.round((q[1]-Y0)*SC-0.5))); if(F.boxm[j*W+i]) nbx++; } return nbx>0.5*l.length; };
   // 1) MURS : à chaque niveau, la pointe suit u = z·tanA à Z = −z (posée pile sur la surface idéale)
   for (let k=1;k<=nV;k++){
@@ -28094,7 +28150,7 @@ function _ilShapeIco(o){ return {rect:'▭',star:'★',line:'—',text:'T',ellip
 let _ilPrev=null;
 function _ilPrevBuild(SC){
   const per=[]; let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
-  for(const o of _ilAllObjs()){ let r=null; try{ r=rasterizeObject(o,SC); }catch(e){} if(!r||!r.pixels) continue; const sc=r.SC||SC;
+  for(const o of _ilAllObjs()){ let r=null; try{ r=(typeof _IL!=='undefined'&&_IL.raster)?_IL.raster(o,SC):rasterizeObject(o,SC); }catch(e){} if(!r||!r.pixels) continue; const sc=r.SC||SC;
     let a=1e9,b=1e9,c=-1,d=-1; for(let py=0;py<r.H;py++) for(let px=0;px<r.W;px++) if(r.pixels[py*r.W+px]){ if(px<a)a=px; if(px>c)c=px; if(py<b)b=py; if(py>d)d=py; }
     if(c<0) continue; const it={o,r,sc,mx0:r.minX+(a-r.pad)/sc,mx1:r.minX+(c+1-r.pad)/sc,my0:r.minY+(b-r.pad)/sc,my1:r.minY+(d+1-r.pad)/sc,area:0};
     for(let q=0;q<r.pixels.length;q++) if(r.pixels[q]) it.area++; per.push(it);
