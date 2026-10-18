@@ -164,6 +164,12 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-18 — JA : les 4 G-codes incrustation sur UNE page (♀ ébauche + finition, ♂ ébauche + finition)
+ [FIX] Seb ne trouvait que 2 fichiers : les 2 mâles étaient sur une page à part. Maintenant 1 page, 4 cartes avec
+   un mini-aperçu du bois après chaque fichier (on voit tout de suite poche ♀ / bouchon ♂), nom du fichier sur le bouton.
+ [FIX] Le ZIP utilisait de mauvaises clés (male_rough…) -> il ne contenait pas les fichiers. Corrigé : les 4 dedans.
+ [AJOUT] Les bois : alerte quand des formes incrustées se superposent (étoile dans un rectangle = îlot de bois ♀).
+
 -- 2026-10-18 — IZ : hauteur coupante des 2 outils (cote cliquable sur les dessins + bibliothèque) ; alerte rouge si
    l'outil est plus court que la profondeur la plus forte (poche ♀ ou dégagement ♂).
 
@@ -2153,6 +2159,22 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 .ilt-inline{position:absolute;z-index:5;width:76px;padding:4px 6px;font-size:15px;font-weight:800;border-radius:7px;border:2px solid var(--acc);background:#11151a;color:var(--txt);outline:none}
 .ilw-hint b{color:var(--txt)}
 @media(max-width:860px){.ilp-left{position:static}}
+.ilf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+@media(max-width:820px){.ilf-grid{grid-template-columns:1fr}}
+.ilf-col{background:var(--surf2);border-radius:12px;padding:10px;border:1.5px solid var(--brd2);display:flex;flex-direction:column;gap:8px}
+.ilf-f{border-color:#4caf5088}.ilf-m{border-color:#42a5f588}
+.ilf-h{font-size:14px;font-weight:800;color:var(--txt)}
+.ilf-card{display:flex;gap:10px;background:var(--surf);border-radius:10px;padding:8px;border:1px solid var(--brd2);align-items:center}
+.ilf-mini{width:130px;height:96px;border-radius:8px;background:#0a0c10;flex:0 0 auto}
+.ilf-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.ilf-n{font-size:14px;font-weight:900;color:var(--txt)}.ilf-d{font-size:11px;color:var(--txt2)}
+.ilf-st{font-size:10px;padding:3px 6px!important;margin:0!important}
+.ilf-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px}
+.ilf-dl{flex:1;min-width:150px;padding:7px 9px;border-radius:8px;border:1.5px solid var(--acc);background:rgba(245,166,35,.12);color:var(--acc);font-weight:800;font-size:12px;cursor:pointer;text-align:left}
+.ilf-b{padding:7px 10px;border-radius:8px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer}
+.ilf-tip{font-size:11px;color:var(--txt2);line-height:1.5}
+.ilf-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.ilf-act .btn{flex:1;min-width:200px}
+.ilw-warn{font-size:12px;color:#ffb74d;background:#ff980018;border:1px solid #ff980055;border-radius:8px;padding:7px 10px;margin-top:8px;display:none}
 </style>
 
 </head>
@@ -2162,7 +2184,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-IZ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JA ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2693,6 +2715,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
     <div class="ilw-hint">👆 Clique une forme (ou sa pastille) pour l'<b>incruster</b> ou l'<b>ignorer</b> (cadre, trait de construction…)</div>
     <canvas id="ilWoodPreview"></canvas>
     <div class="ilw-shapes" id="ilwShapes"></div>
+    <div class="ilw-warn" id="ilwWarn"></div>
     <div class="ilw-note">Les formes incrustées l'une dans l'autre font un trou (un rond dans un rond = un anneau). Les formes ignorées (hachurées) ne sont pas usinées.</div>
   </div>
 </div>
@@ -2920,47 +2943,34 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
   </div>
 </div>
 
-<!-- PAGE 12 : G-CODES FEMELLE ♀ -->
+<!-- PAGE 12 : LES 4 G-CODES (♀ + ♂ sur la même page, IΩ) -->
 <div class="wz-wrap" id="wzp12">
-  <div class="wz-h1">♀ G-Codes Femelle</div>
-  <div class="wz-sub" id="p12sub">2 fichiers à usiner dans l'ordre</div>
-
+  <div class="wz-h1">📄 Tes 4 fichiers G-code</div>
+  <div class="wz-sub" id="p12sub">2 fichiers pour la planche ♀, 2 pour la planche ♂ — à usiner dans l'ordre 1 → 2, puis 3 → 4</div>
   <div id="p12st" class="al al-w">⏳ Génération...</div>
-
-
-  <!-- Fichier 1 : ébauche -->
-  <div style="background:var(--surf2);border-radius:10px;padding:12px;margin-bottom:8px;border:1.5px solid var(--acc)">
-    <div style="font-size:11px;color:var(--acc);font-weight:700;margin-bottom:4px">🔷 Fichier 1/2 — Ébauche Femelle (fraise plate)</div>
-    <div style="font-size:10px;color:var(--txt2);margin-bottom:8px">Dégage l'intérieur des formes. Lancer EN PREMIER.</div>
-    <div id="p12st1" class="al al-w" style="margin-bottom:6px;font-size:10px">⏳</div>
-    <div style="display:flex;gap:6px">
-      <button class="btn" style="flex:1;font-size:11px;border-color:var(--acc);color:var(--acc)"
-        onclick="openGcView('inlay_female_rough')">📄 Voir G-code</button>
-      <button class="btn btn-dim" style="padding:6px 10px" onclick="wzDlInlay2('inlay_female_rough')">💾</button>
-      <button class="btn btn-dim" style="padding:6px 10px" onclick="ilvOpen('f')">▶</button>
+  <div class="ilf-grid">
+    <div class="ilf-col ilf-f">
+      <div class="ilf-h">♀ Planche creusée — <span id="ilfWF">Noyer</span></div>
+      <div class="ilf-card"><canvas class="ilf-mini" id="ilfMini_inlay_female_rough"></canvas><div class="ilf-info">
+        <div class="ilf-n">1 · Ébauche ♀</div><div class="ilf-d">Fraise plate — vide le gros de la poche</div><div id="p12st1" class="ilf-st">⏳</div>
+        <div class="ilf-btns"><button class="ilf-dl" onclick="wzDlInlay2('inlay_female_rough')">💾 1_femelle_ebauche.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_female_rough')">📄</button><button class="ilf-b" title="Atelier 3D" onclick="ilvOpen('f')">🧊</button></div></div></div>
+      <div class="ilf-card"><canvas class="ilf-mini" id="ilfMini_inlay_female_finish"></canvas><div class="ilf-info">
+        <div class="ilf-n">2 · Finition ♀</div><div class="ilf-d">V-bit — murs en V, pointes, coins</div><div id="p12st2" class="ilf-st">⏳</div>
+        <div class="ilf-btns"><button class="ilf-dl" onclick="wzDlInlay2('inlay_female_finish')">💾 2_femelle_finition.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_female_finish')">📄</button><button class="ilf-b" title="Atelier 3D" onclick="ilvOpen('f')">🧊</button></div></div></div>
+      <div class="ilf-tip">Entre 1 et 2 : change pour le V-bit et refais le zéro Z.</div>
+    </div>
+    <div class="ilf-col ilf-m">
+      <div class="ilf-h">♂ Bouchons — <span id="ilfWM">Érable</span></div>
+      <div class="ilf-card"><canvas class="ilf-mini" id="ilfMini_inlay_male_rough"></canvas><div class="ilf-info">
+        <div class="ilf-n">3 · Ébauche ♂</div><div class="ilf-d">Fraise plate — dégage autour des bouchons</div><div id="p13st1" class="ilf-st">⏳</div>
+        <div class="ilf-btns"><button class="ilf-dl" onclick="wzDlInlay2('inlay_male_rough')">💾 3_male_ebauche.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_male_rough')">📄</button><button class="ilf-b" title="Atelier 3D" onclick="ilvOpen('m')">🧊</button></div></div></div>
+      <div class="ilf-card"><canvas class="ilf-mini" id="ilfMini_inlay_male_finish"></canvas><div class="ilf-info">
+        <div class="ilf-n">4 · Finition ♂</div><div class="ilf-d">V-bit — flancs des bouchons</div><div id="p13st2" class="ilf-st">⏳</div>
+        <div class="ilf-btns"><button class="ilf-dl" onclick="wzDlInlay2('inlay_male_finish')">💾 4_male_finition.nc</button><button class="ilf-b" title="Voir le G-code" onclick="openGcView('inlay_male_finish')">📄</button><button class="ilf-b" title="Atelier 3D" onclick="ilvOpen('m')">🧊</button></div></div></div>
+      <div class="ilf-tip">Le mâle est usiné EN MIROIR (normal : tu retournes la pièce pour coller). Même zéro que la femelle. Après usinage, scie la pièce dans la bande creusée à plat.</div>
     </div>
   </div>
-
-  <!-- Fichier 2 : finition -->
-  <div style="background:var(--surf2);border-radius:10px;padding:12px;margin-bottom:8px;border:1.5px solid #fbbf24">
-    <div style="font-size:11px;color:#fbbf24;font-weight:700;margin-bottom:4px">🔻 Fichier 2/2 — Finition Femelle (V-bit)</div>
-    <div style="font-size:10px;color:var(--txt2);margin-bottom:8px">Fait les parois coniques précises. Lancer EN SECOND.</div>
-    <div id="p12st2" class="al al-w" style="margin-bottom:6px;font-size:10px">⏳</div>
-    <div style="display:flex;gap:6px">
-      <button class="btn" style="flex:1;font-size:11px;border-color:#fbbf24;color:#fbbf24"
-        onclick="openGcView('inlay_female_finish')">📄 Voir G-code</button>
-      <button class="btn btn-dim" style="padding:6px 10px" onclick="wzDlInlay2('inlay_female_finish')">💾</button>
-      <button class="btn btn-dim" style="padding:6px 10px" onclick="ilvOpen('f')">▶</button>
-    </div>
-  </div>
-
-  <div class="al al-ok" style="font-size:10px;line-height:1.6">
-    💡 <b>Ordre d'usinage femelle :</b><br>
-    1. Fixer la planche ♀ sur la CNC<br>
-    2. Lancer ébauche (fraise plate)<br>
-    3. Changer pour le V-bit, re-zéro Z<br>
-    4. Lancer finition (V-bit)
-  </div>
+  <div class="ilf-act"><button class="btn btn-p" onclick="ilvOpen('fit')">🧊 Atelier 3D : vérifier l'emboîtement</button><button class="btn" onclick="wzZip()">📦 Les 4 fichiers en ZIP</button></div>
 </div>
 
 <!-- PAGE 13 : G-CODES MÂLE ♂ -->
@@ -3866,7 +3876,7 @@ let pInited = false;
 // Flow selon mode
 // step 10 = page G-code unique (mode normal)
 function wzFlow(){
-  if(appMode==='inlay') return [1,0,2,3,11,12,13,9];
+  if(appMode==='inlay') return [1,0,2,3,11,12,9];   // IΩ : les 4 fichiers sur la même page
   if(appMode==='laser') return [1,2,22,20,21,10]; // laser: mode→dessin→NESTING (imbrication)→chute/pièce→découpe→LST
   return [1,0,2,3,4,10,9]; // normal: mode→brut→dessin→outils→modeUsinage→gcode→récap
 }
@@ -14887,7 +14897,7 @@ function inlayLoadToolFromSelect(type, toolId){
 function wzOnEnter(step){
   if(step===3){ if(appMode==='inlay') inlayInitMaterials(); else wzInitToolAssign(); }
   if(step===11){ wzInitInlayParams(); if(typeof _ilParamFocusSetup==='function'){ _ilParamFocusSetup(); ilSchemaDraw(); } }
-  if(step===12){ const e=document.getElementById('p12sub'); if(e&&typeof ilWood==='function') e.textContent=ilWood('female').name+' (planche creusée) — 2 fichiers à usiner dans l\'ordre'; wzGenInlay(); }
+  if(step===12){ wzGenInlay(); }
   if(step===13){ const e=document.getElementById('p13sub'); if(e&&typeof ilWood==='function') e.textContent=ilWood('male').name+' (bouchons) — 2 fichiers à usiner dans l\'ordre'; }
   if(step===4&&appMode==='normal'){ wzInitMachineMode(); }
   if(step===20){ if(typeof openLaserPaint==='function') openLaserPaint(); if(typeof _lpSummary==='function') _lpSummary(); }
@@ -14923,7 +14933,7 @@ function wzUpdateBar(){
   });
   // Label
   const labels={0:'Brut',1:'Mode',2:'Dessin',3:'Outils',9:'Récap',10:'G-code',20:'Chute/Pièce',21:'Découpe',22:'Nesting',
-    11:'Paramètres inlay',12:'G-codes Femelle',13:'G-codes Mâle'};
+    11:'Paramètres inlay',12:'Les 4 G-codes',13:'G-codes Mâle'};
   document.getElementById('wzLbl').textContent=labels[wzStep]||'';
   // Boutons nav
   const prev=document.getElementById('btnPrev'),next=document.getElementById('btnNext');
@@ -17564,8 +17574,8 @@ function wzShowGc(key,gcId,stId){
 }
 
 // ── Téléchargement ──
-const WZ_NAMES={male_rough:'1_male_ebauche',female_rough:'2_femelle_ebauche',
-  male_finish:'3_male_finition',female_finish:'4_femelle_finition'};
+const WZ_NAMES={inlay_female_rough:'1_femelle_ebauche',inlay_female_finish:'2_femelle_finition',
+  inlay_male_rough:'3_male_ebauche',inlay_male_finish:'4_male_finition'};   // (avant : mauvaises clés -> ZIP vide)
 
 function wzDl(key){
   const gc=generatedGcodes[key]; if(!gc){alert('G-code non disponible');return;}
@@ -17582,7 +17592,7 @@ async function wzZip(){
   if(typeof JSZip==='undefined'){alert('JSZip non chargé');return;}
   const zip=new JSZip();
   Object.entries(WZ_NAMES).forEach(([key,name])=>{
-    if(generatedGcodes[key]) zip.file(`${name}.nc`, generatedGcodes[key]);
+    if(generatedGcodes[key]) zip.file(`${name}.nc`, generatedGcodes[key]);   // 4 fichiers incrustation
   });
   const blob=await zip.generateAsync({type:'blob'});
   const a=document.createElement('a');
@@ -25989,6 +25999,7 @@ function wzGenInlay(){
     setStatus('p12st', true, '✅ 4 fichiers générés — '+tot+' lignes total');
     const btn3d=document.getElementById('btn3DPreview');if(btn3d) btn3d.style.display='';
     setStatus('p13st', true, '✅ G-codes mâle prêts');
+    if(typeof ilFilesPreview==='function') setTimeout(ilFilesPreview,30);
   } catch(e4){ setStatus('p12st', false, '❌ Erreur finition mâle: '+e4.message); console.error(e4); }
   }, 30);
   } catch(e3){ setStatus('p12st', false, '❌ Erreur ébauche mâle: '+e3.message); console.error(e3); }
@@ -27765,15 +27776,16 @@ function _ilPrevBuild(SC){
     x0=Math.min(x0,it.mx0); x1=Math.max(x1,it.mx1); y0=Math.min(y0,it.my0); y1=Math.max(y1,it.my1); }
   if(!per.length) return null; const pad=6; const X0=x0-pad, Y0=y0-pad, W=Math.ceil((x1-x0+2*pad)*SC), H=Math.ceil((y1-y0+2*pad)*SC);
   const at=(it,x,y)=>{ const px=Math.floor((x-it.r.minX)*it.sc+it.r.pad), py=Math.floor((y-it.r.minY)*it.sc+it.r.pad); return px>=0&&py>=0&&px<it.r.W&&py<it.r.H&&it.r.pixels[py*it.r.W+px]===1; };
-  const m=new Uint8Array(W*H), off=new Uint8Array(W*H);
+  const m=new Uint8Array(W*H), off=new Uint8Array(W*H), cnt=new Uint8Array(W*H);
   for(const it of per){ const i0=Math.max(0,Math.floor((it.mx0-X0)*SC)-1), i1=Math.min(W-1,Math.ceil((it.mx1-X0)*SC)+1), j0=Math.max(0,Math.floor((it.my0-Y0)*SC)-1), j1=Math.min(H-1,Math.ceil((it.my1-Y0)*SC)+1);
-    for(let j=j0;j<=j1;j++){ const y=Y0+(j+0.5)/SC; for(let i=i0;i<=i1;i++){ const x=X0+(i+0.5)/SC; if(at(it,x,y)){ if(it.o._inlayOff) off[j*W+i]=1; else m[j*W+i]^=1; } } } }
+    for(let j=j0;j<=j1;j++){ const y=Y0+(j+0.5)/SC; for(let i=i0;i<=i1;i++){ const x=X0+(i+0.5)/SC; if(at(it,x,y)){ if(it.o._inlayOff) off[j*W+i]=1; else { m[j*W+i]^=1; if(cnt[j*W+i]<9) cnt[j*W+i]++; } } } } }
   // bord de chaque forme (pour les pointillés) : 1 = forme incrustée, 2 = ignorée
   const edge=new Uint8Array(W*H);
   for(const it of per){ const i0=Math.max(1,Math.floor((it.mx0-X0)*SC)-1), i1=Math.min(W-2,Math.ceil((it.mx1-X0)*SC)+1), j0=Math.max(1,Math.floor((it.my0-Y0)*SC)-1), j1=Math.min(H-2,Math.ceil((it.my1-Y0)*SC)+1);
     const ins=new Uint8Array((i1-i0+3)*(j1-j0+3)), ww=i1-i0+3; for(let j=j0-1;j<=j1+1;j++) for(let i=i0-1;i<=i1+1;i++) ins[(j-j0+1)*ww+(i-i0+1)]=at(it,X0+(i+0.5)/SC,Y0+(j+0.5)/SC)?1:0;
     for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){ const q=(j-j0+1)*ww+(i-i0+1); if(ins[q] && (!ins[q-1]||!ins[q+1]||!ins[q-ww]||!ins[q+ww])) edge[j*W+i]=it.o._inlayOff?2:1; } }
-  return {SC,X0,Y0,W,H,m,off,per,at,edge};
+  let overlap=0; for(let q=0;q<W*H;q++) if(cnt[q]>1) overlap++;
+  return {SC,X0,Y0,W,H,m,off,per,at,edge,overlap};
 }
 function ilWoodPreviewDraw(){
   const cv=document.getElementById('ilWoodPreview'); if(!cv) return;
@@ -27803,6 +27815,9 @@ function ilWoodPreviewDraw(){
       if((Math.floor((px+py)/dash)&1)===0) continue; const o=(py*W+px)*4; const v=e===1?255:150; img.data[o]=v; img.data[o+1]=v; img.data[o+2]=e===1?255:160; } }
   ctx.putImageData(img,0,0);
   const nOff=all.length-on.length;
+  const wn=document.getElementById('ilwWarn'); if(wn){ const ov=G.overlap/(G.SC*G.SC);
+    if(ov>0.5){ wn.style.display='block'; wn.innerHTML='⚠️ Des formes incrustées se superposent (ex : une étoile dans un rectangle). Là où elles se superposent, ça <b>reste du bois ♀</b> (un îlot) — c\'est ce que tu vois au milieu. Pour n\'incruster que l\'étoile, clique le rectangle pour l\'<b>ignorer</b>.'; }
+    else wn.style.display='none'; }
   if(info) info.textContent=`— ${on.length} forme${on.length>1?'s':''} incrustée${on.length>1?'s':''}${nOff?' · '+nOff+' ignorée'+(nOff>1?'s':''):''} · fond ${ilWood('female').name} · bouchons ${ilWood('male').name}`;
   ilShapeChips();
 }
@@ -28215,6 +28230,29 @@ function ilvFitDraw(){ const R=ILV.fit; if(!R) return; const G=R.G, n=G.nx*G.ny;
     if(!R.out[k]){ const pz=R.dm[k]-R.T; c2.fillStyle=mwc; c2.fillRect(x,0,xs+0.6,Y(pz)); if(pz>fz+0.005){ const yb=Y(fz), yt=Y(Math.min(pz,0)); if(pz<=0){ c2.fillStyle='#ffd54f'; c2.fillRect(x,Y(pz),xs+0.6,yb-Y(pz)); } else { c2.fillStyle='#00e5ff'; c2.fillRect(x,Y(0),xs+0.6,yb-Y(0)); } } } }
   c2.strokeStyle='#ffffff55'; c2.setLineDash([4,4]); c2.beginPath(); c2.moveTo(0,Y(0)); c2.lineTo(CW,Y(0)); c2.stroke(); c2.strokeStyle='#ff9800aa'; c2.beginPath(); c2.moveTo(0,Y(-sand)); c2.lineTo(CW,Y(-sand)); c2.stroke(); c2.setLineDash([]);
   c2.fillStyle='#cfd6df'; c2.font=(11*(window.devicePixelRatio||1))+'px sans-serif'; c2.fillText(`pointillé blanc = surface · orange = après ponçage · hauteur ×${ex.toFixed(1)}`,8,CH-6);
+}
+
+
+// ---------- mini-aperçus des 4 fichiers (vue de dessus du bois après ce fichier) ----------
+function ilFilesPreview(){
+  const P=inlayGetParams(); const t=Math.tan((P.vAngle/2)*Math.PI/180);
+  const ef=document.getElementById('ilfWF'), em=document.getElementById('ilfWM'); if(ef) ef.textContent=ilWood('female').name; if(em) em.textContent=ilWood('male').name;
+  const keys=[['inlay_female_rough','female',null],['inlay_female_finish','female','inlay_female_rough'],['inlay_male_rough','male',null],['inlay_male_finish','male','inlay_male_rough']];
+  for(const [key,g,prev] of keys){ const cv=document.getElementById('ilfMini_'+key); if(!cv) continue; const gc=generatedGcodes[key]; if(!gc) continue;
+    const files=[]; if(prev && generatedGcodes[prev]) files.push({gc:generatedGcodes[prev], tool:{type:'flat',R:P.rDia/2}}); files.push({gc, tool:key.endsWith('rough')?{type:'flat',R:P.rDia/2}:{type:'v',t,w:Math.max(0,+P.vTip||0)}});
+    const mv=[]; files.forEach((f,fi)=>{ for(const m of ILV.parse(f.gc).mv){ m.fi=fi; mv.push(m); } });
+    let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9; for(const m of mv) if(m.g===1&&m.z1<0){ x0=Math.min(x0,m.x1); x1=Math.max(x1,m.x1); y0=Math.min(y0,m.y1); y1=Math.max(y1,m.y1); }
+    if(x0>x1) continue; x0-=3; y0-=3; x1+=3; y1+=3; const res=Math.max(0.12, Math.sqrt((x1-x0)*(y1-y0)/60000));
+    const G={X0:x0,Y0:y0,res,nx:Math.ceil((x1-x0)/res)+1,ny:Math.ceil((y1-y0)/res)+1};
+    const S={files, mv, idx:0, sub:0, h:new Float32Array(G.nx*G.ny), G, head:[0,0,0], fi:0}; ILV.advance(S, Infinity);
+    const dpr=window.devicePixelRatio||1, W=Math.round(cv.clientWidth*dpr)||260, H=Math.round(cv.clientHeight*dpr)||190; cv.width=W; cv.height=H;
+    const ctx=cv.getContext('2d'), img=ctx.createImageData(W,H); const col=_ilRGB(ilWood(g).color); const Dm=Math.max(P.pocketDepth, P.pocketDepth-P.glueGap+P.surfaceGap);
+    const k=Math.min(W/(G.nx*res), H/(G.ny*res)), ox=(W-G.nx*res*k)/2, oy=(H-G.ny*res*k)/2;
+    for(let py=0;py<H;py++){ const j=Math.floor((py-oy)/k/res); for(let px=0;px<W;px++){ const i=Math.floor((px-ox)/k/res); const o=(py*W+px)*4;
+      if(i<0||j<0||i>=G.nx||j>=G.ny){ img.data[o]=10; img.data[o+1]=12; img.data[o+2]=16; img.data[o+3]=255; continue; }
+      const d=S.h[j*G.nx+i], f=(1-0.62*Math.min(1,d/Dm))*_ilGrain(i*res*3,j*res*3,g==='male'?0.5:0);
+      img.data[o]=col[0]*f; img.data[o+1]=col[1]*f; img.data[o+2]=col[2]*f; img.data[o+3]=255; } }
+    ctx.putImageData(img,0,0); }
 }
 
 function inlaySimAll(){ if(typeof ilvOpen==='function') return ilvOpen('f');
