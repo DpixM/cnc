@@ -164,6 +164,19 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-18 — JE : finition V-bit propre (murs lisses, plus de hachures vertes, coins vifs EN DERNIER)
+ [FIX] Seb : « les traits verts serrés sur les murs, pourquoi ? ». C'était la reprise qui courait après les petites
+   marches d'escalier du raster (murs en V ondulés). Maintenant, près des bords, la distance vient des VECTEURS du dessin
+   (exacte, lisse) -> les tours de mur suffisent, le flanc du V rase tout le mur. Le raster reste le garde-fou (texte,
+   formes qui se chevauchent : on garde l'ancien calcul).
+ [FIX] La reprise ne fait plus que : le FOND que la fraise plate ne peut pas atteindre (bosses > tolérance seulement ;
+   les petites bosses restent, elles sont sous le jeu de colle) et les zones ÉTROITES (traits fins) où le dernier tour
+   n'existe pas. Plus de passes sur les murs.
+ [FIX] Coins vifs EN DERNIER (Seb : « c'est ce qui évite les trous à l'emboîtement ») : la pointe qui remonte le long de
+   l'arête du coin est le tout dernier passage du fichier.
+ Mesuré (simulation, bouchon idéal 4,70) : étoile 4,51 -> 4,62 mm, anneau 4,56 -> 4,65, rectangle 4,64 -> 4,65 ;
+   finition ♀ étoile 3309 -> 953 lignes, ♂ 20070 -> 1250 lignes.
+
 -- 2026-10-18 — JD : l'étoile = la pièce ♂ + VUE 3D incrustation avec la même interface que la découpe
  [FIX] Seb : « l'étoile c'est la pièce MÂLE ». Un rectangle qui entoure tout le dessin est maintenant pris comme le
    CONTOUR DE LA PLANCHE (pas usiné, pastille « 🖼 contour de planche ») -> ce qui est dedans = la pièce ♂ incrustée.
@@ -2260,7 +2273,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JD ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JE ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -27636,15 +27649,17 @@ _IL.field = function(objects, p, male){
     const m2=new Uint8Array(W*H); for(let j=0;j<H;j++) for(let i=0;i<W;i++) m2[j*W+i]=G.m[j*W+(W-1-i)]; G.m=m2;
     // la grille est symétrique autour de son centre → le dessin miroir reste au même endroit
   }
-  const e=_IL.signed(G); const u=new Float32Array(W*H); let umax=-Infinity;
+  let boxm=null;
+  const e=_IL.signed(G); if(p.vecField!==false) _IL.vecRefine(e, G, objects, male, Math.max(Dm,p.pocketDepth)*tanA+0.6);
+  const u=new Float32Array(W*H); let umax=-Infinity;
   if (!male){ for(let k=0;k<W*H;k++){ u[k]=-e[k]; if(u[k]>umax) umax=u[k]; } }
   else {
     const bx0=G.bx0-margin, bx1=G.bx1+margin, by0=G.by0-margin, by1=G.by1+margin;
     for(let j=0;j<H;j++){ const y=G.Y0+(j+0.5)/SC; for(let i=0;i<W;i++){ const x=G.X0+(i+0.5)/SC;
-      const box=Math.min(x-bx0, bx1-x, y-by0, by1-y); const k=j*W+i; u[k]=Math.min(Ds*tanA+e[k], box); if(u[k]>umax) umax=u[k]; } }
+      const box=Math.min(x-bx0, bx1-x, y-by0, by1-y); const k=j*W+i; u[k]=Math.min(Ds*tanA+e[k], box); if(box<Ds*tanA+e[k]){ if(!boxm) boxm=new Uint8Array(W*H); boxm[k]=1; } if(u[k]>umax) umax=u[k]; } }
   }
   const box = male ? [G.bx0-margin, G.bx1+margin, G.by0-margin, G.by1+margin] : null;
-  return {u,W,H,SC,X0:G.X0,Y0:G.Y0,umax,tanA,Ds,Dm,Dmax: male?Dm:p.pocketDepth, male, margin, box, xc:(G.bx0+G.bx1)/2};
+  return {u,W,H,SC,X0:G.X0,Y0:G.Y0,umax,tanA,Ds,Dm,Dmax: male?Dm:p.pocketDepth, male, margin, box, boxm, xc:(G.bx0+G.bx1)/2};
 };
 
 // --- ÉBAUCHE fraise plate ---
@@ -27686,6 +27701,33 @@ _IL.vecPolys = function(objs){ // contours VECTEUR des formes (mêmes coordonné
       let closed=!!st._closed || !!closeT[o.type]; if(pts.length>2 && Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])<1e-3){ pts.pop(); closed=true; }
       if(pts.length>=3) out.push({pts,closed}); } }
   return out; };
+// JE : près des bords, la distance vient des VECTEURS du dessin (exacte, lisse) au lieu du raster en marches d'escalier
+// (les marches donnaient des murs en V ondulés -> plein de petites passes de reprise). Le raster sert de garde-fou :
+// on ne remplace que là où les deux sont d'accord (sinon : texte, formes qui se chevauchent… -> on garde le raster).
+_IL.vecRefine = function(e, G, objects, male, band){
+  const {m,W,H,SC,X0,Y0}=G; const polys=_IL.vecPolys(objects); if(!polys.length) return 0;
+  const mirX=x=>2*X0+W/SC-x; const S=[];
+  for(const {pts,closed} of polys){ const n=pts.length; const lim=closed?n:n-1; for(let k=0;k<lim;k++){ const a=pts[k], b=pts[(k+1)%n]; let ax=a[0],bx=b[0]; if(male){ ax=mirX(ax); bx=mirX(bx); } S.push([ax,a[1],bx,b[1]]); } }
+  if(!S.length || S.length>200000) return 0;
+  const C=1.0, gx0=X0, gy0=Y0, nx=Math.ceil(W/SC/C)+1, ny=Math.ceil(H/SC/C)+1; const cell=new Map();
+  S.forEach((sg,id)=>{ const i0=Math.floor((Math.min(sg[0],sg[2])-gx0)/C), i1=Math.floor((Math.max(sg[0],sg[2])-gx0)/C), j0=Math.floor((Math.min(sg[1],sg[3])-gy0)/C), j1=Math.floor((Math.max(sg[1],sg[3])-gy0)/C);
+    for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){ const key=j*nx+i; let a=cell.get(key); if(!a){ a=[]; cell.set(key,a); } a.push(id); } });
+  const px=1/SC, R=Math.ceil(band/C); let nrep=0;
+  const mAt=(x,y)=>{ const i=Math.round((x-X0)*SC-0.5), j=Math.round((y-Y0)*SC-0.5); return (i>=0&&j>=0&&i<W&&j<H)?m[j*W+i]:0; };
+  for(let j=0;j<H;j++){ const y=Y0+(j+0.5)*px; const cj=Math.floor((y-gy0)/C);
+    for(let i=0;i<W;i++){ const k=j*W+i; const ae=Math.abs(e[k]); if(ae>band) continue; const x=X0+(i+0.5)*px; const ci=Math.floor((x-gx0)/C);
+      let best=Infinity, bs=-1, bt=0; const seen=new Set();
+      for(let dj=-R;dj<=R;dj++) for(let di=-R;di<=R;di++){ const a=cell.get((cj+dj)*nx+(ci+di)); if(!a) continue;
+        for(const id of a){ if(seen.has(id)) continue; seen.add(id); const sg=S[id]; const vx=sg[2]-sg[0], vy=sg[3]-sg[1]; const L2=vx*vx+vy*vy; let t=L2>0?((x-sg[0])*vx+(y-sg[1])*vy)/L2:0; t=Math.max(0,Math.min(1,t));
+          const dx=x-(sg[0]+vx*t), dy=y-(sg[1]+vy*t); const d=dx*dx+dy*dy; if(d<best){ best=d; bs=id; bt=t; } } }
+      if(bs<0) continue; const d=Math.sqrt(best); if(Math.abs(d-ae)>1.5*px+0.03) continue;   // pas d'accord avec le raster : on garde le raster
+      // de quel côté ? on regarde le masque un peu plus loin (1,5 px) de part et d'autre du segment le plus proche
+      const sg=S[bs], vx=sg[2]-sg[0], vy=sg[3]-sg[1], L=Math.hypot(vx,vy)||1; const nxv=-vy/L, nyv=vx/L; const qx=sg[0]+vx*bt, qy=sg[1]+vy*bt;
+      const side=(x-qx)*nxv+(y-qy)*nyv; const o=2*px; const mA=mAt(qx+nxv*o,qy+nyv*o), mB=mAt(qx-nxv*o,qy-nyv*o);
+      let inside=m[k]===1; if(d<1.5*px && bt>1e-6 && bt<1-1e-6 && mA!==mB) inside = side>=0 ? mA===1 : mB===1;   // tout près du bord seulement (loin : le masque est sûr)
+      e[k]= inside ? -d : d; nrep++; } }
+  return nrep; };
+
 _IL.corners = function(F, wTip){
   const dbg=_IL._cdbg=[]; const rj=(r,q)=>{ if(_IL.debug) dbg.push(r+' '+(q?q.map(v=>v.toFixed(2)).join(','):'')); };
   const t=F.tanA, u0=F.male?F.Ds*t:0, cap=F.Dmax*t+wTip/2, px=1/F.SC, out=[];
@@ -27760,24 +27802,23 @@ _IL.finish = function(F, p, Wr, roughUsed){
       for (let j=1;j<=2;j++){ const c2=c+wTip/2+j*sfw; if(c2>F.umax) break; const l2=_IL.contours(u,W,H,c2,X0,Y0,SC).map(l=>_IL.simplifyLoop(l,0.01));
         _IL.emitPaths(Wr,F,l2,()=>zcmd(c2),()=>c,true); nb+=l2.length; for(const l of l2) stampPath(l,()=>zcmd(c2)); } }
   }
-  // 1b) COINS VIFS : du point Q (au fond, déjà dégagé par le dernier tour de mur) la pointe remonte en biais jusqu'au coin, puis redescend
+  // 1b) COINS VIFS : calculés et simulés maintenant (la reprise sait que les coins seront faits), mais écrits EN DERNIER :
+  //     la pointe qui remonte le long de l'arête du coin est le tout dernier passage (c'est lui qui évite les trous à l'emboîtement)
   const cor=_IL.corners(F, wTip);
-  if (cor.length){
-    Wr.out.push(`; --- coins vifs : ${cor.length} (la pointe remonte en biais dans chaque coin, comme Aspire)`); Wr.retract();
-    const rest=cor.slice();
-    while(rest.length){ const pos=Wr.pos; let bi=0, bd=Infinity; rest.forEach((c,k)=>{ const d=pos?(c.Q[0]-pos[0])**2+(c.Q[1]-pos[1])**2:0; if(d<bd){bd=d;bi=k;} });
-      const c=rest.splice(bi,1)[0]; const zQ=zcmd(c.cQ), zP=zcmd(c.cP);
-      Wr.rapidTo(c.Q[0],c.Q[1]); Wr.plunge(zQ); Wr.cut(c.P[0],c.P[1],zP); Wr.cut(c.Q[0],c.Q[1],zQ); nb++;
-      const L=Math.hypot(c.Q[0]-c.P[0],c.Q[1]-c.P[1]), ns=Math.max(2,Math.ceil(L*SC*1.5));
-      for(let q=0;q<=ns;q++){ const f=q/ns; stamp(c.Q[0]+(c.P[0]-c.Q[0])*f, c.Q[1]+(c.P[1]-c.Q[1])*f, -(zQ+(zP-zQ)*f)); } }
-  }
+  for(const c of cor){ const zQ=zcmd(c.cQ), zP=zcmd(c.cP); const L=Math.hypot(c.Q[0]-c.P[0],c.Q[1]-c.P[1]), ns=Math.max(2,Math.ceil(L*SC*1.5));
+    for(let q=0;q<=ns;q++){ const f=q/ns; stamp(c.Q[0]+(c.P[0]-c.Q[0])*f, c.Q[1]+(c.P[1]-c.Q[1])*f, -(zQ+(zP-zQ)*f)); } }
   _IL._corners=cor;
+  // les murs sont exacts après le dernier tour (le flanc du V rase tout le mur) : la reprise ne s'occupe que
+  //  - du FOND que la fraise plate n'a pas pu atteindre (bosses plus hautes que la tolérance, sous le jeu de colle)
+  //  - des zones ÉTROITES où le dernier tour de mur n'existe pas (traits fins, texte) : loin de la zone u ≥ cN
+  const inN=new Uint8Array(N); for(let k=0;k<N;k++) if(u[k]>=cN-1e-6) inN[k]=1; const dN2=_IL.edt(inN,W,H,1);
+  const narrow=(k)=>Math.sqrt(dN2[k])/SC > (cN-u[k])+0.12;
   // 2) REPRISE (2 tours : normal puis fin) : pointes, zones étroites, coins et fond
   const hAllow=Math.min(0.15, 0.5*Math.max(0.1,p.glueGap)); const sf=Math.max(0.02, 2*t*hAllow);
   for (let it=0; it<2; it++){
     let tol=it===0?0.1:0.08; const delta=Math.max(0.004,Math.min(0.04,Math.max(0.01,0.1*t))/(it===0?1:3));
     const left=new Uint8Array(N); let nl=0, lo=Infinity, hi=-Infinity, bi0=W, bj0=H, bi1=0, bj1=0;
-    for(let k=0;k<N;k++) if(ideal[k]>=0.2 && ideal[k]-h[k]>(u[k]>=cN-1e-6?hAllow+0.05:tol)){ left[k]=1; nl++; if(u[k]<lo) lo=u[k]; if(u[k]>hi) hi=u[k]; const i=k%W, j=(k-i)/W; if(i<bi0)bi0=i; if(i>bi1)bi1=i; if(j<bj0)bj0=j; if(j>bj1)bj1=j; }
+    for(let k=0;k<N;k++) if(ideal[k]>=0.2 && ideal[k]-h[k]>(u[k]>=cN-1e-6?hAllow+0.05:tol) && (u[k]>=cN-1e-6 || narrow(k)) && !(F.boxm&&F.boxm[k])){ /* ♂ : le cadre autour sera scié */ left[k]=1; nl++; if(u[k]<lo) lo=u[k]; if(u[k]>hi) hi=u[k]; const i=k%W, j=(k-i)/W; if(i<bi0)bi0=i; if(i>bi1)bi1=i; if(j<bj0)bj0=j; if(j>bj1)bj1=j; }
     if (!nl) break;
     { // ignorer les miettes (moins de 8 px ≈ 0,02 mm²) : le bois s'écrase, inutile d'y retourner
       const uu=new Float32Array(N); for(let k=0;k<N;k++) uu[k]=left[k]?1:-1;
@@ -27841,6 +27882,13 @@ _IL.finish = function(F, p, Wr, roughUsed){
         stampPath(pth,()=>pth._z);
       }
     }
+  }
+  if (cor.length){
+    Wr.out.push(`; --- coins vifs : ${cor.length} (EN DERNIER : la pointe remonte en biais le long de l'arête de chaque coin, comme Aspire)`); Wr.retract();
+    const rest=cor.slice();
+    while(rest.length){ const pos=Wr.pos; let bi=0, bd=Infinity; rest.forEach((c,k)=>{ const d=pos?(c.Q[0]-pos[0])**2+(c.Q[1]-pos[1])**2:0; if(d<bd){bd=d;bi=k;} });
+      const c=rest.splice(bi,1)[0]; const zQ=zcmd(c.cQ), zP=zcmd(c.cP);
+      Wr.rapidTo(c.Q[0],c.Q[1]); Wr.plunge(zQ); Wr.cut(c.P[0],c.P[1],zP); Wr.cut(c.Q[0],c.Q[1],zQ); nb++; }
   }
   if(_IL.debug) _IL._dbg={h,ideal,W,H,X0,Y0,SC};
   return nb;
