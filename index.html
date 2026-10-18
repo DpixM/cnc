@@ -164,6 +164,20 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-18 — JG : LE DERNIER PASSAGE en vrai V-carve (méthode F-Engrave / Vectric) + plus de zigzags
+ [REFAIT] Le dernier passage de la finition longe le VRAI contour (vecteurs). En chaque point du bord, la pointe se
+   met au centre du plus grand cercle tangent au bord qui tient dans la zone usinée (rayon ≤ profondeur max × tan) :
+   partie large = tour du fond posé sur le mur ; partie étroite = la pointe suit l'axe et remonte ; coin saillant =
+   le cercle rétrécit -> la pointe remonte EN BIAIS jusqu'au coin ; coin rentrant = arc autour. UN SEUL trajet continu
+   par contour, sans à-coups, écrit EN DERNIER (Seb : « c'est la passe la plus importante »).
+ [♂] C'est l'inverse de la ♀ : le mâle est un V-carve de l'EXTÉRIEUR du dessin (miroir) qui part de la profondeur de
+   départ. Les pointes du bouchon sont formées par le flanc (la fraise tourne autour), et la pointe remonte en biais
+   dans les creux, de Z−Dm jusqu'à Z−Ds — exactement comme le fichier Aspire de Seb (15 mouvements Z−5.2 -> Z−4.7 aux creux).
+ [FIX] Zigzags dans les coins / chevrons sur les arêtes = la reprise. Elle ne fait plus que le fond, et seulement là
+   où c'est utile : ♀ creusé au moins jusqu'au fond du bouchon (A − jeu de colle + 0,1) ; ♂ dégagé jusqu'à Ds + 0,15.
+   Plus bas : on laisse brut (sous le jeu de colle / entre les planches).
+ Simulation (bouchon idéal 4,70) : rectangle 4,65 -> 4,69, anneau 4,65 -> 4,68, étoile 4,62. Texte : ancienne méthode.
+
 -- 2026-10-18 — JF : VUE 3D : calque 🟣 « Coins vifs » (la pointe qui remonte en biais, G1 X Y Z) bien visible, en violet
    par-dessus tout, + compteur « N coins vifs » en haut à gauche (♀ et ♂). Affichage seulement, G-code inchangé.
 
@@ -2278,7 +2292,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JF ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JG ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -27733,6 +27747,72 @@ _IL.vecRefine = function(e, G, objects, male, band){
       e[k]= inside ? -d : d; nrep++; } }
   return nrep; };
 
+// --- JG : LE DERNIER PASSAGE, en vrai V-carve (comme Vectric / F-Engrave) ---
+// On longe le VRAI contour du dessin. En chaque point P du bord, la pointe se met au centre du plus grand cercle
+// tangent au bord en P qui tient dans la zone usinée (rayon r ≤ cap) : profondeur = r/tan(demi-angle).
+//  - partie large : r = cap -> c'est le tour du fond, posé pile sur le mur
+//  - partie étroite : r = demi-largeur -> la pointe suit l'axe du trait et remonte toute seule
+//  - coin vif saillant : r -> 0 en arrivant au coin -> la pointe remonte en biais jusqu'au coin (le « magnifique mouvement »)
+//  - coin rentrant : la pointe tourne autour du coin (arc)
+// Un seul trajet continu par contour, sans à-coups : c'est lui qui fait l'emboîtement.
+_IL.vtrace = function(F, wTip){
+  const t=F.tanA, u0=F.male?F.Ds*t:0, capR=F.Dmax*t+wTip/2-u0, px=1/F.SC; if(capR<=0) return null;
+  const polys=_IL.vecPolys(F.objs); if(!polys.length) return null;
+  const mirX=x=>2*F.X0+F.W/F.SC-x; const dist=(x,y)=>_IL.at(F,x,y)-u0;
+  // tous les segments (exacts, vecteurs) + le cadre du mâle, rangés dans une grille pour aller vite
+  const SEG=[]; for(const {pts:p0,closed} of polys){ const q=p0.map(v=>F.male?[mirX(v[0]),v[1]]:[v[0],v[1]]); const m=q.length; for(let k=0;k<(closed?m:m-1);k++) SEG.push([q[k][0],q[k][1],q[(k+1)%m][0],q[(k+1)%m][1]]); }
+  if(F.box){ const [x0,x1,y0,y1]=F.box; SEG.push([x0,y0,x1,y0],[x1,y0,x1,y1],[x1,y1,x0,y1],[x0,y1,x0,y0]); }
+  const CS=Math.max(0.5,capR*2), cells=new Map(), ck=(i,j)=>i*100003+j;
+  SEG.forEach((g,id)=>{ const i0=Math.floor(Math.min(g[0],g[2])/CS), i1=Math.floor(Math.max(g[0],g[2])/CS), j0=Math.floor(Math.min(g[1],g[3])/CS), j1=Math.floor(Math.max(g[1],g[3])/CS);
+    for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++){ const key=ck(i,j); let a=cells.get(key); if(!a){ a=[]; cells.set(key,a); } a.push(id); } });
+  const segD=(x,y,g)=>{ const vx=g[2]-g[0], vy=g[3]-g[1], L2=vx*vx+vy*vy; let f=L2>0?((x-g[0])*vx+(y-g[1])*vy)/L2:0; f=Math.max(0,Math.min(1,f)); return Math.hypot(x-g[0]-vx*f, y-g[1]-vy*f); };
+  const rAt=(x,y,nx,ny,skip)=>{ // plus grand r ≤ capR : le cercle de centre P+n·r tangent en P ne touche aucun autre segment (F-Engrave)
+    const ci=Math.floor(x/CS), cj=Math.floor(y/CS); const seen=new Set(); let r=capR;
+    for(let di=-2;di<=2;di++) for(let dj=-2;dj<=2;dj++){ const a=cells.get(ck(ci+di,cj+dj)); if(!a) continue;
+      for(const id of a){ if(seen.has(id)) continue; seen.add(id); if(skip&&skip.has(id)) continue; const g=SEG[id];
+        if(segD(x+nx*r,y+ny*r,g) >= r-1e-7) continue; let lo=0, hi=r; for(let it=0;it<30;it++){ const m=(lo+hi)/2; if(segD(x+nx*m,y+ny*m,g) >= m-1e-7) lo=m; else hi=m; } r=lo; } }
+    return r; };
+  const out=[]; const ds=Math.max(0.025, 0.6*px), rMin=wTip/2; let segBase=0;
+  for (const {pts:p0,closed} of polys){
+    const nSeg=closed?p0.length:p0.length-1; const base=segBase; segBase+=nSeg;
+    if(!closed) continue; let pts=p0.map(q=>F.male?[mirX(q[0]),q[1]]:[q[0],q[1]]); const n=pts.length; if(n<3) continue;
+    // sens : la normale « vers la zone usinée »
+    let side=0; for(let k=0;k<n && !side;k++){ const a=pts[k], b=pts[(k+1)%n]; const L=Math.hypot(b[0]-a[0],b[1]-a[1]); if(L<0.3) continue; const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2, nx=-(b[1]-a[1])/L, ny=(b[0]-a[0])/L;
+      const dp=dist(mx+nx*0.1,my+ny*0.1), dm=dist(mx-nx*0.1,my-ny*0.1); if(Math.abs(dp-dm)>0.1) side=dp>dm?1:-1; }
+    if(!side) continue;
+    const nrm=(a,b)=>{ const L=Math.hypot(b[0]-a[0],b[1]-a[1])||1; return [-(b[1]-a[1])/L*side,(b[0]-a[0])/L*side]; };
+    const path=[]; const pushC=(x,y,r,onB)=>{ if(!onB){ if(path.length){ out.push(path.splice(0)); } return; } path.push([x,y,u0+r]); };
+    const onBoundary=(x,y)=>Math.abs(dist(x,y))<Math.max(3*px,0.1);
+    for (let k=0;k<n;k++){
+      const A=pts[(k-1+n)%n], V=pts[k], B=pts[(k+1)%n];
+      const n1=nrm(A,V), n2=nrm(V,B); const cr=(V[0]-A[0])*(B[1]-V[1])-(V[1]-A[1])*(B[0]-V[0]); const turn=Math.atan2(cr*side, (V[0]-A[0])*(B[0]-V[0])+(V[1]-A[1])*(B[1]-V[1]));
+      // au sommet V
+      if (Math.abs(turn)>0.02){
+        if (turn>0){ // coin saillant pour la zone usinée : la pointe va jusqu'au coin (sur la bissectrice, cercle de rayon rMin)
+          const bx=n1[0]+n2[0], by=n1[1]+n2[1], bl=Math.hypot(bx,by)||1; const sb=Math.max(0.05, Math.sin((Math.PI-Math.abs(turn))/2));
+          const s=rMin/sb; pushC(V[0]+bx/bl*s, V[1]+by/bl*s, rMin, onBoundary(V[0],V[1]));
+        } else { // coin rentrant : arc autour du coin
+          const a1=Math.atan2(n1[1],n1[0]); let da=Math.atan2(n2[1],n2[0])-a1; while(da>Math.PI) da-=2*Math.PI; while(da<-Math.PI) da+=2*Math.PI;
+          const sk=new Set([base+((k-1+n)%n), base+k]);
+          const m=Math.max(1,Math.ceil(Math.abs(da)/0.08)); for(let q=0;q<=m;q++){ const a=a1+da*q/m, nx=Math.cos(a), ny=Math.sin(a); const r=rAt(V[0],V[1],nx,ny,sk); if(r>=rMin-1e-6) pushC(V[0]+nx*r,V[1]+ny*r,r,onBoundary(V[0],V[1])); }
+        }
+      }
+      // le long du côté V -> B
+      const L=Math.hypot(B[0]-V[0],B[1]-V[1]); const m=Math.max(1,Math.ceil(L/ds));
+      const skS=new Set([base+k]);
+      for (let q=1;q<m;q++){ const f=q/m, x=V[0]+(B[0]-V[0])*f, y=V[1]+(B[1]-V[1])*f; const r=rAt(x,y,n2[0],n2[1],skS); if(r<rMin-1e-6) continue; pushC(x+n2[0]*r, y+n2[1]*r, r, onBoundary(x,y)); }
+    }
+    if(path.length){ if(out.length && closed){ /* on referme sur le début si le contour était entier */ } path.push(path[0].slice()); out.push(path.splice(0)); }
+  }
+  // simplification 3D (tolérance 4 µm en XY, 3 µm en profondeur) — garde les biais des coins
+  const simp=(P)=>{ if(P.length<3) return P; const keep=new Uint8Array(P.length); keep[0]=keep[P.length-1]=1; const st=[[0,P.length-1]];
+    while(st.length){ const [a,b]=st.pop(); let md=0, mi=-1; const A=P[a], B=P[b]; const vx=B[0]-A[0], vy=B[1]-A[1], vz=(B[2]-A[2])/t, L2=vx*vx+vy*vy+vz*vz;
+      for(let k=a+1;k<b;k++){ const Q=P[k]; let f=L2>0?((Q[0]-A[0])*vx+(Q[1]-A[1])*vy+((Q[2]-A[2])/t)*vz)/L2:0; f=Math.max(0,Math.min(1,f)); const dx=Q[0]-A[0]-vx*f, dy=Q[1]-A[1]-vy*f, dz=((Q[2]-A[2])-(B[2]-A[2])*f); const d=Math.max(Math.hypot(dx,dy), Math.abs(dz)*0.6); if(d>md){ md=d; mi=k; } }
+      if(md>0.004){ keep[mi]=1; st.push([a,mi],[mi,b]); } }
+    return P.filter((_,k)=>keep[k]); };
+  return out.filter(P=>P.length>=2).map(simp);
+};
+
 _IL.corners = function(F, wTip){
   const dbg=_IL._cdbg=[]; const rj=(r,q)=>{ if(_IL.debug) dbg.push(r+' '+(q?q.map(v=>v.toFixed(2)).join(','):'')); };
   const t=F.tanA, u0=F.male?F.Ds*t:0, cap=F.Dmax*t+wTip/2, px=1/F.SC, out=[];
@@ -27775,7 +27855,7 @@ _IL.corners = function(F, wTip){
 
 // --- FINITION V-bit : murs par niveaux + « reprise » partout où il reste du bois ---
 _IL.finish = function(F, p, Wr, roughUsed){
-  const t=F.tanA, Dmax=F.Dmax, nV=Math.max(1,Math.ceil(Dmax/1.3-1e-9)), R=p.rDia/2;
+  const t=F.tanA, Dmax=F.Dmax, nV=Math.max(1,Math.ceil(Dmax/1.3-1e-9)), R=p.rDia/2; const u0f=F.male?F.Ds*F.tanA:0;
   // pointe plate du V-bit (Ø w) : on vise la pointe « virtuelle » du cône -> on remonte de w/2/tanA
   const wTip=Math.max(0,+p.vTip||0), tipOff=(wTip/2)/t;
   const zcmd=(c)=>-Math.min(Dmax, Math.max(0, c/t-tipOff));
@@ -27795,11 +27875,15 @@ _IL.finish = function(F, p, Wr, roughUsed){
     for(let j=j0;j<=j1;j++){ const dy=j-cj; for(let i=i0;i<=i1;i++){ const dx=i-ci; const v=D-Math.max(0,Math.sqrt(dx*dx+dy*dy)-w2)*k1; const k=j*W+i; if(v>h[k]) h[k]=v; } } };
   const stampPath=(pth,zOf)=>{ for(let s=1;s<pth.length;s++){ const a=pth[s-1], b=pth[s]; const n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])*SC*1.5));
     for(let q=0;q<=n;q++){ const x=a[0]+(b[0]-a[0])*q/n, y=a[1]+(b[1]-a[1])*q/n; stamp(x,y,-zOf([x,y])); } } };
+  // 0) le dernier passage en vrai V-carve (si les formes ont des vecteurs) : calculé maintenant, écrit EN DERNIER
+  const trace = (p.vtrace!==false && F.objs && F.objs.every(o=>o.type!=='text')) ? _IL.vtrace(F, wTip) : null;
+  const isBoxLoop=(l)=>{ if(!F.boxm) return false; let nbx=0; for(const q of l){ const i=Math.max(0,Math.min(W-1,Math.round((q[0]-X0)*SC-0.5))), j=Math.max(0,Math.min(H-1,Math.round((q[1]-Y0)*SC-0.5))); if(F.boxm[j*W+i]) nbx++; } return nbx>0.5*l.length; };
   // 1) MURS : à chaque niveau, la pointe suit u = z·tanA à Z = −z (posée pile sur la surface idéale)
   for (let k=1;k<=nV;k++){
     const z=k*Dmax/nV, c=z*t; if(c>F.umax) break;
-    Wr.out.push(`; --- mur  Z=-${z.toFixed(3)}`);
-    const loops=_IL.contours(u,W,H,c,X0,Y0,SC).map(l=>_IL.simplifyLoop(l,0.01));
+    let loops=_IL.contours(u,W,H,c,X0,Y0,SC).map(l=>_IL.simplifyLoop(l,0.01));
+    if (trace && k===nV) loops=loops.filter(isBoxLoop);   // le tour du fond le long du dessin = le dernier passage V-carve (plus bas)
+    if (loops.length) Wr.out.push(`; --- mur  Z=-${z.toFixed(3)}${trace&&k===nV?' (cadre seulement)':''}`);
     Wr.retract(); _IL.emitPaths(Wr,F,loops,()=>zcmd(c),()=>c,true); nb+=loops.length;
     for(const l of loops) stampPath(l,()=>zcmd(c));
     if (k===nV){ // pied du mur : 2 tours de plus au fond (raccord avec la fraise plate)
@@ -27809,7 +27893,9 @@ _IL.finish = function(F, p, Wr, roughUsed){
   }
   // 1b) COINS VIFS : calculés et simulés maintenant (la reprise sait que les coins seront faits), mais écrits EN DERNIER :
   //     la pointe qui remonte le long de l'arête du coin est le tout dernier passage (c'est lui qui évite les trous à l'emboîtement)
-  const cor=_IL.corners(F, wTip);
+  const cor=trace?[]:_IL.corners(F, wTip);
+  if (trace) for(const P of trace){ for(let s=1;s<P.length;s++){ const a=P[s-1], b=P[s]; const L=Math.hypot(b[0]-a[0],b[1]-a[1]), ns=Math.max(1,Math.ceil(L*SC*1.5));
+      for(let q=0;q<=ns;q++){ const f=q/ns; stamp(a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f, -zcmd(a[2]+(b[2]-a[2])*f)); } } }
   for(const c of cor){ const zQ=zcmd(c.cQ), zP=zcmd(c.cP); const L=Math.hypot(c.Q[0]-c.P[0],c.Q[1]-c.P[1]), ns=Math.max(2,Math.ceil(L*SC*1.5));
     for(let q=0;q<=ns;q++){ const f=q/ns; stamp(c.Q[0]+(c.P[0]-c.Q[0])*f, c.Q[1]+(c.P[1]-c.Q[1])*f, -(zQ+(zP-zQ)*f)); } }
   _IL._corners=cor;
@@ -27819,11 +27905,14 @@ _IL.finish = function(F, p, Wr, roughUsed){
   const inN=new Uint8Array(N); for(let k=0;k<N;k++) if(u[k]>=cN-1e-6) inN[k]=1; const dN2=_IL.edt(inN,W,H,1);
   const narrow=(k)=>Math.sqrt(dN2[k])/SC > (cN-u[k])+0.12;
   // 2) REPRISE (2 tours : normal puis fin) : pointes, zones étroites, coins et fond
-  const hAllow=Math.min(0.15, 0.5*Math.max(0.1,p.glueGap)); const sf=Math.max(0.02, 2*t*hAllow);
+  // ce qui compte vraiment : ♀ assez creusé pour le bouchon (fond du bouchon = A − jeu de colle, + 0,1 de marge) ;
+  // ♂ assez dégagé autour pour que la planche ne touche pas la ♀ (Ds + 0,15). Plus bas que ça : on laisse brut.
+  const Dneed = F.male ? Math.min(Dmax, F.Ds+0.15) : Math.min(Dmax, Dmax-Math.max(0,p.glueGap)+0.1);
+  const hAllow=F.male ? Math.max(0.15, Math.min(0.3, Math.max(0,p.surfaceGap)-0.2)) : Math.min(0.2, Math.max(0.05, p.glueGap-0.1)); const sf=Math.max(0.02, 2*t*hAllow);   // ♀ bosses du fond < jeu de colle ; ♂ < jeu entre planches
   for (let it=0; it<2; it++){
     let tol=it===0?0.1:0.08; const delta=Math.max(0.004,Math.min(0.04,Math.max(0.01,0.1*t))/(it===0?1:3));
     const left=new Uint8Array(N); let nl=0, lo=Infinity, hi=-Infinity, bi0=W, bj0=H, bi1=0, bj1=0;
-    for(let k=0;k<N;k++) if(ideal[k]>=0.2 && ideal[k]-h[k]>(u[k]>=cN-1e-6?hAllow+0.05:tol) && (u[k]>=cN-1e-6 || narrow(k)) && !(F.boxm&&F.boxm[k])){ /* ♂ : le cadre autour sera scié */ left[k]=1; nl++; if(u[k]<lo) lo=u[k]; if(u[k]>hi) hi=u[k]; const i=k%W, j=(k-i)/W; if(i<bi0)bi0=i; if(i>bi1)bi1=i; if(j<bj0)bj0=j; if(j>bj1)bj1=j; }
+    for(let k=0;k<N;k++) if(ideal[k]>=0.2 && (trace ? Math.min(ideal[k],Dneed)-h[k]>0.08 : ideal[k]-h[k]>(u[k]>=cN-1e-6?hAllow:tol)) && (u[k]>=cN-1e-6 || (!trace && narrow(k))) && !(F.boxm&&F.boxm[k])){ /* ♂ : le cadre autour sera scié */ left[k]=1; nl++; if(u[k]<lo) lo=u[k]; if(u[k]>hi) hi=u[k]; const i=k%W, j=(k-i)/W; if(i<bi0)bi0=i; if(i>bi1)bi1=i; if(j<bj0)bj0=j; if(j>bj1)bj1=j; }
     if (!nl) break;
     { // ignorer les miettes (moins de 8 px ≈ 0,02 mm²) : le bois s'écrase, inutile d'y retourner
       const uu=new Float32Array(N); for(let k=0;k<N;k++) uu[k]=left[k]?1:-1;
@@ -27861,7 +27950,7 @@ _IL.finish = function(F, p, Wr, roughUsed){
       }
     }
     if (!paths.length) break;
-    Wr.out.push(`; --- reprise ${it+1} : ${paths.length} passes (pointes, zones étroites, coins, fond)`);
+    Wr.out.push(trace?`; --- fond ${it+1} : ${paths.length} passes (là où la fraise plate ne passe pas, seulement si ça gênerait l'emboîtement)`:`; --- reprise ${it+1} : ${paths.length} passes (pointes, zones étroites, coins, fond)`);
     Wr.retract(); 
     // regrouper par îlot de bois restant (composantes du masque « près »), puis par profondeur croissante
     const lab=new Int32Array(N).fill(-1); let nlab=0; { const st=new Int32Array(N);
@@ -27887,6 +27976,19 @@ _IL.finish = function(F, p, Wr, roughUsed){
         stampPath(pth,()=>pth._z);
       }
     }
+  }
+  if (trace && trace.length){
+    let nc=0; for(const P of trace) for(let s=0;s+1<P.length;s++){ if(P[s][2]<=u0f+wTip/2+1e-4) nc++; }
+    Wr.out.push(`; --- DERNIER PASSAGE V-carve : ${trace.length} contour(s), la pointe reste tangente au mur, remonte en biais dans les coins vifs (${nc})`); Wr.retract();
+    const rest=trace.slice();
+    while(rest.length){ const pos=Wr.pos; let bi=0, bd=Infinity; rest.forEach((P,k)=>{ const d=pos?(P[0][0]-pos[0])**2+(P[0][1]-pos[1])**2:0; if(d<bd){bd=d;bi=k;} });
+      let P=rest.splice(bi,1)[0];
+      // départ au point le plus profond (on entre là où c'est déjà creusé)
+      let kd=0; for(let k=0;k<P.length;k++) if(P[k][2]>P[kd][2]+1e-6) kd=k;
+      const closedP=Math.hypot(P[0][0]-P[P.length-1][0],P[0][1]-P[P.length-1][1])<1e-6;
+      if(closedP && kd>0){ P=P.slice(kd,P.length-1).concat(P.slice(0,kd)); P.push(P[0].slice()); }
+      Wr.rapidTo(P[0][0],P[0][1]); Wr.plunge(zcmd(P[0][2]));
+      for(let k=1;k<P.length;k++) Wr.cut(P[k][0],P[k][1],zcmd(P[k][2])); nb++; }
   }
   if (cor.length){
     Wr.out.push(`; --- coins vifs : ${cor.length} (EN DERNIER : la pointe remonte en biais le long de l'arête de chaque coin, comme Aspire)`); Wr.retract();
