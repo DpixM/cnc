@@ -164,6 +164,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-18 — JD : l'étoile = la pièce ♂ + VUE 3D incrustation avec la même interface que la découpe
+ [FIX] Seb : « l'étoile c'est la pièce MÂLE ». Un rectangle qui entoure tout le dessin est maintenant pris comme le
+   CONTOUR DE LA PLANCHE (pas usiné, pastille « 🖼 contour de planche ») -> ce qui est dedans = la pièce ♂ incrustée.
+   Un clic sur le rectangle le remet en incrusté (cadre). Avant : le rectangle était incrusté et l'étoile devenait un
+   îlot de bois ♀ -> les couleurs avaient l'air inversées partout.
+ [AJOUT] Les bois : les 2 VRAIES pièces dessinées côte à côte (♀ planche avec ses trous / ♂ pièce à incruster).
+ [UI] Atelier 3D refait comme la VUE 3D de la découpe : titre « VUE 3D », barre de calques (fichiers + 🪵 Bois /
+   🔵 Rapides / 🟢 Usinage / 🔴 Plongées / ⌂ Reset), G-code à droite (ligne en cours surlignée, clic = y aller),
+   lecteur en bas (▶, barre %, Vitesse en mm/s, rapides 8× plus vite), cube de vue + 🏠. Trajets tracés au fur et à mesure.
+
 -- 2026-10-18 — JC : COINS VIFS en finition V-bit (comme Aspire)
  [FIX] Seb : « pourquoi le G-code ne monte pas en biais dans les angles ? ». Il avait raison : à profondeur fixe le V-bit
    ne peut pas atteindre le fond d'un coin vif. Vérifié dans ses fichiers Aspire : 30 mouvements en biais (♀ : du fond
@@ -2212,6 +2222,35 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 .ilv-bw i{display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid #fff6}
 .ilv-fn{font-size:11px;font-weight:600;color:var(--txt2);margin-top:3px}
 @media(max-width:600px){.ilv-big{font-size:13px;padding:6px 9px}.ilv-tab{padding:6px 9px}}
+/* JD : même interface que la VUE 3D de la découpe */
+#ilvModal{background:var(--bg)}
+.ilv-head{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surf);border-bottom:1px solid var(--brd);flex-shrink:0}
+#ilvModal .ilv-title{font-family:var(--mono);font-size:12px;font-weight:400;color:var(--acc);flex:1;margin:0}
+.ilv-hint{font-size:10px;color:var(--txt3)}
+.ilv-toolbar{display:flex;gap:6px;padding:6px 10px;background:var(--surf);border-bottom:1px solid var(--brd);flex-wrap:wrap;flex-shrink:0;align-items:center}
+.ilv-tb{padding:4px 10px!important;font-size:10px!important}
+#ilvModal .ilv-tab{padding:4px 10px;font-size:10px;border-radius:7px}
+.ilv-sep{width:1px;align-self:stretch;background:var(--brd);margin:0 4px}
+.ilv-main{flex:1;display:flex;min-height:0}
+.ilv-main .ilv-body{flex:1;position:relative;overflow:hidden;touch-action:none}
+.ilv-side{width:300px;flex-shrink:0;display:flex;flex-direction:column;border-left:1px solid var(--brd);background:var(--surf)}
+.ilv-side-h{padding:6px 8px;font-size:10px;color:var(--txt3);border-bottom:1px solid var(--brd)}
+.ilv-code{flex:1;overflow:auto;font-family:var(--mono);font-size:10px;line-height:1.5;background:#0d1117}
+.ilv-ln{padding:1px 8px;cursor:pointer;white-space:pre;color:#c9d1d9}
+.ilv-ln._on{background:rgba(245,166,35,.28)}
+.ilv-info{position:absolute;bottom:8px;left:8px;font-family:var(--mono);font-size:10px;color:rgba(255,255,255,.4);pointer-events:none}
+.ilv-player{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surf);border-top:1px solid var(--brd);flex-shrink:0}
+.ilv-mono{font-family:var(--mono);font-size:11px;color:var(--txt2)}
+.ilv-cube{position:absolute;right:12px;bottom:40px;width:110px;height:110px;z-index:5}
+.ilv-home{position:absolute;left:-40px;bottom:4px;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#fff;padding:3px 7px;cursor:pointer;font-size:14px}
+@media(max-width:760px){.ilv-side{display:none!important}.ilv-hint{display:none}.ilv-cube{transform:scale(.8);transform-origin:right bottom}}
+.ilw-pieces{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.ilw-pc{border:1.5px solid var(--brd2);border-radius:10px;padding:8px;background:var(--surf2)}
+.ilw-pc.ilw-f{border-color:#4caf5088}.ilw-pc.ilw-m{border-color:#42a5f588}
+.ilw-pct{font-size:13px;font-weight:800;margin-bottom:6px}
+.ilw-pc canvas{width:100%;height:150px;display:block;border-radius:8px;background:#0a0c10}
+.ilw-pcs{font-size:11px;color:var(--txt2);margin-top:4px}
+@media(max-width:600px){.ilw-pieces{grid-template-columns:1fr}}
 </style>
 
 </head>
@@ -2221,7 +2260,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JC ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JD ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2754,6 +2793,10 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
     <canvas id="ilWoodPreview"></canvas>
     <div class="ilw-shapes" id="ilwShapes"></div>
     <div class="ilw-warn" id="ilwWarn"></div>
+    <div class="ilw-pieces">
+      <div class="ilw-pc ilw-f"><div class="ilw-pct">♀ La planche creusée — <b id="ilPcFn">Noyer</b></div><canvas id="ilPcF"></canvas><div class="ilw-pcs">les trous (plus foncés) sont creusés</div></div>
+      <div class="ilw-pc ilw-m"><div class="ilw-pct">♂ La pièce incrustée — <b id="ilPcMn">Érable</b></div><canvas id="ilPcM"></canvas><div class="ilw-pcs">découpée dans l'autre planche, puis retournée et collée dans les trous</div></div>
+    </div>
     <div class="ilw-note">Les formes incrustées l'une dans l'autre font un trou (un rond dans un rond = un anneau). Les formes ignorées (hachurées) ne sont pas usinées.</div>
   </div>
 </div>
@@ -27910,7 +27953,7 @@ function ilWoodPreviewDraw(){
   ctx.fillStyle='#0a0c10'; ctx.fillRect(0,0,W,H); _ilPrev=null;
   if(!all.length){ ctx.fillStyle='#888'; ctx.font=(14*dpr)+'px sans-serif'; ctx.textAlign='center'; ctx.fillText('Dessine d\'abord tes formes',W/2,H/2); if(info) info.textContent=''; ilShapeChips(); return; }
   // résolution de l'aperçu : ~ la taille de l'écran
-  let bw=0,bh=0; { const t=_ilPrevBuild(2); if(t){ bw=t.W/2; bh=t.H/2; } }
+  let bw=0,bh=0; { const t=_ilPrevBuild(2); if(t){ bw=t.W/2; bh=t.H/2; ilAutoFrame(t); } }
   const SC=Math.max(2,Math.min(16,Math.round(Math.min(W/Math.max(1,bw),H/Math.max(1,bh))*0.6)));
   const G=_ilPrevBuild(SC); if(!G){ ilShapeChips(); return; }
   const wMm=G.W/G.SC, hMm=G.H/G.SC; const k=Math.min(W/wMm, H/hMm)*0.94; const ox=(W-wMm*k)/2, oy=(H-hMm*k)/2;
@@ -27928,10 +27971,12 @@ function ilWoodPreviewDraw(){
   for(let py=0;py<H;py++){ const j=Math.floor(((py-oy)/k)*G.SC); if(j<0||j>=G.H) continue;
     for(let px=0;px<W;px++){ const i=Math.floor(((px-ox)/k)*G.SC); if(i<0||i>=G.W) continue; const e=G.edge[j*G.W+i]; if(!e) continue;
       if((Math.floor((px+py)/dash)&1)===0) continue; const o=(py*W+px)*4; const v=e===1?255:150; img.data[o]=v; img.data[o+1]=v; img.data[o+2]=e===1?255:160; } }
-  ctx.putImageData(img,0,0);
+  ctx.putImageData(img,0,0); ilPiecesDraw(G);
   const nOff=all.length-on.length;
   const wn=document.getElementById('ilwWarn'); if(wn){ const ov=G.overlap/(G.SC*G.SC);
-    if(ov>0.5){ wn.style.display='block'; wn.innerHTML='⚠️ Des formes incrustées se superposent (ex : une étoile dans un rectangle). Là où elles se superposent, ça <b>reste du bois ♀</b> (un îlot) — c\'est ce que tu vois au milieu. Pour n\'incruster que l\'étoile, clique le rectangle pour l\'<b>ignorer</b>.'; }
+    const af=all.find(o=>o._inlayAuto&&o._inlayOff);
+    if(af){ wn.style.display='block'; wn.innerHTML='▭ Le <b>rectangle</b> qui entoure ton dessin = le <b>contour de ta planche</b> : il n\'est pas usiné. Ce qui est dedans devient la pièce ♂ incrustée. (Tu veux vraiment un cadre incrusté ? clique le rectangle.)'; }
+    else if(ov>0.5){ wn.style.display='block'; wn.innerHTML='⚠️ Des formes incrustées se superposent (ex : une étoile dans un rectangle). Là où elles se superposent, ça <b>reste du bois ♀</b> (un îlot) — c\'est ce que tu vois au milieu. Pour n\'incruster que l\'étoile, clique le rectangle pour l\'<b>ignorer</b>.'; }
     else wn.style.display='none'; }
   if(info) info.textContent=`— ${on.length} forme${on.length>1?'s':''} incrustée${on.length>1?'s':''}${nOff?' · '+nOff+' ignorée'+(nOff>1?'s':''):''} · fond ${ilWood('female').name} · bouchons ${ilWood('male').name}`;
   ilShapeChips();
@@ -27945,11 +27990,29 @@ function _ilPrevClick(e){ const P=_ilPrev; if(!P) return; const cv=e.currentTarg
     if(hit && (!best || it.area<best.area)) best=it; }
   if(best) ilShapeToggle(best.o.id);
 }
-function ilShapeToggle(id){ const o=_ilAllObjs().find(x=>x.id===id); if(!o) return; o._inlayOff=!o._inlayOff; ilWoodPreviewDraw(); }
+function ilShapeToggle(id){ const o=_ilAllObjs().find(x=>x.id===id); if(!o) return; o._inlayOff=!o._inlayOff; o._inlayUser=true; o._inlayAuto=false; ilWoodPreviewDraw(); }
+// JD : un RECTANGLE qui entoure tout le reste = le contour de la planche -> pas usiné (une seule fois ; un clic le remet)
+function ilAutoFrame(G){ if(!G||G.per.length<2) return false; let ch=false;
+  for(const it of G.per){ const o=it.o; if(o.type!=='rect' || o._inlayUser || o._inlayAutoDone) continue; o._inlayAutoDone=true;
+    const others=G.per.filter(q=>q!==it && !q.o._inlayOff); if(!others.length) continue;
+    if(others.every(q=>q.mx0>it.mx0+0.05 && q.mx1<it.mx1-0.05 && q.my0>it.my0+0.05 && q.my1<it.my1-0.05)){ o._inlayOff=true; o._inlayAuto=true; ch=true; } }
+  return ch; }
+// les 2 vraies pièces de bois : la planche ♀ avec ses trous, la pièce ♂ qu'on incruste
+function ilPiecesDraw(G){ const fW=ilWood('female'), mW=ilWood('male'); const F=_ilRGB(fW.color), M=_ilRGB(mW.color);
+  for(const [id,male] of [['ilPcF',false],['ilPcM',true]]){ const cv=document.getElementById(id); if(!cv) continue; const dpr=window.devicePixelRatio||1;
+    const W=Math.max(120,Math.round(cv.clientWidth*dpr)), H=Math.max(80,Math.round(cv.clientHeight*dpr)); cv.width=W; cv.height=H; const ctx=cv.getContext('2d'); ctx.clearRect(0,0,W,H);
+    if(!G) continue; const k=Math.min(W/G.W,H/G.H)*0.92, ox=(W-G.W*k)/2, oy=(H-G.H*k)/2; const img=ctx.createImageData(W,H);
+    for(let py=0;py<H;py++){ const j=Math.floor((py-oy)/k); for(let px=0;px<W;px++){ const i=Math.floor((px-ox)/k); const o=(py*W+px)*4; if(i<0||j<0||i>=G.W||j>=G.H) continue;
+      const inS=G.m[j*G.W+i]===1; let c=null, g=1;
+      if(male){ if(inS){ c=M; g=_ilGrain(i/G.SC*3,j/G.SC*3,0.5); } }
+      else { c=F; g=_ilGrain(i/G.SC*3,j/G.SC*3,0); if(inS) g*=0.38; }
+      if(c){ img.data[o]=c[0]*g; img.data[o+1]=c[1]*g; img.data[o+2]=c[2]*g; img.data[o+3]=255; } } }
+    ctx.putImageData(img,0,0); }
+  const a=document.getElementById('ilPcFn'), b=document.getElementById('ilPcMn'); if(a) a.textContent=fW.name; if(b) b.textContent=mW.name; }
 function ilShapeChips(){ const box=document.getElementById('ilwShapes'); if(!box) return; const all=_ilAllObjs();
   const has=new Set(_ilPrev?_ilPrev.G.per.map(it=>it.o.id):all.map(o=>o.id));
   box.innerHTML=all.map(o=>!has.has(o.id)?`<span class="ilw-chip off" title="Trait ouvert : pas de surface à creuser">${_ilShapeIco(o)} ${_ilShapeName(o)} <b>pas de surface</b></span>`
-    :`<button class="ilw-chip${o._inlayOff?' off':''}" onclick="ilShapeToggle(${JSON.stringify(o.id)})" title="Cliquer pour ${o._inlayOff?'incruster':'ignorer'}">${_ilShapeIco(o)} ${_ilShapeName(o)} <b>${o._inlayOff?'🚫 ignorée':'✅ incrustée'}</b></button>`).join(''); }
+    :`<button class="ilw-chip${o._inlayOff?' off':''}" onclick="ilShapeToggle(${JSON.stringify(o.id)})" title="Cliquer pour ${o._inlayOff?'incruster':'ignorer'}">${_ilShapeIco(o)} ${_ilShapeName(o)} <b>${o._inlayOff?(o._inlayAuto?'🖼 contour de planche':'🚫 ignorée'):'✅ incrustée (♂)'}</b></button>`).join(''); }
 (function(){ const bind=()=>{ const cv=document.getElementById('ilWoodPreview'); if(cv && !cv._ilc){ cv._ilc=1; cv.addEventListener('click',_ilPrevClick); } };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind(); setTimeout(bind,500); })();
 window.addEventListener('resize',()=>{ const p=document.getElementById('wzp3'); if(p&&p.classList.contains('wz-on')) ilWoodPreviewDraw(); });
@@ -28113,7 +28176,7 @@ function _ilParamFocusSetup(){
 }
 
 // ---------- 3) ATELIER 3D : vrai bois creusé, onglets Femelle / Mâle / Emboîtement ----------
-const ILV={ side:null, sides:{}, playing:false, speed:5, tab:'f', showPaths:false };
+const ILV={ side:null, sides:{}, playing:false, speed:10, tab:'f0', show:{wood:true,rapid:true,cut:true,plunge:true} };
 ILV.parse=function(gc){ const mv=[]; let x=0,y=0,z=0, g=0, n=0; const meta={};
   const m1=/axe miroir X=(-?\d+(?:\.\d+)?)/.exec(gc); if(m1) meta.xc=parseFloat(m1[1]);
   for(const raw of gc.split('\n')){ n++; const L=raw.split(';')[0].trim().toUpperCase(); if(!L) continue;
@@ -28149,48 +28212,60 @@ ILV.stamp=function(S, x, y, z, tool){ if(z>=0) return; const G=S.G, D=-z; const 
 // avance de `budget` mm de trajet (Infinity = jusqu'au bout)
 ILV.advance=function(S, budget){ const step=S.G.res*0.7;
   while(budget>0 && S.idx<S.mv.length){ const m=S.mv[S.idx]; const L=Math.hypot(m.x1-m.x0,m.y1-m.y0,m.z1-m.z0); const tool=S.files[m.fi].tool; S.fi=m.fi;
-    const take=Math.min(L-S.sub, budget); const a=L>0?S.sub/L:1, b=L>0?(S.sub+take)/L:1;
+    const kf=m.g===0?8:1; const take=Math.min(L-S.sub, budget*kf); const a=L>0?S.sub/L:1, b=L>0?(S.sub+take)/L:1;
     if(m.z0<0||m.z1<0){ const n=Math.max(1,Math.ceil(take/step)); for(let q=0;q<=n;q++){ const u=a+(b-a)*q/n; ILV.stamp(S, m.x0+(m.x1-m.x0)*u, m.y0+(m.y1-m.y0)*u, m.z0+(m.z1-m.z0)*u, tool); } }
     S.head=[m.x0+(m.x1-m.x0)*b, m.y0+(m.y1-m.y0)*b, m.z0+(m.z1-m.z0)*b];
-    budget-=Math.max(take,1e-3); S.sub+=take; if(S.sub>=L-1e-9){ S.idx++; S.sub=0; } }
+    budget-=Math.max(take/kf,1e-3); S.sub+=take; if(S.sub>=L-1e-9){ S.idx++; S.sub=0; } }
   S.done=S.idx>=S.mv.length; };
 
-ILV.build=function(){
+ILV.build=function(){   // JD : même interface que la VUE 3D de la découpe (barre de calques, G-code à droite, lecteur en bas, cube)
   if(document.getElementById('ilvModal')) return;
   const d=document.createElement('div'); d.id='ilvModal';
-  d.innerHTML=`<div class="ilv-top"><span class="ilv-title">🧊 Atelier 3D</span>
-      <span class="ilv-grp ilv-gf"><b>♀ FEMELLE</b><button class="ilv-tab" data-t="f0" onclick="ilvTab('f0')">1 · Ébauche</button><button class="ilv-tab" data-t="f1" onclick="ilvTab('f1')">2 · Finition</button></span>
-      <span class="ilv-grp ilv-gm"><b>♂ MÂLE</b><button class="ilv-tab" data-t="m0" onclick="ilvTab('m0')">3 · Ébauche</button><button class="ilv-tab" data-t="m1" onclick="ilvTab('m1')">4 · Finition</button></span>
+  const B='class="btn btn-dim ilv-tb"';
+  d.innerHTML=`<div class="ilv-head"><span class="ilv-title" id="ilvTitle">🧊 VUE 3D — INCRUSTATION</span>
+      <span class="ilv-hint">Glisser=tourner · molette=zoom · Maj+glisser=déplacer</span>
+      <button class="btn btn-dim" style="padding:5px 10px" onclick="ilvClose()">✕</button></div>
+    <div class="ilv-toolbar">
+      <span class="ilv-grp ilv-gf"><b>♀</b><button class="ilv-tab" data-t="f0" onclick="ilvTab('f0')">1 · Ébauche</button><button class="ilv-tab" data-t="f1" onclick="ilvTab('f1')">2 · Finition</button></span>
+      <span class="ilv-grp ilv-gm"><b>♂</b><button class="ilv-tab" data-t="m0" onclick="ilvTab('m0')">3 · Ébauche</button><button class="ilv-tab" data-t="m1" onclick="ilvTab('m1')">4 · Finition</button></span>
       <button class="ilv-tab" data-t="fit" onclick="ilvTab('fit')">🧩 Emboîtement</button>
-      <button class="ilv-x" onclick="ilvClose()">✕</button></div>
-    <div class="ilv-body">
-      <canvas id="ilvCanvas"></canvas>
-      <div class="ilv-hud" id="ilvHud"><div class="ilv-big" id="ilvBig"></div><div class="ilv-steps" id="ilvSteps"></div><div class="ilv-chip" id="ilvInfo"></div></div>
-      <div class="ilv-opts" id="ilvOpts">
-        <button class="ilv-opt" id="ilvOptPaths" onclick="ilvTogglePaths()">〰 Trajets</button>
-        <button class="ilv-opt" onclick="ilvView('top')">⬒ Vue dessus</button>
-        <button class="ilv-opt" onclick="ilvView('iso')">⟲ Recentrer</button>
+      <span class="ilv-sep"></span>
+      <span id="ilvLayers" style="display:contents">
+      <button ${B} id="ilvBtn_wood" onclick="ilvToggle('wood')">🪵 Bois</button>
+      <button ${B} id="ilvBtn_rapid" onclick="ilvToggle('rapid')">🔵 Rapides</button>
+      <button ${B} id="ilvBtn_cut" onclick="ilvToggle('cut')">🟢 Usinage</button>
+      <button ${B} id="ilvBtn_plunge" onclick="ilvToggle('plunge')">🔴 Plongées</button></span>
+      <div style="flex:1"></div>
+      <button ${B} onclick="ilvView('iso')">⌂ Reset</button></div>
+    <div class="ilv-main">
+      <div class="ilv-body" id="ilvBody">
+        <canvas id="ilvCanvas"></canvas>
+        <div class="ilv-hud" id="ilvHud"><div class="ilv-big" id="ilvBig"></div><div class="ilv-steps" id="ilvSteps"></div></div>
+        <div class="ilv-info" id="ilvInfo"></div>
+        <div class="ilv-fit" id="ilvFit">
+          <div class="ilv-verdict ilv-card" id="ilvVerdict"></div>
+          <div class="ilv-card"><h4>Rendu fini (vu de dessus, après ponçage)</h4><canvas id="ilvTop" height="420"></canvas>
+            <div class="ilv-row">Ponçage <input type="range" id="ilvSand" min="0" max="1" step="0.05" value="0.2" oninput="ilvFitDraw()"> <span id="ilvSandV"></span></div>
+            <div class="ilv-leg" id="ilvLegTop"></div></div>
+          <div class="ilv-card"><h4>Coupe (bouchon enfoncé)</h4><canvas id="ilvCut" height="300"></canvas>
+            <div class="ilv-row">Position de la coupe <input type="range" id="ilvCutY" min="0" max="1000" value="500" oninput="ilvFitDraw()"></div>
+            <div class="ilv-leg" id="ilvLegCut"></div></div>
+        </div>
+        <div class="ilv-busy" id="ilvBusy">⏳ Calcul…</div>
       </div>
-      <div class="ilv-fit" id="ilvFit">
-        <div class="ilv-verdict ilv-card" id="ilvVerdict"></div>
-        <div class="ilv-card"><h4>Rendu fini (vu de dessus, après ponçage)</h4><canvas id="ilvTop" height="420"></canvas>
-          <div class="ilv-row">Ponçage <input type="range" id="ilvSand" min="0" max="1" step="0.05" value="0.2" oninput="ilvFitDraw()"> <span id="ilvSandV"></span></div>
-          <div class="ilv-leg" id="ilvLegTop"></div></div>
-        <div class="ilv-card"><h4>Coupe (bouchon enfoncé)</h4><canvas id="ilvCut" height="300"></canvas>
-          <div class="ilv-row">Position de la coupe <input type="range" id="ilvCutY" min="0" max="1000" value="500" oninput="ilvFitDraw()"></div>
-          <div class="ilv-leg" id="ilvLegCut"></div></div>
-      </div>
-      <div class="ilv-busy" id="ilvBusy">⏳ Calcul…</div>
+      <div class="ilv-side" id="ilvSide"><div class="ilv-side-h">📄 G-code — touche une ligne pour y aller</div><div class="ilv-code" id="ilvCode"></div></div>
     </div>
-    <div class="ilv-bar" id="ilvBar">
-      <button class="ilv-btn" title="Début" onclick="ilvRestart()">⏮</button>
-      <button class="ilv-btn play" id="ilvPlay" onclick="ilvPlay()">▶</button>
-      <button class="ilv-btn" title="Fin (tout usiner)" onclick="ilvEnd()">⏭</button>
-      <input type="range" id="ilvProg" min="0" max="1000" value="0" oninput="ilvSeek(this.value/1000)">
-      <select class="ilv-sel" id="ilvSpeed" onchange="ILV.speed=+this.value"><option value="1">Lent</option><option value="5" selected>Normal</option><option value="25">Rapide</option><option value="120">Turbo</option></select>
+    <div class="ilv-player" id="ilvBar">
+      <button id="ilvPlay" class="btn btn-p" style="padding:6px 14px;font-size:15px" onclick="ilvPlay()">▶</button>
+      <input type="range" id="ilvProg" min="0" max="1000" value="0" style="flex:1;height:22px;accent-color:var(--acc)" onpointerdown="ilvScrub(event)" oninput="ilvSeek(this.value/1000)">
+      <span id="ilvPct" class="ilv-mono" style="min-width:40px">0%</span>
+      <span style="font-size:10px;color:var(--txt2)">Vitesse</span>
+      <input type="range" id="ilvSpeed" min="1" max="300" value="10" style="width:90px;accent-color:var(--txt2)" oninput="ilvSetSpeed(this.value)">
+      <span id="ilvSpeedLbl" class="ilv-mono" style="min-width:58px">20 mm/s</span>
     </div>`;
   document.body.appendChild(d);
   ILV.cv=document.getElementById('ilvCanvas'); ILV.ctrlSetup(ILV.cv);
+  for(const k in ILV.show) ilvBtnState(k);
 };
 ILV.three=function(){
   if(ILV.renderer || !window.THREE) return;
@@ -28243,25 +28318,58 @@ ILV.headFor=function(){ const T=window.THREE; if(ILV.heads) return; const P=inla
   const f=new T.Group(); const R=P.rDia/2; const fl=new T.Mesh(new T.CylinderGeometry(R,R,8,20),steel); fl.rotation.x=Math.PI/2; fl.position.z=4; f.add(fl);
   const c2=col.clone(); c2.position.z=11; f.add(c2);
   ILV.heads={v,f}; ILV.scene.add(v); ILV.scene.add(f); v.visible=f.visible=false; };
-ILV.pathsFor=function(S){ const T=window.THREE; if(S.paths) return; const pc=[], cc=[]; const cols=[[1,0.6,0.15],[0.3,0.9,0.5]];
-  for(const m of S.mv){ if(m.g!==1) continue; pc.push(m.x0,m.y0,m.z0,m.x1,m.y1,m.z1); const c=cols[m.fi]; cc.push(...c,...c); }
-  const g=new T.BufferGeometry(); g.setAttribute('position',new T.Float32BufferAttribute(pc,3)); g.setAttribute('color',new T.Float32BufferAttribute(cc,3));
-  S.paths=new T.LineSegments(g,new T.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.55})); S.paths.visible=false; ILV.scene.add(S.paths); };
+ILV.pathsFor=function(S){ const T=window.THREE; if(S.paths) return;
+  const cat=m=>m.g===0?'rapid':((Math.abs(m.x1-m.x0)+Math.abs(m.y1-m.y0)<1e-6 && m.z1<m.z0)?'plunge':'cut');
+  const col={rapid:0x3b82f6, cut:0x22c55e, plunge:0xef4444}; S.paths={}; S.pcnt={};
+  for(const k of ['rapid','cut','plunge']){ const pc=[]; const cnt=new Int32Array(S.mv.length+1); let n=0;
+    S.mv.forEach((m,i)=>{ if(cat(m)===k){ pc.push(m.x0,m.y0,m.z0,m.x1,m.y1,m.z1); n++; } cnt[i+1]=n; });
+    const g=new T.BufferGeometry(); g.setAttribute('position',new T.Float32BufferAttribute(pc,3)); g.setDrawRange(0,0);
+    const L=new T.LineSegments(g,new T.LineBasicMaterial({color:col[k],transparent:true,opacity:k==='rapid'?0.6:0.85})); L.visible=false; ILV.scene.add(L); S.paths[k]=L; S.pcnt[k]=cnt; } };
+ILV.pathsShow=function(S,on){ if(!S||!S.paths) return; for(const k in S.paths) S.paths[k].visible=on&&ILV.show[k]; };
+ILV.pathsUpdate=function(S){ if(!S||!S.paths) return; const i=Math.min(S.idx+(S.sub>0?1:0), S.mv.length); if(S._pi===i) return; S._pi=i; for(const k in S.paths) S.paths[k].geometry.setDrawRange(0,2*S.pcnt[k][i]); };
 ILV.frame=function(){ ILV.resize(); const S=ILV.side; if(!S||ILV.tab==='fit'){ return; }
-  if(ILV.playing){ ILV.advance(S, ILV.speed); if(S.done){ ILV.playing=false; ILV.ui(); } }
-  const now=performance.now(); if(S.dirty && (!ILV.playing || now-(ILV._lu||0)>90)){ ILV.meshUpdate(S); ILV._lu=now; }
-  // tête
+  const now=performance.now(), dt=Math.min(0.05,Math.max(0,(now-(ILV._tLast||now))/1000)); ILV._tLast=now;
+  if(ILV.playing){ ILV.advance(S, Math.max(1,ILV.speed)*2*dt); if(S.done){ ILV.playing=false; ILV.ui(); } }
+  if(S.dirty && (!ILV.playing || now-(ILV._lu||0)>90)){ ILV.meshUpdate(S); ILV._lu=now; }
+  ILV.pathsUpdate(S);
   if(ILV.heads){ const tool=S.files[S.fi]?.tool; const H=tool&&tool.type==='v'?ILV.heads.v:ILV.heads.f; ILV.heads.v.visible=ILV.heads.f.visible=false;
     if(!S.done || ILV.playing){ H.visible=true; H.position.set(S.head[0],S.head[1],S.head[2]); } }
-  ILV.camUpdate(); ILV.renderer.render(ILV.world,ILV.cam); ILV.info(); };
-ILV.info=function(){ const S=ILV.side; if(!S) return; const el=document.getElementById('ilvInfo'); const m=S.mv[Math.min(S.idx,S.mv.length-1)];
-  const pr=S.mv.length?S.idx/S.mv.length:1; const pg=document.getElementById('ilvProg'); if(pg && !ILV._seeking) pg.value=Math.round(pr*1000);
-  if(el) el.innerHTML=`${S.done?'terminé ✅':'en cours'} · Z ${S.head[2].toFixed(2)} · ligne ${m?m.line:'-'} / ${S.mv.length?S.mv[S.mv.length-1].line:'-'}${S.side==='m'?' · dessin en miroir (normal)':''}`;
+  ILV.camUpdate(); ILV.renderer.render(ILV.world,ILV.cam); ILV.cubeRender(); ILV.info(); };
+ILV.code=function(S){ const el=document.getElementById('ilvCode'); if(!el) return; const gc=(S&&S.files[S.fi0]&&S.files[S.fi0].gc)||''; if(el._gc===gc) return; el._gc=gc; ILV._hi=null;
+  const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  el.innerHTML=gc.split('\n').map((ln,i)=>'<div class="ilv-ln" data-l="'+(i+1)+'" onclick="ilvGotoLine('+(i+1)+')">'+String(i+1).padStart(5,' ')+'  '+esc(ln)+'</div>').join(''); };
+ILV.hiLine=function(S){ const el=document.getElementById('ilvCode'); if(!el||!S) return; const m=S.mv[Math.min(S.idx,S.mv.length-1)]; const cur=m?m.line:0; if(cur===ILV._hi) return; ILV._hi=cur;
+  const prev=el.querySelector('.ilv-ln._on'); if(prev) prev.classList.remove('_on'); const row=el.querySelector('.ilv-ln[data-l="'+cur+'"]'); if(row){ row.classList.add('_on'); try{ row.scrollIntoView({block:'nearest'}); }catch(e){} } };
+ILV.info=function(){ const S=ILV.side; if(!S) return; const el=document.getElementById('ilvInfo');
+  const pr=S.mv.length?S.idx/S.mv.length:1; const pg=document.getElementById('ilvProg'); if(pg && !ILV._seeking && document.activeElement!==pg) pg.value=Math.round(pr*1000);
+  const pc=document.getElementById('ilvPct'); if(pc) pc.textContent=Math.round(pr*100)+'%';
+  if(el){ if(!S._bb){ let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9; for(const m of S.mv){ x0=Math.min(x0,m.x1); x1=Math.max(x1,m.x1); y0=Math.min(y0,m.y1); y1=Math.max(y1,m.y1); } S._bb=`X[${x0.toFixed(1)}→${x1.toFixed(1)}] Y[${y0.toFixed(1)}→${y1.toFixed(1)}]`; }
+    const t=`${S.mv.length} mvts · ${S._bb} · Z ${S.head[2].toFixed(2)}${S.done?' · terminé ✅':''}${S.side==='m'?' · dessin en miroir (normal)':''}`; if(el._t!==t){ el.textContent=t; el._t=t; } }
   const bg=document.getElementById('ilvBig'); if(bg){ const n=S.side==='f'?(S.fi0===1?2:1):(S.fi0===1?4:3), fem=S.side==='f', w=ilWood(fem?'female':'male');
     const html=`<span class="ilv-bs ${fem?'f':'m'}">${fem?'♀ FEMELLE':'♂ MÂLE'}</span> <span>${n} · ${S.files[S.fi0].label}</span> <span class="ilv-bw"><i style="background:${w.color}"></i>${w.name}</span><div class="ilv-fn">💾 ${ilFileName(S.files[S.fi0].key)}</div>`;
     if(bg._h!==html){ bg.innerHTML=html; bg._h=html; } }
-  const st=document.getElementById('ilvSteps'); if(st){ const html=S.only===1?`<span class="ilv-step done">départ : ébauche ${S.side==='f'?'1':'3'} déjà faite</span>`:''; if(st._h!==html){ st.innerHTML=html; st._h=html; st.style.display=html?'':'none'; } } };
-ILV.ui=function(){ const b=document.getElementById('ilvPlay'); if(b) b.textContent=ILV.playing?'⏸':'▶'; };
+  const st=document.getElementById('ilvSteps'); if(st){ const html=S.only===1?`<span class="ilv-step done">départ : ébauche ${S.side==='f'?'1':'3'} déjà faite</span>`:''; if(st._h!==html){ st.innerHTML=html; st._h=html; st.style.display=html?'':'none'; } }
+  ILV.hiLine(S); };
+// cube de vue (comme la découpe) : clic sur une face = vue de ce côté
+ILV.cubeInit=function(){ const host=document.getElementById('ilvBody'); if(!host||!window.THREE||ILV.cube) return; const T=window.THREE;
+  const wrap=document.createElement('div'); wrap.className='ilv-cube'; const cv=document.createElement('canvas'); cv.style.cssText='width:110px;height:110px;cursor:pointer'; wrap.appendChild(cv);
+  const hb=document.createElement('button'); hb.textContent='🏠'; hb.title='Vue de départ'; hb.className='ilv-home'; hb.onclick=()=>ilvView('iso'); wrap.appendChild(hb); host.appendChild(wrap);
+  const r=new T.WebGLRenderer({canvas:cv,antialias:true,alpha:true}); r.setPixelRatio(Math.min(2,devicePixelRatio||1)); r.setSize(110,110,false);
+  const sc=new T.Scene(); const cam=new T.OrthographicCamera(-1.6,1.6,1.6,-1.6,0.1,20); sc.add(new T.AmbientLight(0xffffff,0.9)); const dl=new T.DirectionalLight(0xffffff,0.4); dl.position.set(2,3,5); sc.add(dl);
+  // faces dans le repère de la scène (dessin vu de dessus : AVANT = bas du dessin à l'écran)
+  const F=[['DROITE',0,Math.PI/2],['GAUCHE',Math.PI,Math.PI/2],['FOND',Math.PI/2,Math.PI/2],['AVANT',-Math.PI/2,Math.PI/2],['DESSUS',null,0.06],['DESSOUS',null,Math.PI-0.06]];
+  const tex=(t,hl)=>{ const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d'); g.fillStyle=hl?'#f59e0b':'#2b3440'; g.fillRect(0,0,128,128); g.strokeStyle='#94a3b8'; g.lineWidth=5; g.strokeRect(3,3,122,122); g.fillStyle=hl?'#111':'#e8edf1'; g.font='bold '+(t.length>6?20:24)+'px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(t,64,64); return new T.CanvasTexture(c); };
+  const M=F.map(f=>new T.MeshLambertMaterial({map:tex(f[0],false)})), MH=F.map(f=>new T.MeshLambertMaterial({map:tex(f[0],true)}));
+  const cube=new T.Mesh(new T.BoxGeometry(1.6,1.6,1.6),M.slice()); sc.add(cube);
+  const rc=new T.Raycaster(); let hov=-1;
+  const pick=e=>{ const b=cv.getBoundingClientRect(); rc.setFromCamera(new T.Vector2(((e.clientX-b.left)/b.width)*2-1,-((e.clientY-b.top)/b.height)*2+1),cam); const h=rc.intersectObject(cube)[0]; return h?Math.floor(h.faceIndex/2):-1; };
+  cv.addEventListener('pointermove',e=>{ const f=pick(e); if(f!==hov){ hov=f; cube.material=M.map((m,i)=>i===f?MH[i]:m); } });
+  cv.addEventListener('pointerleave',()=>{ hov=-1; cube.material=M.slice(); });
+  cv.addEventListener('click',e=>{ const f=pick(e); if(f<0) return; const ff=F[f], o=ILV.orbit; if(ff[1]!=null) o.th=ff[1]; else o.th=-Math.PI/2; o.ph=ff[2]; });
+  ILV.cube={r,sc,cam,wrap}; };
+ILV.cubeRender=function(){ const C=ILV.cube; if(!C) return; const o=ILV.orbit, sp=Math.sin(o.ph), cp=Math.cos(o.ph);
+  C.cam.position.set(6*sp*Math.cos(o.th),6*sp*Math.sin(o.th),6*cp); C.cam.up.set(0,0,1); C.cam.lookAt(0,0,0); C.r.render(C.sc,C.cam); };
+ILV.ui=function(){ const b=document.getElementById('ilvPlay'); if(b) b.textContent=ILV.playing?'⏸':'▶'; ILV._tLast=performance.now(); };
 
 function ilvOpen(tab, fi){ if(tab==='f'||tab==='m') tab=tab+(fi?1:0);
   if(!generatedGcodes.inlay_female_finish){ alert('Génère d\'abord les G-codes'); return; }
@@ -28270,31 +28378,37 @@ function ilvOpen(tab, fi){ if(tab==='f'||tab==='m') tab=tab+(fi?1:0);
   ILV.three();
   const sig=['inlay_female_rough','inlay_female_finish','inlay_male_rough','inlay_male_finish'].map(k=>(generatedGcodes[k]||'').length).join('/')+JSON.stringify(inlayWoods);
   if(ILV.sig!==sig){ // nouveaux fichiers : tout reconstruire
-    for(const s of Object.values(ILV.sides)){ if(s.grp) ILV.scene.remove(s.grp); if(s.paths) ILV.scene.remove(s.paths); }
+    for(const s of Object.values(ILV.sides)){ if(s.grp) ILV.scene.remove(s.grp); if(s.paths) for(const k in s.paths) ILV.scene.remove(s.paths[k]); }
     if(ILV.heads){ ILV.scene.remove(ILV.heads.v); ILV.scene.remove(ILV.heads.f); ILV.heads=null; }
     ILV.sides={}; ILV.fit=null; ILV.sig=sig; ILV.G=ILV.grid(); }
   if(!ILV.G){ document.getElementById('ilvInfo').textContent='Rien à afficher'; return; }
-  ILV.headFor(); const tt=document.querySelector('#ilvModal .ilv-title'); if(tt){ const p=ilProjName(); tt.textContent='🧊 Atelier 3D'+(p?' — '+p:''); }
+  ILV.headFor(); ILV.cubeInit(); const tt=document.getElementById('ilvTitle'); if(tt){ const p=ilProjName(); tt.textContent='🧊 VUE 3D — INCRUSTATION'+(p?' — '+p:''); }
   ilvTab(tab||'f0');
 }
 function ilvClose(){ ILV.playing=false; ILV.ui(); const m=document.getElementById('ilvModal'); if(m) m.classList.remove('open'); }
 function ilvTab(t){ ILV.tab=t; document.querySelectorAll('#ilvModal .ilv-tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
-  const fit=document.getElementById('ilvFit'), bar=document.getElementById('ilvBar'), hud=document.getElementById('ilvHud'), opts=document.getElementById('ilvOpts');
-  fit.classList.toggle('on',t==='fit'); bar.style.display=t==='fit'?'none':''; hud.style.display=opts.style.display=t==='fit'?'none':''; ILV.cv.style.visibility=t==='fit'?'hidden':'visible';
-  if(t==='fit'){ ILV.playing=false; ILV.ui(); ilvFitCompute(); return; }
-  for(const s of Object.values(ILV.sides)){ if(s.grp) s.grp.visible=false; if(s.paths) s.paths.visible=false; }
+  const fit=document.getElementById('ilvFit'), bar=document.getElementById('ilvBar'), hud=document.getElementById('ilvHud'), side=document.getElementById('ilvSide'), lay=document.getElementById('ilvLayers'), info=document.getElementById('ilvInfo');
+  const isFit=t==='fit'; fit.classList.toggle('on',isFit); bar.style.display=isFit?'none':''; hud.style.display=isFit?'none':''; side.style.display=isFit?'none':''; lay.style.display=isFit?'none':'contents'; info.style.display=isFit?'none':'';
+  ILV.cv.style.visibility=isFit?'hidden':'visible'; if(ILV.cube) ILV.cube.wrap.style.display=isFit?'none':'';
+  if(isFit){ ILV.playing=false; ILV.ui(); ilvFitCompute(); return; }
+  for(const s of Object.values(ILV.sides)){ if(s.grp) s.grp.visible=false; ILV.pathsShow(s,false); }
   if(!ILV.sides[t]){ ILV.sides[t]=ILV.newSide(t[0], ILV.G, +t[1]); }
-  const S=ILV.side=ILV.sides[t]; ILV.meshFor(S); ILV.pathsFor(S); S.grp.visible=true; S.paths.visible=ILV.showPaths;
-  ilvView('iso'); ILV.ui();
+  const S=ILV.side=ILV.sides[t]; ILV.meshFor(S); ILV.pathsFor(S); S.grp.visible=ILV.show.wood; ILV.pathsShow(S,true); S._pi=-1; ILV.code(S);
+  ILV.playing=false; ilvView('iso'); ILV.ui();
 }
 function ilvPlay(){ const S=ILV.side; if(!S) return; if(S.done){ ilvRestart(); } ILV.playing=!ILV.playing; ILV.ui(); }
+function ilvSetSpeed(v){ ILV.speed=parseInt(v)||10; const l=document.getElementById('ilvSpeedLbl'); if(l) l.textContent=(Math.max(1,ILV.speed)*2)+' mm/s'; }
+function ilvScrub(e){ ILV.playing=false; ILV.ui(); }   // attraper la barre = pause (le clic saute directement à la position)
+function ilvSeekIdx(target){ const S=ILV.side; if(!S) return; target=Math.max(0,Math.min(S.mv.length,target)); const b=document.getElementById('ilvBusy'); const big=Math.abs(target-S.idx)>4000;
+  const go=()=>{ ILV._seeking=true; if(target<S.idx){ ILV.reset(S); } while(S.idx<target){ const before=S.idx; ILV.advance(S, 50); if(S.idx===before) break; } S.dirty=true; ILV._seeking=false; if(b) b.classList.remove('on'); };
+  if(big&&b){ b.classList.add('on'); setTimeout(go,20); } else go(); }
+function ilvGotoLine(n){ const S=ILV.side; if(!S) return; let i=S.mv.findIndex(m=>m.line>=n); if(i<0) i=S.mv.length; ILV.playing=false; ILV.ui(); ilvSeekIdx(i+1); }
+function ilvBtnState(k){ const b=document.getElementById('ilvBtn_'+k); if(b) b.style.opacity=ILV.show[k]?'1':'0.35'; }
+function ilvToggle(k){ ILV.show[k]=!ILV.show[k]; ilvBtnState(k); const S=ILV.side; if(!S) return; if(k==='wood'){ if(S.grp) S.grp.visible=ILV.show.wood; } else ILV.pathsShow(S,true); }
 function ilvRestart(){ const S=ILV.side; if(!S) return; ILV.reset(S); ILV.playing=false; ILV.ui(); }
-function ilvEnd(){ const S=ILV.side; if(!S) return; const b=document.getElementById('ilvBusy'); b.classList.add('on');
+function ilvEnd(){ const S=ILV.side; if(!S) return; const b=document.getElementById('ilvBusy'); if(b) b.classList.add('on');
   setTimeout(()=>{ ILV.advance(S, Infinity); S.dirty=true; ILV.playing=false; ILV.ui(); b.classList.remove('on'); },20); }
-function ilvSeek(f){ const S=ILV.side; if(!S) return; const target=Math.round(f*S.mv.length); ILV._seeking=true;
-  if(target<S.idx){ ILV.reset(S); }
-  while(S.idx<target){ const before=S.idx; ILV.advance(S, 50); if(S.idx===before) break; } S.dirty=true; ILV._seeking=false; }
-function ilvTogglePaths(){ ILV.showPaths=!ILV.showPaths; const S=ILV.side; if(S&&S.paths) S.paths.visible=ILV.showPaths; const b=document.getElementById('ilvOptPaths'); if(b) b.classList.toggle('on',ILV.showPaths); }
+function ilvSeek(f){ const S=ILV.side; if(!S) return; ilvSeekIdx(Math.round(f*S.mv.length)); }
 function ilvView(v){ const G=ILV.G; if(!G) return; const w=(G.nx-1)*G.res, h=(G.ny-1)*G.res; const o=ILV.orbit; o.tx=G.X0+w/2; o.ty=-(G.Y0+h/2); o.tz=-2; const asp=(ILV.cv&&ILV.cv.clientWidth)?ILV.cv.clientWidth/Math.max(1,ILV.cv.clientHeight):1.6; o.r=1.25*Math.max(1.37*h, 1.37*w/asp);
   if(v==='top'){ o.ph=0.06; o.th=-Math.PI/2; } else { o.ph=0.9; o.th=-Math.PI/2+0.45; } }
 
