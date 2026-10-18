@@ -164,6 +164,9 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-18 — JH : Réglages incrustation : BULLES D'AIDE (survol d'une cote orange sur les dessins, ou le « ? » à côté de
+   chaque réglage, ou en touchant le champ) : à quoi ça sert + valeur conseillée, en mots simples. Affichage seulement.
+
 -- 2026-10-18 — JG : LE DERNIER PASSAGE en vrai V-carve (méthode F-Engrave / Vectric) + plus de zigzags
  [REFAIT] Le dernier passage de la finition longe le VRAI contour (vecteurs). En chaque point du bord, la pointe se
    met au centre du plus grand cercle tangent au bord qui tient dans la zone usinée (rayon ≤ profondeur max × tan) :
@@ -2283,6 +2286,15 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 @media(max-width:600px){.ilw-pieces{grid-template-columns:1fr}}
 .ilv-step.ilv-cor{color:#f0abfc;border-color:#e040fb88}
 .ilv-steps{flex-wrap:wrap}
+/* JH : bulles d'aide */
+.ilh-q{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;margin-left:5px;border-radius:50%;background:var(--acc);color:#000;font-size:11px;font-weight:900;cursor:help;vertical-align:1px;flex:0 0 auto}
+#ilHelp{position:fixed;z-index:9500;display:none;background:#1b2230;color:#e8edf1;border:1.5px solid var(--acc);border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.45;box-shadow:0 8px 28px rgba(0,0,0,.55);pointer-events:none}
+#ilHelp.on{display:block}
+#ilHelp b{display:block;color:var(--acc);font-size:13px;margin-bottom:3px}
+#ilHelp .ilh-tip{margin-top:5px;color:#b9c4d0}
+#ilHelp::after{content:'';position:absolute;left:var(--ax,50%);bottom:-8px;transform:translateX(-50%);border:8px solid transparent;border-bottom:0;border-top-color:var(--acc)}
+#ilHelp.below::after{bottom:auto;top:-8px;border-top:0;border-bottom:8px solid var(--acc);border-left-color:transparent;border-right-color:transparent}
+#wzp11 [data-edit]{cursor:pointer}
 </style>
 
 </head>
@@ -2292,7 +2304,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JG ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JH ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2984,7 +2996,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- PAGE 11 : PARAMÈTRES INLAY -->
 <div class="wz-wrap" id="wzp11">
   <div class="wz-h1">⚙️ Réglages de l'incrustation</div>
-  <div class="wz-sub">Touche un réglage — ou clique directement une cote orange sur les dessins pour la changer</div>
+  <div class="wz-sub">Touche un réglage — ou clique directement une cote orange sur les dessins pour la changer. <b>Survole une cote ou touche le <span class="ilh-q" style="cursor:default">?</span> pour savoir à quoi elle sert.</b></div>
   <div class="ilr-recap"></div>
 
   <div class="ilp-grid">
@@ -28323,8 +28335,48 @@ function ilToolSave(kind){ const p=inlayGetParams(); const sel=document.getEleme
   else { Object.assign(t,{dia:p.rDia, maxD:p.rMaxD, cutH:p.rCutH, fxy:p.rFxy, fz:p.rFz, spin:p.rSpin}); }
   try{ saveTools(); }catch(e){} try{ localStorage.setItem('kerf_ilTool_'+kind, String(t.id)); }catch(e){} ilToolsLibInit(); if(typeof toastHist==='function') toastHist('💾 Outil gardé : '+name); }
 
+// ---------- JH : bulles d'aide (survol / toucher une cote ou le « ? » d'un réglage) ----------
+const IL_HELP={
+  inlay_pocketDepth:['A — Profondeur de la poche','Jusqu\'où le V-bit creuse la planche femelle. Plus c\'est profond, plus le bouchon tient et plus tu as de marge pour poncer.','Avec un V-bit 20° : 4 à 6 mm. Tes fraises doivent couper au moins aussi profond.'],
+  inlay_glueGap:['C — Jeu de colle','Petit espace laissé au fond, entre le bout du bouchon et le fond de la poche, pour la colle. Ce sont les murs en V qui se serrent, pas le fond.','0,2 à 0,3 mm. Plus grand = le bouchon s\'enfonce plus avant de se bloquer.'],
+  inlay_surfaceGap:['B — Jeu entre planches','Le mâle est creusé un peu plus bas tout autour du bouchon, pour que les 2 planches ne se touchent pas : le bouchon peut s\'enfoncer à fond et il dépasse un peu.','0,5 mm. Ce qui dépasse sera poncé à ras.'],
+  inlay_rDia:['Ø — Fraise d\'ébauche','La fraise plate qui vide le gros, vite. Elle reste en retrait des murs : c\'est le V-bit qui finit.','Plus grosse = plus rapide, mais elle ne rentre pas dans les zones étroites (pointes, traits fins).'],
+  inlay_rMaxD:['Profondeur par passe','La fraise plate descend par étages de cette hauteur à chaque tour.','Ø3 dans du bois dur : 1 à 1,5 mm. Bois tendre : jusqu\'à 2 mm.'],
+  inlay_rCutH:['↕ Hauteur coupante (fraise plate)','La longueur des dents de la fraise. Elle doit être plus grande que la profondeur la plus forte, sinon le corps lisse frotte et chauffe.','L\'appli te prévient en rouge si elle est trop courte.'],
+  inlay_vAngle:['∠ Angle du V-bit','L\'angle complet de la pointe. C\'est LE MÊME V-bit pour la femelle et le mâle, sinon les murs ne collent pas.','20° = murs raides, incrustation fine et profonde. Lis-le sur la fraise ou mesure-le.'],
+  inlay_vTip:['Ø Pointe du V-bit','Beaucoup de V-bits ne sont pas vraiment pointus : il y a un petit plat au bout. L\'appli remonte la fraise d\'autant pour que les murs restent justes.','0 = pointe parfaite. Souvent 0,1 à 0,2 mm (c\'est écrit sur la fraise, ex. « 20° 0,1 mm »).'],
+  inlay_vCutH:['↕ Hauteur coupante (V-bit)','La partie du V-bit qui coupe. Elle doit couvrir toute la profondeur de la poche.','Sinon la queue frotte en haut du mur.'],
+  inlay_rFxy:['Avance (fraise plate)','La vitesse quand la fraise avance en coupant.','3018 + Ø3 dans le bois : 600 à 1000 mm/min.'],
+  inlay_rFz:['Plongée (fraise plate)','La vitesse quand la fraise descend dans le bois.','Environ le quart de l\'avance.'],
+  inlay_rSpin:['Broche (fraise plate)','La vitesse de rotation.','10 000 à 12 000 tr/min.'],
+  inlay_vFxy:['Avance (V-bit)','La vitesse quand le V-bit avance. C\'est la passe de finition : pas trop vite pour des murs propres.','800 à 1200 mm/min.'],
+  inlay_vFz:['Plongée (V-bit)','La vitesse quand le V-bit descend.','200 à 300 mm/min.'],
+  inlay_vSpin:['Broche (V-bit)','La vitesse de rotation du V-bit.','Assez vite pour un beau fini : 16 000 à 20 000 tr/min.'],
+  inlay_safeZ:['Z sécurité','La hauteur à laquelle la fraise monte pour les grands déplacements. Les petits sauts se font juste au-dessus du bois (1 mm).','5 mm suffit si rien ne dépasse (brides…).']
+};
+function ilHelpShow(id, anchor, pin){ const h=IL_HELP[id]; if(!h||!anchor) return; let b=document.getElementById('ilHelp');
+  if(!b){ b=document.createElement('div'); b.id='ilHelp'; document.body.appendChild(b); }
+  b.innerHTML=`<b>${h[0]}</b><div>${h[1]}</div>${h[2]?`<div class="ilh-tip">👉 ${h[2]}</div>`:''}`; b._id=id; b._pin=!!pin; b.classList.add('on');
+  const r=anchor.getBoundingClientRect(), W=Math.min(300, window.innerWidth-20); b.style.width=W+'px';
+  let x=r.left+r.width/2-W/2; x=Math.max(10,Math.min(window.innerWidth-W-10,x)); b.style.left=x+'px';
+  const bh=b.offsetHeight; let y=r.top-bh-10, below=false; if(y<8){ y=r.bottom+10; below=true; } b.style.top=y+'px'; b.classList.toggle('below',below);
+  b.style.setProperty('--ax', Math.max(14,Math.min(W-14, r.left+r.width/2-x))+'px'); }
+function ilHelpHide(force){ const b=document.getElementById('ilHelp'); if(b && (force||!b._pin)) b.classList.remove('on'); }
+function _ilHelpSetup(){ const root=document.getElementById('wzp11'); if(!root||root._ilh) return; root._ilh=1;
+  // un petit « ? » à côté de chaque réglage
+  root.querySelectorAll('.ilp-f').forEach(f=>{ const inp=f.querySelector('input'); const l=f.querySelector('.ilp-l'); if(!inp||!l||!IL_HELP[inp.id]||l.querySelector('.ilh-q')) return;
+    const q=document.createElement('span'); q.className='ilh-q'; q.textContent='?'; q.dataset.help=inp.id; q.title='Explication'; l.appendChild(q); });
+  const idOf=el=>{ const e=el.closest('[data-edit],[data-help]'); return e?(e.dataset.help||e.dataset.edit):null; };
+  root.addEventListener('mouseover',e=>{ const id=idOf(e.target); if(id) ilHelpShow(id, e.target.closest('[data-edit],[data-help]')); });
+  root.addEventListener('mouseout',e=>{ const id=idOf(e.target); if(id) ilHelpHide(); });
+  root.addEventListener('click',e=>{ const q=e.target.closest('.ilh-q'); if(q){ e.preventDefault(); e.stopPropagation(); const b=document.getElementById('ilHelp'); if(b&&b.classList.contains('on')&&b._pin&&b._id===q.dataset.help) ilHelpHide(true); else ilHelpShow(q.dataset.help,q,true); return; }
+    const c=e.target.closest('[data-edit]'); if(c) ilHelpShow(c.dataset.edit,c,true); },true);
+  root.addEventListener('focusin',e=>{ const inp=e.target; if(inp.tagName==='INPUT' && IL_HELP[inp.id]) ilHelpShow(inp.id, inp.closest('.ilp-f')||inp, true); });
+  document.addEventListener('pointerdown',e=>{ if(e.target.closest('#ilHelp,.ilh-q,[data-edit],#wzp11 input')) return; ilHelpHide(true); });
+  window.addEventListener('scroll',()=>ilHelpHide(true),{passive:true,capture:true});
+}
 function _ilParamFocusSetup(){
-  _ilEditHost(document.getElementById('ilSchema')); ilToolsLibInit();
+  _ilEditHost(document.getElementById('ilSchema')); ilToolsLibInit(); _ilHelpSetup();
   document.querySelectorAll('#wzp11 .ilp-f').forEach(f=>{ const inp=f.querySelector('input'); if(!inp||inp._ilf) return; inp._ilf=1;
     inp.addEventListener('focus',()=>{ document.querySelectorAll('#wzp11 .ilp-f').forEach(x=>x.classList.remove('focus')); f.classList.add('focus'); _ilFocus=f.dataset.k; ilSchemaDraw(); });
     inp.addEventListener('input',()=>{ ilSchemaDraw(); }); });
