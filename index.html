@@ -164,6 +164,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-18 — IY : incrustation — cotes jamais usinées, formes en pointillés, outils dessinés + bibliothèque, pointe plate
+ [FIX] Les COTES (et points/contraintes) n'étaient pas exclues : elles devenaient des rectangles creusés. Exclues partout.
+   Les groupes sont dépliés (chaque forme du groupe compte).
+ [AJOUT] Aperçu des bois : contour pointillé de chaque forme (blanc = incrustée, gris = ignorée) -> visible même avec le même bois.
+ [AJOUT] Réglages : on clique directement une cote orange (A, B, C, angle…) sur le schéma ou sur les outils pour la changer.
+ [AJOUT] Les 2 outils sont DESSINÉS (fraise plate + V-bit) avec leurs cotes cliquables ; liste « ma bibliothèque » (les outils
+   de l'appli) + bouton « Garder dans ma bibliothèque » pour créer / mettre à jour un outil.
+ [AJOUT] Pointe plate du V-bit (ex. « 20° 0,1 mm ») : réglage Ø pointe, compensée dans le G-code (la pointe vise le sommet
+   virtuel du cône, les passes de fond démarrent à w/2 du mur) et simulée pareil dans l'Atelier 3D.
+
 -- 2026-10-18 — IX : 🪵 Les bois — on CLIQUE une forme de l'aperçu (ou sa pastille) pour l'incruster ou l'ignorer
  [AJOUT] Forme ignorée = hachurée grise, pas usinée (cadre, trait de construction…). Garde le réglage avec le projet.
 
@@ -2064,7 +2074,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 .ilw-note{font-size:10px;color:var(--txt3);margin-top:6px}
 
 .ilp-grid{display:grid;grid-template-columns:minmax(300px,1fr) minmax(300px,1fr);gap:12px;margin-top:10px;align-items:start}
-@media(max-width:860px){.ilp-grid{grid-template-columns:1fr}.ilp-left{position:static}}
+@media(max-width:860px){.ilp-grid{grid-template-columns:1fr}}
 .ilp-left{position:sticky;top:0;display:flex;flex-direction:column;gap:10px}
 .ilp-right{display:flex;flex-direction:column;gap:10px}
 .ilp-card{background:var(--surf2);border-radius:12px;padding:12px;border:1.5px solid var(--brd2)}
@@ -2128,6 +2138,18 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 .ilv-leg i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
 .ilv-busy{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#0008;font-weight:800;font-size:14px}
 .ilv-busy.on{display:flex}
+/* outils dessinés + cotes cliquables (IY) */
+.ilt-lib{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.ilt-sel{flex:1;min-width:160px;width:auto!important;padding:7px 9px;border-radius:8px;background:var(--surf);color:var(--txt);border:1.5px solid var(--brd2);font-size:12px}
+.ilt-save{padding:7px 10px;border-radius:8px;border:1.5px solid var(--brd2);background:var(--surf);color:var(--txt);font-size:12px;cursor:pointer}
+.ilt-draw,.ilt-edit-host{position:relative}
+.ilt-draw svg{width:100%;height:auto;max-height:200px;display:block;margin:0 auto}
+.ilt-draw{background:#0d1014;border-radius:10px;margin-bottom:6px}
+svg .ed{cursor:pointer;fill:#f5a623}svg .ed:hover{text-decoration:underline}
+svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:pointer}
+.ilt-inline{position:absolute;z-index:5;width:76px;padding:4px 6px;font-size:15px;font-weight:800;border-radius:7px;border:2px solid var(--acc);background:#11151a;color:var(--txt);outline:none}
+.ilw-hint b{color:var(--txt)}
+@media(max-width:860px){.ilp-left{position:static}}
 </style>
 
 </head>
@@ -2137,7 +2159,7 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-IX ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-IY ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2823,13 +2845,13 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 <!-- PAGE 11 : PARAMÈTRES INLAY -->
 <div class="wz-wrap" id="wzp11">
   <div class="wz-h1">⚙️ Réglages de l'incrustation</div>
-  <div class="wz-sub">Touche un réglage : le schéma te montre ce qu'il change</div>
+  <div class="wz-sub">Touche un réglage — ou clique directement une cote orange sur les dessins pour la changer</div>
 
   <div class="ilp-grid">
     <!-- Schéma vivant -->
     <div class="ilp-left">
       <div class="ilp-card ilp-schema">
-        <div id="ilSchema"></div>
+        <div id="ilSchema" class="ilt-edit-host"></div>
         <div class="ilp-schema-bar">
           <button class="ilp-anim" onclick="ilSchemaAnim()">▶ Voir l'assemblage</button>
           <span id="ilSchemaMsg" class="ilp-msg">Coupe de l'incrustation : planche ♀ creusée, bouchon ♂ retourné et enfoncé.</span>
@@ -2852,25 +2874,12 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
         </div>
       </div>
 
-      <div class="ilp-card ilp-v">
-        <div class="ilp-ct">🔻 V-bit <small>finition — le même pour ♀ et ♂</small></div>
-        <div id="inlayVbitPick" class="ilp-tools"></div>
-        <label class="ilp-f" data-k="ang"><span class="ilp-l"><b class="ilp-tag">∠</b> Angle de la pointe</span>
-          <span class="ilp-in"><input type="number" id="inlay_vAngle" value="20" min="10" max="90" step="5" inputmode="decimal" oninput="inlayCalcPreview()"><i>°</i></span></label>
-        <details class="ilp-more"><summary>Vitesses du V-bit</summary>
-          <div class="ilp-row3">
-            <label class="ilp-f" data-k="feed"><span class="ilp-l">Avance</span><span class="ilp-in"><input type="number" id="inlay_vFxy" value="1000" min="100" max="2000" inputmode="decimal"><i>mm/min</i></span></label>
-            <label class="ilp-f" data-k="plunge"><span class="ilp-l">Plongée</span><span class="ilp-in"><input type="number" id="inlay_vFz" value="250" min="20" max="500" inputmode="decimal"><i>mm/min</i></span></label>
-            <label class="ilp-f" data-k="rpm"><span class="ilp-l">Broche</span><span class="ilp-in"><input type="number" id="inlay_vSpin" value="18000" min="8000" max="30000" inputmode="decimal"><i>tr/min</i></span></label>
-          </div>
-        </details>
-      </div>
-
       <div class="ilp-card ilp-r">
-        <div class="ilp-ct">🔷 Fraise plate <small>ébauche — vide le gros</small></div>
-        <div id="inlayRoughPick" class="ilp-tools"></div>
+        <div class="ilp-ct">🔷 Ébauche — fraise plate <small>vide le gros sans toucher les murs</small></div>
+        <div class="ilt-lib"><select id="ilLibR" class="ilt-sel" onchange="ilToolPick('r',this.value)"></select><button class="ilt-save" onclick="ilToolSave('r')">💾 Garder dans ma bibliothèque</button></div>
+        <div class="ilt-draw" id="ilToolR"></div>
         <div class="ilp-row3">
-          <label class="ilp-f" data-k="dia"><span class="ilp-l">Diamètre</span><span class="ilp-in"><input type="number" id="inlay_rDia" value="3" min="0.5" max="6" step="0.5" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
+          <label class="ilp-f" data-k="dia"><span class="ilp-l">Ø Diamètre</span><span class="ilp-in"><input type="number" id="inlay_rDia" value="3" min="0.5" max="6" step="0.1" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
           <label class="ilp-f" data-k="pass"><span class="ilp-l">Prof. par passe</span><span class="ilp-in"><input type="number" id="inlay_rMaxD" value="1.5" min="0.1" max="3" step="0.1" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
         </div>
         <details class="ilp-more"><summary>Vitesses de la fraise</summary>
@@ -2878,6 +2887,23 @@ body{margin:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
             <label class="ilp-f" data-k="feed"><span class="ilp-l">Avance</span><span class="ilp-in"><input type="number" id="inlay_rFxy" value="800" inputmode="decimal"><i>mm/min</i></span></label>
             <label class="ilp-f" data-k="plunge"><span class="ilp-l">Plongée</span><span class="ilp-in"><input type="number" id="inlay_rFz" value="200" inputmode="decimal"><i>mm/min</i></span></label>
             <label class="ilp-f" data-k="rpm"><span class="ilp-l">Broche</span><span class="ilp-in"><input type="number" id="inlay_rSpin" value="12000" min="8000" max="30000" inputmode="decimal"><i>tr/min</i></span></label>
+          </div>
+        </details>
+      </div>
+
+      <div class="ilp-card ilp-v">
+        <div class="ilp-ct">🔻 Finition — V-bit <small>le même pour ♀ et ♂</small></div>
+        <div class="ilt-lib"><select id="ilLibV" class="ilt-sel" onchange="ilToolPick('v',this.value)"></select><button class="ilt-save" onclick="ilToolSave('v')">💾 Garder dans ma bibliothèque</button></div>
+        <div class="ilt-draw" id="ilToolV"></div>
+        <div class="ilp-row3">
+          <label class="ilp-f" data-k="ang"><span class="ilp-l"><b class="ilp-tag">∠</b> Angle</span><span class="ilp-in"><input type="number" id="inlay_vAngle" value="20" min="10" max="90" step="1" inputmode="decimal" oninput="inlayCalcPreview()"><i>°</i></span></label>
+          <label class="ilp-f" data-k="tip"><span class="ilp-l">Ø Pointe</span><span class="ilp-in"><input type="number" id="inlay_vTip" value="0" min="0" max="1" step="0.05" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
+        </div>
+        <details class="ilp-more"><summary>Vitesses du V-bit</summary>
+          <div class="ilp-row3">
+            <label class="ilp-f" data-k="feed"><span class="ilp-l">Avance</span><span class="ilp-in"><input type="number" id="inlay_vFxy" value="1000" min="100" max="2000" inputmode="decimal"><i>mm/min</i></span></label>
+            <label class="ilp-f" data-k="plunge"><span class="ilp-l">Plongée</span><span class="ilp-in"><input type="number" id="inlay_vFz" value="250" min="20" max="500" inputmode="decimal"><i>mm/min</i></span></label>
+            <label class="ilp-f" data-k="rpm"><span class="ilp-l">Broche</span><span class="ilp-in"><input type="number" id="inlay_vSpin" value="18000" min="8000" max="30000" inputmode="decimal"><i>tr/min</i></span></label>
           </div>
         </details>
       </div>
@@ -25924,7 +25950,7 @@ function wzGenInlay(){
   };
   setStatus('p12st', false, '⏳ Génération en cours...');
 
-  const allObjs = paintObjects.filter(o=>(o.type!=='free'||o.pts?.length>1) && !o._inlayOff);   // IX : formes « ignorées » exclues
+  const allObjs = (typeof _ilObjs==='function') ? _ilObjs() : paintObjects.filter(o=>(o.type!=='free'||o.pts?.length>1) && !o._inlayOff);   // IY : sans cotes/points/contraintes, groupes dépliés, sans formes ignorées
   if(!allObjs.length){
     setStatus('p12st', false, '❌ Aucune forme à incruster (toutes ignorées ?)'); return;
   }
@@ -27262,6 +27288,7 @@ function inlayGetParams(){
     vFxy:        parseFloat(document.getElementById('inlay_vFxy')?.value)||400,
     vFz:         parseFloat(document.getElementById('inlay_vFz')?.value)||80,
     vSpin:       parseFloat(document.getElementById('inlay_vSpin')?.value)||18000,
+    vTip:        Math.max(0,parseFloat(document.getElementById('inlay_vTip')?.value)||0),
     rDia:        parseFloat(document.getElementById('inlay_rDia')?.value)||3,
     rMaxD:       parseFloat(document.getElementById('inlay_rMaxD')?.value)||1.5,
     rFxy:        parseFloat(document.getElementById('inlay_rFxy')?.value)||600,
@@ -27543,6 +27570,9 @@ _IL.comps = function(F, c, eight){ const {u,W,H}=F; const lab=new Int32Array(W*H
 // --- FINITION V-bit : murs par niveaux + « reprise » partout où il reste du bois ---
 _IL.finish = function(F, p, Wr, roughUsed){
   const t=F.tanA, Dmax=F.Dmax, nV=Math.max(1,Math.ceil(Dmax/1.3-1e-9)), R=p.rDia/2;
+  // pointe plate du V-bit (Ø w) : on vise la pointe « virtuelle » du cône -> on remonte de w/2/tanA
+  const wTip=Math.max(0,+p.vTip||0), tipOff=(wTip/2)/t;
+  const zcmd=(c)=>-Math.min(Dmax, Math.max(0, c/t-tipOff));
   const {u,W,H,SC,X0,Y0}=F, N=W*H;
   const cN=Dmax*t;
   let nb=0;
@@ -27553,10 +27583,10 @@ _IL.finish = function(F, p, Wr, roughUsed){
     for(let j=1;j<=n;j++){ const z=j*dz, base=z*t+R+0.03; if(base>F.umax) break;
       const inC=new Uint8Array(N); for(let k=0;k<N;k++) if(u[k]>=base) inC[k]=1;
       const d2=_IL.edt(inC,W,H,1); const r2=(R*SC-0.3)**2; for(let k=0;k<N;k++) if(d2[k]<=r2 && h[k]<z) h[k]=z; } }
-  const stamp=(x,y,D)=>{ if(D<=0) return; const rp=D*t*SC, ci=(x-X0)*SC-0.5, cj=(y-Y0)*SC-0.5;
+  const stamp=(x,y,D)=>{ if(D<=0) return; const rp=(D*t+wTip/2)*SC, ci=(x-X0)*SC-0.5, cj=(y-Y0)*SC-0.5, w2=wTip/2*SC;
     const i0=Math.max(0,Math.floor(ci-rp)), i1=Math.min(W-1,Math.ceil(ci+rp)), j0=Math.max(0,Math.floor(cj-rp)), j1=Math.min(H-1,Math.ceil(cj+rp));
     const k1=1/(t*SC);
-    for(let j=j0;j<=j1;j++){ const dy=j-cj; for(let i=i0;i<=i1;i++){ const dx=i-ci; const v=D-Math.sqrt(dx*dx+dy*dy)*k1; const k=j*W+i; if(v>h[k]) h[k]=v; } } };
+    for(let j=j0;j<=j1;j++){ const dy=j-cj; for(let i=i0;i<=i1;i++){ const dx=i-ci; const v=D-Math.max(0,Math.sqrt(dx*dx+dy*dy)-w2)*k1; const k=j*W+i; if(v>h[k]) h[k]=v; } } };
   const stampPath=(pth,zOf)=>{ for(let s=1;s<pth.length;s++){ const a=pth[s-1], b=pth[s]; const n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])*SC*1.5));
     for(let q=0;q<=n;q++){ const x=a[0]+(b[0]-a[0])*q/n, y=a[1]+(b[1]-a[1])*q/n; stamp(x,y,-zOf([x,y])); } } };
   // 1) MURS : à chaque niveau, la pointe suit u = z·tanA à Z = −z (posée pile sur la surface idéale)
@@ -27564,12 +27594,12 @@ _IL.finish = function(F, p, Wr, roughUsed){
     const z=k*Dmax/nV, c=z*t; if(c>F.umax) break;
     Wr.out.push(`; --- mur  Z=-${z.toFixed(3)}`);
     const loops=_IL.contours(u,W,H,c,X0,Y0,SC).map(l=>_IL.simplifyLoop(l,0.01));
-    Wr.retract(); _IL.emitPaths(Wr,F,loops,()=>-z,()=>c,true); nb+=loops.length;
-    for(const l of loops) stampPath(l,()=>-z);
+    Wr.retract(); _IL.emitPaths(Wr,F,loops,()=>zcmd(c),()=>c,true); nb+=loops.length;
+    for(const l of loops) stampPath(l,()=>zcmd(c));
     if (k===nV){ // pied du mur : 2 tours de plus au fond (raccord avec la fraise plate)
       const sfw=Math.max(0.02, 2*t*Math.min(0.15, 0.5*Math.max(0.1,p.glueGap)));
-      for (let j=1;j<=2;j++){ const c2=c+j*sfw; if(c2>F.umax) break; const l2=_IL.contours(u,W,H,c2,X0,Y0,SC).map(l=>_IL.simplifyLoop(l,0.01));
-        _IL.emitPaths(Wr,F,l2,()=>-z,()=>c,true); nb+=l2.length; for(const l of l2) stampPath(l,()=>-z); } }
+      for (let j=1;j<=2;j++){ const c2=c+wTip/2+j*sfw; if(c2>F.umax) break; const l2=_IL.contours(u,W,H,c2,X0,Y0,SC).map(l=>_IL.simplifyLoop(l,0.01));
+        _IL.emitPaths(Wr,F,l2,()=>zcmd(c2),()=>c,true); nb+=l2.length; for(const l of l2) stampPath(l,()=>zcmd(c2)); } }
   }
   // 2) REPRISE (2 tours : normal puis fin) : pointes, zones étroites, coins et fond
   const hAllow=Math.min(0.15, 0.5*Math.max(0.1,p.glueGap)); const sf=Math.max(0.02, 2*t*hAllow);
@@ -27602,7 +27632,7 @@ _IL.finish = function(F, p, Wr, roughUsed){
       C.mx.forEach((m,id)=>{ if(cnt[id]>=3){ const b=C.bb[id]; crest.push([m-0.002,[b[0]-4,b[1]-4,b[2]+4,b[3]+4]]); } }); }
     else if (hi<cN) lv.push(hi-0.002);
     for (const [c,w] of lv.map(c=>[c,win]).concat(crest)){
-      const zc=-Math.min(Dmax,c/t);
+      const zc=zcmd(c); if(zc>=-1e-4) continue;
       for (const l of _IL.contours(u,W,H,c,X0,Y0,SC,w)){
         // morceaux qui passent près du bois restant (+ petits ponts : sur l'isocourbe c'est toujours sûr)
         let run=[], gap=[], gl=0;
@@ -27661,6 +27691,7 @@ _IL.gen = function(objects, p, date, male, rough){
        `dégagement à plat = ${Dm.toFixed(2)} mm (jeu entre planches ${P.surfaceGap}), marge autour = ${(F?F.margin:0).toFixed(1)} mm`,
        `DESSIN EN MIROIR : retourner la planche gauche↔droite pour coller`, `axe miroir X=${F?(F.xc-org.x).toFixed(3):'0'}`]
     : [`poche ${P.pocketDepth} mm, murs en V ${P.vAngle}°`];
+  if (!rough && +P.vTip>0) info.push(`pointe plate Ø${P.vTip} compensée (+${((P.vTip/2)/tanA).toFixed(3)} mm)`);
   if (typeof ilWood==='function') info.push('bois : '+ilWood(male?'male':'female').name);
   const lines=[...info, `${date}`];
   const Wr=_IL.writer(P, org, P.safeZ, rough?P.rFxy:P.vFxy, rough?P.rFz:P.vFz);
@@ -27706,7 +27737,10 @@ function ilWoodsInit(keepInputs){
 function _ilGrain(x, y, ang){ const u=x*Math.cos(ang)+y*Math.sin(ang), v=-x*Math.sin(ang)+y*Math.cos(ang);
   return 0.86+0.09*Math.sin(v*1.7+2.2*Math.sin(u*0.13)+0.8*Math.sin(u*0.031))+0.05*Math.sin(v*5.3+u*0.4); }
 function _ilRGB(hex){ const h=(hex||'#888').replace('#',''); return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)]; }
-function _ilAllObjs(){ return (typeof paintObjects!=='undefined'?paintObjects:[]).filter(o=>o.type!=='free'||o.pts?.length>1); }
+const _IL_NOCUT={dim:1,point:1,constraint:1};          // cotes, points, contraintes : jamais usinés
+function _ilAllObjs(){ const out=[]; for(const o of (typeof paintObjects!=='undefined'?paintObjects:[])){ if(!o) continue;
+    if(o.type==='group'&&o.children){ for(const c of o.children) out.push(c); } else out.push(o); }
+  return out.filter(o=>o && !_IL_NOCUT[o.type] && (o.type!=='free'||o.pts?.length>1)); }
 function _ilObjs(){ return _ilAllObjs().filter(o=>!o._inlayOff); }      // formes incrustées (les « ignorées » sont exclues)
 function _ilShapeName(o){ const n={rect:'Rectangle',star:'Étoile',line:'Trait',text:'Texte',polygon:'Polygone',tri:'Triangle',oblong:'Oblong',gear:'Engrenage',arc:'Arc',svg:'Image',free:'Forme libre'};
   if(o.type==='ellipse') return o._circle?'Cercle':'Ellipse'; if(o.type==='text') return 'Texte « '+String(o.text||'').slice(0,12)+' »'; return n[o.type]||o.type; }
@@ -27725,7 +27759,12 @@ function _ilPrevBuild(SC){
   const m=new Uint8Array(W*H), off=new Uint8Array(W*H);
   for(const it of per){ const i0=Math.max(0,Math.floor((it.mx0-X0)*SC)-1), i1=Math.min(W-1,Math.ceil((it.mx1-X0)*SC)+1), j0=Math.max(0,Math.floor((it.my0-Y0)*SC)-1), j1=Math.min(H-1,Math.ceil((it.my1-Y0)*SC)+1);
     for(let j=j0;j<=j1;j++){ const y=Y0+(j+0.5)/SC; for(let i=i0;i<=i1;i++){ const x=X0+(i+0.5)/SC; if(at(it,x,y)){ if(it.o._inlayOff) off[j*W+i]=1; else m[j*W+i]^=1; } } } }
-  return {SC,X0,Y0,W,H,m,off,per,at};
+  // bord de chaque forme (pour les pointillés) : 1 = forme incrustée, 2 = ignorée
+  const edge=new Uint8Array(W*H);
+  for(const it of per){ const i0=Math.max(1,Math.floor((it.mx0-X0)*SC)-1), i1=Math.min(W-2,Math.ceil((it.mx1-X0)*SC)+1), j0=Math.max(1,Math.floor((it.my0-Y0)*SC)-1), j1=Math.min(H-2,Math.ceil((it.my1-Y0)*SC)+1);
+    const ins=new Uint8Array((i1-i0+3)*(j1-j0+3)), ww=i1-i0+3; for(let j=j0-1;j<=j1+1;j++) for(let i=i0-1;i<=i1+1;i++) ins[(j-j0+1)*ww+(i-i0+1)]=at(it,X0+(i+0.5)/SC,Y0+(j+0.5)/SC)?1:0;
+    for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){ const q=(j-j0+1)*ww+(i-i0+1); if(ins[q] && (!ins[q-1]||!ins[q+1]||!ins[q-ww]||!ins[q+ww])) edge[j*W+i]=it.o._inlayOff?2:1; } }
+  return {SC,X0,Y0,W,H,m,off,per,at,edge};
 }
 function ilWoodPreviewDraw(){
   const cv=document.getElementById('ilWoodPreview'); if(!cv) return;
@@ -27745,10 +27784,14 @@ function ilWoodPreviewDraw(){
     for(let px=0;px<W;px++){ const xm=(px-ox)/k; const i=Math.floor(xm*G.SC); const o=(py*W+px)*4;
       if(i<0||j<0||i>=G.W||j>=G.H){ img.data[o]=10; img.data[o+1]=12; img.data[o+2]=16; img.data[o+3]=255; continue; }
       const q=j*G.W+i, inS=G.m[q]===1; const c=inS?M:F; const gr=_ilGrain(xm*3,ym*3,inS?0.5:0);
-      let edge=false; if(i>0&&j>0&&i<G.W-1&&j<G.H-1){ const a=G.m[q]; edge=(G.m[q+1]!==a||G.m[q-1]!==a||G.m[q+G.W]!==a||G.m[q-G.W]!==a); }
-      let r=c[0]*(edge?0.55:gr), g=c[1]*(edge?0.55:gr), b=c[2]*(edge?0.55:gr);
+      let r=c[0]*gr, g=c[1]*gr, b=c[2]*gr;
       if(G.off[q] && !inS){ const st=((px+py)>>2)&1; r=r*0.45+(st?150:90)*0.55; g=g*0.45+(st?150:90)*0.55; b=b*0.45+(st?160:100)*0.55; }   // forme ignorée : hachurée grise
       img.data[o]=Math.min(255,r); img.data[o+1]=Math.min(255,g); img.data[o+2]=Math.min(255,b); img.data[o+3]=255; } }
+  // pointillés : on voit les formes même avec le même bois des 2 côtés
+  const dash=Math.max(3,Math.round(4*dpr)), lw=Math.max(1,Math.round(1.3*dpr));
+  for(let py=0;py<H;py++){ const j=Math.floor(((py-oy)/k)*G.SC); if(j<0||j>=G.H) continue;
+    for(let px=0;px<W;px++){ const i=Math.floor(((px-ox)/k)*G.SC); if(i<0||i>=G.W) continue; const e=G.edge[j*G.W+i]; if(!e) continue;
+      if((Math.floor((px+py)/dash)&1)===0) continue; const o=(py*W+px)*4; const v=e===1?255:150; img.data[o]=v; img.data[o+1]=v; img.data[o+2]=e===1?255:160; } }
   ctx.putImageData(img,0,0);
   const nOff=all.length-on.length;
   if(info) info.textContent=`— ${on.length} forme${on.length>1?'s':''} incrustée${on.length>1?'s':''}${nOff?' · '+nOff+' ignorée'+(nOff>1?'s':''):''} · fond ${ilWood('female').name} · bouchons ${ilWood('male').name}`;
@@ -27782,6 +27825,7 @@ const _IL_MSG={
   dia:'<b>Fraise plate</b> : elle vide le gros de la poche sans jamais toucher les murs en V. Là où elle ne passe pas, le V-bit finit.',
   pass:'<b>Profondeur par passe</b> : la fraise plate descend par étages de cette hauteur.',
   feed:'<b>Avance</b> : vitesse de déplacement pendant la coupe.', plunge:'<b>Plongée</b> : vitesse quand l\'outil descend dans le bois.',
+  tip:'<b>Pointe du V-bit</b> : beaucoup de V-bits « 20° 0,1 mm » ont un petit plat au bout. Mets sa largeur : le G-code compense pour que les murs tombent juste.',
   rpm:'<b>Broche</b> : vitesse de rotation de l\'outil.', safe:'<b>Z sécurité</b> : hauteur pour les grands déplacements (les petits sauts se font à 1 mm).'
 };
 function ilSchemaDraw(){
@@ -27822,17 +27866,19 @@ function ilSchemaDraw(){
     <path d="M${tipx} ${tipy} L${tipx-vr} ${tipy-vh} L${tipx+vr} ${tipy-vh} Z" fill="#b8c1cc" stroke="#6b7480"/>
     <rect x="${tipx-vr}" y="${tipy-vh-26}" width="${2*vr}" height="26" fill="#8a939e"/>
     <path d="M${tipx-26*Math.sin(ang*Math.PI/360)} ${tipy-26*Math.cos(ang*Math.PI/360)} A26 26 0 0 1 ${tipx+26*Math.sin(ang*Math.PI/360)} ${tipy-26*Math.cos(ang*Math.PI/360)}" class="d"/>
-    <text x="${tipx+vr+6}" y="${tipy-vh+14}" class="dt">${ang}°</text></g>`:''}
+    <text x="${tipx+vr+6}" y="${tipy-vh+14}" class="dt ed" data-edit="inlay_vAngle">${ang}°</text></g>`:''}
   ${(F==='dia'||F==='pass')?`<g class="hl"><rect x="${cx-wb+p.rDia/2*k*0+4}" y="${yb-Math.min(A,p.rMaxD)*k}" width="${Math.max(8,p.rDia*k)}" height="${Math.min(A,p.rMaxD)*k}" fill="#8a939e" stroke="#f5a623"/><rect x="${cx-wb+4+Math.max(8,p.rDia*k)/2-3}" y="${y0-40}" width="6" height="${yb-Math.min(A,p.rMaxD)*k-y0+40}" fill="#6b7480"/><text x="${cx-wb+8+Math.max(8,p.rDia*k)}" y="${yb-6}" class="dt">Ø${p.rDia}</text></g>`:''}
   <!-- cotes -->
-  <g${hl('A')}><path class="d" d="M${cx+half+18} ${y0} L${cx+half+18} ${yb} M${cx+half+13} ${y0} L${cx+half+23} ${y0} M${cx+half+13} ${yb} L${cx+half+23} ${yb}"/><text class="dt" x="${cx+half+26}" y="${(y0+yb)/2+4}">A ${A}</text></g>
-  <g${hl('C')}><path class="d" d="M${cx+wb+8} ${ypl} L${cx+wb+8} ${yb}"/><text class="dt" x="${cx+wb+12}" y="${yb+12}">C ${C}</text></g>
-  <g${hl('B')}><path class="d" d="M${cx-half-24} ${yfl} L${cx-half-24} ${y0} M${cx-half-29} ${yfl} L${cx-half-19} ${yfl} M${cx-half-29} ${y0} L${cx-half-19} ${y0}"/><text class="dt" x="${cx-half-60}" y="${(yfl+y0)/2+4}">B ${B}</text></g>
+  <g${hl('A')}><path class="d" d="M${cx+half+18} ${y0} L${cx+half+18} ${yb} M${cx+half+13} ${y0} L${cx+half+23} ${y0} M${cx+half+13} ${yb} L${cx+half+23} ${yb}"/><rect class="edbox" x="${cx+half+22}" y="${(y0+yb)/2-9}" width="46" height="18" data-edit="inlay_pocketDepth"/><text class="dt ed" x="${cx+half+26}" y="${(y0+yb)/2+4}" data-edit="inlay_pocketDepth">A ${A}</text></g>
+  <g${hl('C')}><path class="d" d="M${cx+wb+8} ${ypl} L${cx+wb+8} ${yb}"/><rect class="edbox" x="${cx+wb+8}" y="${yb+1}" width="48" height="16" data-edit="inlay_glueGap"/><text class="dt ed" x="${cx+wb+12}" y="${yb+13}" data-edit="inlay_glueGap">C ${C}</text></g>
+  <g${hl('B')}><path class="d" d="M${cx-half-24} ${yfl} L${cx-half-24} ${y0} M${cx-half-29} ${yfl} L${cx-half-19} ${yfl} M${cx-half-29} ${y0} L${cx-half-19} ${y0}"/><rect class="edbox" x="${cx-half-64}" y="${(yfl+y0)/2-9}" width="40" height="18" data-edit="inlay_surfaceGap"/><text class="dt ed" x="${cx-half-60}" y="${(yfl+y0)/2+4}" data-edit="inlay_surfaceGap">B ${B}</text></g>
   <line x1="8" y1="${y0}" x2="${VW-8}" y2="${y0}" stroke="#ffffff22" stroke-dasharray="3 3"/>
   </svg>`;
+  if(box.querySelector('.ilt-inline')) return;   // une saisie en cours : on ne redessine pas dessous
   box.innerHTML=svg;
   const msg=document.getElementById('ilSchemaMsg'); if(msg) msg.innerHTML=_ilFocus&&_IL_MSG[_ilFocus]?_IL_MSG[_ilFocus]:'Coupe de l\'incrustation : planche ♀ creusée, bouchon ♂ retourné et enfoncé. Touche un réglage pour voir ce qu\'il change.';
   if(_ilAnimT!==null) _ilSchemaPose(_ilAnimT, y0, ypl);
+  if(_ilAnimT===null) ilToolsDraw();
 }
 function _ilSchemaPose(s, y0, ypl){ // animation : bouchon à l'endroit au-dessus → se retourne → descend
   const g=document.getElementById('ilsMale'); if(!g) return; const piv=(y0+ypl)/2-30; const lab=document.getElementById('ilsMaleLab'); if(lab) lab.style.opacity=0;
@@ -27844,7 +27890,75 @@ function ilSchemaAnim(){
   const step=(now)=>{ _ilAnimT=Math.min(1,(now-t0)/dur); ilSchemaDraw(); if(_ilAnimT<1) _ilAnimRaf=requestAnimationFrame(step); else { _ilAnimT=null; ilSchemaDraw(); } };
   _ilAnimRaf=requestAnimationFrame(step);
 }
+// éditeur en place : clic sur une cote orange -> petite case de saisie posée dessus
+function _ilInlineEdit(host, el, inputId){
+  const src=document.getElementById(inputId); if(!src) return; host.querySelectorAll('.ilt-inline').forEach(x=>x.remove());
+  const hr=host.getBoundingClientRect(), r=el.getBoundingClientRect(); const ed=document.createElement('input');
+  ed.type='number'; ed.step=src.step||'0.1'; ed.value=src.value; ed.className='ilt-inline'; ed.inputMode='decimal';
+  ed.style.left=Math.max(0,Math.min(hr.width-80,r.left-hr.left-6))+'px'; ed.style.top=Math.max(0,r.top-hr.top-6)+'px';
+  host.appendChild(ed); ed.focus(); ed.select();
+  let done=false; const fin=(ok)=>{ if(done) return; done=true; if(ok && ed.value!==''){ src.value=ed.value; } try{ ed.remove(); }catch(e){} if(ok) src.dispatchEvent(new Event('input',{bubbles:true})); ilSchemaDraw(); };
+  ed.addEventListener('keydown',e=>{ if(e.key==='Enter') fin(true); if(e.key==='Escape') fin(false); });
+  ed.addEventListener('blur',()=>fin(true));
+  const f=src.closest('.ilp-f'); if(f){ document.querySelectorAll('#wzp11 .ilp-f').forEach(x=>x.classList.remove('focus')); f.classList.add('focus'); _ilFocus=f.dataset.k; }
+}
+function _ilEditHost(host){ if(!host||host._ile) return; host._ile=1;
+  host.addEventListener('click',e=>{ const el=e.target.closest('[data-edit]'); if(!el) return; e.preventDefault(); const lab=host.querySelector(`text[data-edit="${el.dataset.edit}"]`)||el; _ilInlineEdit(host, lab, el.dataset.edit); }); }
+// dessins des 2 outils, cotes cliquables
+function ilToolsDraw(){
+  const p=inlayGetParams(); const t=Math.tan((p.vAngle/2)*Math.PI/180); const steel='#c3cbd5', dark='#8d96a1';
+  const V=document.getElementById('ilToolV'); if(V && !V.querySelector('.ilt-inline')){
+    const tipW=Math.max(0,p.vTip||0), k=26, cx=150, ytip=128, hC=78, rTop=Math.min(60,Math.max(8,hC*t+tipW*k/2)), rTip=Math.min(rTop-2,tipW*k/2);
+    const angR=Math.min(40,hC*0.5);
+    V.innerHTML=`<svg viewBox="0 0 300 170"><style>.dt{fill:#cfd6df;font:700 12px sans-serif}.d{stroke:#cfd6df;fill:none;stroke-width:1}.lab{font:600 10px sans-serif;fill:#8a94a0}</style>
+      <rect x="${cx-11}" y="6" width="22" height="${ytip-hC-6}" fill="${dark}"/>
+      <path d="M${cx-rTop} ${ytip-hC} L${cx+rTop} ${ytip-hC} L${cx+rTip} ${ytip} L${cx-rTip} ${ytip} Z" fill="${steel}" stroke="#6b7480"/>
+      <path d="M${cx} ${ytip-hC} L${cx} ${ytip+4}" stroke="#6b748088" stroke-dasharray="3 3"/>
+      <path class="d" d="M${cx-angR*Math.sin(p.vAngle*Math.PI/360)} ${ytip-angR*Math.cos(p.vAngle*Math.PI/360)} A${angR} ${angR} 0 0 1 ${cx+angR*Math.sin(p.vAngle*Math.PI/360)} ${ytip-angR*Math.cos(p.vAngle*Math.PI/360)}" transform="translate(0 ${-(tipW*k/2)/Math.max(0.05,t)*0})"/>
+      <rect class="edbox" x="${cx+rTop+8}" y="${ytip-hC/2-12}" width="54" height="20" data-edit="inlay_vAngle"/><text class="dt ed" x="${cx+rTop+14}" y="${ytip-hC/2+3}" data-edit="inlay_vAngle">∠ ${p.vAngle}°</text>
+      <path class="d" d="M${cx-rTip} ${ytip+10} L${cx+rTip} ${ytip+10} M${cx-rTip} ${ytip+5} L${cx-rTip} ${ytip+15} M${cx+rTip} ${ytip+5} L${cx+rTip} ${ytip+15}"/>
+      <rect class="edbox" x="${cx-44}" y="${ytip+18}" width="88" height="20" data-edit="inlay_vTip"/><text class="dt ed" x="${cx-38}" y="${ytip+33}" data-edit="inlay_vTip">pointe Ø ${tipW}</text>
+    </svg>`;
+    _ilEditHost(V); }
+  const R=document.getElementById('ilToolR'); if(R && !R.querySelector('.ilt-inline')){
+    const D=Math.max(0.5,p.rDia), k=Math.min(18,70/D), w=D*k, cx=110, yb=120, hf=60, pass=Math.max(0.1,p.rMaxD), ph=Math.min(46,pass*k*2.2);
+    let fl=''; for(let q=0;q<4;q++){ const y=yb-hf+q*hf/4; fl+=`<path d="M${cx-w/2} ${y+hf/8} L${cx+w/2} ${y}" stroke="#6b7480"/>`; }
+    R.innerHTML=`<svg viewBox="0 0 300 170"><style>.dt{fill:#cfd6df;font:700 12px sans-serif}.d{stroke:#cfd6df;fill:none;stroke-width:1}.lab{font:600 10px sans-serif;fill:#8a94a0}</style>
+      <rect x="${cx-Math.min(w/2,9)}" y="6" width="${2*Math.min(w/2,9)}" height="${yb-hf-6}" fill="${dark}"/>
+      <rect x="${cx-w/2}" y="${yb-hf}" width="${w}" height="${hf}" fill="${steel}" stroke="#6b7480"/>${fl}
+      <path class="d" d="M${cx-w/2} ${yb+10} L${cx+w/2} ${yb+10} M${cx-w/2} ${yb+5} L${cx-w/2} ${yb+15} M${cx+w/2} ${yb+5} L${cx+w/2} ${yb+15}"/>
+      <rect class="edbox" x="${cx-30}" y="${yb+18}" width="60" height="20" data-edit="inlay_rDia"/><text class="dt ed" x="${cx-22}" y="${yb+33}" data-edit="inlay_rDia">Ø ${p.rDia}</text>
+      <!-- marche = profondeur par passe -->
+      <path d="M200 ${yb-ph} L240 ${yb-ph} L240 ${yb} L292 ${yb} L292 ${yb+30} L200 ${yb+30} Z" fill="#7a5a34" opacity=".9"/>
+      <path class="d" d="M248 ${yb-ph} L248 ${yb}"/>
+      <rect class="edbox" x="196" y="${yb-ph-26}" width="96" height="20" data-edit="inlay_rMaxD"/><text class="dt ed" x="202" y="${yb-ph-11}" data-edit="inlay_rMaxD">${pass} / passe</text>
+    </svg>`;
+    _ilEditHost(R); }
+}
+// bibliothèque d'outils (celle de l'appli : tools / saveTools)
+function _ilLibList(kind){ const all=(typeof tools!=='undefined'&&Array.isArray(tools))?tools:[]; return all.filter(t=>kind==='v'?t.type==='vbit':(t.type==='flat'||t.type==='ball')); }
+function ilToolsLibInit(){
+  for(const kind of ['r','v']){ const sel=document.getElementById(kind==='v'?'ilLibV':'ilLibR'); if(!sel) continue; const list=_ilLibList(kind);
+    let cur=null; try{ cur=localStorage.getItem('kerf_ilTool_'+kind); }catch(e){}
+    sel.innerHTML=`<option value="">— réglage libre —</option>`+list.map(t=>`<option value="${t.id}"${String(t.id)===cur?' selected':''}>${kind==='v'?'🔻':'🔷'} ${String(t.name).replace(/</g,'&lt;')}</option>`).join('');
+    if(cur==null && list.length && !window['_ilAuto_'+kind]){ window['_ilAuto_'+kind]=1; sel.value=String(list[0].id); ilToolPick(kind, list[0].id, true); } }
+}
+function ilToolPick(kind, id, silent){ const t=_ilLibList(kind).find(x=>String(x.id)===String(id)); try{ localStorage.setItem('kerf_ilTool_'+kind, id?String(id):''); }catch(e){}
+  if(!t) return; const set=(i,v)=>{ const e=document.getElementById(i); if(e&&v!=null&&v!=='') e.value=v; };
+  if(kind==='v'){ set('inlay_vAngle',t.angle); set('inlay_vTip',t.tipD!=null?t.tipD:0); set('inlay_vFxy',t.fxy); set('inlay_vFz',t.fz); set('inlay_vSpin',t.spin); }
+  else { set('inlay_rDia',t.dia); set('inlay_rMaxD',t.maxD); set('inlay_rFxy',t.fxy); set('inlay_rFz',t.fz); set('inlay_rSpin',t.spin); }
+  inlayCalcPreview(); }
+function ilToolSave(kind){ const p=inlayGetParams(); const sel=document.getElementById(kind==='v'?'ilLibV':'ilLibR');
+  const curT=_ilLibList(kind).find(x=>String(x.id)===String(sel&&sel.value));
+  const def=curT?curT.name:(kind==='v'?`V-bit ${p.vAngle}° pointe ${p.vTip||0}`:`Fraise plate Ø${p.rDia}`);
+  const name=prompt('Nom de l\'outil (garde le même nom pour mettre à jour celui-ci) :', def); if(!name) return;
+  let t=_ilLibList(kind).find(x=>x.name===name); if(!t){ t={id:Date.now(), name, type:kind==='v'?'vbit':'flat', flutes:2}; tools.push(t); }
+  if(kind==='v'){ Object.assign(t,{angle:p.vAngle, tipD:p.vTip||0, fxy:p.vFxy, fz:p.vFz, spin:p.vSpin}); if(!t.dia) t.dia=3.175; }
+  else { Object.assign(t,{dia:p.rDia, maxD:p.rMaxD, fxy:p.rFxy, fz:p.rFz, spin:p.rSpin}); }
+  try{ saveTools(); }catch(e){} try{ localStorage.setItem('kerf_ilTool_'+kind, String(t.id)); }catch(e){} ilToolsLibInit(); if(typeof toastHist==='function') toastHist('💾 Outil gardé : '+name); }
+
 function _ilParamFocusSetup(){
+  _ilEditHost(document.getElementById('ilSchema')); ilToolsLibInit();
   document.querySelectorAll('#wzp11 .ilp-f').forEach(f=>{ const inp=f.querySelector('input'); if(!inp||inp._ilf) return; inp._ilf=1;
     inp.addEventListener('focus',()=>{ document.querySelectorAll('#wzp11 .ilp-f').forEach(x=>x.classList.remove('focus')); f.classList.add('focus'); _ilFocus=f.dataset.k; ilSchemaDraw(); });
     inp.addEventListener('input',()=>{ ilSchemaDraw(); }); });
@@ -27862,7 +27976,7 @@ ILV.parse=function(gc){ const mv=[]; let x=0,y=0,z=0, g=0, n=0; const meta={};
   return {mv,meta}; };
 ILV.files=function(side){ const P=inlayGetParams(); const t=Math.tan((P.vAngle/2)*Math.PI/180), R=P.rDia/2;
   const k=side==='f'?['inlay_female_rough','inlay_female_finish']:['inlay_male_rough','inlay_male_finish'];
-  return k.map((key,i)=>({key, gc:generatedGcodes[key]||'', tool:i===0?{type:'flat',R}:{type:'v',t}, label:i===0?`Ébauche — fraise Ø${P.rDia}`:`Finition — V-bit ${P.vAngle}°`})); };
+  return k.map((key,i)=>({key, gc:generatedGcodes[key]||'', tool:i===0?{type:'flat',R}:{type:'v',t,w:Math.max(0,+P.vTip||0)}, label:i===0?`Ébauche — fraise Ø${P.rDia}`:`Finition — V-bit ${P.vAngle}°`})); };
 // grille commune (même pour ♀ et ♂ : on peut comparer case à case), symétrique autour de l'axe miroir
 ILV.grid=function(maxCells){ const all=[]; let xc=null;
   for(const s of ['f','m']) for(const f of ILV.files(s)){ const r=ILV.parse(f.gc); if(r.meta.xc!=null) xc=r.meta.xc; for(const m of r.mv) if(m.g===1&&m.z1<0) all.push(m); }
@@ -27875,9 +27989,9 @@ ILV.grid=function(maxCells){ const all=[]; let xc=null;
   return {xc, X0:xc-(nx-1)/2*res, Y0:y0, res, nx, ny}; };
 ILV.newSide=function(side, G){ const files=ILV.files(side); const mv=[]; files.forEach((f,fi)=>{ for(const m of ILV.parse(f.gc).mv){ m.fi=fi; mv.push(m); } });
   return {side, files, mv, idx:0, sub:0, h:new Float32Array(G.nx*G.ny), G, dirty:true, head:[0,0,5], fi:0, done:false}; };
-ILV.stamp=function(S, x, y, z, tool){ if(z>=0) return; const G=S.G, D=-z; const r=tool.type==='v'?Math.min(D*tool.t, 12):tool.R; const rp=r/G.res;
+ILV.stamp=function(S, x, y, z, tool){ if(z>=0) return; const G=S.G, D=-z; const r=tool.type==='v'?Math.min(D*tool.t+(tool.w||0)/2, 12):tool.R; const rp=r/G.res;
   const ci=(x-G.X0)/G.res, cj=(y-G.Y0)/G.res; const i0=Math.max(0,Math.floor(ci-rp)), i1=Math.min(G.nx-1,Math.ceil(ci+rp)), j0=Math.max(0,Math.floor(cj-rp)), j1=Math.min(G.ny-1,Math.ceil(cj+rp));
-  const h=S.h; if(tool.type==='v'){ const k1=G.res/tool.t; for(let j=j0;j<=j1;j++){ const dy=j-cj; for(let i=i0;i<=i1;i++){ const dx=i-ci; const v=D-Math.sqrt(dx*dx+dy*dy)*k1; const q=j*G.nx+i; if(v>h[q]) h[q]=v; } } }
+  const h=S.h; if(tool.type==='v'){ const k1=G.res/tool.t, w2=(tool.w||0)/2/G.res; for(let j=j0;j<=j1;j++){ const dy=j-cj; for(let i=i0;i<=i1;i++){ const dx=i-ci; const v=D-Math.max(0,Math.sqrt(dx*dx+dy*dy)-w2)*k1; const q=j*G.nx+i; if(v>h[q]) h[q]=v; } } }
   else { const r2=rp*rp; for(let j=j0;j<=j1;j++){ const dy=j-cj; for(let i=i0;i<=i1;i++){ const dx=i-ci; if(dx*dx+dy*dy<=r2){ const q=j*G.nx+i; if(D>h[q]) h[q]=D; } } } }
   S.dirty=true; };
 // avance de `budget` mm de trajet (Infinity = jusqu'au bout)
