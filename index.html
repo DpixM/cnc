@@ -164,6 +164,9 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-18 — IZ : hauteur coupante des 2 outils (cote cliquable sur les dessins + bibliothèque) ; alerte rouge si
+   l'outil est plus court que la profondeur la plus forte (poche ♀ ou dégagement ♂).
+
 -- 2026-10-18 — IY : incrustation — cotes jamais usinées, formes en pointillés, outils dessinés + bibliothèque, pointe plate
  [FIX] Les COTES (et points/contraintes) n'étaient pas exclues : elles devenaient des rectangles creusés. Exclues partout.
    Les groupes sont dépliés (chaque forme du groupe compte).
@@ -2159,7 +2162,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-IY ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-IZ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2881,6 +2884,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
         <div class="ilp-row3">
           <label class="ilp-f" data-k="dia"><span class="ilp-l">Ø Diamètre</span><span class="ilp-in"><input type="number" id="inlay_rDia" value="3" min="0.5" max="6" step="0.1" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
           <label class="ilp-f" data-k="pass"><span class="ilp-l">Prof. par passe</span><span class="ilp-in"><input type="number" id="inlay_rMaxD" value="1.5" min="0.1" max="3" step="0.1" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
+          <label class="ilp-f" data-k="cutR"><span class="ilp-l">↕ Hauteur coupante</span><span class="ilp-in"><input type="number" id="inlay_rCutH" value="17" min="1" max="60" step="0.5" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
         </div>
         <details class="ilp-more"><summary>Vitesses de la fraise</summary>
           <div class="ilp-row3">
@@ -2898,6 +2902,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
         <div class="ilp-row3">
           <label class="ilp-f" data-k="ang"><span class="ilp-l"><b class="ilp-tag">∠</b> Angle</span><span class="ilp-in"><input type="number" id="inlay_vAngle" value="20" min="10" max="90" step="1" inputmode="decimal" oninput="inlayCalcPreview()"><i>°</i></span></label>
           <label class="ilp-f" data-k="tip"><span class="ilp-l">Ø Pointe</span><span class="ilp-in"><input type="number" id="inlay_vTip" value="0" min="0" max="1" step="0.05" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
+          <label class="ilp-f" data-k="cutV"><span class="ilp-l">↕ Hauteur coupante</span><span class="ilp-in"><input type="number" id="inlay_vCutH" value="8" min="1" max="40" step="0.5" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
         </div>
         <details class="ilp-more"><summary>Vitesses du V-bit</summary>
           <div class="ilp-row3">
@@ -27289,6 +27294,8 @@ function inlayGetParams(){
     vFz:         parseFloat(document.getElementById('inlay_vFz')?.value)||80,
     vSpin:       parseFloat(document.getElementById('inlay_vSpin')?.value)||18000,
     vTip:        Math.max(0,parseFloat(document.getElementById('inlay_vTip')?.value)||0),
+    vCutH:       parseFloat(document.getElementById('inlay_vCutH')?.value)||8,
+    rCutH:       parseFloat(document.getElementById('inlay_rCutH')?.value)||17,
     rDia:        parseFloat(document.getElementById('inlay_rDia')?.value)||3,
     rMaxD:       parseFloat(document.getElementById('inlay_rMaxD')?.value)||1.5,
     rFxy:        parseFloat(document.getElementById('inlay_rFxy')?.value)||600,
@@ -27315,6 +27322,8 @@ function inlayCalcPreview(){
     `Bouchon enfoncé : ${p.glueGap} mm de colle au fond, ${p.surfaceGap} mm entre planches`,
     `Traits plus fins que ${(2*p.pocketDepth*tanA).toFixed(2)} mm : le V n'atteint pas le fond (normal)`,
     `Fraise Ø${p.rDia} : passe dans les zones > ${(p.rDia+2*p.pocketDepth*tanA).toFixed(1)} mm, le V-bit fait le reste`,
+    ...(p.rCutH<Math.max(p.pocketDepth,Dm)?[`<span style="color:var(--red)">⚠️ Fraise trop courte : ${p.rCutH} mm de coupe pour ${Math.max(p.pocketDepth,Dm).toFixed(2)} mm de profondeur</span>`]:[]),
+    ...(p.vCutH<Math.max(p.pocketDepth,Dm)?[`<span style="color:var(--red)">⚠️ V-bit trop court : ${p.vCutH} mm de cône pour ${Math.max(p.pocketDepth,Dm).toFixed(2)} mm de profondeur</span>`]:[]),
   ].join('<br>');
   if (typeof ilSchemaDraw==='function') ilSchemaDraw();
 }
@@ -27826,6 +27835,8 @@ const _IL_MSG={
   pass:'<b>Profondeur par passe</b> : la fraise plate descend par étages de cette hauteur.',
   feed:'<b>Avance</b> : vitesse de déplacement pendant la coupe.', plunge:'<b>Plongée</b> : vitesse quand l\'outil descend dans le bois.',
   tip:'<b>Pointe du V-bit</b> : beaucoup de V-bits « 20° 0,1 mm » ont un petit plat au bout. Mets sa largeur : le G-code compense pour que les murs tombent juste.',
+  cutR:'<b>Hauteur coupante de la fraise</b> : la longueur des goujures. Elle doit dépasser la profondeur la plus forte (poche ♀ ou dégagement ♂), sinon le corps frotte.',
+  cutV:'<b>Hauteur coupante du V-bit</b> : la hauteur du cône qui coupe. Si elle est plus courte que la profondeur, le V ne peut pas faire tout le mur.',
   rpm:'<b>Broche</b> : vitesse de rotation de l\'outil.', safe:'<b>Z sécurité</b> : hauteur pour les grands déplacements (les petits sauts se font à 1 mm).'
 };
 function ilSchemaDraw(){
@@ -27905,6 +27916,7 @@ function _ilInlineEdit(host, el, inputId){
 function _ilEditHost(host){ if(!host||host._ile) return; host._ile=1;
   host.addEventListener('click',e=>{ const el=e.target.closest('[data-edit]'); if(!el) return; e.preventDefault(); const lab=host.querySelector(`text[data-edit="${el.dataset.edit}"]`)||el; _ilInlineEdit(host, lab, el.dataset.edit); }); }
 // dessins des 2 outils, cotes cliquables
+function inlayDmax(p){ return Math.max(p.pocketDepth, Math.max(0,p.pocketDepth-p.glueGap)+Math.max(0,p.surfaceGap)); }
 function ilToolsDraw(){
   const p=inlayGetParams(); const t=Math.tan((p.vAngle/2)*Math.PI/180); const steel='#c3cbd5', dark='#8d96a1';
   const V=document.getElementById('ilToolV'); if(V && !V.querySelector('.ilt-inline')){
@@ -27915,6 +27927,9 @@ function ilToolsDraw(){
       <path d="M${cx-rTop} ${ytip-hC} L${cx+rTop} ${ytip-hC} L${cx+rTip} ${ytip} L${cx-rTip} ${ytip} Z" fill="${steel}" stroke="#6b7480"/>
       <path d="M${cx} ${ytip-hC} L${cx} ${ytip+4}" stroke="#6b748088" stroke-dasharray="3 3"/>
       <path class="d" d="M${cx-angR*Math.sin(p.vAngle*Math.PI/360)} ${ytip-angR*Math.cos(p.vAngle*Math.PI/360)} A${angR} ${angR} 0 0 1 ${cx+angR*Math.sin(p.vAngle*Math.PI/360)} ${ytip-angR*Math.cos(p.vAngle*Math.PI/360)}" transform="translate(0 ${-(tipW*k/2)/Math.max(0.05,t)*0})"/>
+      <path class="d" d="M${cx-rTop-12} ${ytip-hC} L${cx-rTop-12} ${ytip} M${cx-rTop-17} ${ytip-hC} L${cx-rTop-7} ${ytip-hC} M${cx-rTop-17} ${ytip} L${cx-rTop-7} ${ytip}"/>
+      <rect class="edbox" x="${cx-rTop-74}" y="${ytip-hC/2-12}" width="56" height="20" data-edit="inlay_vCutH"/><text class="dt ed" x="${cx-rTop-68}" y="${ytip-hC/2+3}" data-edit="inlay_vCutH">↕ ${p.vCutH}</text>
+      ${p.vCutH<inlayDmax(p)?`<text x="${cx-rTop-74}" y="${ytip-hC/2+24}" style="fill:#ef5350;font:700 10px sans-serif">trop court !</text>`:''}
       <rect class="edbox" x="${cx+rTop+8}" y="${ytip-hC/2-12}" width="54" height="20" data-edit="inlay_vAngle"/><text class="dt ed" x="${cx+rTop+14}" y="${ytip-hC/2+3}" data-edit="inlay_vAngle">∠ ${p.vAngle}°</text>
       <path class="d" d="M${cx-rTip} ${ytip+10} L${cx+rTip} ${ytip+10} M${cx-rTip} ${ytip+5} L${cx-rTip} ${ytip+15} M${cx+rTip} ${ytip+5} L${cx+rTip} ${ytip+15}"/>
       <rect class="edbox" x="${cx-44}" y="${ytip+18}" width="88" height="20" data-edit="inlay_vTip"/><text class="dt ed" x="${cx-38}" y="${ytip+33}" data-edit="inlay_vTip">pointe Ø ${tipW}</text>
@@ -27927,6 +27942,9 @@ function ilToolsDraw(){
       <rect x="${cx-Math.min(w/2,9)}" y="6" width="${2*Math.min(w/2,9)}" height="${yb-hf-6}" fill="${dark}"/>
       <rect x="${cx-w/2}" y="${yb-hf}" width="${w}" height="${hf}" fill="${steel}" stroke="#6b7480"/>${fl}
       <path class="d" d="M${cx-w/2} ${yb+10} L${cx+w/2} ${yb+10} M${cx-w/2} ${yb+5} L${cx-w/2} ${yb+15} M${cx+w/2} ${yb+5} L${cx+w/2} ${yb+15}"/>
+      <path class="d" d="M${cx-w/2-12} ${yb-hf} L${cx-w/2-12} ${yb} M${cx-w/2-17} ${yb-hf} L${cx-w/2-7} ${yb-hf} M${cx-w/2-17} ${yb} L${cx-w/2-7} ${yb}"/>
+      <rect class="edbox" x="${cx-w/2-76}" y="${yb-hf/2-12}" width="58" height="20" data-edit="inlay_rCutH"/><text class="dt ed" x="${cx-w/2-70}" y="${yb-hf/2+3}" data-edit="inlay_rCutH">↕ ${p.rCutH}</text>
+      ${p.rCutH<inlayDmax(p)?`<text x="${cx-w/2-76}" y="${yb-hf/2+24}" style="fill:#ef5350;font:700 10px sans-serif">trop court !</text>`:''}
       <rect class="edbox" x="${cx-30}" y="${yb+18}" width="60" height="20" data-edit="inlay_rDia"/><text class="dt ed" x="${cx-22}" y="${yb+33}" data-edit="inlay_rDia">Ø ${p.rDia}</text>
       <!-- marche = profondeur par passe -->
       <path d="M200 ${yb-ph} L240 ${yb-ph} L240 ${yb} L292 ${yb} L292 ${yb+30} L200 ${yb+30} Z" fill="#7a5a34" opacity=".9"/>
@@ -27945,16 +27963,16 @@ function ilToolsLibInit(){
 }
 function ilToolPick(kind, id, silent){ const t=_ilLibList(kind).find(x=>String(x.id)===String(id)); try{ localStorage.setItem('kerf_ilTool_'+kind, id?String(id):''); }catch(e){}
   if(!t) return; const set=(i,v)=>{ const e=document.getElementById(i); if(e&&v!=null&&v!=='') e.value=v; };
-  if(kind==='v'){ set('inlay_vAngle',t.angle); set('inlay_vTip',t.tipD!=null?t.tipD:0); set('inlay_vFxy',t.fxy); set('inlay_vFz',t.fz); set('inlay_vSpin',t.spin); }
-  else { set('inlay_rDia',t.dia); set('inlay_rMaxD',t.maxD); set('inlay_rFxy',t.fxy); set('inlay_rFz',t.fz); set('inlay_rSpin',t.spin); }
+  if(kind==='v'){ set('inlay_vAngle',t.angle); set('inlay_vTip',t.tipD!=null?t.tipD:0); set('inlay_vCutH',t.cutH); set('inlay_vFxy',t.fxy); set('inlay_vFz',t.fz); set('inlay_vSpin',t.spin); }
+  else { set('inlay_rDia',t.dia); set('inlay_rMaxD',t.maxD); set('inlay_rCutH',t.cutH); set('inlay_rFxy',t.fxy); set('inlay_rFz',t.fz); set('inlay_rSpin',t.spin); }
   inlayCalcPreview(); }
 function ilToolSave(kind){ const p=inlayGetParams(); const sel=document.getElementById(kind==='v'?'ilLibV':'ilLibR');
   const curT=_ilLibList(kind).find(x=>String(x.id)===String(sel&&sel.value));
   const def=curT?curT.name:(kind==='v'?`V-bit ${p.vAngle}° pointe ${p.vTip||0}`:`Fraise plate Ø${p.rDia}`);
   const name=prompt('Nom de l\'outil (garde le même nom pour mettre à jour celui-ci) :', def); if(!name) return;
   let t=_ilLibList(kind).find(x=>x.name===name); if(!t){ t={id:Date.now(), name, type:kind==='v'?'vbit':'flat', flutes:2}; tools.push(t); }
-  if(kind==='v'){ Object.assign(t,{angle:p.vAngle, tipD:p.vTip||0, fxy:p.vFxy, fz:p.vFz, spin:p.vSpin}); if(!t.dia) t.dia=3.175; }
-  else { Object.assign(t,{dia:p.rDia, maxD:p.rMaxD, fxy:p.rFxy, fz:p.rFz, spin:p.rSpin}); }
+  if(kind==='v'){ Object.assign(t,{angle:p.vAngle, tipD:p.vTip||0, cutH:p.vCutH, fxy:p.vFxy, fz:p.vFz, spin:p.vSpin}); if(!t.dia) t.dia=3.175; }
+  else { Object.assign(t,{dia:p.rDia, maxD:p.rMaxD, cutH:p.rCutH, fxy:p.rFxy, fz:p.rFz, spin:p.rSpin}); }
   try{ saveTools(); }catch(e){} try{ localStorage.setItem('kerf_ilTool_'+kind, String(t.id)); }catch(e){} ilToolsLibInit(); if(typeof toastHist==='function') toastHist('💾 Outil gardé : '+name); }
 
 function _ilParamFocusSetup(){
