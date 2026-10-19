@@ -9199,7 +9199,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v56',
+  const CIP_VER = 'CIP v57',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -11451,6 +11451,7 @@ function cip_build() {
   function applyStart(o) {
     // point de départ choisi + angle de tête au départ (l'écart est gardé sur tout le tour)
     const st = S.starts && S.starts[o.name];
+    let sideDone = false;
     if (st && isClosed(o)) {
       let P = o.P.slice(),
         D = o.D.slice();
@@ -11512,12 +11513,13 @@ function cip_build() {
       const fn = c => (typeof aOf === 'function' ? i => aOf(i) + c : aOf + c);
       let corr = 0;
       for (let it = 0; it < 3; it++) {
-        const d0 = weldLean(o.P, D0, fn(corr), o.faceIn)[0];
+        const d0 = startNoSide(o.P, weldLean(o.P, D0, fn(corr), o.faceIn), isClosed(o))[0];
         const err = toLean(+b0) - toLean(Bof(d0));
         if (Math.abs(err) < 1e-7) break;
         corr += err;
       }
-      o.D = weldLean(o.P, D0, fn(corr), o.faceIn);
+      o.D = startNoSide(o.P, weldLean(o.P, D0, fn(corr), o.faceIn), isClosed(o));
+      sideDone = true;
       o.leanDeg = lean / DEG;
     } else if (b0 !== undefined && b0 !== '' && !isNaN(+b0)) {
       const off = bMachToTube(+b0) * DEG - decomp(o.D[0]).B; // b0 = B machine
@@ -11526,7 +11528,47 @@ function cip_build() {
         return compo(q.th, q.B + off);
       });
     }
+    if (o.weld && !sideDone) o.D = startNoSide(o.P, o.D, isClosed(o));
     return o;
+  }
+  // v57 : départ PILE sur l'axe -> Y = 0 et C1 = 0 en même temps (dans le SET_POS / 1er point / retour).
+  // La tête ne penche que dans un plan (B) : si le faisceau penche un peu SUR LE CÔTÉ au départ, avec C1 = 0 le point
+  // tombe à côté de l'axe (Y = 0.38…). On enlève cette petite pente de côté au départ (et au point de fermeture du tour),
+  // puis elle revient en douceur sur les premiers mm. Si elle est grande (évitement de collision), on n'y touche pas.
+  function startNoSide(P, D, closed) {
+    if (!P || P.length < 3 || !D || D.length !== P.length) return D;
+    const side = i => {
+      const r = [P[i][0], 0, P[i][2]],
+        rl = Math.hypot(r[0], r[2]);
+      return rl < 1e-6 ? null : [r[2] / rl, 0, -r[0] / rl]; // tangente autour de l'axe du mandrin (y)
+    };
+    const t0 = side(0);
+    if (!t0 || Math.abs(V.dot(D[0], t0)) > Math.sin(5 * DEG)) return D;
+    let tot = 0;
+    for (let i = 1; i < P.length; i++) tot += V.len(V.sub(P[i], P[i - 1]));
+    const Ls = Math.max(0.5, Math.min(6, tot * 0.06)); // longueur du raccord
+    const out = D.slice();
+    const fix = (i, w) => {
+      const t = side(i);
+      if (!t) return;
+      const d = V.sub(D[i], V.mul(t, w * V.dot(D[i], t)));
+      const l = V.len(d);
+      if (l > 1e-9) out[i] = V.mul(d, 1 / l);
+    };
+    const W = s => (s >= Ls ? 0 : 0.5 * (1 + Math.cos((Math.PI * s) / Ls)));
+    let s = 0;
+    for (let i = 0; i < P.length && s < Ls; i++) {
+      if (i) s += V.len(V.sub(P[i], P[i - 1]));
+      fix(i, W(s));
+    }
+    if (closed && V.len(V.sub(P[0], P[P.length - 1])) < 1e-6) {
+      s = 0;
+      for (let i = P.length - 1; i > 0 && s < Ls; i--) {
+        if (i < P.length - 1) s += V.len(V.sub(P[i + 1], P[i]));
+        fix(i, W(s));
+      }
+    }
+    return out;
   }
   // Faisceau incliné de « a » (radians) par rapport à la normale du tube, dans le plan perpendiculaire au cordon,
   // la tête TOUJOURS du côté extérieur du corps soudé (elle ne peut pas être au-dessus du piquage).
