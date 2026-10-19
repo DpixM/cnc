@@ -2619,7 +2619,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNote" style="margin-top:0">Tape les cotes : les 2 tubes se mettent à jour dans la 3D. Passe la souris sur une cote pour la voir en couleur sur la pièce. La pièce est tenue centrée dans un montage (jonction face au mandrin).</div>
           <div style="font:600 12px var(--sans);color:var(--txt2);margin:8px 0 2px">LES 2 TUBES</div>
           <div class="cipNum cipGK" data-hk="M:d" data-tip="Diamètre extérieur des tubes (mm)."><span>Ø tube (mm)</span><input type="number" id="cipMtD" value="40" step="0.1" min="2" oninput="cip_ui('mt')"></div>
-          <div class="cipNum cipGK" data-hk="M:ep" data-tip="Épaisseur des tubes (pour le dessin 3D)."><span>Épaisseur (mm)</span><input type="number" id="cipMtE" value="1.5" step="0.1" min="0.3" oninput="cip_ui('mt')"></div>
+          <div class="cipNum cipGK" data-hk="M:ep" data-only="decoupe" data-tip="Épaisseur des tubes (pour le dessin 3D)."><span>Épaisseur (mm)</span><input type="number" id="cipMtE" value="1.5" step="0.1" min="0.3" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:ang" data-tip="Angle entre les deux tubes. 90 = coude à angle droit. 180 = tubes alignés (jonction ronde)."><span>Angle entre les tubes (°)</span><input type="number" id="cipMtA" value="90" step="1" min="30" max="180" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:L" data-tip="Longueur de chaque tube depuis la jonction (sur son axe) : sert au dessin et au contrôle de collision de la tête."><span>Longueur des tubes (mm)</span><input type="number" id="cipMtL" value="80" step="1" min="10" oninput="cip_ui('mt')"></div>
           <div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">LA SOUDURE</div>
@@ -2640,7 +2640,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNote" style="margin-top:0">Tape les cotes : la pièce se met à jour toute seule dans la 3D. Les lignes de soudure sont calculées exactement (pas devinées).</div>
           <div style="font:600 12px var(--sans);color:var(--txt2);margin:8px 0 2px">TUBE PRINCIPAL</div>
           <div class="cipNum cipGK" data-hk="T:d"><span>Ø extérieur (mm)</span><input type="number" id="cipGTD" value="56" min="4" step="0.1" oninput="cip_ui('gen')"></div>
-          <div class="cipNum cipGK" data-hk="T:ep" data-tip="Épaisseur du tube. Mets l'épaisseur = le rayon (ou plus) pour une pièce PLEINE (rond plein, cylindre)."><span>Épaisseur (mm)</span><input type="number" id="cipGTE" value="3" min="0.3" step="0.1" oninput="cip_ui('gen')"></div>
+          <div class="cipNum cipGK" data-hk="T:ep" data-only="decoupe" data-tip="Épaisseur du tube. Mets l'épaisseur = le rayon (ou plus) pour une pièce PLEINE (rond plein, cylindre)."><span>Épaisseur (mm)</span><input type="number" id="cipGTE" value="3" min="0.3" step="0.1" oninput="cip_ui('gen')"></div>
           <div class="cipNum cipGK" data-hk="T:L"><span>Longueur de la pièce (mm)</span><input type="number" id="cipGTL" value="120" min="10" step="1" oninput="cip_ui('gen')"></div>
           <div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">CE QU'ON SOUDE DESSUS</div>
           <div id="cipGBodies"></div>
@@ -7907,8 +7907,17 @@ function cip_build() {
   });
   function genBuild(def) {
     const R = def.d / 2,
-      Ri = Math.max(0, R - def.ep), // épaisseur >= rayon : pièce PLEINE (cylindre / rond plein)
       L = def.L;
+    let Ri = Math.max(0, R - def.ep); // épaisseur >= rayon : pièce PLEINE (cylindre / rond plein)
+    // soudure : l'épaisseur ne sert pas (champ caché) -> un déporté posé sur le trou du tube ne bloque pas, on dessine la face pleine
+    if (
+      $('cipProc') &&
+      $('cipProc').value === 'soudure' &&
+      (def.bodies || []).some(
+        b => b.type === 'deport' && Math.max(0, +b.exc || 0) - Math.max(0.5, (+b.d || 0) / 2) < Ri
+      )
+    )
+      Ri = 0;
     if (!(R > 0) || !(L > 0)) return { err: 'Cotes du tube impossibles.' };
     const solid = Ri < 0.05;
     const pos = [],
@@ -8348,7 +8357,13 @@ function cip_build() {
       base: g.M.map(p => p.slice()),
       fit: f,
       name: 'PIECE-CREEE',
-      info: '<b>Pièce créée</b> · tube Ø' + def.d + ' × ' + def.ep + ', ' + def.bodies.length + ' corps<br>',
+      info:
+        '<b>Pièce créée</b> · tube Ø' +
+        def.d +
+        ($('cipProc').value === 'soudure' ? '' : ' × ' + def.ep) +
+        ', ' +
+        def.bodies.length +
+        ' corps<br>',
       gen: { seams: r.seams, info: r.info, R: r.R, Ri: r.Ri, L: r.L, def: JSON.parse(JSON.stringify(def)) },
       det: { d: def.d, ep: def.ep },
       fitL: !keep
@@ -9184,7 +9199,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v55',
+  const CIP_VER = 'CIP v56',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
