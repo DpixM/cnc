@@ -9156,7 +9156,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v53',
+  const CIP_VER = 'CIP v54',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -11462,7 +11462,19 @@ function cip_build() {
         aOf = i => lean + ((lean1 - lean) * (1 - Math.cos((2 * Math.PI * cum[i]) / tot))) / 2;
         o.leanOpp = lean1 / DEG;
       }
-      o.D = weldLean(o.P, o.D, aOf, o.faceIn);
+      // B pile au départ : l'inclinaison est construite perpendiculairement au cordon ; si le cordon n'est pas tout à fait
+      // « droit » au départ, la machine afficherait 0,02° d'écart (ex. -129.977 au lieu de -130). On corrige pour tomber PILE.
+      const D0 = o.D;
+      const Bof = d => toLst(o.P[0], d, decomp(d).th, lstOpt(true)).B;
+      const fn = c => (typeof aOf === 'function' ? i => aOf(i) + c : aOf + c);
+      let corr = 0;
+      for (let it = 0; it < 3; it++) {
+        const d0 = weldLean(o.P, D0, fn(corr), o.faceIn)[0];
+        const err = toLean(+b0) - toLean(Bof(d0));
+        if (Math.abs(err) < 1e-7) break;
+        corr += err;
+      }
+      o.D = weldLean(o.P, D0, fn(corr), o.faceIn);
       o.leanDeg = lean / DEG;
     } else if (b0 !== undefined && b0 !== '' && !isNaN(+b0)) {
       const off = bMachToTube(+b0) * DEG - decomp(o.D[0]).B; // b0 = B machine
