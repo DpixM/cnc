@@ -8863,6 +8863,12 @@ function cip_build() {
       return null;
     }
   }
+  // valeurs du SET_POS = position du point de départ dans le programme (origine G54 sur le départ le long de l'axe)
+  function wzSetPosVals(P) {
+    const o = lstOpt(true);
+    o.off = toLst(P.f.p, P.f.d, P.f.th, o)[o.ax];
+    return toLst(P.f.p, P.f.d, P.f.th, o);
+  }
   function wzCur() {
     const P = wzP1();
     if (!P) return 0;
@@ -8938,9 +8944,17 @@ function cip_build() {
     ${cur === 2 ? `<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',1)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',2)">C'est fait →</button></div>` : ''}</div>`;
     // v46 : UNE seule valeur à l'étape 3 (celle du SET_G54), aux 2 mandrins. La hauteur du point (pour la marge en Z)
     // est calculée : Z de l'axe du mandrin (réglé UNE fois dans les réglages avancés) + hauteur du point connue par la pièce.
-    h += `<div class="cipWzS ${st(3)}"><h4><i>${cur > 3 ? '✓' : 3}</i>Pose la pointe sur le départ</h4><div class="cipWzT">${Math.abs(+Ctxt) < 0.05 ? 'Le mandrin reste à <span class="cipWzBig">C = 0</span>. Amène' : 'Tourne le mandrin à <span class="cipWzBig">C = ' + Ctxt + '°</span> puis amène'} la pointe <b>pile sur le point jaune qui clignote</b> (départ ${W ? 'de la soudure' : 'de la découpe'}).<div class="cipWzHow"><b>Quelle valeur lire :</b><br>1. TRAORI actif (TC_SET_TRAFO("${P.ax === 'X' ? 'BA1' : 'Bc1'}") + TRAORI(1)) avec <b>SET_G54(0, 0, 0)</b> — G54 à zéro.<br>2. Pointe pile sur le point jaune.<br>3. Écran <b>« Axes de géométrie (SCP) »</b> (pas SCM) : lis le <b>${P.ax}</b>, avec son signe.<br><span style="color:var(--txt2)">= ${P.ax === 'Z' ? "la distance de la face de la platine au joint, le long de l'axe du mandrin" : "la position du point le long de l'axe du mandrin"}. Ça devient ton SET_G54.</span></div></div>
-    <div class="cipNum"><span>${P.ax} lu en SCP (G54 à 0)</span><input type="number" step="0.001" id="cipWzX" value="${S.wz.x !== null && S.wz.key === P.key ? S.wz.x : S.wz.xLast != null ? S.wz.xLast : ''}" placeholder="ex : -125.40"></div>
-    ${cur === 3 ? `<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',2)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',3)">Valider →</button></div>` : cur > 3 ? `<div class="cipNote" style="margin:2px 0 0">${ok} SET_G54(${P.ax === 'X' ? S.wz.x + ', 0, 0' : '0, 0, ' + S.wz.x}) — le programme part de ce point.${S.wz.z != null ? `<br>${ok} Marge en Z au-dessus du point : <b>${(+$('cipZTop').value - S.wz.z).toFixed(0)} mm</b> → dégagements limités à ${$('cipZMax').value} mm.` : P.ax === 'X' ? `<br><span style="color:var(--txt2)">Marge en Z pas calculée : règle une fois le « Z de l'axe du mandrin » dans les réglages avancés.</span>` : ''}</div>` : ''}</div>`;
+    // origine : SET_G54 (on lit une valeur et on la tape) OU SET_POS (la pointe est sur le départ au lancement)
+    const posM = !!S.orgPos && !S.miter;
+    const qS = wzSetPosVals(P);
+    const orgSeg = `<div class="cipSeg" style="margin:6px 0 4px" data-tip="Deux façons de dire à la machine où est le départ :\n• SET_G54 : tu lis une valeur à l'écran (SCP) et tu la tapes ici, le programme commence par se dégager.\n• SET_POS : tu laisses la pointe SUR le départ et tu lances ; le programme déclare « je suis ici » (SET_POS) et part de là. Rien à taper."><button class="cipBtn ${posM ? '' : 'cipOn'}" onclick="cip_ui('orgmode','g54')">SET_G54 (je tape la valeur)</button><button class="cipBtn ${posM ? 'cipOn' : ''}" onclick="cip_ui('orgmode','pos')">SET_POS (pointe sur le départ)</button></div>`;
+    h += `<div class="cipWzS ${st(3)}"><h4><i>${cur > 3 ? '✓' : 3}</i>Pose la pointe sur le départ</h4>${orgSeg}<div class="cipWzT">${Math.abs(+Ctxt) < 0.05 ? 'Le mandrin reste à <span class="cipWzBig">C = 0</span>. Amène' : 'Tourne le mandrin à <span class="cipWzBig">C = ' + Ctxt + '°</span> puis amène'} la pointe <b>pile sur le point jaune qui clignote</b> (départ ${W ? 'de la soudure' : 'de la découpe'}).${
+      posM
+        ? `<div class="cipWzHow"><b>Mode SET_POS :</b><br>1. Mets la tête à <b>B = ${qS.B.toFixed(3)}</b> et le mandrin à <b>C1 = ${qS.C.toFixed(3)}</b>.<br>2. Pointe <b>pile</b> sur le point jaune, TRAORI actif.<br>3. <b>Ne bouge plus la tête</b> : génère, puis lance le programme d'ici. Il ne fait PAS les mouvements de début (Z 350…), il déclare <b>SET_POS(${qS.X.toFixed(3)}, ${qS.Y.toFixed(3)}, ${qS.Z.toFixed(3)})</b> = « la pointe est sur le départ » et part de là.<br><span style="color:var(--txt2)">Pas 0,0,0 : avec TRAORI, le 0 doit rester sur l'axe du mandrin, donc le soft donne la vraie position du départ par rapport à l'axe.</span></div></div>`
+        : `<div class="cipWzHow"><b>Quelle valeur lire :</b><br>1. TRAORI actif (TC_SET_TRAFO("${P.ax === 'X' ? 'BA1' : 'Bc1'}") + TRAORI(1)) avec <b>SET_G54(0, 0, 0)</b> — G54 à zéro.<br>2. Pointe pile sur le point jaune.<br>3. Écran <b>« Axes de géométrie (SCP) »</b> (pas SCM) : lis le <b>${P.ax}</b>, avec son signe.<br><span style="color:var(--txt2)">= ${P.ax === 'Z' ? "la distance de la face de la platine au joint, le long de l'axe du mandrin" : "la position du point le long de l'axe du mandrin"}. Ça devient ton SET_G54.</span></div></div>
+    <div class="cipNum"><span>${P.ax} lu en SCP (G54 à 0)</span><input type="number" step="0.001" id="cipWzX" value="${S.wz.x !== null && S.wz.key === P.key ? S.wz.x : S.wz.xLast != null ? S.wz.xLast : ''}" placeholder="ex : -125.40"></div>`
+    }
+    ${cur === 3 ? `<div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',2)">←</button><button class="cipBtn cipMain" onclick="cip_ui('wz',3)">${posM ? "C'est fait, la pointe est dessus →" : 'Valider →'}</button></div>` : cur > 3 ? `<div class="cipNote" style="margin:2px 0 0">${S.wz.pos ? `${ok} SET_POS(${qS.X.toFixed(3)}, ${qS.Y.toFixed(3)}, ${qS.Z.toFixed(3)}) — lance le programme avec la pointe sur le départ (B ${qS.B.toFixed(1)}, C1 ${qS.C.toFixed(1)}).` : `${ok} SET_G54(${P.ax === 'X' ? S.wz.x + ', 0, 0' : '0, 0, ' + S.wz.x}) — le programme part de ce point.`}${S.wz.z != null ? `<br>${ok} Marge en Z au-dessus du point : <b>${(+$('cipZTop').value - S.wz.z).toFixed(0)} mm</b> → dégagements limités à ${$('cipZMax').value} mm.` : P.ax === 'X' ? `<br><span style="color:var(--txt2)">Marge en Z pas calculée : règle une fois le « Z de l'axe du mandrin » dans les réglages avancés.</span>` : ''}</div>` : ''}</div>`;
     const nm = $('cipLName').value || '';
     const dry = S.wz.dry !== false;
     h += `<div class="cipWzS ${st(4)}"><h4><i>4</i>Fichier .LST</h4>
@@ -9138,7 +9152,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v51',
+  const CIP_VER = 'CIP v52',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -10759,6 +10773,9 @@ function cip_build() {
     renderCube();
     requestAnimationFrame(loop);
   }
+  try {
+    S.orgPos = localStorage.getItem('cipOrgMode') === 'pos';
+  } catch (e) {}
   const MT_IDS = [
     'cipMtD',
     'cipMtE',
@@ -12782,11 +12799,18 @@ function cip_build() {
     const OX = $('cipLOX').value,
       OY = $('cipLOY').value,
       OZ = $('cipLOZ').value;
-    if (OX === '' || OY === '' || OZ === '')
+    const posMode = !!(S.wz && S.wz.pos && S.orgPos);
+    if (!posMode && (OX === '' || OY === '' || OZ === ''))
       return { err: 'Remplis les 3 valeurs de SET_G54 (mesurées sur la machine).' };
     const fg = +$('cipLFg').value;
     if (kind !== 'soudure' && !(fg > 0)) return { err: 'Donne le rayon pièce pour FGREF.' };
-    const g54 = `SET_G54(${OX}, ${OY}, ${OZ})`;
+    let g54 = `SET_G54(${OX}, ${OY}, ${OZ})`;
+    if (posMode) {
+      // SET_POS : la pointe est SUR le point de départ quand on lance -> on déclare sa position (sur l'axe du mandrin)
+      const f0 = F.find(x => x.j >= 0);
+      const q0 = toLst(f0.p, f0.d, f0.th, o);
+      g54 = `SET_POS(${n3(q0.X)}, ${n3(q0.Y)}, ${n3(q0.Z)}) ;la pointe est sur le point de depart (B ${n3(q0.B)} C1 ${n3(q0.C)}) : on part d'ici`;
+    }
     const dry = $('cipLDry').checked;
     const B = [];
     const W = kind === 'soudure';
@@ -12808,8 +12832,9 @@ function cip_build() {
         'TC_DYNAMIC_LEVEL(-1)',
         '',
         '',
-        'G01 Z = 350 B = 0 C1 =0 F10000',
-        o.trafo === 'Bc1' ? 'G01 X =50 Y = 200' : 'G01 Y = 200',
+        ...(posMode
+          ? [';SET_POS : pas de degagement au debut, la tete est deja sur le point de depart']
+          : ['G01 Z = 350 B = 0 C1 =0 F10000', o.trafo === 'Bc1' ? 'G01 X =50 Y = 200' : 'G01 Y = 200']),
         ';TC_AUX_LIGHT(5,1)',
         ';TC_AUX_LIGHT(6,1)',
         '',
@@ -14668,8 +14693,22 @@ function cip_build() {
         else if (v == 2) S.wz.d2 = true;
         else if (v == 3) {
           const P = wzP1();
-          const x = parseFloat(($('cipWzX') || {}).value);
           if (!P) return;
+          if (S.orgPos && !S.miter) {
+            // SET_POS : rien à taper, la pointe est sur le départ au lancement
+            S.wz.x = 0;
+            S.wz.pos = true;
+            S.wz.key = P.key;
+            wzApplyG54();
+            try {
+              flyTo(0.62, 1.05, 1.05);
+            } catch (e) {}
+            S.wz.msg = '';
+            wzRender();
+            return;
+          }
+          S.wz.pos = false;
+          const x = parseFloat(($('cipWzX') || {}).value);
           if (isNaN(x)) {
             const i = $('cipWzX');
             if (i) {
@@ -14699,6 +14738,19 @@ function cip_build() {
           } else S.wz.z = null;
         }
         S.wz.msg = '';
+        wzRender();
+        return;
+      } else if (a === 'orgmode') {
+        if (S.prog && S.prog.verify) lstVerifyExit();
+        S.orgPos = v === 'pos';
+        try {
+          localStorage.setItem('cipOrgMode', v);
+        } catch (e) {}
+        if (S.wz.x !== null) {
+          S.wz.x = null; // on revalide l'étape 3 dans le nouveau mode
+          S.wz.pos = false;
+        }
+        lstForget();
         wzRender();
         return;
       } else if (a === 'wzback') {
