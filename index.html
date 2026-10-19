@@ -2636,11 +2636,11 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNote" style="margin-top:0">Tape les cotes : la pièce se met à jour toute seule dans la 3D. Les lignes de soudure sont calculées exactement (pas devinées).</div>
           <div style="font:600 12px var(--sans);color:var(--txt2);margin:8px 0 2px">TUBE PRINCIPAL</div>
           <div class="cipNum cipGK" data-hk="T:d"><span>Ø extérieur (mm)</span><input type="number" id="cipGTD" value="56" min="4" step="0.1" oninput="cip_ui('gen')"></div>
-          <div class="cipNum cipGK" data-hk="T:ep"><span>Épaisseur (mm)</span><input type="number" id="cipGTE" value="3" min="0.3" step="0.1" oninput="cip_ui('gen')"></div>
+          <div class="cipNum cipGK" data-hk="T:ep" data-tip="Épaisseur du tube. Mets l'épaisseur = le rayon (ou plus) pour une pièce PLEINE (rond plein, cylindre)."><span>Épaisseur (mm)</span><input type="number" id="cipGTE" value="3" min="0.3" step="0.1" oninput="cip_ui('gen')"></div>
           <div class="cipNum cipGK" data-hk="T:L"><span>Longueur de la pièce (mm)</span><input type="number" id="cipGTL" value="120" min="10" step="1" oninput="cip_ui('gen')"></div>
           <div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">CE QU'ON SOUDE DESSUS</div>
           <div id="cipGBodies"></div>
-          <div class="cipRow"><button class="cipBtn" onclick="cip_ui('genadd','rond')">+ Tube / rond</button><button class="cipBtn" onclick="cip_ui('genadd','plat')">+ Plat</button><button class="cipBtn" onclick="cip_ui('genadd','bride')">+ Bride</button></div>
+          <div class="cipRow"><button class="cipBtn" onclick="cip_ui('genadd','rond')">+ Tube / rond</button><button class="cipBtn" onclick="cip_ui('genadd','plat')">+ Plat</button><button class="cipBtn" onclick="cip_ui('genadd','bride')">+ Bride</button><button class="cipBtn" onclick="cip_ui('genadd','deport')">+ Déporté</button></div>
           <div class="cipStat" id="cipGMsg"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : réglages →</button></div>
         </div>
@@ -6390,6 +6390,8 @@ function cip_build() {
   }
   const JAW = 10; // marge mini entre la pièce et l'avant des mors (mm)
   function partSpan() {
+    // pièce créée : le tube de base va de 0 à L (un corps déporté posé sur la face du bout ne compte pas)
+    if (S.part && S.part.gen && S.part.gen.L) return S.flip ? [-S.part.gen.L, 0] : [0, S.part.gen.L];
     let a = 1e9,
       b = -1e9;
     const pr = S.profile;
@@ -6418,7 +6420,9 @@ function cip_build() {
     const rho = +$('cipPRot').value || 0;
     // SOUDURE : la pièce EST le tube tenu dans les mors -> son bout libre est au bout (distance 0),
     // et c'est l'Offset X (90°) / Z (à plat) = ce qui dépasse des mors qui dit si la tête tape. On ne le change jamais.
-    const W = $('cipProc').value === 'soudure';
+    // corps DÉPORTÉ sur la face du bout : cette face doit être le bout libre (sinon le tube qui dépasse cache la face)
+    const W =
+      $('cipProc').value === 'soudure' || !!(P.gen && P.gen.def && P.gen.def.bodies.some(b => b.type === 'deport'));
     let off = W ? 0 : Math.max(0, +$('cipPOff').value || 0);
     const [ymin, ymax] = partSpan();
     const len = ymax - ymin;
@@ -6576,7 +6580,23 @@ function cip_build() {
             S.bodyCloud = null;
           }
           const _tw = performance.now();
-          const bo = isWeld ? weldOps(r.C) : buildOps(r.C);
+          // DÉCOUPE d'un corps déporté (cercle sur la face du bout) : un trou à part, faisceau perpendiculaire à la face
+          // (pas un détourage de tube : buildOps prendrait ce cercle pour le profil du tube)
+          const depC = !isWeld && S.part.gen ? r.C.filter(c => c.NS) : [];
+          const restC = depC.length ? r.C.filter(c => !c.NS) : r.C;
+          const bo = isWeld ? weldOps(r.C) : restC.length ? buildOps(restC) : { ops: [], notes: [] };
+          if (depC.length) {
+            let kd = 0;
+            instList().forEach(ins =>
+              depC.forEach(c => {
+                const P = c.P.map(p => {
+                  const q = rotM(p, ins.a);
+                  return [q[0], q[1] + ins.dy, q[2]];
+                });
+                bo.ops.push({ name: 'Trou déporté ' + ++kd, step: 2, P, D: c.D.map(d => rotM(d, ins.a)) });
+              })
+            );
+          }
           let C = bo.ops;
           S.tmW = performance.now() - _tw;
           if (!isWeld) C.forEach(o => applyStart(o));
@@ -7883,9 +7903,10 @@ function cip_build() {
   });
   function genBuild(def) {
     const R = def.d / 2,
-      Ri = R - def.ep,
+      Ri = Math.max(0, R - def.ep), // épaisseur >= rayon : pièce PLEINE (cylindre / rond plein)
       L = def.L;
-    if (!(R > 0) || !(Ri > 0) || !(L > 0)) return { err: 'Cotes du tube impossibles.' };
+    if (!(R > 0) || !(L > 0)) return { err: 'Cotes du tube impossibles.' };
+    const solid = Ri < 0.05;
     const pos = [],
       idx = [];
     let nv = 0;
@@ -7913,10 +7934,12 @@ function cip_build() {
         }
         return o;
       };
-      for (const [r, sgn] of [
-        [R, 1],
-        [Ri, -1]
-      ]) {
+      for (const [r, sgn] of solid
+        ? [[R, 1]]
+        : [
+            [R, 1],
+            [Ri, -1]
+          ]) {
         let prev = ring(r, 0);
         for (let j = 1; j <= NY; j++) {
           const cur = ring(r, (L * j) / NY);
@@ -7934,8 +7957,14 @@ function cip_build() {
         [0, -1],
         [L, 1]
       ]) {
-        const o = ring(R, y),
-          i = ring(Ri, y);
+        const o = ring(R, y);
+        if (solid) {
+          // face pleine : éventail autour du centre
+          const c = vtx([0, y, 0]);
+          for (let k = 0; k < NA; k++) tri(c, o[k], o[(k + 1) % NA], [0, sg, 0]);
+          continue;
+        }
+        const i = ring(Ri, y);
         for (let k = 0; k < NA; k++) {
           const k2 = (k + 1) % NA;
           tri(o[k], o[k2], i[k], [0, sg, 0]);
@@ -8001,6 +8030,78 @@ function cip_build() {
           seams.push({ P, NB, ax: [0, -s, 0], c: [0, yb, 0], r: Rb, noCut: true });
         }
         info[bi] = { type: 'bride', yb, Rb, y1, y2 };
+        return;
+      }
+      if (b.type === 'deport') {
+        // CORPS DÉPORTÉ : cylindre posé sur la face du bout libre, axe PARALLÈLE à l'axe du mandrin mais décalé du centre.
+        // La jonction = un cercle sur la face (pas centré sur l'axe) -> le mandrin tourne, X/Y/Z suivent (TRAORI).
+        const r = Math.max(0.3, +b.d || 10) / 2,
+          e = Math.max(0, +b.exc || 0),
+          H = Math.max(0.5, +b.h || 20);
+        if (e + r > R + 1e-6) {
+          err = 'Déporté ' + (bi + 1) + ' : il dépasse du bord de la face (Ø + déport trop grands).';
+          return;
+        }
+        if (!solid && e - r < Ri - 1e-6) {
+          err =
+            'Déporté ' +
+            (bi + 1) +
+            " : il passe au-dessus du trou du tube (augmente le déport ou l'épaisseur ; épaisseur = rayon pour une pièce pleine).";
+          return;
+        }
+        const B0 = RT([0, L, e]); // comme les autres corps : 0° = côté tête (dessus)
+        const e1 = RT([0, 0, 1]),
+          e3 = RT([1, 0, 0]),
+          a = [0, 1, 0];
+        const n = Math.max(96, Math.ceil((2 * Math.PI * r) / 0.4));
+        const bot = [],
+          topv = [],
+          P = [],
+          NB = [];
+        for (let k = 0; k < n; k++) {
+          const t = (2 * Math.PI * k) / n;
+          const u = V.add(V.mul(e1, Math.cos(t)), V.mul(e3, Math.sin(t)));
+          const p = V.add(B0, V.mul(u, r));
+          bot.push(vtx(p));
+          topv.push(vtx(V.add(p, [0, H, 0])));
+          P.push(p);
+          NB.push(u);
+        }
+        const ct = vtx(V.add(B0, [0, H, 0]));
+        for (let k = 0; k < n; k++) {
+          const k2 = (k + 1) % n;
+          const t = (2 * Math.PI * (k + 0.5)) / n;
+          const nn = V.add(V.mul(e1, Math.cos(t)), V.mul(e3, Math.sin(t)));
+          tri(bot[k], bot[k2], topv[k], nn);
+          tri(bot[k2], topv[k2], topv[k], nn);
+          tri(ct, topv[k], topv[k2], [0, 1, 0]);
+        }
+        info[bi] = {
+          type: 'deport',
+          yb: L,
+          a,
+          e1,
+          e2: e3,
+          B0,
+          sTop: H,
+          sBot: 0,
+          H,
+          hiP: P[0],
+          hiN: NB[0],
+          loP: P[0],
+          loN: NB[0],
+          rad: r,
+          th: 0,
+          rot,
+          exc: e,
+          w: 0,
+          t: 0,
+          d: 2 * r,
+          seamTop: seams.length,
+          trav: false
+        };
+        // NS = normale de la surface de BASE (la face du bout, vers l'extérieur) : sert à viser l'angle entre les 2 surfaces
+        seams.push({ P, NB, NS: [0, 1, 0], ax: [0, -1, 0], c: B0, r, t0: -H, t1: 0.5 });
         return;
       }
       // corps prismatique : rond (tube piqué / rond plein) ou plat
@@ -8187,7 +8288,8 @@ function cip_build() {
         D: P.map(() => ax.slice()),
         NB,
         W: P.map(() => true),
-        body: { c: XP(s.c), ax, r: s.r, t0: -500, t1: 500 },
+        body: { c: XP(s.c), ax, r: s.r, t0: s.t0 !== undefined ? s.t0 : -500, t1: s.t1 !== undefined ? s.t1 : 500 },
+        NS: s.NS ? P.map(() => XV(s.NS)) : null, // corps déporté : la surface de base est la FACE du bout (pas le tube)
         mode: 'fixe',
         A: 0,
         len,
@@ -8258,9 +8360,31 @@ function cip_build() {
       D.bodies
         .map((b, i) => {
           const f = (k, lab, val, tip, st) => f0(k, lab, val, tip, st, i);
-          const T = { rond: 'Tube / rond piqué', plat: 'Plat / gousset', bride: 'Bride / collerette' }[b.type];
+          const T = {
+            rond: 'Tube / rond piqué',
+            plat: 'Plat / gousset',
+            bride: 'Bride / collerette',
+            deport: 'Déporté sur la face du bout'
+          }[b.type];
           let h = `<div class="cipGB" data-i="${i}"><div class="cipRow" style="justify-content:space-between;margin:0 0 4px"><b style="font-size:13px">${i + 1}. ${T}</b><button class="cipBtn" style="padding:1px 7px" data-del="${i}" data-tip="Enlever ce corps.">✕</button></div>`;
-          if (b.type === 'bride')
+          if (b.type === 'deport')
+            h +=
+              f('d', 'Ø', b.d, 'Diamètre du cylindre déporté (mm).', 0.1) +
+              f('h', 'Hauteur', b.h, 'Hauteur du cylindre déporté au-dessus de la face (mm).') +
+              f(
+                'exc',
+                'Déport du centre',
+                b.exc,
+                "Distance entre l'axe du mandrin (centre de la face) et l'axe du cylindre déporté (mm).",
+                0.1
+              ) +
+              f(
+                'rot',
+                'Tour autour (°)',
+                b.rot,
+                'De quel côté il est déporté : 0 = dessus, 90 = sur le côté, 180 = dessous (vu au départ).'
+              );
+          else if (b.type === 'bride')
             h +=
               f('d', 'Ø extérieur bride', b.d, 'Diamètre extérieur de la bride (mm).', 0.1) +
               f('t', 'Épaisseur', b.t, 'Épaisseur de la bride (mm).', 0.1) +
@@ -8990,8 +9114,8 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v48',
-    CIP_DATE = '13/10/2026';
+  const CIP_VER = 'CIP v49',
+    CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
     if (e) {
@@ -11255,21 +11379,28 @@ function cip_build() {
       // (départ −55 -> côtés 55° sur le côté -> opposé +55). Avant, on ajoutait un décalage fixe sur B (sens de la
       // longueur seulement) : ça marchait au départ puis s'écrasait sur les côtés et à l'opposé (34°, 5°…).
       // angle aigu entre le faisceau et la normale du tube (à plat, B=±55 = 35° du tube, la tête se met du bon côté toute seule)
-      const lean = Math.abs(Math.asin(Math.sin(bMachToTube(+b0) * DEG)));
+      // B machine -> inclinaison voulue par rapport à la normale de la surface de base.
+      // Tube : la normale est radiale (B 0 = tête perpendiculaire au tube). Face du bout (corps déporté) : la normale est
+      // dans l'axe -> on prend le complément, pour que le B tapé soit bien le B de la machine au départ.
+      const toLean = B => {
+        const l = Math.abs(Math.asin(Math.sin(bMachToTube(B) * DEG)));
+        return o.faceIn ? Math.PI / 2 - l : l;
+      };
+      const lean = toLean(+b0);
       // v47 : B différent à l'OPPOSÉ (facultatif) -> l'inclinaison passe en douceur de l'une à l'autre
       // (départ -> opposé à mi-tour -> retour à la valeur du départ en fin de tour)
       let b1 = S.oppB && S.oppB[o.name];
       if ((b1 === undefined || b1 === '') && $('cipOppB') && $('cipOppB').value !== '') b1 = $('cipOppB').value;
       let aOf = lean;
       if (b1 !== undefined && b1 !== '' && !isNaN(+b1) && isClosed(o)) {
-        const lean1 = Math.abs(Math.asin(Math.sin(bMachToTube(+b1) * DEG)));
+        const lean1 = toLean(+b1);
         const cum = [0];
         for (let i = 1; i < o.P.length; i++) cum.push(cum[i - 1] + V.len(V.sub(o.P[i], o.P[i - 1])));
         const tot = cum[cum.length - 1] || 1;
         aOf = i => lean + ((lean1 - lean) * (1 - Math.cos((2 * Math.PI * cum[i]) / tot))) / 2;
         o.leanOpp = lean1 / DEG;
       }
-      o.D = weldLean(o.P, o.D, aOf);
+      o.D = weldLean(o.P, o.D, aOf, o.faceIn);
       o.leanDeg = lean / DEG;
     } else if (b0 !== undefined && b0 !== '' && !isNaN(+b0)) {
       const off = bMachToTube(+b0) * DEG - decomp(o.D[0]).B; // b0 = B machine
@@ -11282,7 +11413,7 @@ function cip_build() {
   }
   // Faisceau incliné de « a » (radians) par rapport à la normale du tube, dans le plan perpendiculaire au cordon,
   // la tête TOUJOURS du côté extérieur du corps soudé (elle ne peut pas être au-dessus du piquage).
-  function weldLean(P, D, a) {
+  function weldLean(P, D, a, faceIn) {
     // corps soudé de ce cordon = celui dont la surface passe au plus près des points
     let body = null,
       be = 1e9;
@@ -11303,7 +11434,7 @@ function cip_build() {
       const t0 = V.sub(P[Math.min(n - 1, i + 1)], P[Math.max(0, i - 1)]);
       if (V.len(t0) < 1e-9) return D[i];
       const t = V.nrm(t0);
-      let ni = nIn(p);
+      let ni = faceIn || nIn(p); // corps déporté sur la face du bout : la « surface de base » est la face
       ni = V.nrm(V.sub(ni, V.mul(t, V.dot(ni, t))));
       // côté du corps : de la tête vers le corps (composante latérale du faisceau)
       let side = null;
@@ -11502,12 +11633,14 @@ function cip_build() {
       s = Math.sin(a);
     return V.add(V.add(V.mul(v, c), V.mul(V.cross(ax, v), s)), V.mul(ax, V.dot(ax, v) * (1 - c)));
   }
-  function optimizeWeldDirs(P, D) {
+  function optimizeWeldDirs(P, D, mg) {
     const _t0 = performance.now();
     S.otm = S.otm || {};
     const n = P.length;
     if (n < 4) return { D, bad: 0, moved: 0, pieces: null };
-    const margin = 2.5;
+    // marge voulue autour de la tête. Corps déporté sur une face PLATE : le cône du faisceau, tout près du point,
+    // passe forcément à ~2 mm de la face (elle ne s'écarte pas comme un tube) -> marge réduite, sinon la tête se couche pour rien
+    const margin = mg !== undefined ? mg : 2.5;
     const maxDev = Math.max(0, +($('cipWMaxDev') || {}).value || 60);
     const W = [-60, -45, -30, -15, 0, 15, 30, 45, 60],
       Lg = [-50, -25, 0, 25, 50];
@@ -11920,8 +12053,9 @@ function cip_build() {
     const splitNotes = [];
     inst.forEach(ins =>
       seams.forEach(c => {
+        const fIn = c.NS ? V.mul(rotM(c.NS[0], ins.a), -1) : null; // face du bout : normale vers l'intérieur
         const D = c.P.map((p, i) => {
-          const nt = V.mul(nIn(p), -1);
+          const nt = c.NS ? c.NS[i] : V.mul(nIn(p), -1);
           const nb = c.NB[i];
           return V.mul(V.nrm(V.add(nt, nb)), -1);
         }); // vise l'angle entre les 2 surfaces
@@ -12000,7 +12134,10 @@ function cip_build() {
           const PP = sg.closed ? sg.P.concat([sg.P[0]]) : sg.P;
           let DD = sg.closed ? sg.D.concat([sg.D[0]]) : sg.D;
           let opt = null;
-          if (optOn) {
+          // corps déporté (cercle sur une face plate) : l'angle idéal passe ? on le garde tel quel (l'optimiseur, fait
+          // pour les piquages sur tube, couchait la tête pour freiner le mandrin, alors que rien ne touche)
+          const faceOk = fIn && !DD.some((d, i) => i % 3 === 0 && clearance(PP[i], d, true) < 0.5);
+          if (optOn && !faceOk) {
             const h = hp();
             const ph = p => Math.atan2(p[2], p[0]) / DEG;
             const ph0 = ph(PP[0]);
@@ -12018,7 +12155,8 @@ function cip_build() {
               S.profile.rmax,
               inst.length,
               ins.a,
-              $('cipWMaxDev') ? $('cipWMaxDev').value : 60
+              $('cipWMaxDev') ? $('cipWMaxDev').value : 60,
+              fIn ? 'face' : ''
             ].join('|');
             S.optCache = S.optCache || new Map();
             const hit = S.optCache.get(key);
@@ -12030,7 +12168,7 @@ function cip_build() {
                 pieces: hit.opt.pieces ? hit.opt.pieces.map(pc => ({ idx: pc.idx, D: pc.D.map(R) })) : null
               });
             } else {
-              opt = optimizeWeldDirs(PP, DD);
+              opt = optimizeWeldDirs(PP, DD, fIn ? 0.8 : undefined);
               if (S.optCache.size > 20) S.optCache.clear();
               S.optCache.set(key, { opt, ph0 });
             }
@@ -12069,7 +12207,8 @@ function cip_build() {
                 weld: true,
                 opt,
                 piece: true,
-                gapPts: j === 0 ? gapPts : null
+                gapPts: j === 0 ? gapPts : null,
+                faceIn: fIn
               };
               o = applyStart(o); // ouverte : pas de recouvrement, juste la pente de fin
               let acc = 0,
@@ -12084,7 +12223,7 @@ function cip_build() {
               ops.push(o);
             });
           } else if (sg.closed) {
-            let o = { name: nm, step: 2, P: PP, D: DD, weld: true, opt };
+            let o = { name: nm, step: 2, P: PP, D: DD, weld: true, opt, faceIn: fIn };
             o = applyStart(o);
             {
               const Lp = plen(PP, true);
@@ -12092,7 +12231,7 @@ function cip_build() {
             }
             ops.push(o);
           } else {
-            let o = { name: nm, step: 2, P: PP, D: DD, weld: true, opt, piece: true };
+            let o = { name: nm, step: 2, P: PP, D: DD, weld: true, opt, piece: true, faceIn: fIn };
             o = applyStart(o);
             const rampMm = (ramp / 360) * plen(PP, false); // cordon OUVERT : 360° = toute sa longueur
             let acc = 0,
@@ -13039,6 +13178,8 @@ function cip_build() {
       "Mise en machine : les étapes pour monter la pièce, prendre l'origine avec la pointe et sortir le .LST.",
     "[onclick*=\"cip_ui('genadd','rond')\"]": 'Ajouter un tube (ou un rond plein) piqué sur le tube principal.',
     "[onclick*=\"cip_ui('genadd','plat')\"]": 'Ajouter un plat / un gousset soudé sur le tube.',
+    "[onclick*=\"cip_ui('genadd','deport')\"]":
+      "Ajouter un cylindre DÉPORTÉ posé sur la face du bout libre : son axe est parallèle à l'axe du mandrin mais décalé du centre. Le soft soude (ou découpe) le cercle de la jonction, le mandrin tourne et X/Y/Z suivent.",
     "[onclick*=\"cip_ui('genadd','bride')\"]":
       'Ajouter une bride / une collerette autour du tube (soudée des deux côtés).',
     '[onclick*="cip_ui(\'rotstep\',-15)"]': 'Tourner la pièce de 15° dans un sens autour du tube.',
@@ -14581,7 +14722,14 @@ function cip_build() {
         const B = {
           rond: { type: 'rond', d: 20, h: 50, ang: 90, pos: 30 + 25 * n, exc: 0, rot: 0, trav: false },
           plat: { type: 'plat', w: 40, t: 5, h: 40, ang: 90, pos: 40, exc: 0, rot: 90, trav: false },
-          bride: { type: 'bride', d: +S.genDef.d + 30, t: 4, pos: 15 }
+          bride: { type: 'bride', d: +S.genDef.d + 30, t: 4, pos: 15 },
+          deport: {
+            type: 'deport',
+            d: Math.max(2, Math.round(+S.genDef.d / 4)),
+            h: 25,
+            exc: Math.max(1, Math.round(+S.genDef.d / 4)),
+            rot: 0
+          }
         }[v];
         S.genDef.bodies.push(B);
         genRender();
