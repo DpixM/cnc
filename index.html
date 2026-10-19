@@ -8304,6 +8304,24 @@ function cip_build() {
     });
     return { C, totalBad: 0 };
   }
+  // cotes de « Créer ma pièce » / « Pièce déportée » gardées (session + navigateur) : on ne les retape pas
+  function genMemLoad(kind) {
+    try {
+      const v = (S.genMem && S.genMem[kind]) || JSON.parse(localStorage.getItem('cipGen_' + kind) || 'null');
+      return v && v.bodies ? JSON.parse(JSON.stringify(v)) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function genMemSave() {
+    const k = S.genKind;
+    if (k !== 'create' && k !== 'deport') return;
+    S.genMem = S.genMem || {};
+    S.genMem[k] = JSON.parse(JSON.stringify(S.genDef));
+    try {
+      localStorage.setItem('cipGen_' + k, JSON.stringify(S.genDef));
+    } catch (e) {}
+  }
   function genApply(first) {
     S.srcMesh = null;
     const def = S.genDef;
@@ -8314,6 +8332,7 @@ function cip_build() {
       return false;
     }
     if (msg) msg.innerHTML = '<span class="cipOk">' + r.seams.length + ' ligne(s) de soudure.</span>';
+    genMemSave();
     const meshes = [{ attributes: { position: { array: r.pos } }, index: { array: r.idx } }];
     const g = G.weld(meshes);
     G.triInfo(g);
@@ -8479,6 +8498,7 @@ function cip_build() {
       } catch (e) {}
   }
   function genSoon() {
+    genMemSave(); // même si la cote donne une erreur : on garde ce que tu as tapé
     clearTimeout(S.genT);
     S.genT = setTimeout(() => genApply(false), 250);
   }
@@ -9118,7 +9138,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v50',
+  const CIP_VER = 'CIP v51',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -10739,6 +10759,23 @@ function cip_build() {
     renderCube();
     requestAnimationFrame(loop);
   }
+  const MT_IDS = [
+    'cipMtD',
+    'cipMtE',
+    'cipMtA',
+    'cipMtL',
+    'cipMtS0',
+    'cipMtB',
+    'cipMtP0',
+    'cipMtR',
+    'cipMtP1',
+    'cipMtRet',
+    'cipMtStep'
+  ];
+  try {
+    const o = JSON.parse(localStorage.getItem('cipMtVals') || 'null');
+    if (o) MT_IDS.forEach(id => $(id) && o[id] !== undefined && ($(id).value = o[id]));
+  } catch (e) {}
   try {
     const zt = localStorage.getItem('cipZTop');
     if (zt && $('cipZTop')) $('cipZTop').value = zt;
@@ -14041,6 +14078,7 @@ function cip_build() {
     }
     mtLeave();
     if (t === 'gen') {
+      S.genKind = 'proj'; // un projet ouvert n'écrase pas les cotes gardées
       S.genDef = JSON.parse(JSON.stringify(P.part.def));
       showWork('build');
       genRender();
@@ -14511,6 +14549,11 @@ function cip_build() {
         }
         return;
       } else if (a === 'mt') {
+        try {
+          const o = {};
+          MT_IDS.forEach(id => $(id) && (o[id] = $(id).value));
+          localStorage.setItem('cipMtVals', JSON.stringify(o)); // cotes du coude gardées
+        } catch (e) {}
         mtRender();
         $('cipMtMsg').innerHTML = '';
         if (S.miter) {
@@ -14710,21 +14753,29 @@ function cip_build() {
         // raccourci : « Créer ma pièce » déjà réglé pour une pièce déportée (rond plein + plot décalé sur la face du bout)
         mtLeave();
         showWork('build');
-        S.genDef = {
-          d: 40,
-          ep: 20,
-          L: 60,
-          bodies: [{ type: 'deport', d: 10, h: 25, exc: 10, rot: 0 }]
-        };
-        genRender();
-        genApply(true);
+        // on reprend les cotes de la dernière pièce déportée (gardées, même après fermeture)
+        if (S.genKind !== 'deport' || !(S.part && S.part.gen)) {
+          S.genKind = 'deport';
+          S.genDef = genMemLoad('deport') || {
+            d: 40,
+            ep: 20,
+            L: 60,
+            bodies: [{ type: 'deport', d: 10, h: 25, exc: 10, rot: 0 }]
+          };
+          genRender();
+          genApply(true);
+        } else genRender();
         return;
       } else if (a === 'partcreate') {
         mtLeave();
         showWork('build');
-        if (!S.genDef) S.genDef = GEN_DEF();
-        genRender();
-        if (!(S.part && S.part.gen)) genApply(true);
+        // on reprend les cotes de la dernière pièce créée (gardées, même après fermeture)
+        if (S.genKind !== 'create' || !(S.part && S.part.gen)) {
+          S.genKind = 'create';
+          S.genDef = genMemLoad('create') || GEN_DEF();
+          genRender();
+          genApply(true);
+        } else genRender();
         return;
       } else if (a === 'gen') {
         S.genDef = S.genDef || GEN_DEF();
@@ -14963,6 +15014,7 @@ function cip_build() {
         return;
       } else if (a === 'demo') {
         if ($('cipProc').value === 'soudure') {
+          S.genKind = 'demo'; // l'exemple n'écrase pas les cotes gardées
           S.genDef = GEN_DEF();
           S.cfg.L = Math.max(S.cfg.L, 230);
           genApply(true);
