@@ -164,6 +164,10 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-19 — JK : simulation 3D, les montées en biais des coins vifs se revoient (affichage seulement)
+ [FIX] Depuis JG la pointe monte au coin puis repart directement sur l'autre mur (plus d'aller-retour exact) -> la 3D ne
+   les reconnaissait plus. Maintenant : montée puis descente avec un virage > 60° = coin vif -> trait violet + boule.
+
 -- 2026-10-18 — JJ : fin de l'incrustation = la page ♀ | ♂ (affichage seulement)
  [UI] Mode incrustation : la page « Les 4 G-codes » (colonne ♀ à gauche, ♂ à droite) redevient la dernière étape.
    La page « Récapitulatif » en liste n'est plus dans le parcours incrustation (CNC normal : inchangé).
@@ -2317,7 +2321,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-18-JJ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-19-JK ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -28590,23 +28594,35 @@ ILV.headFor=function(){ const T=window.THREE; if(ILV.heads) return; const P=inla
   const c2=col.clone(); c2.position.z=11; f.add(c2);
   ILV.heads={v,f}; ILV.scene.add(v); ILV.scene.add(f); v.visible=f.visible=false; };
 ILV.pathsFor=function(S){ const T=window.THREE; if(S.paths) return;
-  // coin vif = aller-retour en biais (G1 X Y Z puis le même à l'envers), comme Aspire
-  const isC=new Uint8Array(S.mv.length); const near=(a,b)=>Math.abs(a)<1e-3&&Math.abs(b)<1e-3;
-  for(let i=0;i+1<S.mv.length;i++){ const a=S.mv[i], b=S.mv[i+1]; if(a.g!==1||b.g!==1) continue; const dxy=Math.abs(a.x1-a.x0)+Math.abs(a.y1-a.y0), dz=Math.abs(a.z1-a.z0);
-    if(dxy>1e-6 && dz>0.05 && near(b.x1-a.x0,b.y1-a.y0) && near(b.x0-a.x1,b.y0-a.y1) && Math.abs(b.z1-a.z0)<1e-3){ isC[i]=isC[i+1]=1; } }
+  // coin vif = la pointe monte en biais vers le coin puis redescend (JK : aussi quand elle repart sur l'autre mur, plus seulement l'aller-retour exact)
+  // on cherche chaque « pic » : la pointe monte (avec éventuellement de tout petits pas à plat), puis redescend, en changeant de direction (> 60°)
+  const isC=new Uint8Array(S.mv.length); const cpairs=[]; const mv=S.mv, n=mv.length;
+  const dz=m=>m.z1-m.z0, len=m=>Math.hypot(m.x1-m.x0,m.y1-m.y0), flat=m=>Math.abs(dz(m))<=1e-4&&len(m)<0.3;
+  const steep=m=>Math.abs(dz(m))>=1.0*Math.max(len(m),1e-6);   // un vrai coin : la pointe monte/descend plus vite qu'elle n'avance (pas les petites bosses au milieu d'une lettre fine)
+  for(let i=0;i<n;i++){ if(mv[i].g!==1 || dz(mv[i])<=0.02) continue;
+    let j=i; while(j+1<n && mv[j+1].g===1 && (dz(mv[j+1])>1e-4 || flat(mv[j+1]))) j++;
+    let k=j+1; if(k>=n || mv[k].g!==1 || dz(mv[k])>=-1e-4) continue;
+    while(k+1<n && mv[k+1].g===1 && (dz(mv[k+1])<-1e-4 || flat(mv[k+1]))) k++;
+    while(k>j+1 && dz(mv[k])>=-1e-4) k--;
+    const P0=mv[i], Pk=mv[j], P2=mv[k]; const rise=Pk.z1-P0.z0, fall=Pk.z1-P2.z1;
+    const ux=Pk.x1-P0.x0, uy=Pk.y1-P0.y0, vx=P2.x1-Pk.x1, vy=P2.y1-Pk.y1, lu=Math.hypot(ux,uy), lv=Math.hypot(vx,vy);
+    let lr=j; while(lr>i && flat(mv[lr])) lr--;
+    if(rise>0.05 && fall>0.05 && (steep(mv[lr])||steep(mv[j+1])) && lu>1e-3 && lv>1e-3 && (ux*vx+uy*vy) < 0.5*lu*lv){
+      for(let q=i;q<=j;q++) isC[q]=1; for(let q=j+1;q<=k;q++){ if(flat(mv[q]) || -dz(mv[q])>=0.5*len(mv[q])) isC[q]=1; else break; }   // violet = seulement la partie raide (pas le mur qui suit)
+      cpairs.push(j); i=k; } }
   const idxOf=new Map(S.mv.map((m,i)=>[m,i]));
   const cat=m=>{ if(m.g===0) return 'rapid'; if(isC[idxOf.get(m)]) return 'corner'; const dxy=Math.abs(m.x1-m.x0)+Math.abs(m.y1-m.y0);
     if(dxy<1e-6 && m.z1<m.z0) return 'plunge'; return 'cut'; };
   const col={rapid:0x3b82f6, cut:0x22c55e, plunge:0xef4444, corner:0xe040fb}; S.paths={}; S.pcnt={};
-  S.ncorner=0; for(const m of S.mv) if(cat(m)==='corner') S.ncorner++; S.ncorner=Math.round(S.ncorner/2);   // aller + retour = 1 coin
+  S.ncorner=cpairs.length;   // montée + descente = 1 coin
   for(const k of ['rapid','cut','plunge','corner']){ const pc=[]; const cnt=new Int32Array(S.mv.length+1); let n=0;
     S.mv.forEach((m,i)=>{ if(cat(m)===k){ pc.push(m.x0,m.y0,m.z0,m.x1,m.y1,m.z1); n++; } cnt[i+1]=n; });
     const g=new T.BufferGeometry(); g.setAttribute('position',new T.Float32BufferAttribute(pc,3)); g.setDrawRange(0,0);
     const L=new T.LineSegments(g,new T.LineBasicMaterial({color:col[k],transparent:true,opacity:k==='rapid'?0.6:(k==='corner'?1:0.85),depthTest:k!=='corner'})); if(k==='corner') L.renderOrder=10; L.visible=false; ILV.scene.add(L); S.paths[k]=L; S.pcnt[k]=cnt; }
   // petites boules violettes au bout de chaque coin vif (sur le mâle le mouvement est minuscule : 0,1 mm)
   S.cmarks=[]; const sg=new T.SphereGeometry(0.22,12,8), sm=new T.MeshBasicMaterial({color:0xe040fb,depthTest:false,transparent:true,opacity:0.95});
-  for(let i=0;i+1<S.mv.length;i++){ if(isC[i]&&isC[i+1]&&(i===0||!isC[i-1]||(S.cmarks.length&&S.cmarks[S.cmarks.length-1].userData.i===i-2))){ const m=S.mv[i]; const top=m.z1>m.z0?[m.x1,m.y1,m.z1]:[m.x0,m.y0,m.z0];
-      const b=new T.Mesh(sg,sm); b.position.set(top[0],top[1],top[2]); b.renderOrder=11; b.visible=false; b.userData.i=i; ILV.scene.add(b); S.cmarks.push(b); i++; } } };
+  for(const i of cpairs){ const m=S.mv[i]; const top=[m.x1,m.y1,m.z1];
+    const b=new T.Mesh(sg,sm); b.position.set(top[0],top[1],top[2]); b.renderOrder=11; b.visible=false; b.userData.i=i; ILV.scene.add(b); S.cmarks.push(b); } };
 ILV.pathsShow=function(S,on){ if(!S||!S.paths) return; for(const k in S.paths) S.paths[k].visible=on&&ILV.show[k]; S._mon=on&&ILV.show.corner; S._pi=-1; if(S.cmarks) for(const b of S.cmarks) b.visible=false; };
 ILV.pathsUpdate=function(S){ if(!S||!S.paths) return; const i=Math.min(S.idx+(S.sub>0?1:0), S.mv.length); if(S._pi===i) return; S._pi=i; for(const k in S.paths) S.paths[k].geometry.setDrawRange(0,2*S.pcnt[k][i]); if(S.cmarks) for(const b of S.cmarks) b.visible=!!S._mon && b.userData.i<i; };
 ILV.frame=function(){ ILV.resize(); const S=ILV.side; if(!S||ILV.tab==='fit'){ return; }
