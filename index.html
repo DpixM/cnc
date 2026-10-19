@@ -8981,9 +8981,10 @@ function cip_build() {
     ].forEach(([a, b, k]) => {
       const e = $(a);
       if (!e || !$(b)) return;
-      const f = () => {
+      const f = ev => {
         $(b)[k] = e[k];
         if (k === 'checked') S.wz.dry = e.checked;
+        if (ev && ev.isTrusted) dlStale(); // nom / techno / à vide changé : l'ancien fichier n'est plus le bon
       };
       e.addEventListener('input', f);
       e.addEventListener('change', f);
@@ -9078,6 +9079,7 @@ function cip_build() {
     } else {
       S.lastLST = r;
       S.lastGen = r;
+      S.genSig = dlSig();
       S.wz.msg = '';
       S.dlMsg =
         `<span class="cipOk">${r.file} prêt.</span> ` +
@@ -9097,6 +9099,32 @@ function cip_build() {
       }
     S.dlDone = '';
     dlRender();
+  }
+  // Nom / techno / test à vide modifié après la génération : on retire l'ancien fichier (sinon on téléchargerait l'ancien nom)
+  function dlSig() {
+    const v = id => {
+      const e = $(id);
+      return e ? (e.type === 'checkbox' ? e.checked : e.value) : '';
+    };
+    return ['cipLName', 'cipLTW', 'cipLDry', 'cipMtName', 'cipMtTech', 'cipMtDry'].map(v).join('|');
+  }
+  function dlStale() {
+    if (!S.lastGen && !S.lastLST) return;
+    if (dlSig() === S.genSig) return; // rien n'a vraiment changé (ex : champ qui perd le focus)
+    S.lastGen = null;
+    S.lastLST = null;
+    S.dlDone = '';
+    S.dlMsg = '';
+    const box = $('cipDlBox');
+    if (box) {
+      box.style.display = '';
+      box.innerHTML =
+        '<h3>⬇ Télécharger le programme</h3><div class="cipStat"><span class="cipWarn">Nom ou réglage du fichier changé : clique « ▶ Générer et simuler » pour refaire le .LST avec le nouveau nom.</span></div>';
+    }
+    ['cipLBtns', 'cipLTxt'].forEach(id => {
+      const e = $(id);
+      if (e) e.style.display = 'none';
+    });
   }
   // ---------- APRÈS la simulation : le gros bouton pour télécharger le .LST ----------
   function dlRender() {
@@ -9156,7 +9184,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v54',
+  const CIP_VER = 'CIP v55',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -13166,12 +13194,16 @@ function cip_build() {
         'Y et Z',
         o.trafo === 'BA1' ? 'Y et Z' : 'X et Y'
       );
-    if (!$('cipLName').value && S.part && S.part.name)
-      $('cipLName').value = S.part.name
+    if (S.part && S.part.name) {
+      const an = S.part.name
         .replace(/\.[^.]*$/, '')
         .toUpperCase()
         .replace(/[^A-Z0-9_-]+/g, '-')
         .replace(/^-+|-+$/g, '');
+      // nom vide ou encore le nom auto de la pièce d'avant -> nom de la nouvelle pièce
+      if (!$('cipLName').value || $('cipLName').value === S._autoName) $('cipLName').value = an;
+      S._autoName = an;
+    }
   }
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
   // §25. BULLES D'AIDE
@@ -13296,11 +13328,12 @@ function cip_build() {
     '#cipWzX':
       "Pose la pointe pile sur le point jaune de la pièce, puis tape ici la valeur X affichée par la machine, avec son signe (ex : -125.40).\nC'est l'origine du programme.",
     '#cipWzName':
-      "Nom du programme sur la machine (lettres, chiffres, tirets). Le fichier s'appellera P + ce nom + .LST.",
+      "Nom du programme sur la machine (lettres, chiffres, tirets). Le fichier s'appellera ce nom + .LST (+ « -VIDE » en test à vide).",
     '#cipWzTech': 'Nom de ta table techno soudure (WTT), exactement comme dans TC_WELD_ON (ex : TUBECOUDE-DORE).',
     '#cipWzDry':
       "Test à vide : le laser ne s'allume jamais (allumage en commentaire), fichier « -VIDE ».\nEn découpe, toute la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint).\nToujours passer à vide avant le vrai !",
-    '#cipWz [onclick*="cip_ui(\'wzgen\')"]': 'Créer le .LST et le télécharger. Mets-le ensuite sur la machine.',
+    '#cipWz [onclick*="cip_ui(\'wzgen\')"]':
+      'Créer le .LST et le simuler. Le bouton Télécharger apparaît sous la simulation.',
     '#cipWz [onclick*="cip_ui(\'wzback\'"]': "Revenir à l'étape d'avant.",
     '#cipNavBtn': "Passer à l'étape suivante.",
     "[onclick*=\"cip_ui('gostep','sim')\"]":
@@ -13913,7 +13946,7 @@ function cip_build() {
   }
   // ---------- VÉRIF FINALE : on rejoue le .LST généré (ce que la machine va vraiment faire), la pièce reste affichée ----------
   function lstVerify() {
-    const L0 = S.lastLST || S.lastGen;
+    const L0 = S.lastGen || S.lastLST;
     if (!L0 || !L0.o) return;
     const r = parseLST(L0.txt);
     if (!r.moves.length) return;
@@ -14242,6 +14275,10 @@ function cip_build() {
   // choix faits à la main : on ne les écrase plus avec les valeurs automatiques
   try {
     $('cipRetMode').addEventListener('change', () => (S.retUser = true));
+    ['cipMtName', 'cipMtTech', 'cipMtDry', 'cipLName', 'cipLTW', 'cipLDry'].forEach(id => {
+      const e = $(id);
+      if (e) ['input', 'change'].forEach(t => e.addEventListener(t, ev => ev.isTrusted && dlStale()));
+    });
     $('cipLFg').addEventListener('input', () => (S.fgUser = $('cipLFg').value !== ''));
   } catch (e) {}
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -14668,6 +14705,8 @@ function cip_build() {
         // pour la simulation finale du fichier : le .LST onglet a son 0 sur la jonction -> on remet la jonction (Yj) du modèle 3D
         if (S.miter && r.o) r.o = Object.assign({}, r.o, { L: S.miter.Yj });
         S.lastGen = r;
+        S.lastLST = null;
+        S.genSig = dlSig();
         $('cipMtMsg2').innerHTML = '';
         S.dlMsg =
           '<span class="cipOk">' +
@@ -14941,6 +14980,8 @@ function cip_build() {
           return;
         }
         S.lastLST = r;
+        S.lastGen = r;
+        S.genSig = dlSig();
         $('cipLTxt').value = r.txt;
         $('cipLTxt').style.display = '';
         {
