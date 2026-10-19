@@ -8258,7 +8258,11 @@ function cip_build() {
       if (s.noCut && !isWeld) return;
       const P0 = s.P.map(XP);
       const N0 = s.NB.map(XV);
-      // ré-échantillonnage à ~0,5 mm
+      // ré-échantillonnage à ~0,5 mm (plus fin sur un petit cercle : au moins 144 points par tour, pour que le
+      // recouvrement et la pente de fin aient assez de points pour faire des CIP, pas des G01)
+      let L0 = 0;
+      for (let i = 1; i <= P0.length; i++) L0 += V.len(V.sub(P0[i % P0.length], P0[i - 1]));
+      const STEP = Math.max(0.05, Math.min(0.5, L0 / 144));
       const P = [],
         NB = [];
       P.push(P0[0]);
@@ -8270,8 +8274,8 @@ function cip_build() {
           b = P0[i % n];
         const L = V.len(V.sub(b, a));
         let t0 = 0;
-        while (acc + L * (1 - t0) >= 0.5 && L > 1e-9) {
-          const t = t0 + (0.5 - acc) / L;
+        while (acc + L * (1 - t0) >= STEP && L > 1e-9) {
+          const t = t0 + (STEP - acc) / L;
           if (t > 1) break;
           P.push(V.add(a, V.mul(V.sub(b, a), t)));
           NB.push(V.nrm(V.add(V.mul(N0[i - 1], 1 - t), V.mul(N0[i % n], t))));
@@ -9152,7 +9156,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v52',
+  const CIP_VER = 'CIP v53',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -12454,8 +12458,11 @@ function cip_build() {
   }
   // découpe d'un contour en blocs CIP / G01 (tolérance 0,01 mm, orientation 0,3°)
   function fitBlocks(Q) {
+    // atol = écart max (°) de B / C1 entre le vrai angle et l'angle que la machine interpole le long d'un bloc.
+    // Soudure : 1° (la tête à ±1° ne change rien au cordon) -> des CIP presque partout ; découpe : 0,3° (biseaux).
     const tol = 0.01,
-      atol = 0.3,
+      weldFit = $('cipProc').value === 'soudure',
+      atol = weldFit ? 1.0 : 0.3,
       blocks = [];
     let i = 0;
     const n = Q.length;
@@ -12497,8 +12504,15 @@ function cip_build() {
       // arc à 3 points : rien d'autre à contrôler -> on vérifie que l'arc ne s'écarte pas des 2 segments
       // de plus que la tolérance (sinon un coin vif deviendrait un mini-arc arrondi)
       if (j - i === 2) {
-        const sag = c => ci.r - Math.sqrt(Math.max(0, ci.r * ci.r - (c * c) / 4));
-        if (sag(V.len(V.sub(pt(m), a))) > tol || sag(V.len(V.sub(pt(j), pt(m)))) > tol) return null;
+        if (weldFit) {
+          // soudure : les points sont SUR le vrai cercle -> l'arc est plus juste que 2 segments ; on refuse seulement un vrai coin
+          const u1 = V.nrm(V.sub(pt(m), a)),
+            u2 = V.nrm(V.sub(pt(j), pt(m)));
+          if (Math.acos(Math.max(-1, Math.min(1, V.dot(u1, u2)))) > 25 * DEG) return null;
+        } else {
+          const sag = c => ci.r - Math.sqrt(Math.max(0, ci.r * ci.r - (c * c) / 4));
+          if (sag(V.len(V.sub(pt(m), a))) > tol || sag(V.len(V.sub(pt(j), pt(m)))) > tol) return null;
+        }
       }
       let prev = 0;
       for (let k = i + 1; k < j; k++) {
