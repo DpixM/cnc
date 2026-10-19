@@ -2585,7 +2585,11 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
         </button>
         <button class="cipCard" id="cipCardGen" onclick="cip_ui('partcreate')">
           <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="10" y="74" width="180" height="28" rx="4" fill="#9aa5ae"/><rect x="10" y="83" width="180" height="10" fill="#7d8890"/><rect x="88" y="16" width="26" height="62" rx="2" fill="#b9c3cb" transform="rotate(20 101 76)"/><rect x="140" y="40" width="10" height="36" fill="#b9c3cb"/><path d="M78 76q22-8 44 0" stroke="#ffb74d" stroke-width="4" fill="none"/><circle cx="40" cy="40" r="16" fill="none" stroke="#f5a623" stroke-width="4"/><path d="M40 28v24M28 40h24" stroke="#f5a623" stroke-width="4"/></svg>
-          <b>🛠 Créer ma pièce</b><span>Un tube + des piquages, ronds, plats ou une bride, en tapant juste les cotes. Ligne de soudure exacte.</span>
+          <b>🛠 Créer ma pièce</b><span>Un tube + des piquages, ronds, plats, une bride ou un plot déporté, en tapant juste les cotes. Ligne de soudure exacte.</span>
+        </button>
+        <button class="cipCard" id="cipCardDep" onclick="cip_ui('partdeport')" data-tip="Un cylindre (ou un tube) avec un petit cylindre posé sur sa face du bout, axe parallèle mais DÉCALÉ du centre. Tu tapes les cotes (Ø, hauteur, déport), le soft fait le CIP : le mandrin tourne, X/Y/Z suivent le cercle décalé. Soudure ou découpe, mandrin à plat ou à 90°.">
+          <svg viewBox="0 0 200 130" aria-hidden="true"><ellipse cx="100" cy="112" rx="58" ry="12" fill="#7d8890"/><rect x="42" y="62" width="116" height="50" fill="#9aa5ae"/><ellipse cx="100" cy="62" rx="58" ry="12" fill="#b9c3cb"/><line x1="100" y1="20" x2="100" y2="124" stroke="#66bb6a" stroke-width="2" stroke-dasharray="5 4"/><rect x="118" y="24" width="22" height="38" fill="#c9d1d8"/><ellipse cx="129" cy="24" rx="11" ry="4" fill="#dde3e8"/><ellipse cx="129" cy="62" rx="11" ry="4" fill="none" stroke="#f5a623" stroke-width="3"/><line x1="100" y1="16" x2="129" y2="16" stroke="#f5a623" stroke-width="2"/></svg>
+          <b>⊙ Pièce déportée</b><span>Un cylindre + un plot posé sur sa face, décalé du centre. Tu tapes les cotes, le CIP se fait tout seul.</span>
         </button>
         <button class="cipCard" id="cipCardMiter" onclick="cip_ui('mtbuild')" data-tip="Deux tubes coupés en biais mis bout à bout (coude). La pièce est tenue dans un montage, centrée sur l'axe du mandrin. Programme en CIP (TRAORI), B fixe.">
           <svg viewBox="0 0 200 130" aria-hidden="true"><path d="M30 95 L95 40 L170 95" fill="none" stroke="#9aa5ae" stroke-width="26" stroke-linejoin="miter"/><path d="M95 26 L95 56" stroke="#4fc3f7" stroke-width="4"/><ellipse cx="95" cy="40" rx="8" ry="20" fill="none" stroke="#f5a623" stroke-width="3"/></svg>
@@ -9114,7 +9118,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v49',
+  const CIP_VER = 'CIP v50',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -14701,6 +14705,19 @@ function cip_build() {
         mtLeave();
         showWork('prep');
         cip_ui('demo');
+        return;
+      } else if (a === 'partdeport') {
+        // raccourci : « Créer ma pièce » déjà réglé pour une pièce déportée (rond plein + plot décalé sur la face du bout)
+        mtLeave();
+        showWork('build');
+        S.genDef = {
+          d: 40,
+          ep: 20,
+          L: 60,
+          bodies: [{ type: 'deport', d: 10, h: 25, exc: 10, rot: 0 }]
+        };
+        genRender();
+        genApply(true);
         return;
       } else if (a === 'partcreate') {
         mtLeave();
