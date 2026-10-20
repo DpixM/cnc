@@ -164,6 +164,29 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-20 — JP : INCRUSTATION — « angle des murs » séparé de l'angle de la fraise + 📘 guide
+ [AJOUT] Réglages V-bit : « ∠ Angle des murs » (coché « = angle de la fraise » par défaut -> G-code IDENTIQUE à avant).
+   Décoché : tu choisis la pente des murs (poche ♀ et bouchon ♂). Si la fraise est plus fine que le mur, la finition
+   descend le long du mur en marches (pas réglable, 0,05 mm par défaut), puis le dernier passage V-carve.
+   Murs plus fermés que la fraise : refusé (alerte rouge + G-code avec message, rien ne bouge).
+   Le moteur : la forme (poche, bouchon, ébauche) suit l'angle des MURS, la simulation de coupe suit la vraie FRAISE.
+ [AJOUT] Schéma : la fraise est dessinée avec SON angle, le mur avec le sien (« mur 40° » / « fraise 20° »).
+ [AJOUT] 📘 Guide de l'incrustation parfaite (réglages + page des 4 G-codes) : angles conseillés, profondeurs,
+   8 règles du joint sans trou, bois, faire un essai.
+ [FIX] Atelier 3D : coins vifs reconnus aussi quand la montée est moins raide (murs plus ouverts).
+
+-- 2026-10-20 — JO : V-bit — correction de JN (merci Seb) : un V plus court que la poche, ça marche
+ [FIX] Le mur est taillé en plusieurs passes (murs tous les ~1,3 mm) : le V n'a PAS besoin d'être aussi haut que la poche.
+   Le seul vrai souci : la poche plus profonde que le V ET une queue aussi large (ou plus) que le haut du V -> la queue
+   frotte en haut du mur. Ajout du « Ø queue » (champ + cote cliquable), alerte rouge seulement dans ce cas ; sinon
+   simple info « OK en plusieurs passes ». Bulles corrigées. Biblio : le Ø de queue est repris / gardé.
+
+-- 2026-10-20 — JN : V-bit — « hauteur coupante » remplacée par le Ø du V (incrustation + atelier outils)
+ [FIX] Ce qui compte n'est pas la « hauteur coupante » mais la HAUTEUR DU V = (Ø − pointe) ÷ 2 ÷ tan(angle/2).
+   Le V doit monter jusqu'à la profondeur max de la poche ; alors la queue ne touche jamais le bois, même plus fine.
+   Réglages incrustation : champ « Ø du V » (cote cliquable sur le dessin), hauteur du V affichée, alerte « V trop
+   petit » avec le Ø minimum conseillé. Atelier outils : plus de cote « coupe » sur les V-bits.
+
 -- 2026-10-20 — JM : TEXTE — le cadre de sélection colle enfin aux lettres (+ JL atelier outils)
  [FIX] Le cadre du texte était faux : mesuré avec la police SANS guillemets -> une police importée avec un espace ou un
    chiffre dans son nom était ignorée (mesurée en 10 px) -> cadre ~10x trop étroit. Et la hauteur = taille × 1,2 fixe.
@@ -2329,8 +2352,32 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 #ilHelp::after{content:'';position:absolute;left:var(--ax,50%);bottom:-8px;transform:translateX(-50%);border:8px solid transparent;border-bottom:0;border-top-color:var(--acc)}
 #ilHelp.below::after{bottom:auto;top:-8px;border-top:0;border-bottom:8px solid var(--acc);border-left-color:transparent;border-right-color:transparent}
 #wzp11 [data-edit]{cursor:pointer}
+.ilp-wall{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;margin-top:8px}
+.ilp-wall .ilp-f{flex:1;min-width:130px}
+.ilp-chk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--txt2);padding:8px 4px;cursor:pointer;white-space:nowrap}
+.ilp-chk input{width:16px;height:16px;accent-color:var(--acc)}
+#inlay_wAngle:disabled{opacity:.55}
+.ilg-btn{margin-left:6px;background:rgba(245,166,35,.12);border:1px solid var(--acc);color:var(--acc);border-radius:8px;padding:4px 10px;font-weight:700;font-size:12.5px;cursor:pointer}
+#ilGuide{position:fixed;inset:0;z-index:9100;display:none;background:rgba(6,8,10,.7);align-items:center;justify-content:center}
+#ilGuide.on{display:flex}
+#ilGuide .ilg-box{width:min(820px,100vw);max-height:min(92dvh,100dvh);background:var(--bg);border:1px solid var(--brd2);border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+#ilGuide .ilg-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surf);border-bottom:1px solid var(--brd)}
+#ilGuide .ilg-hd b{color:var(--acc);font-size:16px}
+#ilGuide .ilg-hd button{background:var(--surf2);border:1px solid var(--brd2);color:var(--txt);border-radius:8px;width:34px;height:34px;cursor:pointer}
+#ilGuide .ilg-body{overflow:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+#ilGuide .ilg-s{background:var(--surf);border:1px solid var(--brd);border-radius:10px;padding:8px 12px}
+#ilGuide .ilg-s summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--txt);list-style:none}
+#ilGuide .ilg-s summary::-webkit-details-marker{display:none}
+#ilGuide .ilg-s summary span{display:inline-block;width:22px}
+#ilGuide .ilg-s div{font-size:13px;line-height:1.5;color:var(--txt);padding-top:6px}
+#ilGuide ul,#ilGuide ol{margin:0;padding-left:20px}
+#ilGuide li{margin:3px 0}
+#ilGuide .ilg-t{border-collapse:collapse;width:100%;font-size:12.5px}
+#ilGuide .ilg-t th,#ilGuide .ilg-t td{border-bottom:1px solid var(--brd);padding:5px 6px;text-align:left;vertical-align:top}
+#ilGuide .ilg-t th{color:var(--txt2);font-size:11px;text-transform:uppercase}
+#ilGuide .ilg-src{font-size:11px;color:var(--txt3);padding:4px 2px}
+@media (max-width:700px){ #ilGuide .ilg-box{border-radius:0;max-height:100dvh;height:100dvh} }
 </style>
-
 </head>
 <body>
 <button id="logBtn" title="Enregistrer mes actions pour Claude" onclick="_logToggle()" style="position:fixed;right:172px;bottom:18px;z-index:100030;background:#374151;color:#fff;border:1px solid #4a5568;border-radius:10px;padding:8px 12px;font:13px sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5)">🐞 Log</button>
@@ -2338,7 +2385,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-20-JM ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-20-JP ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3034,7 +3081,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- PAGE 11 : PARAMÈTRES INLAY -->
 <div class="wz-wrap" id="wzp11">
   <div class="wz-h1">⚙️ Réglages de l'incrustation</div>
-  <div class="wz-sub">Touche un réglage — ou clique directement une cote orange sur les dessins pour la changer. <b>Survole une cote ou touche le <span class="ilh-q" style="cursor:default">?</span> pour savoir à quoi elle sert.</b></div>
+  <div class="wz-sub">Touche un réglage — ou clique directement une cote orange sur les dessins pour la changer. <b>Survole une cote ou touche le <span class="ilh-q" style="cursor:default">?</span> pour savoir à quoi elle sert.</b> <button class="ilg-btn" onclick="ilGuideOpen()">📘 Guide de l'incrustation parfaite</button></div>
   <div class="ilr-recap"></div>
 
   <div class="ilp-grid">
@@ -3089,7 +3136,13 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
         <div class="ilp-row3">
           <label class="ilp-f" data-k="ang"><span class="ilp-l"><b class="ilp-tag">∠</b> Angle</span><span class="ilp-in"><input type="number" id="inlay_vAngle" value="20" min="10" max="90" step="1" inputmode="decimal" oninput="inlayCalcPreview()"><i>°</i></span></label>
           <label class="ilp-f" data-k="tip"><span class="ilp-l">Ø Pointe</span><span class="ilp-in"><input type="number" id="inlay_vTip" value="0" min="0" max="1" step="0.05" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
-          <label class="ilp-f" data-k="cutV"><span class="ilp-l">↕ Hauteur coupante</span><span class="ilp-in"><input type="number" id="inlay_vCutH" value="8" min="1" max="40" step="0.5" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
+          <label class="ilp-f" data-k="cutV"><span class="ilp-l">Ø du V</span><span class="ilp-in"><input type="number" id="inlay_vDia" value="3.175" min="0.5" max="40" step="0.1" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
+          <label class="ilp-f" data-k="shankV"><span class="ilp-l">Ø queue</span><span class="ilp-in"><input type="number" id="inlay_vShank" value="3.175" min="0.5" max="20" step="0.1" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
+        </div>
+        <div class="ilp-wall">
+          <label class="ilp-f" data-k="wang"><span class="ilp-l"><b class="ilp-tag">∠</b> Angle des murs</span><span class="ilp-in"><input type="number" id="inlay_wAngle" value="20" min="5" max="120" step="1" inputmode="decimal" oninput="inlayCalcPreview()"><i>°</i></span></label>
+          <label class="ilp-chk"><input type="checkbox" id="inlay_wLink" checked onchange="ilWallSync(true);inlayCalcPreview()"> = angle de la fraise</label>
+          <label class="ilp-f" data-k="wstep" id="ilWStepF"><span class="ilp-l">Pas des marches</span><span class="ilp-in"><input type="number" id="inlay_wStep" value="0.05" min="0.02" max="0.5" step="0.05" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
         </div>
         <details class="ilp-more"><summary>Vitesses du V-bit</summary>
           <div class="ilp-row3">
@@ -3110,7 +3163,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- PAGE 12 : LES 4 G-CODES (♀ + ♂ sur la même page, IΩ) -->
 <div class="wz-wrap" id="wzp12">
   <div class="wz-h1">📄 Tes 4 fichiers G-code</div>
-  <div class="wz-sub" id="p12sub">2 fichiers pour la planche ♀, 2 pour la planche ♂ — à usiner dans l'ordre 1 → 2, puis 3 → 4</div>
+  <div class="wz-sub" id="p12sub">2 fichiers pour la planche ♀, 2 pour la planche ♂ — à usiner dans l'ordre 1 → 2, puis 3 → 4 <button class="ilg-btn" onclick="ilGuideOpen()">📘 Guide : astuces pour un joint parfait</button></div>
   <div class="ilf-proj"><label for="ilProj">📝 Nom du projet</label><input type="text" id="ilProj" placeholder="ex : plateau étoile" oninput="ilProjSet(this.value)"><span class="ilf-ph">ajouté devant chaque fichier : <b>nom_1_femelle_ebauche.nc</b>…</span></div>
   <div class="ilr-recap"></div>
   <div id="p12st" class="al al-w">⏳ Génération...</div>
@@ -27877,7 +27930,11 @@ function inlayGetParams(){
     vFz:         parseFloat(document.getElementById('inlay_vFz')?.value)||80,
     vSpin:       parseFloat(document.getElementById('inlay_vSpin')?.value)||18000,
     vTip:        Math.max(0,parseFloat(document.getElementById('inlay_vTip')?.value)||0),
-    vCutH:       parseFloat(document.getElementById('inlay_vCutH')?.value)||8,
+    vDia:        Math.max(0.5,parseFloat(document.getElementById('inlay_vDia')?.value)||3.175),   // JN : Ø du V (remplace « hauteur coupante »)
+    vShank:      Math.max(0.5,parseFloat(document.getElementById('inlay_vShank')?.value)||3.175), // JO : Ø de la queue
+    wLink:       document.getElementById('inlay_wLink') ? !!document.getElementById('inlay_wLink').checked : true,   // JP : murs = angle de la fraise
+    wAngle:      parseFloat(document.getElementById('inlay_wAngle')?.value)||0,                       // JP : angle des murs (si pas lié)
+    wStep:       Math.max(0.02,parseFloat(document.getElementById('inlay_wStep')?.value)||0.05),        // JP : pas des marches
     rCutH:       parseFloat(document.getElementById('inlay_rCutH')?.value)||17,
     rDia:        parseFloat(document.getElementById('inlay_rDia')?.value)||3,
     rMaxD:       parseFloat(document.getElementById('inlay_rMaxD')?.value)||1.5,
@@ -27895,18 +27952,21 @@ function inlayCalcPreview(){
   const p = inlayGetParams();
   const el = document.getElementById('inlayParamsPreview');
   if(!el) return;
-  const tanA = Math.tan((p.vAngle/2) * Math.PI/180);
+  const wA = (typeof _IL!=='undefined' && _IL.wallAngle) ? _IL.wallAngle(p) : p.vAngle;   // JP : angle des murs
+  const tanA = Math.tan((wA/2) * Math.PI/180);
   const Ds = Math.max(0, p.pocketDepth - p.glueGap);
   const Dm = Ds + p.surfaceGap;
   el.innerHTML = [
-    `♀ Femelle : poche ${p.pocketDepth} mm, murs en V ${p.vAngle}°`,
+    `♀ Femelle : poche ${p.pocketDepth} mm, murs en V ${wA}°`+(wA!==p.vAngle?` (fraise ${p.vAngle}°, marches de ${p.wStep} mm)`:''),
+    ...(wA < p.vAngle-0.01 ? [`<span style="color:var(--red)">❌ Murs ${wA}° plus fermés que la fraise ${p.vAngle}° : impossible, le flanc de la fraise mordrait dans le mur. Ouvre les murs ou prends une fraise plus fine.</span>`] : []),
     `♂ Mâle    : le V démarre à ${Ds.toFixed(2)} mm (= ${p.pocketDepth} − ${p.glueGap})`,
     `            dégagé à plat à ${Dm.toFixed(2)} mm, dessin en MIROIR`,
     `Bouchon enfoncé : ${p.glueGap} mm de colle au fond, ${p.surfaceGap} mm entre planches`,
     `Traits plus fins que ${(2*p.pocketDepth*tanA).toFixed(2)} mm : le V n'atteint pas le fond (normal)`,
     `Fraise Ø${p.rDia} : passe dans les zones > ${(p.rDia+2*p.pocketDepth*tanA).toFixed(1)} mm, le V-bit fait le reste`,
     ...(p.rCutH<Math.max(p.pocketDepth,Dm)?[`<span style="color:var(--red)">⚠️ Fraise trop courte : ${p.rCutH} mm de coupe pour ${Math.max(p.pocketDepth,Dm).toFixed(2)} mm de profondeur</span>`]:[]),
-    ...(p.vCutH<Math.max(p.pocketDepth,Dm)?[`<span style="color:var(--red)">⚠️ V-bit trop court : ${p.vCutH} mm de cône pour ${Math.max(p.pocketDepth,Dm).toFixed(2)} mm de profondeur</span>`]:[]),
+    ...((typeof ilShankRub==='function' && ilShankRub(p))?[`<span style="color:var(--red)">⚠️ La poche (${Math.max(p.pocketDepth,Dm).toFixed(2)} mm) est plus profonde que le V (${ilVLen(p).toFixed(1)} mm) et la queue (Ø${p.vShank}) est aussi large que le haut du V (Ø${p.vDia}) : la queue va frotter en haut du mur. Il faut une queue plus fine que le haut du V.</span>`]
+      :((typeof ilVLen==='function' && ilVLen(p)<Math.max(p.pocketDepth,Dm)-1e-6)?[`V de ${ilVLen(p).toFixed(1)} mm pour ${Math.max(p.pocketDepth,Dm).toFixed(2)} mm de poche : OK, le mur est taillé en plusieurs passes et la queue (Ø${p.vShank}) passe dans le vide`]:[])),
   ].join('<br>');
   if (typeof ilSchemaDraw==='function') ilSchemaDraw();
 }
@@ -28144,8 +28204,11 @@ _IL.emitPaths = function(Wr, F, paths, zOf, cminLink, closed){
 };
 
 // --- construction du champ u pour femelle / mâle ---
+// JP : angle des MURS (géométrie de la poche et du bouchon) séparé de l'angle de la FRAISE (forme de l'outil).
+//      mur = fraise -> exactement comme avant ; mur plus ouvert que la fraise -> murs taillés en petites marches.
+_IL.wallAngle = function(p){ const w=+p.wAngle; return (w>0 && !p.wLink) ? w : p.vAngle; };
 _IL.field = function(objects, p, male){
-  const tanA=Math.tan((p.vAngle/2)*Math.PI/180);
+  const tanA=Math.tan((_IL.wallAngle(p)/2)*Math.PI/180), tanB=Math.tan((p.vAngle/2)*Math.PI/180);
   const Ds=Math.max(0.1,p.pocketDepth-p.glueGap), Dm=Ds+Math.max(0,p.surfaceGap);
   const mMargin = Math.max(p.maleMargin||6, p.rDia+1, Dm*tanA+p.rDia+1);
   const margin = male ? mMargin : 0;
@@ -28166,7 +28229,7 @@ _IL.field = function(objects, p, male){
       const box=Math.min(x-bx0, bx1-x, y-by0, by1-y); const k=j*W+i; u[k]=Math.min(Ds*tanA+e[k], box); if(box<Ds*tanA+e[k]){ if(!boxm) boxm=new Uint8Array(W*H); boxm[k]=1; } if(u[k]>umax) umax=u[k]; } }
   }
   const box = male ? [G.bx0-margin, G.bx1+margin, G.by0-margin, G.by1+margin] : null;
-  return {u,W,H,SC,X0:G.X0,Y0:G.Y0,umax,tanA,Ds,Dm,Dmax: male?Dm:p.pocketDepth, male, margin, box, boxm, xc:(G.bx0+G.bx1)/2};
+  return {u,W,H,SC,X0:G.X0,Y0:G.Y0,umax,tanA,tanB,Ds,Dm,Dmax: male?Dm:p.pocketDepth, male, margin, box, boxm, xc:(G.bx0+G.bx1)/2};
 };
 
 // --- ÉBAUCHE fraise plate ---
@@ -28359,7 +28422,9 @@ _IL.corners = function(F, wTip){
 
 // --- FINITION V-bit : murs par niveaux + « reprise » partout où il reste du bois ---
 _IL.finish = function(F, p, Wr, roughUsed){
-  const t=F.tanA, Dmax=F.Dmax, nV=Math.max(1,Math.ceil(Dmax/1.3-1e-9)), R=p.rDia/2; const u0f=F.male?F.Ds*F.tanA:0;
+  const t=F.tanA, tb=Math.min(t, F.tanB||t), stepped=tb<t*0.999, wStep=Math.max(0.02, Math.min(1, +p.wStep||0.05));
+  // JP : t = pente des MURS (forme voulue), tb = pente de la FRAISE. Si la fraise est plus fine : marches de wStep sur les murs.
+  const Dmax=F.Dmax, nV=Math.max(1,Math.ceil(Dmax/(stepped?wStep:1.3)-1e-9)), R=p.rDia/2; const u0f=F.male?F.Ds*F.tanA:0;
   // pointe plate du V-bit (Ø w) : on vise la pointe « virtuelle » du cône -> on remonte de w/2/tanA
   const wTip=Math.max(0,+p.vTip||0), tipOff=(wTip/2)/t;
   const zcmd=(c)=>-Math.min(Dmax, Math.max(0, c/t-tipOff));
@@ -28373,9 +28438,9 @@ _IL.finish = function(F, p, Wr, roughUsed){
     for(let j=1;j<=n;j++){ const z=j*dz, base=z*t+R+0.03; if(base>F.umax) break;
       const inC=new Uint8Array(N); for(let k=0;k<N;k++) if(u[k]>=base) inC[k]=1;
       const d2=_IL.edt(inC,W,H,1); const r2=(R*SC-0.3)**2; for(let k=0;k<N;k++) if(d2[k]<=r2 && h[k]<z) h[k]=z; } }
-  const stamp=(x,y,D)=>{ if(D<=0) return; const rp=(D*t+wTip/2)*SC, ci=(x-X0)*SC-0.5, cj=(y-Y0)*SC-0.5, w2=wTip/2*SC;
+  const stamp=(x,y,D)=>{ if(D<=0) return; const rp=(D*tb+wTip/2)*SC, ci=(x-X0)*SC-0.5, cj=(y-Y0)*SC-0.5, w2=wTip/2*SC;   // la VRAIE fraise (pente tb)
     const i0=Math.max(0,Math.floor(ci-rp)), i1=Math.min(W-1,Math.ceil(ci+rp)), j0=Math.max(0,Math.floor(cj-rp)), j1=Math.min(H-1,Math.ceil(cj+rp));
-    const k1=1/(t*SC);
+    const k1=1/(tb*SC);
     for(let j=j0;j<=j1;j++){ const dy=j-cj; for(let i=i0;i<=i1;i++){ const dx=i-ci; const v=D-Math.max(0,Math.sqrt(dx*dx+dy*dy)-w2)*k1; const k=j*W+i; if(v>h[k]) h[k]=v; } } };
   const stampPath=(pth,zOf)=>{ for(let s=1;s<pth.length;s++){ const a=pth[s-1], b=pth[s]; const n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])*SC*1.5));
     for(let q=0;q<=n;q++){ const x=a[0]+(b[0]-a[0])*q/n, y=a[1]+(b[1]-a[1])*q/n; stamp(x,y,-zOf([x,y])); } } };
@@ -28387,11 +28452,11 @@ _IL.finish = function(F, p, Wr, roughUsed){
     const z=k*Dmax/nV, c=z*t; if(c>F.umax) break;
     let loops=_IL.contours(u,W,H,c,X0,Y0,SC).map(l=>_IL.simplifyLoop(l,0.01));
     if (trace && k===nV) loops=loops.filter(isBoxLoop);   // le tour du fond le long du dessin = le dernier passage V-carve (plus bas)
-    if (loops.length) Wr.out.push(`; --- mur  Z=-${z.toFixed(3)}${trace&&k===nV?' (cadre seulement)':''}`);
+    if (loops.length && (!stepped || k===1 || k===nV || k%10===0)) Wr.out.push(`; --- mur  Z=-${z.toFixed(3)}${stepped?` (marches de ${wStep} mm : mur ${_IL.wallAngle(p)}°, fraise ${p.vAngle}°)`:''}${trace&&k===nV?' (cadre seulement)':''}`);
     Wr.retract(); _IL.emitPaths(Wr,F,loops,()=>zcmd(c),()=>c,true); nb+=loops.length;
     for(const l of loops) stampPath(l,()=>zcmd(c));
     if (k===nV){ // pied du mur : 2 tours de plus au fond (raccord avec la fraise plate)
-      const sfw=Math.max(0.02, 2*t*Math.min(0.15, 0.5*Math.max(0.1,p.glueGap)));
+      const sfw=Math.max(0.02, 2*tb*Math.min(0.15, 0.5*Math.max(0.1,p.glueGap)));
       for (let j=1;j<=2;j++){ const c2=c+wTip/2+j*sfw; if(c2>F.umax) break; const l2=_IL.contours(u,W,H,c2,X0,Y0,SC).map(l=>_IL.simplifyLoop(l,0.01));
         _IL.emitPaths(Wr,F,l2,()=>zcmd(c2),()=>c,true); nb+=l2.length; for(const l of l2) stampPath(l,()=>zcmd(c2)); } }
   }
@@ -28412,9 +28477,9 @@ _IL.finish = function(F, p, Wr, roughUsed){
   // ce qui compte vraiment : ♀ assez creusé pour le bouchon (fond du bouchon = A − jeu de colle, + 0,1 de marge) ;
   // ♂ assez dégagé autour pour que la planche ne touche pas la ♀ (Ds + 0,15). Plus bas que ça : on laisse brut.
   const Dneed = F.male ? Math.min(Dmax, F.Ds+0.15) : Math.min(Dmax, Dmax-Math.max(0,p.glueGap)+0.1);
-  const hAllow=F.male ? Math.max(0.15, Math.min(0.3, Math.max(0,p.surfaceGap)-0.2)) : Math.min(0.2, Math.max(0.05, p.glueGap-0.1)); const sf=Math.max(0.02, 2*t*hAllow);   // ♀ bosses du fond < jeu de colle ; ♂ < jeu entre planches
+  const hAllow=F.male ? Math.max(0.15, Math.min(0.3, Math.max(0,p.surfaceGap)-0.2)) : Math.min(0.2, Math.max(0.05, p.glueGap-0.1)); const sf=Math.max(0.02, 2*tb*hAllow);   // ♀ bosses du fond < jeu de colle ; ♂ < jeu entre planches
   for (let it=0; it<2; it++){
-    let tol=it===0?0.1:0.08; const delta=Math.max(0.004,Math.min(0.04,Math.max(0.01,0.1*t))/(it===0?1:3));
+    let tol=it===0?0.1:0.08; const delta=Math.max(0.004,Math.min(0.04,Math.max(0.01,0.1*t))/(it===0?1:3)*(tb/t));
     const left=new Uint8Array(N); let nl=0, lo=Infinity, hi=-Infinity, bi0=W, bj0=H, bi1=0, bj1=0;
     for(let k=0;k<N;k++) if(ideal[k]>=0.2 && (trace ? Math.min(ideal[k],Dneed)-h[k]>0.08 : ideal[k]-h[k]>(u[k]>=cN-1e-6?hAllow:tol)) && (u[k]>=cN-1e-6 || (!trace && narrow(k))) && !(F.boxm&&F.boxm[k])){ /* ♂ : le cadre autour sera scié */ left[k]=1; nl++; if(u[k]<lo) lo=u[k]; if(u[k]>hi) hi=u[k]; const i=k%W, j=(k-i)/W; if(i<bi0)bi0=i; if(i>bi1)bi1=i; if(j<bj0)bj0=j; if(j>bj1)bj1=j; }
     if (!nl) break;
@@ -28513,14 +28578,15 @@ _IL.gen = function(objects, p, date, male, rough){
   const P=Object.assign({}, p);
   if (P.maleMargin==null) P.maleMargin=6;
   const F=_IL.field(objects, P, male); if(F) F.objs=objects; const org=getOriginMm();
-  const tanA=Math.tan((P.vAngle/2)*Math.PI/180);
+  const wA=_IL.wallAngle(P), tanA=Math.tan((wA/2)*Math.PI/180);
   const Ds=Math.max(0.1,P.pocketDepth-P.glueGap), Dm=Ds+Math.max(0,P.surfaceGap);
+  if (!rough && wA < P.vAngle-0.01) return _IL.head('INLAY '+(male?'♂ MÂLE':'♀ FEMELLE')+' FINITION', P, [`❌ IMPOSSIBLE : murs ${wA}° plus fermés que la fraise ${P.vAngle}°`, 'le flanc de la fraise mordrait dans le mur : prends des murs au moins aussi ouverts que la fraise']).concat(['M30']).join('\n')+'\n';
   const name = (male?'♂ MÂLE':'♀ FEMELLE')+' '+(rough?'ÉBAUCHE (fraise plate Ø'+P.rDia+')':'FINITION (V-bit '+P.vAngle+'°)');
   const info = male
     ? [`profondeur départ V (start depth) = ${Ds.toFixed(2)} mm = poche ${P.pocketDepth} − jeu colle ${P.glueGap}`,
        `dégagement à plat = ${Dm.toFixed(2)} mm (jeu entre planches ${P.surfaceGap}), marge autour = ${(F?F.margin:0).toFixed(1)} mm`,
        `DESSIN EN MIROIR : retourner la planche gauche↔droite pour coller`, `axe miroir X=${F?(F.xc-org.x).toFixed(3):'0'}`]
-    : [`poche ${P.pocketDepth} mm, murs en V ${P.vAngle}°`];
+    : [`poche ${P.pocketDepth} mm, murs en V ${wA}°`+(wA!==P.vAngle?` (fraise ${P.vAngle}° plus fine : murs en marches de ${P.wStep||0.05} mm)`:'')];
   if (!rough && +P.vTip>0) info.push(`pointe plate Ø${P.vTip} compensée (+${((P.vTip/2)/tanA).toFixed(3)} mm)`);
   if (typeof ilWood==='function') info.push('bois : '+ilWood(male?'male':'female').name);
   const lines=[...info, `${date}`];
@@ -28688,12 +28754,20 @@ const _IL_MSG={
   feed:'<b>Avance</b> : vitesse de déplacement pendant la coupe.', plunge:'<b>Plongée</b> : vitesse quand l\'outil descend dans le bois.',
   tip:'<b>Pointe du V-bit</b> : beaucoup de V-bits « 20° 0,1 mm » ont un petit plat au bout. Mets sa largeur : le G-code compense pour que les murs tombent juste.',
   cutR:'<b>Hauteur coupante de la fraise</b> : la longueur des goujures. Elle doit dépasser la profondeur la plus forte (poche ♀ ou dégagement ♂), sinon le corps frotte.',
-  cutV:'<b>Hauteur coupante du V-bit</b> : la hauteur du cône qui coupe. Si elle est plus courte que la profondeur, le V ne peut pas faire tout le mur.',
+  cutV:'<b>Ø du V-bit</b> : le diamètre en haut de la partie en V. Avec l\'angle il donne la hauteur du V. Le mur est taillé en plusieurs passes, donc un V plus court que la poche marche très bien… tant que la queue est plus fine que le haut du V.',
+  shankV:'<b>Ø de la queue</b> : si la poche est plus profonde que le V, la queue descend dans la poche. Plus fine que le haut du V = elle passe dans le vide. Aussi large (ou plus) = elle frotte en haut du mur.',
+  wang:'<b>Angle des murs</b> : la pente des murs de la poche et du bouchon. Par défaut = l\'angle de la fraise (mur lisse d\'un coup). Plus ouvert que la fraise : la fraise taille le mur en petites marches.',
+  wstep:'<b>Pas des marches</b> : la hauteur de chaque marche quand la fraise est plus fine que le mur. 0,1 mm = marches de quelques centièmes, la colle comble.',
   rpm:'<b>Broche</b> : vitesse de rotation de l\'outil.', safe:'<b>Z sécurité</b> : hauteur pour les grands déplacements (les petits sauts se font à 1 mm).'
 };
+// JP : « angle des murs » lié ou non à l'angle de la fraise
+function ilWallSync(fromToggle){ const lk=document.getElementById('inlay_wLink'), wa=document.getElementById('inlay_wAngle'), va=document.getElementById('inlay_vAngle'), st=document.getElementById('ilWStepF'); if(!lk||!wa||!va) return;
+  if(lk.checked){ wa.value=va.value; wa.disabled=true; } else { wa.disabled=false; if(fromToggle && +wa.value<=+va.value) wa.value=Math.min(120,(+va.value||20)+10); }
+  if(st) st.style.display=(!lk.checked && +wa.value!==+va.value)?'':'none'; }
 function ilSchemaDraw(){
   const box=document.getElementById('ilSchema'); if(!box) return;
-  const p=inlayGetParams(); const t=Math.tan((p.vAngle/2)*Math.PI/180);
+  ilWallSync();
+  const p=inlayGetParams(); const wA=_IL.wallAngle(p); const t=Math.tan((wA/2)*Math.PI/180), tb=Math.tan((p.vAngle/2)*Math.PI/180);
   const A=Math.max(0.5,p.pocketDepth), C=Math.max(0,Math.min(A-0.1,p.glueGap)), B=Math.max(0,p.surfaceGap), Ds=A-C, Dm=Ds+B;
   const fW=ilWood('female').color, mW=ilWood('male').color;
   const VW=360, VH=230, k=Math.min(24, 120/(A+B+2.6)), y0=118, cx=190;
@@ -28704,9 +28778,9 @@ function ilSchemaDraw(){
   const yfl=y0-B*k, th=Math.max(14,1.8*k);                        // dessous de la planche ♂ (dégagée à plat)
   const hp=half-Ds*t*k, hf=half+B*t*k;                            // demi-largeurs bouchon : en bas, au niveau de la planche
   const F=_ilFocus, hl=(key)=>F===key?' class="hl"':'';
-  const ang=p.vAngle;
-  // outil V-bit posé contre le mur gauche, pointe au fond
-  const tipx=cx-wb, tipy=yb, vh=Math.min(70,(yb-20)); const vr=vh*t;
+  const ang=p.vAngle, diff=Math.abs(wA-p.vAngle)>0.01;
+  // outil V-bit posé contre le mur gauche, pointe au fond (avec SA pente, qui peut être plus fine que le mur)
+  const tipx=cx-wb, tipy=yb, vh=Math.min(70,(yb-20)); const vr=vh*tb;
   const svg=`<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <pattern id="ilgF" width="40" height="8" patternUnits="userSpaceOnUse"><rect width="40" height="8" fill="${fW}"/><path d="M0 5 Q10 3 20 5 T40 5" stroke="#0003" fill="none"/></pattern>
@@ -28725,11 +28799,12 @@ function ilSchemaDraw(){
   </g>
   <text id="ilsMaleLab" x="36" y="${yfl-th+12}" class="lab" style="fill:${_ilTextOn(mW)}">♂ ${ilWood('male').name} (retourné)</text>
   <!-- V-bit -->
-  ${F==='ang'?`<g id="ilsV" class="hl">
+  ${(F==='ang'||F==='wang'||F==='wstep'||diff)?`<g id="ilsV"${F==='ang'||F==='wang'||F==='wstep'?' class="hl"':''}>
     <path d="M${tipx} ${tipy} L${tipx-vr} ${tipy-vh} L${tipx+vr} ${tipy-vh} Z" fill="#b8c1cc" stroke="#6b7480"/>
     <rect x="${tipx-vr}" y="${tipy-vh-26}" width="${2*vr}" height="26" fill="#8a939e"/>
     <path d="M${tipx-26*Math.sin(ang*Math.PI/360)} ${tipy-26*Math.cos(ang*Math.PI/360)} A26 26 0 0 1 ${tipx+26*Math.sin(ang*Math.PI/360)} ${tipy-26*Math.cos(ang*Math.PI/360)}" class="d"/>
-    <text x="${tipx+vr+6}" y="${tipy-vh+14}" class="dt ed" data-edit="inlay_vAngle">${ang}°</text></g>`:''}
+    <text x="${tipx+vr+6}" y="${tipy-vh+14}" class="dt ed" data-edit="inlay_vAngle">${diff?'fraise ':''}${ang}°</text></g>`:''}
+  ${diff?`<g${hl('wang')}><text x="${(2*cx-half-wb)/2-10}" y="${(y0+yb)/2+4}" text-anchor="end" class="dt ed" data-edit="inlay_wAngle">mur ${wA}°</text></g>`:''}
   ${(F==='dia'||F==='pass')?`<g class="hl"><rect x="${cx-wb+p.rDia/2*k*0+4}" y="${yb-Math.min(A,p.rMaxD)*k}" width="${Math.max(8,p.rDia*k)}" height="${Math.min(A,p.rMaxD)*k}" fill="#8a939e" stroke="#f5a623"/><rect x="${cx-wb+4+Math.max(8,p.rDia*k)/2-3}" y="${y0-40}" width="6" height="${yb-Math.min(A,p.rMaxD)*k-y0+40}" fill="#6b7480"/><text x="${cx-wb+8+Math.max(8,p.rDia*k)}" y="${yb-6}" class="dt">Ø${p.rDia}</text></g>`:''}
   <!-- cotes -->
   <g${hl('A')}><path class="d" d="M${cx+half+18} ${y0} L${cx+half+18} ${yb} M${cx+half+13} ${y0} L${cx+half+23} ${y0} M${cx+half+13} ${yb} L${cx+half+23} ${yb}"/><rect class="edbox" x="${cx+half+22}" y="${(y0+yb)/2-9}" width="46" height="18" data-edit="inlay_pocketDepth"/><text class="dt ed" x="${cx+half+26}" y="${(y0+yb)/2+4}" data-edit="inlay_pocketDepth">A ${A}</text></g>
@@ -28768,6 +28843,9 @@ function _ilInlineEdit(host, el, inputId){
 function _ilEditHost(host){ if(!host||host._ile) return; host._ile=1;
   host.addEventListener('click',e=>{ const el=e.target.closest('[data-edit]'); if(!el) return; e.preventDefault(); const lab=host.querySelector(`text[data-edit="${el.dataset.edit}"]`)||el; _ilInlineEdit(host, lab, el.dataset.edit); }); }
 // dessins des 2 outils, cotes cliquables
+function ilVLen(p){ const t=Math.tan((p.vAngle/2)*Math.PI/180); return Math.max(0,((p.vDia||3.175)-(p.vTip||0))/2/Math.max(1e-6,t)); }   // JN : hauteur du V (de la pointe au Ø du haut)
+function ilShankRub(p){ const L=ilVLen(p); if(!(L < inlayDmax(p)-1e-6)) return false; const tw=Math.tan((_IL.wallAngle(p)/2)*Math.PI/180);   // JP : le mur peut être plus ouvert que la fraise
+  return (p.vShank||3.175)/2 >= (p.vTip||0)/2 + L*tw - 1e-3; }   // JO : la queue descend dans la poche ET elle est aussi large que le haut du V
 function inlayDmax(p){ return Math.max(p.pocketDepth, Math.max(0,p.pocketDepth-p.glueGap)+Math.max(0,p.surfaceGap)); }
 function ilToolsDraw(){
   const p=inlayGetParams(); const t=Math.tan((p.vAngle/2)*Math.PI/180); const steel='#c3cbd5', dark='#8d96a1';
@@ -28780,8 +28858,11 @@ function ilToolsDraw(){
       <path d="M${cx} ${ytip-hC} L${cx} ${ytip+4}" stroke="#6b748088" stroke-dasharray="3 3"/>
       <path class="d" d="M${cx-angR*Math.sin(p.vAngle*Math.PI/360)} ${ytip-angR*Math.cos(p.vAngle*Math.PI/360)} A${angR} ${angR} 0 0 1 ${cx+angR*Math.sin(p.vAngle*Math.PI/360)} ${ytip-angR*Math.cos(p.vAngle*Math.PI/360)}" transform="translate(0 ${-(tipW*k/2)/Math.max(0.05,t)*0})"/>
       <path class="d" d="M${cx-rTop-12} ${ytip-hC} L${cx-rTop-12} ${ytip} M${cx-rTop-17} ${ytip-hC} L${cx-rTop-7} ${ytip-hC} M${cx-rTop-17} ${ytip} L${cx-rTop-7} ${ytip}"/>
-      <rect class="edbox" x="${cx-rTop-74}" y="${ytip-hC/2-12}" width="56" height="20" data-edit="inlay_vCutH"/><text class="dt ed" x="${cx-rTop-68}" y="${ytip-hC/2+3}" data-edit="inlay_vCutH">↕ ${p.vCutH}</text>
-      ${p.vCutH<inlayDmax(p)?`<text x="${cx-rTop-74}" y="${ytip-hC/2+24}" style="fill:#ef5350;font:700 10px sans-serif">trop court !</text>`:''}
+      <path class="d" d="M${cx-rTop} ${ytip-hC-6} L${cx+rTop} ${ytip-hC-6} M${cx-rTop} ${ytip-hC-11} L${cx-rTop} ${ytip-hC-1} M${cx+rTop} ${ytip-hC-11} L${cx+rTop} ${ytip-hC-1}"/>
+      <rect class="edbox" x="${cx+rTop+8}" y="${ytip-hC-18}" width="74" height="20" data-edit="inlay_vDia"/><text class="dt ed" x="${cx+rTop+14}" y="${ytip-hC-3}" data-edit="inlay_vDia">Ø ${p.vDia}</text>
+      <text class="lab" x="${cx-rTop-8}" y="${ytip-hC/2+3}" text-anchor="end">V ${ilVLen(p).toFixed(1)} mm</text>
+      <rect class="edbox" x="${cx-11-96}" y="14" width="88" height="20" data-edit="inlay_vShank"/><text class="dt ed" x="${cx-11-90}" y="29" data-edit="inlay_vShank">queue Ø ${p.vShank}</text>
+      ${ilShankRub(p)?`<text x="${cx-rTop-8}" y="${ytip-hC/2+19}" text-anchor="end" style="fill:#ef5350;font:700 10px sans-serif">la queue frotte !</text>`:''}
       <rect class="edbox" x="${cx+rTop+8}" y="${ytip-hC/2-12}" width="54" height="20" data-edit="inlay_vAngle"/><text class="dt ed" x="${cx+rTop+14}" y="${ytip-hC/2+3}" data-edit="inlay_vAngle">∠ ${p.vAngle}°</text>
       <path class="d" d="M${cx-rTip} ${ytip+10} L${cx+rTip} ${ytip+10} M${cx-rTip} ${ytip+5} L${cx-rTip} ${ytip+15} M${cx+rTip} ${ytip+5} L${cx+rTip} ${ytip+15}"/>
       <rect class="edbox" x="${cx-44}" y="${ytip+18}" width="88" height="20" data-edit="inlay_vTip"/><text class="dt ed" x="${cx-38}" y="${ytip+33}" data-edit="inlay_vTip">pointe Ø ${tipW}</text>
@@ -28815,7 +28896,7 @@ function ilToolsLibInit(){
 }
 function ilToolPick(kind, id, silent){ const t=_ilLibList(kind).find(x=>String(x.id)===String(id)); try{ localStorage.setItem('kerf_ilTool_'+kind, id?String(id):''); }catch(e){}
   if(!t) return; const set=(i,v)=>{ const e=document.getElementById(i); if(e&&v!=null&&v!=='') e.value=v; };
-  if(kind==='v'){ set('inlay_vAngle',t.angle); set('inlay_vTip',t.tipD!=null?t.tipD:0); set('inlay_vCutH',t.cutH); set('inlay_vFxy',t.fxy); set('inlay_vFz',t.fz); set('inlay_vSpin',t.spin); }
+  if(kind==='v'){ set('inlay_vAngle',t.angle); ilWallSync(); set('inlay_vTip',t.tipD!=null?t.tipD:0); set('inlay_vDia',t.dia); set('inlay_vShank',t.shank); set('inlay_vFxy',t.fxy); set('inlay_vFz',t.fz); set('inlay_vSpin',t.spin); }
   else { set('inlay_rDia',t.dia); set('inlay_rMaxD',t.maxD); set('inlay_rCutH',t.cutH); set('inlay_rFxy',t.fxy); set('inlay_rFz',t.fz); set('inlay_rSpin',t.spin); }
   inlayCalcPreview(); }
 function ilToolSave(kind){ const p=inlayGetParams(); const sel=document.getElementById(kind==='v'?'ilLibV':'ilLibR');
@@ -28823,7 +28904,7 @@ function ilToolSave(kind){ const p=inlayGetParams(); const sel=document.getEleme
   const def=curT?curT.name:(kind==='v'?`V-bit ${p.vAngle}° pointe ${p.vTip||0}`:`Fraise plate Ø${p.rDia}`);
   const name=prompt('Nom de l\'outil (garde le même nom pour mettre à jour celui-ci) :', def); if(!name) return;
   let t=_ilLibList(kind).find(x=>x.name===name); if(!t){ t={id:Date.now(), name, type:kind==='v'?'vbit':'flat', flutes:2}; tools.push(t); }
-  if(kind==='v'){ Object.assign(t,{angle:p.vAngle, tipD:p.vTip||0, cutH:p.vCutH, fxy:p.vFxy, fz:p.vFz, spin:p.vSpin}); if(!t.dia) t.dia=3.175; }
+  if(kind==='v'){ Object.assign(t,{angle:p.vAngle, tipD:p.vTip||0, dia:p.vDia||3.175, shank:p.vShank||3.175, fxy:p.vFxy, fz:p.vFz, spin:p.vSpin}); }
   else { Object.assign(t,{dia:p.rDia, maxD:p.rMaxD, cutH:p.rCutH, fxy:p.rFxy, fz:p.rFz, spin:p.rSpin}); }
   try{ saveTools(); }catch(e){} try{ localStorage.setItem('kerf_ilTool_'+kind, String(t.id)); }catch(e){} ilToolsLibInit(); if(typeof toastHist==='function') toastHist('💾 Outil gardé : '+name); }
 
@@ -28837,7 +28918,10 @@ const IL_HELP={
   inlay_rCutH:['↕ Hauteur coupante (fraise plate)','La longueur des dents de la fraise. Elle doit être plus grande que la profondeur la plus forte, sinon le corps lisse frotte et chauffe.','L\'appli te prévient en rouge si elle est trop courte.'],
   inlay_vAngle:['∠ Angle du V-bit','L\'angle complet de la pointe. C\'est LE MÊME V-bit pour la femelle et le mâle, sinon les murs ne collent pas.','20° = murs raides, incrustation fine et profonde. Lis-le sur la fraise ou mesure-le.'],
   inlay_vTip:['Ø Pointe du V-bit','Beaucoup de V-bits ne sont pas vraiment pointus : il y a un petit plat au bout. L\'appli remonte la fraise d\'autant pour que les murs restent justes.','0 = pointe parfaite. Souvent 0,1 à 0,2 mm (c\'est écrit sur la fraise, ex. « 20° 0,1 mm »).'],
-  inlay_vCutH:['↕ Hauteur coupante (V-bit)','La partie du V-bit qui coupe. Elle doit couvrir toute la profondeur de la poche.','Sinon la queue frotte en haut du mur.'],
+  inlay_vDia:['Ø du V-bit','Le diamètre en haut de la partie en V. Avec l\'angle et la pointe, il donne la hauteur du V : (Ø − pointe) ÷ 2 ÷ tan(angle/2).','Le mur est taillé en plusieurs passes : un V plus court que la poche marche très bien, tant que la queue est plus fine que le haut du V.'],
+  inlay_wAngle:['∠ Angle des murs','La pente des murs de la poche et du bouchon (angle total). Décoche « = angle de la fraise » pour la choisir toi-même.','Il doit être au moins aussi ouvert que la fraise. Mur = fraise : mur lisse d\'un coup (le top). Plus ouvert : petites marches, un poil moins parfait.'],
+  inlay_wStep:['Pas des marches','Quand la fraise est plus fine que le mur, elle descend le long du mur par marches de cette hauteur.','0,05 mm (par défaut) = marches de 1 à 2 centièmes, la colle comble. 0,1 = 2 fois plus rapide, un poil moins serré.'],
+  inlay_vShank:['Ø de la queue du V-bit','Seulement utile si la poche est plus profonde que le V : la queue descend alors dans la poche.','Queue plus fine que le haut du V = aucun souci. Aussi large ou plus = elle frotte en haut du mur.'],
   inlay_rFxy:['Avance (fraise plate)','La vitesse quand la fraise avance en coupant.','3018 + Ø3 dans le bois : 600 à 1000 mm/min.'],
   inlay_rFz:['Plongée (fraise plate)','La vitesse quand la fraise descend dans le bois.','Environ le quart de l\'avance.'],
   inlay_rSpin:['Broche (fraise plate)','La vitesse de rotation.','10 000 à 12 000 tr/min.'],
@@ -29023,7 +29107,7 @@ ILV.pathsFor=function(S){ const T=window.THREE; if(S.paths) return;
   // on cherche chaque « pic » : la pointe monte (avec éventuellement de tout petits pas à plat), puis redescend, en changeant de direction (> 60°)
   const isC=new Uint8Array(S.mv.length); const cpairs=[]; const mv=S.mv, n=mv.length;
   const dz=m=>m.z1-m.z0, len=m=>Math.hypot(m.x1-m.x0,m.y1-m.y0), flat=m=>Math.abs(dz(m))<=1e-4&&len(m)<0.3;
-  const steep=m=>Math.abs(dz(m))>=1.0*Math.max(len(m),1e-6);   // un vrai coin : la pointe monte/descend plus vite qu'elle n'avance (pas les petites bosses au milieu d'une lettre fine)
+  const steep=m=>Math.abs(dz(m))>=0.3*Math.max(len(m),1e-6);   // un vrai coin : la pointe monte/descend plus vite qu'elle n'avance (pas les petites bosses au milieu d'une lettre fine)
   for(let i=0;i<n;i++){ if(mv[i].g!==1 || dz(mv[i])<=0.02) continue;
     let j=i; while(j+1<n && mv[j+1].g===1 && (dz(mv[j+1])>1e-4 || flat(mv[j+1]))) j++;
     let k=j+1; if(k>=n || mv[k].g!==1 || dz(mv[k])>=-1e-4) continue;
@@ -29032,7 +29116,7 @@ ILV.pathsFor=function(S){ const T=window.THREE; if(S.paths) return;
     const P0=mv[i], Pk=mv[j], P2=mv[k]; const rise=Pk.z1-P0.z0, fall=Pk.z1-P2.z1;
     const ux=Pk.x1-P0.x0, uy=Pk.y1-P0.y0, vx=P2.x1-Pk.x1, vy=P2.y1-Pk.y1, lu=Math.hypot(ux,uy), lv=Math.hypot(vx,vy);
     let lr=j; while(lr>i && flat(mv[lr])) lr--;
-    if(rise>0.05 && fall>0.05 && (steep(mv[lr])||steep(mv[j+1])) && lu>1e-3 && lv>1e-3 && (ux*vx+uy*vy) < 0.5*lu*lv){
+    if(rise>0.05 && fall>0.05 && (steep(mv[lr])||steep(mv[j+1])||Math.max(rise/Math.max(lu,1e-6), fall/Math.max(lv,1e-6))>=0.3) && lu>1e-3 && lv>1e-3 && (ux*vx+uy*vy) < 0.5*lu*lv){
       for(let q=i;q<=j;q++) isC[q]=1; for(let q=j+1;q<=k;q++){ if(flat(mv[q]) || -dz(mv[q])>=0.5*len(mv[q])) isC[q]=1; else break; }   // violet = seulement la partie raide (pas le mur qui suit)
       cpairs.push(j); i=k; } }
   const idxOf=new Map(S.mv.map((m,i)=>[m,i]));
@@ -29229,6 +29313,44 @@ function ilProjInit(){ const i=document.getElementById('ilProj'); if(i && docume
 // en-tête : « ; Projet : xxx » ajouté juste après la 1re ligne (sans toucher aux mouvements)
 function ilWithProj(gc){ const p=String(ilProjRaw()).trim(); if(!p || !gc) return gc; if(gc.indexOf('; Projet : ')>=0) return gc.replace(/; Projet : .*\n/, '; Projet : '+p+'\n');
   const k=gc.indexOf('\n'); return k<0? gc+'\n; Projet : '+p : gc.slice(0,k+1)+'; Projet : '+p+'\n'+gc.slice(k+1); }
+
+
+
+// ---------- JP : 📘 GUIDE DE L'INCRUSTATION PARFAITE (astuces trouvées sur les forums / tutos) ----------
+const IL_GUIDE=[
+  ['🎯','Le bon angle de fraise',`<table class="ilg-t"><tr><th>Angle</th><th>Pour quoi</th><th>À savoir</th></tr>
+    <tr><td><b>60°</b></td><td>gros motifs, lettres épaisses</td><td>le plus tolérant, grande surface de colle — le plus conseillé pour débuter</td></tr>
+    <tr><td><b>30°</b></td><td>détails fins</td><td>seulement si l'angle est VRAIMENT 30° (les fraises pas chères sont souvent fausses de 1–2°)</td></tr>
+    <tr><td><b>15–20°</b></td><td>détail extrême</td><td>pointe fragile, profondeur totale ~4–5 mm max</td></tr></table>`],
+  ['📐','Les profondeurs qui marchent',`<ul><li>Poche ♀ : <b>5 à 6 mm</b> (0,20–0,25"), quelle que soit l'épaisseur de la planche.</li>
+    <li>Jeu de colle (C) : <b>0,3 à 0,5 mm</b> — le bouchon ne touche pas le fond, la colle a sa place, pas de « son creux ».</li>
+    <li>Jeu entre planches (B) : <b>0,5 à 2,5 mm</b> — c'est le V qui serre, pas les planches. On ponce à ras après.</li>
+    <li>Une règle des tutos : poche : bouchon : colle ≈ 3 : 2 : 1 (à adapter).</li></ul>`],
+  ['∠','Angle des murs ≠ angle de la fraise',`<ul><li>Le mur doit être <b>au moins aussi ouvert</b> que la fraise (une fraise 50° ne peut pas faire un mur 20°).</li>
+    <li><b>Mur = fraise</b> : le flanc taille le mur lisse d'un coup → le meilleur joint.</li>
+    <li><b>Mur plus ouvert</b> (ex. mur 60° avec une fraise 20°) : marches de 0,05 mm (réglable), 1 à 2 centièmes, la colle comble. Pratique si tu n'as pas la fraise « idéale ».</li>
+    <li>Le V n'a pas besoin d'être aussi haut que la poche : le mur est taillé en plusieurs passes, tant que la queue est plus fine que le haut du V.</li></ul>`],
+  ['✅','Les 8 règles du joint sans trou',`<ol><li><b>Mesure ta fraise</b> : angle ET pointe réels (loupe, ou un essai dans une chute). Un angle faux = joint raté.</li>
+    <li><b>La même fraise</b> pour la femelle et le mâle.</li>
+    <li><b>Refais le zéro Z</b> à chaque changement de fraise (X/Y ne bougent pas).</li>
+    <li>Fraise <b>bien serrée, sans faux-rond</b> (pince propre).</li>
+    <li><b>Nettoie les poches</b> (brosse + soufflette) : une miette = un trou au collage.</li>
+    <li><b>Essai à blanc</b> avant la colle : le bouchon doit s'enfoncer et laisser un petit jour entre les planches.</li>
+    <li><b>Colle partout</b> (Titebond II/III, au pinceau silicone), puis <b>presse bien à plat</b> (serre-joints + planche).</li>
+    <li>Après séchage : <b>surfaçage</b> pour enlever le jeu entre planches, puis ponçage.</li></ol>`],
+  ['🪵','Le bois',`<ul><li>Bois durs qui arrachent (noyer, érable) : une passe de nettoyage à la fraise plate avant le V aide.</li>
+    <li>Le bois de bout donne de très belles incrustations.</li>
+    <li>Contraste : bois clair dans foncé (érable / noyer) ou l'inverse.</li></ul>`],
+  ['🧪','Faire un essai',`<ul><li>Fais une petite incrustation qui <b>déborde du bord</b> d'une chute : tu vois le joint en coupe et tu mesures.</li>
+    <li>Trop serré : augmente le jeu de colle. Trop lâche (joint visible) : diminue-le, et vérifie la pointe de la fraise.</li>
+    <li>Note tes réglages qui marchent dans l'atelier outils (notes de la fraise).</li></ul>`],
+];
+function ilGuideOpen(){ let el=document.getElementById('ilGuide'); if(!el){ el=document.createElement('div'); el.id='ilGuide';
+    el.innerHTML=`<div class="ilg-box"><div class="ilg-hd"><b>📘 Le guide de l'incrustation parfaite</b><button onclick="ilGuideClose()">✕</button></div><div class="ilg-body">${IL_GUIDE.map(([i,t,h],k)=>`<details class="ilg-s"${k<4?' open':''}><summary><span>${i}</span> ${t}</summary><div>${h}</div></details>`).join('')}
+      <div class="ilg-src">D'après les tutos et forums Sienci, Vectric, Carbide3D, NC Furniture School… À ajuster selon ta machine et tes fraises.</div></div></div>`;
+    el.addEventListener('click',e=>{ if(e.target===el) ilGuideClose(); }); document.body.appendChild(el); }
+  el.classList.add('on'); }
+function ilGuideClose(){ const el=document.getElementById('ilGuide'); if(el) el.classList.remove('on'); }
 
 function inlaySimAll(){ if(typeof ilvOpen==='function') return ilvOpen('f');
   const combined = [
@@ -33972,7 +34094,7 @@ function tlxGeom(t){
   const ty=t.type||'flat', R=Math.max(0.05,_tlxNum(t.dia,3)/2), Rs=Math.max(0.2,_tlxNum(t.shank,3.175)/2), cutH=Math.max(0.2,_tlxNum(t.cutH,12));
   const a=Math.min(170,Math.max(1,_tlxNum(t.angle,60)))*Math.PI/180, rt=Math.max(0,_tlxNum(t.tipD,0)/2);
   const P=[]; let vh=null, ph=null, topD=null;
-  if(ty==='vbit'||ty==='engraving'){ vh=Math.max(0.01,(R-rt)/Math.tan(a/2)); P.push([rt,0],[R,vh]); if(cutH>vh) P.push([R,cutH]); }
+  if(ty==='vbit'||ty==='engraving'){ vh=Math.max(0.01,(R-rt)/Math.tan(a/2)); P.push([rt,0],[R,vh]); }
   else if(ty==='ball'){ for(let i=0;i<=12;i++){ const th=i/12*Math.PI/2; P.push([R*Math.sin(th), R*(1-Math.cos(th))]); } P.push([R,Math.max(cutH,R)]); }
   else if(ty==='drill'){ ph=R/Math.tan(59*Math.PI/180); P.push([0,0],[R,ph],[R,Math.max(cutH,ph)]); }
   else if(ty==='tapered'){ const al=a/2, rb=Math.max(0.05,rt); const thE=Math.PI/2-al; for(let i=0;i<=8;i++){ const th=i/8*thE; P.push([rb*Math.sin(th), rb*(1-Math.cos(th))]); }
@@ -33980,7 +34102,7 @@ function tlxGeom(t){
   else { P.push([R,0],[R,cutH]); }
   const [rc,yc]=P[P.length-1]; let yT=yc; if(Math.abs(Rs-rc)>0.01){ yT=yc+Math.max(0.6,Math.abs(Rs-rc)*1.2); P.push([Rs,yT]); }
   const L=Math.max(_tlxNum(t.totalH,0)||(Math.max(cutH,yT)+22), yT+3, cutH+3); P.push([Rs,L]);
-  const cz=(ty==='vbit'||ty==='engraving')?Math.min(cutH,Math.max(vh,cutH)):Math.max(cutH, ty==='ball'?R:0);
+  const cz=(ty==='vbit'||ty==='engraving')?vh:Math.max(cutH, ty==='ball'?R:0);
   return {ty,R,Rs,cutH,a,rt,P,vh,ph,topD,yT,L,cz};
 }
 function _tlxSplit(P,cz){ const A=[],B=[]; for(let i=0;i<P.length;i++){ const p=P[i]; if(p[1]<=cz) A.push(p); if(i>0){ const q=P[i-1]; if((q[1]<cz&&p[1]>cz)||(q[1]>cz&&p[1]<cz)){ const f=(cz-q[1])/(p[1]-q[1]); const m=[q[0]+(p[0]-q[0])*f, cz]; A.push(m); B.push(m); } } if(p[1]>=cz) B.push(p); } return [A,B]; }
@@ -34023,7 +34145,7 @@ function tlxSvg(t, mini){
     const lx=X(maxR)+48, ly=yy+(dy||0); C.push(`<polyline points="${cx+r*s},${yy} ${lx-6},${ly}" fill="none" stroke="${c}" stroke-width=".8" opacity=".7"/>`, lab(lx,ly+4,txt,k,'start',grey)); };
   const xl1=X(-maxR)-18, xl2=xl1-96;
   vdim(xl2,0,G.L,'L '+fm(G0.L),'totalH');
-  vdim(xl1,0,G.cutH,'coupe '+fm(G.cutH),'cutH');
+  if(!(G.ty==='vbit'||G.ty==='engraving')) vdim(xl1,0,G.cutH,'coupe '+fm(G.cutH),'cutH');   // JN : sur un V-bit c'est le V entier qui coupe
   if(G.ty==='vbit'||G.ty==='engraving'){
     hdim(G.vh,G.R,'Ø '+fm(G.R*2),'dia',false,-10);
     C.push(`<line x1="${X(G.R)+4}" y1="${Y(0)}" x2="${X(G.R)+4}" y2="${Y(G.vh)}" stroke="#7a8899" stroke-width="1" stroke-dasharray="2 3"/>`);
@@ -34118,6 +34240,7 @@ function tlxWarn(d){ const w=[]; const fl=+d.flutes||2, cl=(+d.fxy)/((+d.spin||1
   if(d.type!=='drill' && d.fxy && d.spin){ if(cl<0.008) w.push('Charge par dent très faible ('+cl.toFixed(3)+' mm) : la fraise frotte au lieu de couper → risque de brûler le bois. Monte l\'avance ou baisse la broche.'); else if(cl>0.08) w.push('Charge par dent forte ('+cl.toFixed(3)+' mm) : beaucoup pour une 3018, risque de casse.'); }
   if(d.type==='flat' && +d.maxD > +d.dia*1.01) w.push('Profondeur par passe plus grande que le Ø : costaud pour une 3018.');
   if((d.type==='vbit'||d.type==='engraving') && !(+d.tipD>0)) w.push('Pointe à 0 : en vrai elle fait souvent 0,1–0,2 mm. Mesure-la pour l\'incrustation.');
+  if((d.type==='vbit'||d.type==='engraving') && +d.shank > +d.dia+0.01){ const G=tlxGeom(d); w.push('Queue plus large que le haut du V : si tu creuses plus profond que le V ('+G.vh.toFixed(1)+' mm), la queue frotte en haut du mur.'); }
   if(+d.cutH > (+d.totalH||1e9)) w.push('La hauteur coupante est plus grande que la longueur totale.');
   return w.map(x=>'⚠️ '+x).join('<br>'); }
 function tlxDirty(v){ TLX.dirty=v; const e=document.getElementById('tlxDirty'); if(e) e.textContent=v?'● pas enregistré':''; }
