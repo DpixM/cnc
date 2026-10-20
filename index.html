@@ -164,6 +164,14 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-20 — JM : TEXTE — le cadre de sélection colle enfin aux lettres (+ JL atelier outils)
+ [FIX] Le cadre du texte était faux : mesuré avec la police SANS guillemets -> une police importée avec un espace ou un
+   chiffre dans son nom était ignorée (mesurée en 10 px) -> cadre ~10x trop étroit. Et la hauteur = taille × 1,2 fixe.
+   Maintenant le cadre = l'encre réelle des lettres (même police que l'écran, étirement, fioritures comprises).
+ [FIX] Redimensionner le texte avec les poignées : ce sont les lettres qui remplissent le cadre demandé.
+ [ATTENTION LASER] L'export des lettres (laser / CNC normal) suit ce cadre : avant, les lettres étaient étirées dans
+   la boîte « taille × 1,2 » (≈ +60–70 % en hauteur par rapport à l'écran). Maintenant elles sortent comme à l'écran.
+
 -- 2026-10-19 — JL : ATELIER OUTILS — la bibliothèque d'outils refaite (affichage seulement, mêmes données)
  [UI] Grande fenêtre : liste à gauche (recherche, filtres par type, ★ favoris), éditeur à droite.
  [UI] Dessin de l'outil À L'ÉCHELLE avec les cotes dessus : clique une cote orange (Ø, coupe, longueur, queue, angle,
@@ -2330,7 +2338,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-19-JL ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-20-JM ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -20205,9 +20213,10 @@ function getObjBB(o){
   if(o.type==='ellipse')return{x:o.x-o.rx,y:o.y-o.ry,w:o.rx*2,h:o.ry*2};
   if(o.type==='line'){const mnx=Math.min(o.x1,o.x2),mny=Math.min(o.y1,o.y2);return{x:mnx,y:mny,w:Math.max(Math.abs(o.x2-o.x1),.5),h:Math.max(Math.abs(o.y2-o.y1),.5)};}
   if(o.type==='text'){
-    const h=o.h||10;
-    const w=o._wOverride!=null?o._wOverride:Math.max(textNaturalWidth(o),0.5);
-    return{x:o.x,y:o.y,w:Math.max(w,0.5),h:h*1.2};
+    // JM : la boîte = l'encre RÉELLE des lettres (police entre guillemets comme l'affichage, étirement _scaleX, fioritures comprises)
+    const k=(o.h||10)/100, sx=o._scaleX||1, m=textInkMetrics(o);
+    const x0=o.x-m.L*k*sx, x1=o.x+m.R*k*sx, y0=o.y-m.A*k, y1=o.y+m.D*k;
+    return{x:x0,y:y0,w:Math.max(x1-x0,0.5),h:Math.max(y1-y0,0.5)};
   }
   if(o.type==='free'&&o.pts?.length){
     let mnx=Infinity,mxx=-Infinity,mny=Infinity,mxy=-Infinity;
@@ -20254,13 +20263,10 @@ function applyBB(o,bb){
     o.y1=y1wasTop?bb.y:bb.y+h;  o.y2=y1wasTop?bb.y+h:bb.y;
   }
   else if(o.type==='text'){
-    o.x=bb.x; o.y=bb.y;
-    o.h=Math.max(1,h/1.2); // height → font size in mm
-    // Compute scaleX = desired_width / natural_width
-    const naturalW=textNaturalWidth(o);
-    if(naturalW>0.1) o._scaleX=Math.max(0.05, w/naturalW);
-    else o._scaleX=1;
-    o._wOverride=w;
+    // JM : on redimensionne l'ENCRE des lettres pour qu'elle remplisse la boîte demandée
+    const m=textInkMetrics(o), inkH=(m.A+m.D)/100, inkW=(m.L+m.R)/100;
+    const hF=Math.max(0.3, h/Math.max(inkH,0.05)), sx=Math.max(0.05, w/Math.max(inkW*hF,0.01));
+    o.h=hF; o._scaleX=sx; o.x=bb.x+m.L/100*hF*sx; o.y=bb.y+m.A/100*hF; o._wOverride=null;
   }
   else if(o.type==='free'&&o.pts?.length){
     const ob=getObjBB(o),sx=w/ob.w,sy=h/ob.h;
@@ -25448,12 +25454,29 @@ function polyPerim(pts){let p=0;for(let i=1;i<pts.length;i++)p+=Math.hypot(pts[i
 // TEXTE & POLICES
 // ══════════════════════════════════════════════════════════════════════════
 
+// JM : mesures de l'encre du texte (police de 100 px, sans étirement), mêmes réglages que l'affichage. Cache vidé quand une police finit de charger.
+const _TXM={c:{},ctx:null};
+try{ if(document.fonts&&document.fonts.addEventListener) document.fonts.addEventListener('loadingdone',()=>{ _TXM.c={}; }); }catch(e){}
+function textInkMetrics(o){
+  const fw=o.fontWeight||'normal', fi=o.fontItalic?'italic':'normal', ff=o.fontFamily||'IBM Plex Mono';
+  const txt=String(o.text||'').trimEnd()||'X', font=`${fi} ${fw} 100px "${ff}"`, key=font+'|'+txt;
+  const c=_TXM.c[key]; if(c) return c;
+  let m;
+  try{ const ctx=_TXM.ctx||(_TXM.ctx=document.createElement('canvas').getContext('2d')); ctx.font=font; ctx.textBaseline='top'; ctx.textAlign='left';
+    const r=ctx.measureText(txt); m={adv:r.width||0, L:+r.actualBoundingBoxLeft||0, R:(r.actualBoundingBoxRight!=null?+r.actualBoundingBoxRight:r.width)||0, A:+r.actualBoundingBoxAscent, D:+r.actualBoundingBoxDescent}; }
+  catch(e){ m={adv:txt.length*55,L:0,R:txt.length*55,A:0,D:100}; }
+  if(!isFinite(m.A)||!isFinite(m.D)||(m.A+m.D)<=0.5){ m.A=0; m.D=100; }
+  if(!(m.L+m.R>0.5)){ m.L=0; m.R=m.adv||txt.length*55; }
+  let ok=true; try{ ok=!document.fonts||document.fonts.check(font,txt); }catch(e){}
+  if(ok) _TXM.c[key]=m;
+  return m;
+}
 function textNaturalWidth(o){
   try{
     const fw=o.fontWeight||'normal', fi=o.fontItalic?'italic':'normal';
     const ff=o.fontFamily||'IBM Plex Mono';
     const tmp=document.createElement('canvas').getContext('2d');
-    tmp.font=`${fi} ${fw} 100px ${ff}`;
+    tmp.font=`${fi} ${fw} 100px "${ff}"`;   // JM : entre guillemets comme l'affichage (sinon police ignorée → 10 px)
     const txt=(o.text||'X').trimEnd();
     const m=tmp.measureText(txt);
     // Largeur = max de l'avance (comme fillText) et de l'encre réelle (débord gauche + droite).
@@ -33966,7 +33989,7 @@ function _tlxSplit(P,cz){ const A=[],B=[]; for(let i=0;i<P.length;i++){ const p=
 function tlxSvg(t, mini){
   const G0=tlxGeom(t); const W=mini?46:460, H=mini?64:400;
   // queue trop longue → on la coupe (trait de cassure) pour que la partie qui coupe soit bien grande ; la cote L garde la vraie valeur
-  const Lv=Math.min(G0.L, Math.max(G0.yT*(mini?1.6:1.9), G0.yT+(mini?5:8))); const G=Object.assign({},G0,{L:Lv, P:G0.P.map(p=>p[1]>Lv?[p[0],Lv]:p)}); const brk=Lv<G0.L-0.01;
+  const Lv=mini?G0.L:Math.min(G0.L, Math.max(G0.yT*1.9, G0.yT+8)); const G=Object.assign({},G0,{L:Lv, P:G0.P.map(p=>p[1]>Lv?[p[0],Lv]:p)}); const brk=Lv<G0.L-0.01;
   const maxR=Math.max(G.R,G.Rs,(G.topD||0)/2);
   const s=mini? Math.min((H-8)/G.L, (W-10)/(2*maxR)) : Math.min((H-78)/G.L, 120/(2*maxR));
   const cx=mini?W/2:205, yb=mini?H-4:H-52; const X=r=>cx+r*s, Y=y=>yb-y*s;
