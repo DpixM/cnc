@@ -164,6 +164,12 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-20 — JN : V-bit — « hauteur coupante » remplacée par le Ø du V (incrustation + atelier outils)
+ [FIX] Ce qui compte n'est pas la « hauteur coupante » mais la HAUTEUR DU V = (Ø − pointe) ÷ 2 ÷ tan(angle/2).
+   Le V doit monter jusqu'à la profondeur max de la poche ; alors la queue ne touche jamais le bois, même plus fine.
+   Réglages incrustation : champ « Ø du V » (cote cliquable sur le dessin), hauteur du V affichée, alerte « V trop
+   petit » avec le Ø minimum conseillé. Atelier outils : plus de cote « coupe » sur les V-bits.
+
 -- 2026-10-20 — JM : TEXTE — le cadre de sélection colle enfin aux lettres (+ JL atelier outils)
  [FIX] Le cadre du texte était faux : mesuré avec la police SANS guillemets -> une police importée avec un espace ou un
    chiffre dans son nom était ignorée (mesurée en 10 px) -> cadre ~10x trop étroit. Et la hauteur = taille × 1,2 fixe.
@@ -2338,7 +2344,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-20-JM ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-20-JN ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3089,7 +3095,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
         <div class="ilp-row3">
           <label class="ilp-f" data-k="ang"><span class="ilp-l"><b class="ilp-tag">∠</b> Angle</span><span class="ilp-in"><input type="number" id="inlay_vAngle" value="20" min="10" max="90" step="1" inputmode="decimal" oninput="inlayCalcPreview()"><i>°</i></span></label>
           <label class="ilp-f" data-k="tip"><span class="ilp-l">Ø Pointe</span><span class="ilp-in"><input type="number" id="inlay_vTip" value="0" min="0" max="1" step="0.05" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
-          <label class="ilp-f" data-k="cutV"><span class="ilp-l">↕ Hauteur coupante</span><span class="ilp-in"><input type="number" id="inlay_vCutH" value="8" min="1" max="40" step="0.5" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
+          <label class="ilp-f" data-k="cutV"><span class="ilp-l">Ø du V</span><span class="ilp-in"><input type="number" id="inlay_vDia" value="3.175" min="0.5" max="40" step="0.1" inputmode="decimal" oninput="inlayCalcPreview()"><i>mm</i></span></label>
         </div>
         <details class="ilp-more"><summary>Vitesses du V-bit</summary>
           <div class="ilp-row3">
@@ -27877,7 +27883,7 @@ function inlayGetParams(){
     vFz:         parseFloat(document.getElementById('inlay_vFz')?.value)||80,
     vSpin:       parseFloat(document.getElementById('inlay_vSpin')?.value)||18000,
     vTip:        Math.max(0,parseFloat(document.getElementById('inlay_vTip')?.value)||0),
-    vCutH:       parseFloat(document.getElementById('inlay_vCutH')?.value)||8,
+    vDia:        Math.max(0.5,parseFloat(document.getElementById('inlay_vDia')?.value)||3.175),   // JN : Ø du V (remplace « hauteur coupante »)
     rCutH:       parseFloat(document.getElementById('inlay_rCutH')?.value)||17,
     rDia:        parseFloat(document.getElementById('inlay_rDia')?.value)||3,
     rMaxD:       parseFloat(document.getElementById('inlay_rMaxD')?.value)||1.5,
@@ -27906,7 +27912,7 @@ function inlayCalcPreview(){
     `Traits plus fins que ${(2*p.pocketDepth*tanA).toFixed(2)} mm : le V n'atteint pas le fond (normal)`,
     `Fraise Ø${p.rDia} : passe dans les zones > ${(p.rDia+2*p.pocketDepth*tanA).toFixed(1)} mm, le V-bit fait le reste`,
     ...(p.rCutH<Math.max(p.pocketDepth,Dm)?[`<span style="color:var(--red)">⚠️ Fraise trop courte : ${p.rCutH} mm de coupe pour ${Math.max(p.pocketDepth,Dm).toFixed(2)} mm de profondeur</span>`]:[]),
-    ...(p.vCutH<Math.max(p.pocketDepth,Dm)?[`<span style="color:var(--red)">⚠️ V-bit trop court : ${p.vCutH} mm de cône pour ${Math.max(p.pocketDepth,Dm).toFixed(2)} mm de profondeur</span>`]:[]),
+    ...((typeof ilVLen==='function' && ilVLen(p)<Math.max(p.pocketDepth,Dm)-1e-6)?[`<span style="color:var(--red)">⚠️ Le V de ta fraise (Ø${p.vDia} à ${p.vAngle}°) ne fait que ${ilVLen(p).toFixed(1)} mm de haut pour ${Math.max(p.pocketDepth,Dm).toFixed(2)} mm de profondeur : le haut du mur ne sera pas en V. Prends un V-bit de Ø ≥ ${(2*Math.max(p.pocketDepth,Dm)*tanA+(p.vTip||0)).toFixed(2)} mm ou une poche moins profonde.</span>`]:[]),
   ].join('<br>');
   if (typeof ilSchemaDraw==='function') ilSchemaDraw();
 }
@@ -28688,7 +28694,7 @@ const _IL_MSG={
   feed:'<b>Avance</b> : vitesse de déplacement pendant la coupe.', plunge:'<b>Plongée</b> : vitesse quand l\'outil descend dans le bois.',
   tip:'<b>Pointe du V-bit</b> : beaucoup de V-bits « 20° 0,1 mm » ont un petit plat au bout. Mets sa largeur : le G-code compense pour que les murs tombent juste.',
   cutR:'<b>Hauteur coupante de la fraise</b> : la longueur des goujures. Elle doit dépasser la profondeur la plus forte (poche ♀ ou dégagement ♂), sinon le corps frotte.',
-  cutV:'<b>Hauteur coupante du V-bit</b> : la hauteur du cône qui coupe. Si elle est plus courte que la profondeur, le V ne peut pas faire tout le mur.',
+  cutV:'<b>Ø du V-bit</b> : le diamètre en haut de la partie en V. Avec l\'angle il donne la hauteur du V. Le V doit monter au moins jusqu\'à la profondeur max, sinon le haut du mur n\'est pas taillé en V. La queue, elle, ne touche jamais le bois (même plus fine).',
   rpm:'<b>Broche</b> : vitesse de rotation de l\'outil.', safe:'<b>Z sécurité</b> : hauteur pour les grands déplacements (les petits sauts se font à 1 mm).'
 };
 function ilSchemaDraw(){
@@ -28768,6 +28774,7 @@ function _ilInlineEdit(host, el, inputId){
 function _ilEditHost(host){ if(!host||host._ile) return; host._ile=1;
   host.addEventListener('click',e=>{ const el=e.target.closest('[data-edit]'); if(!el) return; e.preventDefault(); const lab=host.querySelector(`text[data-edit="${el.dataset.edit}"]`)||el; _ilInlineEdit(host, lab, el.dataset.edit); }); }
 // dessins des 2 outils, cotes cliquables
+function ilVLen(p){ const t=Math.tan((p.vAngle/2)*Math.PI/180); return Math.max(0,((p.vDia||3.175)-(p.vTip||0))/2/Math.max(1e-6,t)); }   // JN : hauteur du V (de la pointe au Ø du haut)
 function inlayDmax(p){ return Math.max(p.pocketDepth, Math.max(0,p.pocketDepth-p.glueGap)+Math.max(0,p.surfaceGap)); }
 function ilToolsDraw(){
   const p=inlayGetParams(); const t=Math.tan((p.vAngle/2)*Math.PI/180); const steel='#c3cbd5', dark='#8d96a1';
@@ -28780,8 +28787,10 @@ function ilToolsDraw(){
       <path d="M${cx} ${ytip-hC} L${cx} ${ytip+4}" stroke="#6b748088" stroke-dasharray="3 3"/>
       <path class="d" d="M${cx-angR*Math.sin(p.vAngle*Math.PI/360)} ${ytip-angR*Math.cos(p.vAngle*Math.PI/360)} A${angR} ${angR} 0 0 1 ${cx+angR*Math.sin(p.vAngle*Math.PI/360)} ${ytip-angR*Math.cos(p.vAngle*Math.PI/360)}" transform="translate(0 ${-(tipW*k/2)/Math.max(0.05,t)*0})"/>
       <path class="d" d="M${cx-rTop-12} ${ytip-hC} L${cx-rTop-12} ${ytip} M${cx-rTop-17} ${ytip-hC} L${cx-rTop-7} ${ytip-hC} M${cx-rTop-17} ${ytip} L${cx-rTop-7} ${ytip}"/>
-      <rect class="edbox" x="${cx-rTop-74}" y="${ytip-hC/2-12}" width="56" height="20" data-edit="inlay_vCutH"/><text class="dt ed" x="${cx-rTop-68}" y="${ytip-hC/2+3}" data-edit="inlay_vCutH">↕ ${p.vCutH}</text>
-      ${p.vCutH<inlayDmax(p)?`<text x="${cx-rTop-74}" y="${ytip-hC/2+24}" style="fill:#ef5350;font:700 10px sans-serif">trop court !</text>`:''}
+      <path class="d" d="M${cx-rTop} ${ytip-hC-6} L${cx+rTop} ${ytip-hC-6} M${cx-rTop} ${ytip-hC-11} L${cx-rTop} ${ytip-hC-1} M${cx+rTop} ${ytip-hC-11} L${cx+rTop} ${ytip-hC-1}"/>
+      <rect class="edbox" x="${cx+rTop+8}" y="${ytip-hC-18}" width="74" height="20" data-edit="inlay_vDia"/><text class="dt ed" x="${cx+rTop+14}" y="${ytip-hC-3}" data-edit="inlay_vDia">Ø ${p.vDia}</text>
+      <text class="lab" x="${cx-rTop-8}" y="${ytip-hC/2+3}" text-anchor="end">V ${ilVLen(p).toFixed(1)} mm</text>
+      ${ilVLen(p)<inlayDmax(p)-1e-6?`<text x="${cx-rTop-8}" y="${ytip-hC/2+19}" text-anchor="end" style="fill:#ef5350;font:700 10px sans-serif">V trop petit !</text>`:''}
       <rect class="edbox" x="${cx+rTop+8}" y="${ytip-hC/2-12}" width="54" height="20" data-edit="inlay_vAngle"/><text class="dt ed" x="${cx+rTop+14}" y="${ytip-hC/2+3}" data-edit="inlay_vAngle">∠ ${p.vAngle}°</text>
       <path class="d" d="M${cx-rTip} ${ytip+10} L${cx+rTip} ${ytip+10} M${cx-rTip} ${ytip+5} L${cx-rTip} ${ytip+15} M${cx+rTip} ${ytip+5} L${cx+rTip} ${ytip+15}"/>
       <rect class="edbox" x="${cx-44}" y="${ytip+18}" width="88" height="20" data-edit="inlay_vTip"/><text class="dt ed" x="${cx-38}" y="${ytip+33}" data-edit="inlay_vTip">pointe Ø ${tipW}</text>
@@ -28815,7 +28824,7 @@ function ilToolsLibInit(){
 }
 function ilToolPick(kind, id, silent){ const t=_ilLibList(kind).find(x=>String(x.id)===String(id)); try{ localStorage.setItem('kerf_ilTool_'+kind, id?String(id):''); }catch(e){}
   if(!t) return; const set=(i,v)=>{ const e=document.getElementById(i); if(e&&v!=null&&v!=='') e.value=v; };
-  if(kind==='v'){ set('inlay_vAngle',t.angle); set('inlay_vTip',t.tipD!=null?t.tipD:0); set('inlay_vCutH',t.cutH); set('inlay_vFxy',t.fxy); set('inlay_vFz',t.fz); set('inlay_vSpin',t.spin); }
+  if(kind==='v'){ set('inlay_vAngle',t.angle); set('inlay_vTip',t.tipD!=null?t.tipD:0); set('inlay_vDia',t.dia); set('inlay_vFxy',t.fxy); set('inlay_vFz',t.fz); set('inlay_vSpin',t.spin); }
   else { set('inlay_rDia',t.dia); set('inlay_rMaxD',t.maxD); set('inlay_rCutH',t.cutH); set('inlay_rFxy',t.fxy); set('inlay_rFz',t.fz); set('inlay_rSpin',t.spin); }
   inlayCalcPreview(); }
 function ilToolSave(kind){ const p=inlayGetParams(); const sel=document.getElementById(kind==='v'?'ilLibV':'ilLibR');
@@ -28823,7 +28832,7 @@ function ilToolSave(kind){ const p=inlayGetParams(); const sel=document.getEleme
   const def=curT?curT.name:(kind==='v'?`V-bit ${p.vAngle}° pointe ${p.vTip||0}`:`Fraise plate Ø${p.rDia}`);
   const name=prompt('Nom de l\'outil (garde le même nom pour mettre à jour celui-ci) :', def); if(!name) return;
   let t=_ilLibList(kind).find(x=>x.name===name); if(!t){ t={id:Date.now(), name, type:kind==='v'?'vbit':'flat', flutes:2}; tools.push(t); }
-  if(kind==='v'){ Object.assign(t,{angle:p.vAngle, tipD:p.vTip||0, cutH:p.vCutH, fxy:p.vFxy, fz:p.vFz, spin:p.vSpin}); if(!t.dia) t.dia=3.175; }
+  if(kind==='v'){ Object.assign(t,{angle:p.vAngle, tipD:p.vTip||0, dia:p.vDia||3.175, fxy:p.vFxy, fz:p.vFz, spin:p.vSpin}); }
   else { Object.assign(t,{dia:p.rDia, maxD:p.rMaxD, cutH:p.rCutH, fxy:p.rFxy, fz:p.rFz, spin:p.rSpin}); }
   try{ saveTools(); }catch(e){} try{ localStorage.setItem('kerf_ilTool_'+kind, String(t.id)); }catch(e){} ilToolsLibInit(); if(typeof toastHist==='function') toastHist('💾 Outil gardé : '+name); }
 
@@ -28837,7 +28846,7 @@ const IL_HELP={
   inlay_rCutH:['↕ Hauteur coupante (fraise plate)','La longueur des dents de la fraise. Elle doit être plus grande que la profondeur la plus forte, sinon le corps lisse frotte et chauffe.','L\'appli te prévient en rouge si elle est trop courte.'],
   inlay_vAngle:['∠ Angle du V-bit','L\'angle complet de la pointe. C\'est LE MÊME V-bit pour la femelle et le mâle, sinon les murs ne collent pas.','20° = murs raides, incrustation fine et profonde. Lis-le sur la fraise ou mesure-le.'],
   inlay_vTip:['Ø Pointe du V-bit','Beaucoup de V-bits ne sont pas vraiment pointus : il y a un petit plat au bout. L\'appli remonte la fraise d\'autant pour que les murs restent justes.','0 = pointe parfaite. Souvent 0,1 à 0,2 mm (c\'est écrit sur la fraise, ex. « 20° 0,1 mm »).'],
-  inlay_vCutH:['↕ Hauteur coupante (V-bit)','La partie du V-bit qui coupe. Elle doit couvrir toute la profondeur de la poche.','Sinon la queue frotte en haut du mur.'],
+  inlay_vDia:['Ø du V-bit','Le diamètre en haut de la partie en V. Avec l\'angle et la pointe, il donne la hauteur du V : (Ø − pointe) ÷ 2 ÷ tan(angle/2).','Le V doit monter au moins jusqu\'à la profondeur max de la poche (pas la taille du dessin !). Tant que c\'est le cas, la queue ne touche jamais le bois, même si elle est plus fine.'],
   inlay_rFxy:['Avance (fraise plate)','La vitesse quand la fraise avance en coupant.','3018 + Ø3 dans le bois : 600 à 1000 mm/min.'],
   inlay_rFz:['Plongée (fraise plate)','La vitesse quand la fraise descend dans le bois.','Environ le quart de l\'avance.'],
   inlay_rSpin:['Broche (fraise plate)','La vitesse de rotation.','10 000 à 12 000 tr/min.'],
@@ -33972,7 +33981,7 @@ function tlxGeom(t){
   const ty=t.type||'flat', R=Math.max(0.05,_tlxNum(t.dia,3)/2), Rs=Math.max(0.2,_tlxNum(t.shank,3.175)/2), cutH=Math.max(0.2,_tlxNum(t.cutH,12));
   const a=Math.min(170,Math.max(1,_tlxNum(t.angle,60)))*Math.PI/180, rt=Math.max(0,_tlxNum(t.tipD,0)/2);
   const P=[]; let vh=null, ph=null, topD=null;
-  if(ty==='vbit'||ty==='engraving'){ vh=Math.max(0.01,(R-rt)/Math.tan(a/2)); P.push([rt,0],[R,vh]); if(cutH>vh) P.push([R,cutH]); }
+  if(ty==='vbit'||ty==='engraving'){ vh=Math.max(0.01,(R-rt)/Math.tan(a/2)); P.push([rt,0],[R,vh]); }
   else if(ty==='ball'){ for(let i=0;i<=12;i++){ const th=i/12*Math.PI/2; P.push([R*Math.sin(th), R*(1-Math.cos(th))]); } P.push([R,Math.max(cutH,R)]); }
   else if(ty==='drill'){ ph=R/Math.tan(59*Math.PI/180); P.push([0,0],[R,ph],[R,Math.max(cutH,ph)]); }
   else if(ty==='tapered'){ const al=a/2, rb=Math.max(0.05,rt); const thE=Math.PI/2-al; for(let i=0;i<=8;i++){ const th=i/8*thE; P.push([rb*Math.sin(th), rb*(1-Math.cos(th))]); }
@@ -33980,7 +33989,7 @@ function tlxGeom(t){
   else { P.push([R,0],[R,cutH]); }
   const [rc,yc]=P[P.length-1]; let yT=yc; if(Math.abs(Rs-rc)>0.01){ yT=yc+Math.max(0.6,Math.abs(Rs-rc)*1.2); P.push([Rs,yT]); }
   const L=Math.max(_tlxNum(t.totalH,0)||(Math.max(cutH,yT)+22), yT+3, cutH+3); P.push([Rs,L]);
-  const cz=(ty==='vbit'||ty==='engraving')?Math.min(cutH,Math.max(vh,cutH)):Math.max(cutH, ty==='ball'?R:0);
+  const cz=(ty==='vbit'||ty==='engraving')?vh:Math.max(cutH, ty==='ball'?R:0);
   return {ty,R,Rs,cutH,a,rt,P,vh,ph,topD,yT,L,cz};
 }
 function _tlxSplit(P,cz){ const A=[],B=[]; for(let i=0;i<P.length;i++){ const p=P[i]; if(p[1]<=cz) A.push(p); if(i>0){ const q=P[i-1]; if((q[1]<cz&&p[1]>cz)||(q[1]>cz&&p[1]<cz)){ const f=(cz-q[1])/(p[1]-q[1]); const m=[q[0]+(p[0]-q[0])*f, cz]; A.push(m); B.push(m); } } if(p[1]>=cz) B.push(p); } return [A,B]; }
@@ -34023,7 +34032,7 @@ function tlxSvg(t, mini){
     const lx=X(maxR)+48, ly=yy+(dy||0); C.push(`<polyline points="${cx+r*s},${yy} ${lx-6},${ly}" fill="none" stroke="${c}" stroke-width=".8" opacity=".7"/>`, lab(lx,ly+4,txt,k,'start',grey)); };
   const xl1=X(-maxR)-18, xl2=xl1-96;
   vdim(xl2,0,G.L,'L '+fm(G0.L),'totalH');
-  vdim(xl1,0,G.cutH,'coupe '+fm(G.cutH),'cutH');
+  if(!(G.ty==='vbit'||G.ty==='engraving')) vdim(xl1,0,G.cutH,'coupe '+fm(G.cutH),'cutH');   // JN : sur un V-bit c'est le V entier qui coupe
   if(G.ty==='vbit'||G.ty==='engraving'){
     hdim(G.vh,G.R,'Ø '+fm(G.R*2),'dia',false,-10);
     C.push(`<line x1="${X(G.R)+4}" y1="${Y(0)}" x2="${X(G.R)+4}" y2="${Y(G.vh)}" stroke="#7a8899" stroke-width="1" stroke-dasharray="2 3"/>`);
