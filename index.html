@@ -6921,18 +6921,30 @@ function cip_build() {
           const f = F[i0];
           const Pm = rotM(f.p, f.th),
             Dm = rotM(f.d, f.th);
-          const n = Math.ceil((Math.abs(k) * 360) / 5);
-          const add = [];
-          let ok = true;
-          for (let q = 1; q <= n; q++) {
-            const th = f.th - (360 * k * q) / n;
-            const pp = rotM(Pm, -th),
-              dd = rotM(Dm, -th);
-            if (q % 3 === 0 && clearance(pp, dd, true) < 1) {
-              ok = false;
-              break;
+          // v60 : tête immobile en l'air, le mandrin tourne : en TRAORI ça s'écrit en quelques lignes (pas de 90° si
+          // ça passe sans toucher, sinon plus fin). Chaque ligne droite est contrôlée.
+          let add = [],
+            ok = false,
+            n = 0;
+          for (const stepDeg of [90, 60, 45, 30, 15, 5]) {
+            n = Math.ceil((Math.abs(k) * 360) / stepDeg);
+            add = [];
+            ok = true;
+            let prev = { p: f.p, d: f.d };
+            for (let q = 1; q <= n && ok; q++) {
+              const th = f.th - (360 * k * q) / n;
+              const pp = rotM(Pm, -th),
+                dd = rotM(Dm, -th);
+              for (let u = 1; u <= 6 && ok; u++) {
+                const t = u / 6;
+                const pi = prev.p.map((v, i) => v + (pp[i] - v) * t),
+                  di = V.nrm(prev.d.map((v, i) => v + (dd[i] - v) * t));
+                if (clearance(pi, di, true) < 1) ok = false;
+              }
+              prev = { p: pp, d: dd };
+              add.push({ p: pp, d: dd, th, ci: H.ci, j: -1, s: 0 });
             }
-            add.push({ p: pp, d: dd, th, ci: H.ci, j: -1, s: 0 });
+            if (ok) break;
           }
           if (ok) {
             const ds = (2 * Math.PI * Math.hypot(Pm[0], Pm[2]) * Math.abs(k) * 0.3) / n;
@@ -7417,39 +7429,46 @@ function cip_build() {
     const fromCyl = (r, ph, y) => [r * Math.sin(ph), y, r * Math.cos(ph)];
     const nl = (A, B, t) => V.nrm(A.map((v, i) => v + (B[i] - v) * t));
     const lin = (A, B, t) => A.map((v, i) => v + (B[i] - v) * t);
-    for (const R of Rl) {
-      const E1 = V.sub(a.p, V.mul(a.d, R)),
-        S1 = V.sub(P0, V.mul(D0, R));
-      const ce = cylOf(E1),
-        cs = cylOf(S1);
-      let dph = cs.ph - ce.ph;
-      while (dph > Math.PI) dph -= 2 * Math.PI;
-      while (dph < -Math.PI) dph += 2 * Math.PI;
-      const n = Math.max(1, Math.ceil(Math.abs(dph) / (12 * DEG)), Math.ceil(Math.abs(cs.y - ce.y) / 40));
-      const L = [[E1, a.d]];
-      for (let k = 1; k < n; k++) {
-        const t = k / n;
-        L.push([fromCyl(ce.r + (cs.r - ce.r) * t, ce.ph + dph * t, ce.y + (cs.y - ce.y) * t), nl(a.d, D0, t)]);
-      }
-      L.push([S1, D0], [P0.slice(), D0]);
-      // contrôle : chaque ligne droite (ce que fait la machine entre 2 points), finement, avec 1 mm de marge
-      let ok = true;
-      const pts = [[a.p, a.d]].concat(L);
-      for (let i = 0; ok && i + 1 < pts.length; i++) {
-        const last = i + 2 === pts.length;
-        for (let q = 1; q <= 8; q++) {
-          const t = q / 8;
-          if ((i === 0 && t < 0.25) || (last && t > 0.75)) continue; // tout près de la pièce : c'est le faisceau, pas la tête
-          const p = lin(pts[i][0], pts[i + 1][0], t),
-            d = nl(pts[i][1], pts[i + 1][1], t);
-          if (clearance(p, d, 'mid') < 1) {
-            ok = false;
-            break;
+    // v60 : le MOINS de lignes possible -> on essaie d'abord en 1 seule ligne (pas de 180°), puis 90°, 45°, 20°, 12°
+    // (chaque ligne droite est contrôlée anti-collision ; si ça touche, on prend un pas plus fin / un recul plus grand)
+    for (const stepDeg of [180, 90, 45, 20, 12])
+      for (const R of Rl) {
+        const E1 = V.sub(a.p, V.mul(a.d, R)),
+          S1 = V.sub(P0, V.mul(D0, R));
+        const ce = cylOf(E1),
+          cs = cylOf(S1);
+        let dph = cs.ph - ce.ph;
+        while (dph > Math.PI) dph -= 2 * Math.PI;
+        while (dph < -Math.PI) dph += 2 * Math.PI;
+        const n = Math.max(
+          1,
+          Math.ceil(Math.abs(dph) / (stepDeg * DEG - 1e-9)),
+          stepDeg >= 90 ? 1 : Math.ceil(Math.abs(cs.y - ce.y) / 40)
+        );
+        const L = [[E1, a.d]];
+        for (let k = 1; k < n; k++) {
+          const t = k / n;
+          L.push([fromCyl(ce.r + (cs.r - ce.r) * t, ce.ph + dph * t, ce.y + (cs.y - ce.y) * t), nl(a.d, D0, t)]);
+        }
+        L.push([S1, D0], [P0.slice(), D0]);
+        // contrôle : chaque ligne droite (ce que fait la machine entre 2 points), finement, avec 1 mm de marge
+        let ok = true;
+        const pts = [[a.p, a.d]].concat(L);
+        for (let i = 0; ok && i + 1 < pts.length; i++) {
+          const last = i + 2 === pts.length;
+          for (let q = 1; q <= 8; q++) {
+            const t = q / 8;
+            if ((i === 0 && t < 0.25) || (last && t > 0.75)) continue; // tout près de la pièce : c'est le faisceau, pas la tête
+            const p = lin(pts[i][0], pts[i + 1][0], t),
+              d = nl(pts[i][1], pts[i + 1][1], t);
+            if (clearance(p, d, 'mid') < 1) {
+              ok = false;
+              break;
+            }
           }
         }
+        if (ok) return L;
       }
-      if (ok) return L;
-    }
     return null;
   }
   function rapid(a, c, ci, push, Rs) {
@@ -9235,8 +9254,13 @@ function cip_build() {
       XV = v => rotM(pl.flip ? [-v[0], -v[1], v[2]] : v.slice(), pl.rho || 0);
     const ops = [];
     const inst = instList();
+    let nRing = 0;
     inst.forEach((ins, ii) =>
       S.part.gen.ops.forEach(o => {
+        // coupe de tour (bout / séparation) : une sur deux dans l'autre sens -> le mandrin se « déroule » tout seul
+        const ring = o.step === 1 || o.step === 4;
+        const rev = ring && nRing++ % 2 === 1;
+        o = rev ? Object.assign({}, o, { P: o.P.slice().reverse(), D: o.D.slice().reverse() }) : o;
         ops.push({
           name: o.name + (inst.length > 1 ? ' · pièce ' + (ii + 1) : ''),
           step: o.step,
@@ -10100,7 +10124,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v59',
+  const CIP_VER = 'CIP v60',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
