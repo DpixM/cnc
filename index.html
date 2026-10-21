@@ -10117,7 +10117,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v62',
+  const CIP_VER = 'CIP v63',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -13574,10 +13574,18 @@ function cip_build() {
         let j = i;
         while (j < hm.length && hm[j].spin) j++;
         const fl = hm[j - 1];
-        const C = toLst(pf(fl), fl.d, fl.th, o).C;
+        const f0 = F[F.indexOf(f) - 1] || f;
+        const C = toLst(pf(fl), fl.d, fl.th, o).C,
+          C0 = toLst(pf(f0), f0.d, f0.th, o).C;
+        // v63 : en RELATIF (G91) -> le mandrin refait VRAIMENT ses tours en arrière, même si l'axe C1 est « modulo »
+        // (en absolu, -360 et 0 c'est la même position : la machine ne bougeait pas)
         out.push(
           { t: 'TRAFOOF ;tete en l air, elle ne bouge plus', s: f.s },
-          { t: ` G01 C1 = ${n3(C)} ;mandrin remis a l angle de depart`, s: fl.s },
+          {
+            t: `G91 G01 C1 = ${n3(C - C0)} ;le mandrin refait ses tours en arriere -> C1 de depart (${n3(C)})`,
+            s: fl.s
+          },
+          { t: 'G90', s: fl.s },
           { t: `TC_SET_TRAFO("${o.trafo}")`, s: fl.s },
           { t: 'TRAORI(1)', s: fl.s }
         );
@@ -14843,7 +14851,7 @@ function cip_build() {
       }
       if (!inT) {
         const mc = /^G0?[01]\b/.test(U) && U.match(/(?<![A-Z0-9_])C1\s*=\s*([-+]?[\d.]+)/);
-        if (mc) st.C = +mc[1]; // TRAFOOF + G01 C1 : le mandrin tourne seul (même position de la pièce à n tours près)
+        if (mc) st.C = /^\s*(\/\s*)?(N\d+\s*)?G91/i.test(l) ? st.C + +mc[1] : +mc[1]; // TRAFOOF + G01 C1 : le mandrin tourne seul (même position de la pièce à n tours près)
         continue;
       }
       const isCIP = /^CIP\b/.test(U);
