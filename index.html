@@ -10117,7 +10117,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v61',
+  const CIP_VER = 'CIP v62',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -13958,8 +13958,19 @@ function cip_build() {
       if (hm.length) {
         B.push(';----- retour au point de depart -----');
         let fset = false;
-        homeLines(hm, o, sh).forEach(l => {
+        const HL = homeLines(hm, o, sh);
+        let lastF = -1;
+        HL.forEach((l, k) => {
+          if (l.f) lastF = k;
+        });
+        HL.forEach((l, k) => {
           if (l.t) return B.push(l.t);
+          // v62 : le DERNIER point = le départ EXACT (pas reculé « à vide ») : la pointe est où le SET_POS l'attend
+          // -> la pièce suivante repart pile pareil (sinon à vide on remontait de 3 mm à chaque cycle)
+          if (k === lastF && DRYOFF) {
+            B.push(lstMv(toLst(l.f.p, l.f.d, l.f.th, o)) + ' ;pointe sur le depart : pret pour la piece suivante');
+            return;
+          }
           // 1re ligne de déplacement du retour : f5000 en soudure (sinon : vitesse de soudure, très lent)
           const fx = W && !fset ? 'f5000 ;retour rapide (laser coupe)' : '';
           fset = true;
@@ -13996,7 +14007,22 @@ function cip_build() {
         '',
         'M30'
       );
-    } else B.push('M30');
+    } else
+      // v62 : découpe aussi : fin propre + PORTES OUVERTES (la tête est déjà sur le départ, prête pour la pièce suivante)
+      B.push(
+        '',
+        'TRAFOOF',
+        '',
+        'G500',
+        'G90',
+        park ? ';(tete degagee)' : ';(tete laissee sur le point de depart, prete pour la piece suivante)',
+        '',
+        'TC_LASER_REQUEST(0)',
+        'TC_RESET',
+        'TC_OPEN_DOOR(0,1,0,0)',
+        '',
+        'M30'
+      );
     const L = lstHead(prog, kind, tech).concat(B, ['STOP_TEXT', 'C', 'ENDE_PROGRAMM', 'C']);
     if (!W) {
       L.push(...lttTable().table.split('\n'), 'C');
