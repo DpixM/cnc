@@ -10117,7 +10117,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v64',
+  const CIP_VER = 'CIP v65',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -13863,11 +13863,19 @@ function cip_build() {
       ? rot => `TC_WELD_ON(1, "${tech}", ${WM}, ${WP});` + (rot > 0 ? ' ROTATIONCW' : rot < 0 ? ' ROTATIONCCW' : '')
       : () => `TC_LASER_ON(11,"${tech}",0,300)`;
     const OFF = W ? `TC_WELD_OFF(3,${WO}) ;(00 sans pente,10 avec pente)` : 'TC_LASER_OFF(2)';
+    // v65 : FIN SIMPLE (comme à la main) : on lève la tête, TRAFOOF, puis tous les axes reviennent en coordonnées MACHINE
+    // SET_POS : là où ils étaient au lancement (mémorisés au début) ; SET_G54 : position de dégagement du gabarit (Z 350, C1 0)
+    const simpleEnd = !!(S.prog.home && !S.prog.home.noUnw);
+    const MEM = [
+      'STOPRE',
+      'R191 = $AA_IM[X] R192 = $AA_IM[Y] R193 = $AA_IM[Z] R194 = $AA_IM[B] R195 = $AA_IM[C1] ;position de depart memorisee (machine)'
+    ];
     // en-tête du corps (gabarits)
     if (W) {
       B.push(
         'TC_RESET',
         'G71',
+        ...(posMode && simpleEnd ? MEM : []),
         'G500',
         'g90',
         'TC_LASER_REQUEST(2)',
@@ -13889,6 +13897,7 @@ function cip_build() {
       B.push(
         'TC_RESET',
         'G71',
+        ...(posMode && simpleEnd ? MEM : []),
         'g90',
         'TC_DYNAMIC_LEVEL(0)',
         `TC_SET_TRAFO("${o.trafo}")`,
@@ -13956,8 +13965,15 @@ function cip_build() {
       B.push('', (dry ? ';A VIDE ' : '') + OFF, '');
     }
     {
-      const hm = S.prog.home ? F.filter(f => f.ci === S.prog.home.ci) : [];
-      if (hm.length) {
+      const hm = S.prog.home && !simpleEnd ? F.filter(f => f.ci === S.prog.home.ci) : [];
+      if (simpleEnd) {
+        const fl = F.filter(f => f.ci < S.prog.home.ci).pop() || F[F.length - 1];
+        B.push(
+          ';----- fin : on leve la tete, puis tous les axes reviennent a la position de depart -----',
+          lstMv(toLst(V.sub(sh(fl), V.mul(fl.d, 30)), fl.d, fl.th, o), W ? 'f5000' : '') +
+            " ;tete levee de 30 mm dans l'axe du faisceau"
+        );
+      } else if (hm.length) {
         B.push(';----- retour au point de depart -----');
         let fset = false;
         const HL = homeLines(hm, o, sh);
@@ -13987,7 +14003,20 @@ function cip_build() {
         );
       }
     }
-    const park = !S.prog.home;
+    const park = !S.prog.home || (simpleEnd && !posMode);
+    const PARK = [
+      'G01 Z = 350 F10000 ;tete en haut',
+      'G01 B = 0 C1 =0',
+      o.trafo === 'Bc1' ? 'G01 X =50 Y = 200' : 'G01 Y = 200',
+      ';(position de depart du gabarit : prete pour la piece suivante)'
+    ];
+    const BACK = [
+      'G01 Z = 350 F10000 ;tete en haut',
+      'G53 G01 B = R194 C1 = R195 ;mandrin et tete remis a l angle de depart',
+      'G53 G01 X = R191 Y = R192',
+      'G53 G01 Z = R193 F2000 ;pointe sur le depart : prete pour la piece suivante'
+    ];
+    const ENDMV = simpleEnd ? (posMode ? BACK : PARK) : null;
     if (W) {
       B.push(
         '',
@@ -13995,12 +14024,14 @@ function cip_build() {
         '',
         'G500',
         'G90',
-        ...(park
-          ? [
-              o.trafo === 'Bc1' ? 'G01 X =50 Y = 200 F10000' : 'G01 Y = 200 C1 =0 F10000',
-              o.trafo === 'Bc1' ? 'G01 Z = 350 B = 0 C1 =0' : 'G01 Z = 350 B = 0'
-            ]
-          : [';(tete laissee sur le point de depart, prete pour la piece suivante)']),
+        ...(ENDMV
+          ? ENDMV
+          : park
+            ? [
+                o.trafo === 'Bc1' ? 'G01 X =50 Y = 200 F10000' : 'G01 Y = 200 C1 =0 F10000',
+                o.trafo === 'Bc1' ? 'G01 Z = 350 B = 0 C1 =0' : 'G01 Z = 350 B = 0'
+              ]
+            : [';(tete laissee sur le point de depart, prete pour la piece suivante)']),
         '',
         'TC_AUX_LIGHT(5,0)',
         'TC_AUX_LIGHT(6,0)',
@@ -14018,7 +14049,9 @@ function cip_build() {
         '',
         'G500',
         'G90',
-        park ? ';(tete degagee)' : ';(tete laissee sur le point de depart, prete pour la piece suivante)',
+        ...(ENDMV
+          ? ENDMV
+          : [park ? ';(tete degagee)' : ';(tete laissee sur le point de depart, prete pour la piece suivante)']),
         '',
         'TC_LASER_REQUEST(0)',
         'TC_RESET',
