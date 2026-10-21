@@ -10117,7 +10117,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v66',
+  const CIP_VER = 'CIP v67',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -14884,7 +14884,12 @@ function cip_build() {
       }
       if (!inT) {
         const mc = /^G0?[01]\b/.test(U) && U.match(/(?<![A-Z0-9_])C1\s*=\s*([-+]?[\d.]+)/);
-        if (mc) st.C = /^\s*(\/\s*)?(N\d+\s*)?G91/i.test(l) ? st.C + +mc[1] : +mc[1]; // TRAFOOF + G01 C1 : le mandrin tourne seul (même position de la pièce à n tours près)
+        if (mc && moves.length) {
+          // TRAFOOF + G01 C1 : le MANDRIN tourne seul, la tête reste immobile -> on le montre dans la simu
+          const nc = /^\s*(\/\s*)?(N\d+\s*)?G91/i.test(l) ? st.C + +mc[1] : +mc[1];
+          moves.push({ t: 'SPIN', s: { ...st }, e: { ...st, C: nc }, m: null, laser: false, ln: li });
+          st.C = nc;
+        }
         continue;
       }
       const isCIP = /^CIP\b/.test(U);
@@ -14913,11 +14918,26 @@ function cip_build() {
     return { trafo, moves, lines };
   }
   // échantillonne chaque bloc G01 / CIP d'un .LST lu (points machine X Y Z B C + laser)
-  function lstSample(r) {
+  function lstSample(r, o) {
     const pts = [];
     for (const mv of r.moves) {
       const a = mv.s,
         e = mv.e;
+      if (mv.t === 'SPIN') {
+        // mandrin seul : la tête ne bouge pas dans la machine -> dans le repère pièce elle tourne à l'envers du mandrin
+        const oo = o || lstOpt(true);
+        const f0 = fromLst(a, oo),
+          f1 = fromLst(e, oo);
+        const Pm = rotM(f0.p, f0.th),
+          Dm = rotM(f0.d, f0.th);
+        const N = Math.max(1, Math.ceil(Math.abs(f1.th - f0.th) / 5));
+        for (let k = 1; k <= N; k++) {
+          const th = f0.th + ((f1.th - f0.th) * k) / N;
+          const q = toLst(rotM(Pm, -th), rotM(Dm, -th), th, oo);
+          pts.push({ X: q.X, Y: q.Y, Z: q.Z, B: q.B, C: q.C, laser: false, ln: k === N ? mv.ln : -1 });
+        }
+        continue;
+      }
       let N = 1,
         ci = null;
       if (mv.t === 'CIP') {
@@ -15007,7 +15027,7 @@ function cip_build() {
     if (!L0 || !L0.o) return;
     const r = parseLST(L0.txt);
     if (!r.moves.length) return;
-    const pts = lstSample(r);
+    const pts = lstSample(r, L0.o);
     const FB = lstFrames(r, pts, L0.o);
     if (!FB) return;
     if (!(S.prog && S.prog.verify)) S.progCalc = S.prog;
