@@ -2536,6 +2536,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
     #cipBody .cipGB{border:1px solid var(--brd2);border-radius:6px;padding:6px 8px;margin:6px 0;background:var(--bg)}
     #cipBody .cipGB .cipNum{margin:3px 0}#cipBody .cipGB .cipNum input{width:72px}
     #cipBody .cipW.cipMtMode [data-mtno],#cipBody .cipW:not(.cipMtMode) [data-mtonly]{display:none!important}
+    #cipBody .cipW.cipCutMode #cipGenBox,#cipBody .cipW:not(.cipCutMode) #cipCutBox{display:none!important}
     #cipBody .cipGK{border-radius:4px;padding:1px 4px;margin-left:-4px;margin-right:-4px;transition:background .15s}
     #cipBody .cipGK>span:first-child::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c,#888);margin-right:7px;vertical-align:-1px}
     #cipBody .cipGK input{border-left:4px solid var(--c,#888)!important}
@@ -2616,6 +2617,10 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <svg viewBox="0 0 200 130" aria-hidden="true"><path d="M30 95 L95 40 L170 95" fill="none" stroke="#9aa5ae" stroke-width="26" stroke-linejoin="miter"/><path d="M95 26 L95 56" stroke="#4fc3f7" stroke-width="4"/><ellipse cx="95" cy="40" rx="8" ry="20" fill="none" stroke="#f5a623" stroke-width="3"/></svg>
           <b>↺ Soudure en onglet</b><span>Coude : 2 tubes coupés en biais, pièce centrée. Programme CIP lissé, B fixe.</span>
         </button>
+        <button class="cipCard" id="cipCardCut" onclick="cip_ui('partcut')" data-tip="N'importe quel tube (rond, carré, rectangle, oblong ou section DXF) : tu choisis la coupe des bouts (droite, biais, gueule de loup) et tu poses des trous, oblongs, piquages ou formes DXF. Tout est calculé exact sur le tube.">
+          <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="20" y="50" width="160" height="34" rx="17" fill="#9aa5ae"/><rect x="20" y="62" width="160" height="10" fill="#7d8890"/><rect x="70" y="58" width="26" height="12" rx="6" fill="#2a3036" stroke="#f5a623" stroke-width="3"/><circle cx="125" cy="64" r="7" fill="#2a3036" stroke="#f5a623" stroke-width="3"/><path d="M180 50q-14 17 0 34" stroke="#f5a623" stroke-width="4" fill="none"/><path d="M28 30l14 10M28 40l14-10" stroke="#f5a623" stroke-width="4"/></svg>
+          <b>✂ Tube à découper</b><span>Tout profil (rond, carré, oblong, DXF) : coupes droites, en biais, gueules de loup, trous, oblongs, piquages, formes DXF.</span>
+        </button>
         <button class="cipCard" id="cipCardDemo" onclick="cip_ui('partdemo')">
           <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="20" y="66" width="160" height="30" rx="4" fill="#9aa5ae"/><rect x="20" y="76" width="160" height="10" fill="#7d8890"/><rect x="88" y="22" width="24" height="46" fill="#b9c3cb"/><path d="M84 66q16-7 32 0" stroke="#4fc3f7" stroke-width="4" fill="none"/><path d="M150 18l20 12-20 12z" fill="#f5a623"/></svg>
           <b id="cipCardDemoT">▶ Voir un exemple</b><span id="cipCardDemoS">Une pièce toute prête, calculée en vrai, pour essayer.</span>
@@ -2655,6 +2660,14 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipRow"><button class="cipBtn" style="flex:1" onclick="cip_ui('miter')">📐 Voir l'ellipse et l'écart de rayon</button></div>
           <div class="cipStat" id="cipMtMsg"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','mach')">Suivant : mise en machine + simulation →</button></div>
+        </div>
+        <div class="cipBox" data-st="build" id="cipCutBox" data-mtno>
+          <h3>✂ Tube à découper</h3>
+          <div class="cipNote" style="margin-top:0">Choisis le tube, la coupe des bouts et pose tes découpes : la pièce se met à jour toute seule dans la 3D (les tubes qui viennent dessus en rouge transparent). Tout est calculé exact sur la surface du tube.</div>
+          <div id="cipCutBody"></div>
+          <input type="file" id="cipCutFile" accept=".dxf,.DXF" style="display:none">
+          <div class="cipStat" id="cipCutMsg"></div>
+          <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : réglages →</button></div>
         </div>
         <div class="cipBox" data-st="build" id="cipGenBox" data-mtno>
           <h3>🛠 Créer ma pièce</h3>
@@ -6442,12 +6455,14 @@ function cip_build() {
   function placeAndShow(dragging) {
     if (!S.part) return;
     const P = S.part;
-    const rho = +$('cipPRot').value || 0;
+    // tube à découper NON rond : la pièce ne tourne pas toute seule dans le tube (le profil ne suivrait pas)
+    const rho = P.gen && P.gen.cut && S.profile && S.profile.type !== 'rond' ? 0 : +$('cipPRot').value || 0;
     // SOUDURE : la pièce EST le tube tenu dans les mors -> son bout libre est au bout (distance 0),
     // et c'est l'Offset X (90°) / Z (à plat) = ce qui dépasse des mors qui dit si la tête tape. On ne le change jamais.
     // corps DÉPORTÉ sur la face du bout : cette face doit être le bout libre (sinon le tube qui dépasse cache la face)
     const W =
-      $('cipProc').value === 'soudure' || !!(P.gen && P.gen.def && P.gen.def.bodies.some(b => b.type === 'deport'));
+      $('cipProc').value === 'soudure' ||
+      !!(P.gen && P.gen.def && P.gen.def.bodies && P.gen.def.bodies.some(b => b.type === 'deport'));
     let off = W ? 0 : Math.max(0, +$('cipPOff').value || 0);
     const [ymin, ymax] = partSpan();
     const len = ymax - ymin;
@@ -6569,7 +6584,9 @@ function cip_build() {
         // + si on a seulement TOURNÉ (tube rond) ou GLISSÉ la pièce le long du tube : on déplace le résultat au lieu de tout recalculer
         const pl = g.pl || {},
           gc = S.geoC;
-        if (S.part.gen) {
+        if (S.part.gen && S.part.gen.cut) {
+          r = { C: [] }; // tube à découper : les contours sont déjà calculés exacts (cutBuild)
+        } else if (S.part.gen) {
           r = genSeams($('cipProc').value === 'soudure');
         } else if (gc && gc.M === g.M && gc.pr === S.profile) {
           r = structuredClone(gc.r);
@@ -6609,7 +6626,16 @@ function cip_build() {
           // (pas un détourage de tube : buildOps prendrait ce cercle pour le profil du tube)
           const depC = !isWeld && S.part.gen ? r.C.filter(c => c.NS) : [];
           const restC = depC.length ? r.C.filter(c => !c.NS) : r.C;
-          const bo = isWeld ? weldOps(r.C) : restC.length ? buildOps(restC) : { ops: [], notes: [] };
+          const bo =
+            S.part.gen && S.part.gen.cut
+              ? isWeld
+                ? { ops: [], notes: ['Tube à découper : passe le procédé en Découpe.'] }
+                : { ops: cutOpsPlaced(), notes: [] }
+              : isWeld
+                ? weldOps(r.C)
+                : restC.length
+                  ? buildOps(restC)
+                  : { ops: [], notes: [] };
           if (depC.length) {
             let kd = 0;
             instList().forEach(ins =>
@@ -7608,6 +7634,7 @@ function cip_build() {
     w.classList.toggle('cipProcW', W);
     w.classList.toggle('cipProcC', !W);
     w.classList.toggle('cipHasGen', !!(S.part && S.part.gen));
+    w.classList.toggle('cipCutMode', S.genKind === 'cut');
     w.classList.toggle('cipHasDet', !!(S.part && S.part.det));
   }
   function syncProc() {
@@ -8543,6 +8570,795 @@ function cip_build() {
     S.genT = setTimeout(() => genApply(false), 250);
   }
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  // §11b. TUBE À DÉCOUPER (v58)
+  //     n'importe quel profil (rond, carré, rectangle, oblong, section DXF) + des découpes posées dessus :
+  //     bout libre / séparation (droite, biais, gueule de loup), trous ronds / oblongs / rectangles,
+  //     trou de piquage (tube qui rentre), forme DXF. Tout est calculé EXACT sur la surface du tube.
+  //     Repère pièce comme « Créer ma pièce » : axe du tube = y (0 = côté mandrin / séparation, L = bout libre),
+  //     tête côté +z. Angle « tour » : 0° = dessus, 90° = côté +x.
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  const CUT_END = () => ({ type: 'droit', ang: 30, rot: 0, d2: 30, beta: 90, exc: 0 });
+  const CUT_DEF = () => ({
+    prof: 'oblong',
+    d: 40,
+    w: 29.38,
+    h: 12.88,
+    r: 2,
+    ep: 1.5,
+    L: 100,
+    dxf: null,
+    end: CUT_END(),
+    sep: CUT_END(),
+    feats: []
+  });
+  // contour extérieur DENSE (arcs fins) dans le plan (x, z), sens trigo
+  function cutOuter(D) {
+    const rr = (w, h, r) => {
+      r = Math.max(0.01, Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4));
+      const n = Math.max(12, Math.ceil((r * Math.PI) / 2 / 0.2));
+      const cs = [
+        [w / 2 - r, h / 2 - r, 0],
+        [-w / 2 + r, h / 2 - r, 90],
+        [-w / 2 + r, -h / 2 + r, 180],
+        [w / 2 - r, -h / 2 + r, 270]
+      ];
+      const pts = [];
+      for (const [cx, cy, a0] of cs)
+        for (let k = 0; k <= n; k++) {
+          const a = (a0 + (90 * k) / n) * DEG;
+          pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+        }
+      return pts;
+    };
+    let out;
+    if (D.prof === 'rond') {
+      const R = Math.max(1, +D.d / 2 || 20),
+        n = Math.max(180, Math.ceil((2 * Math.PI * R) / 0.3));
+      out = [];
+      for (let k = 0; k < n; k++) out.push([R * Math.cos((2 * Math.PI * k) / n), R * Math.sin((2 * Math.PI * k) / n)]);
+    } else if (D.prof === 'carre') out = rr(+D.w, +D.w, +D.r);
+    else if (D.prof === 'rect') out = rr(+D.w, +D.h, +D.r);
+    else if (D.prof === 'oblong') {
+      const a = Math.max(+D.w, +D.h),
+        b = Math.min(+D.w, +D.h);
+      out = rr(a, b, b / 2);
+    } else {
+      if (!D.dxf || !D.dxf.out || D.dxf.out.length < 3) return null;
+      out = pDensify(pCCW(D.dxf.out), 0.3);
+    }
+    // points en double (arcs qui se touchent) -> dehors
+    const o2 = [];
+    out.forEach(p => {
+      const q = o2[o2.length - 1];
+      if (!q || Math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-5) o2.push(p);
+    });
+    if (Math.hypot(o2[0][0] - o2[o2.length - 1][0], o2[0][1] - o2[o2.length - 1][1]) < 1e-5) o2.pop();
+    return pCCW(o2);
+  }
+  // le profil pour le reste du soft (collisions, tube dans les mors…)
+  function cutProfile(D, out) {
+    const ep = Math.max(0.2, +D.ep || 1);
+    if (D.prof === 'rond') return { cfg: { prof: 'rond', d: +D.d, ep } };
+    if (D.prof === 'carre') return { cfg: { prof: 'carre', w: +D.w, r: +D.r, ep } };
+    if (D.prof === 'rect') return { cfg: { prof: 'rect', w: +D.w, h: +D.h, r: +D.r, ep } };
+    if (D.prof === 'oblong') {
+      const a = Math.max(+D.w, +D.h),
+        b = Math.min(+D.w, +D.h);
+      return { cfg: { prof: 'rect', w: a, h: b, r: b / 2 - 1e-3, ep } };
+    }
+    const inn = pInset(out, ep);
+    if (!inn) return { err: 'Épaisseur trop grande pour cette section.' };
+    let rmax = 0,
+      x0 = 1e9,
+      x1 = -1e9,
+      z0 = 1e9,
+      z1 = -1e9;
+    out.forEach(q => {
+      rmax = Math.max(rmax, Math.hypot(q[0], q[1]));
+      x0 = Math.min(x0, q[0]);
+      x1 = Math.max(x1, q[0]);
+      z0 = Math.min(z0, q[1]);
+      z1 = Math.max(z1, q[1]);
+    });
+    return {
+      cfg: { prof: 'perso', ep },
+      cust: { type: 'perso', out, inn, rmax, ep, R: null, name: (D.dxf && D.dxf.name) || 'DXF', w: x1 - x0, h: z1 - z0 }
+    };
+  }
+  // surface du tube paramétrée par s (longueur le long du contour) : point + normale extérieure
+  function cutSurf(out) {
+    const n = out.length,
+      S0 = [0],
+      en = [];
+    for (let i = 0; i < n; i++) {
+      const a = out[i],
+        b = out[(i + 1) % n];
+      const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      S0.push(S0[i] + l);
+      en.push([(b[1] - a[1]) / (l || 1), -(b[0] - a[0]) / (l || 1)]);
+    }
+    const vn = out.map((_, i) => {
+      const a = en[(i - 1 + n) % n],
+        b = en[i];
+      const x = a[0] + b[0],
+        z = a[1] + b[1],
+        l = Math.hypot(x, z) || 1;
+      return [x / l, z / l];
+    });
+    const per = S0[n];
+    const at = s => {
+      s = ((s % per) + per) % per;
+      let lo = 0,
+        hi = n;
+      while (hi - lo > 1) {
+        const m = (lo + hi) >> 1;
+        if (S0[m] <= s) lo = m;
+        else hi = m;
+      }
+      const i = lo,
+        j = (i + 1) % n,
+        t = (s - S0[i]) / (S0[i + 1] - S0[i] || 1);
+      const nx = vn[i][0] * (1 - t) + vn[j][0] * t,
+        nz = vn[i][1] * (1 - t) + vn[j][1] * t,
+        l = Math.hypot(nx, nz) || 1;
+      return {
+        x: out[i][0] + (out[j][0] - out[i][0]) * t,
+        z: out[i][1] + (out[j][1] - out[i][1]) * t,
+        nx: nx / l,
+        nz: nz / l,
+        s
+      };
+    };
+    // s du point du contour le plus proche de (x, z)
+    const sOf = (x, z) => {
+      let bd = 1e18,
+        bs = 0;
+      for (let i = 0; i < n; i++) {
+        const a = out[i],
+          b = out[(i + 1) % n];
+        const dx = b[0] - a[0],
+          dz = b[1] - a[1];
+        let t = ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1);
+        t = Math.max(0, Math.min(1, t));
+        const d = (a[0] + t * dx - x) ** 2 + (a[1] + t * dz - z) ** 2;
+        if (d < bd) {
+          bd = d;
+          bs = S0[i] + t * (S0[i + 1] - S0[i]);
+        }
+      }
+      return bs;
+    };
+    // toutes les rencontres d'une droite (ox,oz)+t(dx,dz) avec le contour : [{t, s}]
+    const hits = (ox, oz, dx, dz) => {
+      const r = [];
+      for (let i = 0; i < n; i++) {
+        const a = out[i],
+          b = out[(i + 1) % n];
+        const ex = b[0] - a[0],
+          ez = b[1] - a[1];
+        const den = dx * ez - dz * ex;
+        if (Math.abs(den) < 1e-12) continue;
+        const wx = a[0] - ox,
+          wz = a[1] - oz;
+        const t = (wx * ez - wz * ex) / den,
+          u = (wx * dz - wz * dx) / den;
+        if (u >= -1e-9 && u < 1 - 1e-9) r.push({ t, s: S0[i] + u * (S0[i + 1] - S0[i]) });
+      }
+      return r.sort((p, q) => p.t - q.t);
+    };
+    return { out, n, S0, per, at, sOf, hits };
+  }
+  // point du contour dans la direction « tour » rot (0 = dessus +z, 90 = côté +x)
+  function cutAtRot(sf, rot) {
+    const dx = Math.sin(rot * DEG),
+      dz = Math.cos(rot * DEG);
+    const h = sf.hits(0, 0, dx, dz).filter(q => q.t > 0);
+    return h.length ? sf.at(h[h.length - 1].s) : null;
+  }
+  // ---- bouts : y(s) sur chaque colonne du contour + faisceau
+  function cutEnd(E, sf, cols, L, free) {
+    const M = cols.length;
+    let y = new Array(M),
+      D = new Array(M),
+      body = null;
+    const t = E.type || 'droit';
+    const lab = free ? 'bout libre' : 'séparation';
+    if (t === 'droit' || t === 'brut') {
+      for (let k = 0; k < M; k++) {
+        y[k] = free ? L : 0;
+        D[k] = [-cols[k].nx, 0, -cols[k].nz];
+      }
+      return { y, D, kind: t };
+    }
+    if (t === 'biais') {
+      const a = Math.max(-75, Math.min(75, +E.ang || 0)) * DEG,
+        ux = Math.sin((+E.rot || 0) * DEG),
+        uz = Math.cos((+E.rot || 0) * DEG);
+      const m = [Math.sin(a) * ux, Math.cos(a), Math.sin(a) * uz];
+      for (let k = 0; k < M; k++) {
+        const c = cols[k];
+        y[k] = -Math.tan(a) * (c.x * ux + c.z * uz);
+        let d = [-c.nx, 0, -c.nz];
+        d = V.nrm(V.sub(d, V.mul(m, V.dot(d, m))));
+        D[k] = d;
+      }
+    } else if (t === 'gueule') {
+      const R2 = Math.max(0.5, +E.d2 / 2 || 10),
+        be = Math.max(20, Math.min(90, +E.beta || 90)) * DEG,
+        ro = (+E.rot || 0) * DEG,
+        exc = +E.exc || 0;
+      const ap = [Math.cos(ro), 0, -Math.sin(ro)],
+        w = [Math.sin(ro), 0, Math.cos(ro)];
+      const a2 = V.nrm(V.add(V.mul([0, 1, 0], Math.cos(be)), V.mul(ap, Math.sin(be))));
+      const C = V.mul(w, exc);
+      const A = V.sub([0, 1, 0], V.mul(a2, a2[1]));
+      const aa = V.dot(A, A);
+      for (let k = 0; k < M; k++) {
+        const c = cols[k];
+        const w0 = V.sub([c.x, 0, c.z], C);
+        const B = V.sub(w0, V.mul(a2, V.dot(w0, a2)));
+        const bb = 2 * V.dot(A, B),
+          cc = V.dot(B, B) - R2 * R2;
+        const disc = bb * bb - 4 * aa * cc;
+        if (disc < 0)
+          return {
+            err: `Gueule de loup (${lab}) : le tube qui rentre (Ø${(2 * R2).toFixed(1)}) est trop petit, il ne couvre pas toute la largeur du tube. Prends un Ø plus grand, ou fais plutôt un « trou de piquage ».`
+          };
+        const r1 = (-bb - Math.sqrt(disc)) / (2 * aa),
+          r2 = (-bb + Math.sqrt(disc)) / (2 * aa);
+        y[k] = free ? r1 : r2;
+        D[k] = [-c.nx, 0, -c.nz];
+      }
+      body = { C, a2, R2 };
+    } else return { err: 'Type de bout inconnu.' };
+    // cote = longueur HORS TOUT : le point le plus long tombe sur L (bout libre) / sur 0 (séparation)
+    const sh = free ? L - Math.max(...y) : -Math.min(...y);
+    y = y.map(v => v + sh);
+    if (body) body.C = V.add(body.C, [0, sh, 0]);
+    return { y, D, kind: t, body };
+  }
+  // ---- formes 2D (u = autour du tube, v = le long du tube), centrées
+  function cutShape(F) {
+    const out = [];
+    const arcs = (w, h, r) => {
+      r = Math.max(0, Math.min(r, w / 2, h / 2));
+      if (r < 1e-3)
+        return [
+          [w / 2, h / 2],
+          [-w / 2, h / 2],
+          [-w / 2, -h / 2],
+          [w / 2, -h / 2]
+        ];
+      const n = Math.max(8, Math.ceil((r * Math.PI) / 2 / 0.25)),
+        p = [];
+      [
+        [w / 2 - r, h / 2 - r, 0],
+        [-w / 2 + r, h / 2 - r, 90],
+        [-w / 2 + r, -h / 2 + r, 180],
+        [w / 2 - r, -h / 2 + r, 270]
+      ].forEach(([cx, cy, a0]) => {
+        for (let k = 0; k <= n; k++) {
+          const a = (a0 + (90 * k) / n) * DEG;
+          p.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+        }
+      });
+      return p;
+    };
+    if (F.type === 'rond') {
+      const R = Math.max(0.1, +F.d / 2 || 5),
+        n = Math.max(48, Math.ceil((2 * Math.PI * R) / 0.25));
+      for (let k = 0; k < n; k++) out.push([R * Math.cos((2 * Math.PI * k) / n), R * Math.sin((2 * Math.PI * k) / n)]);
+    } else if (F.type === 'oblong') {
+      const l = Math.max(+F.l || 10, +F.w || 4),
+        w = Math.max(0.2, +F.w || 4);
+      arcs(w, l, w / 2).forEach(p => out.push(p));
+    } else if (F.type === 'rect')
+      arcs(Math.max(0.2, +F.w || 5), Math.max(0.2, +F.l || 10), +F.r || 0).forEach(p => out.push(p));
+    else if (F.type === 'dxf') {
+      if (!F.pts || F.pts.length < 3) return null;
+      const sc = (+F.sc || 100) / 100;
+      F.pts.forEach(p => out.push([p[0] * sc, p[1] * sc]));
+    }
+    const a = (+F.ang || 0) * DEG;
+    // dédoublonne
+    const r = [];
+    out.forEach(p => {
+      const q = [p[0] * Math.cos(a) - p[1] * Math.sin(a), p[0] * Math.sin(a) + p[1] * Math.cos(a)];
+      const z = r[r.length - 1];
+      if (!z || Math.hypot(q[0] - z[0], q[1] - z[1]) > 1e-5) r.push(q);
+    });
+    return r;
+  }
+  // ---- tout le calcul : contours (ops) + maillage 3D
+  function cutBuild(D) {
+    const out = cutOuter(D);
+    if (!out) return { err: 'Importe la section du tube (DXF) ou choisis une forme.' };
+    const pp = cutProfile(D, out);
+    if (pp.err) return { err: pp.err };
+    const L = +D.L;
+    if (!(L > 1)) return { err: 'Longueur impossible.' };
+    const ep = Math.max(0.2, +D.ep || 1);
+    const sf = cutSurf(out);
+    const M = Math.max(120, Math.ceil(sf.per / 0.4));
+    // colonnes : on part du DESSUS (tour 0°) -> le départ des coupes de bout est sous la tête à C1 = 0
+    const top = cutAtRot(sf, 0);
+    const s0 = top ? top.s : 0;
+    const cols = [];
+    for (let k = 0; k < M; k++) cols.push(sf.at(s0 + (k * sf.per) / M));
+    const eTop =
+      D.end.type === 'brut' ? { y: cols.map(() => L), D: null, kind: 'brut' } : cutEnd(D.end, sf, cols, L, true);
+    if (eTop.err) return { err: eTop.err };
+    const eBot = cutEnd(D.sep, sf, cols, L, false);
+    if (eBot.err) return { err: eBot.err };
+    for (let k = 0; k < M; k++)
+      if (eTop.y[k] - eBot.y[k] < 0.5)
+        return { err: 'Les deux bouts se croisent : la pièce est trop courte pour ces coupes. Rallonge-la.' };
+    const ops = [],
+      holes = [],
+      bodies = [];
+    const ring = (e, nm, step) => {
+      const P = [],
+        Dd = [];
+      for (let k = 0; k <= M; k++) {
+        const c = cols[k % M];
+        P.push([c.x, e.y[k % M], c.z]);
+        Dd.push(e.D[k % M].slice());
+      }
+      ops.push({ name: nm, step, P, D: Dd });
+    };
+    const enm = { droit: '(droite)', biais: '(en biais)', gueule: '(gueule de loup)' };
+    if (eTop.kind !== 'brut') ring(eTop, 'Bout libre ' + enm[eTop.kind], 1);
+    if (eTop.body) bodies.push(eTop.body);
+    if (eBot.body) bodies.push(eBot.body);
+    // découpes posées sur le tube
+    let kh = 0;
+    const NAMES = { rond: 'Trou Ø', oblong: 'Oblong', rect: 'Rectangle', piq: 'Piquage', dxf: 'Forme' };
+    for (let fi = 0; fi < D.feats.length; fi++) {
+      const F = D.feats[fi];
+      const nmF = `${fi + 1}. ${NAMES[F.type] || 'Découpe'}${F.type === 'rond' ? F.d : ''}`;
+      const pos = +F.pos || 0;
+      if (F.type === 'piq') {
+        const R2 = Math.max(0.2, +F.d2 / 2 || 5),
+          be = Math.max(15, Math.min(90, +F.beta || 90)) * DEG,
+          ro = (+F.rot || 0) * DEG,
+          exc = +F.exc || 0;
+        const nr = [Math.sin(ro), 0, Math.cos(ro)],
+          w = [Math.cos(ro), 0, -Math.sin(ro)];
+        const a2 = V.nrm(V.add(V.mul([0, 1, 0], Math.cos(be)), V.mul(nr, Math.sin(be))));
+        const e2 = V.nrm(V.cross(a2, w));
+        const C = V.add([0, pos, 0], V.mul(w, exc));
+        const n = Math.max(72, Math.ceil((2 * Math.PI * R2) / 0.3));
+        const Po = [],
+          Pi = [];
+        for (let k = 0; k <= n; k++) {
+          const ps = (2 * Math.PI * (k % n)) / n;
+          const L0 = V.add(C, V.add(V.mul(w, R2 * Math.cos(ps)), V.mul(e2, R2 * Math.sin(ps))));
+          const h = sf.hits(L0[0], L0[2], a2[0], a2[2]);
+          if (h.length < 2)
+            return { err: `${nmF} : le tube qui rentre déborde du tube (Ø trop grand ou décalage trop grand).` };
+          const hi = h[h.length - 1],
+            lo = h[0];
+          Po.push(V.add(L0, V.mul(a2, hi.t)));
+          Pi.push(V.add(L0, V.mul(a2, lo.t)));
+        }
+        ops.push({ name: nmF, step: 2, P: Po, D: Po.map(() => V.mul(a2, -1)) });
+        holes.push(Po);
+        if (F.trav) {
+          ops.push({ name: nmF + ' (côté opposé)', step: 2, P: Pi, D: Pi.map(() => a2.slice()) });
+          holes.push(Pi);
+        }
+        bodies.push({ C, a2, R2, tube: true });
+        continue;
+      }
+      const sh = cutShape(F);
+      if (!sh || sh.length < 3) return { err: `${nmF} : forme vide (importe un DXF fermé).` };
+      const c = cutAtRot(sf, +F.rot || 0);
+      if (!c) return { err: `${nmF} : position autour du tube impossible.` };
+      const t = [c.nz, -c.nx]; // autour du tube (dans le plan x,z)
+      const H = 3 * (sf.per / 2 + 10);
+      const P = [];
+      for (const [u, v] of sh) {
+        const ox = c.x + u * t[0] + H * c.nx,
+          oz = c.z + u * t[1] + H * c.nz;
+        const h = sf.hits(ox, oz, -c.nx, -c.nz).filter(q => q.t > 0);
+        if (!h.length) return { err: `${nmF} : la forme est plus large que la face du tube.` };
+        const q = sf.at(h[0].s);
+        if (q.nx * c.nx + q.nz * c.nz < Math.cos(70 * DEG))
+          return { err: `${nmF} : la forme déborde sur un arrondi / une autre face (le faisceau serait trop rasant).` };
+        P.push([q.x, pos + v, q.z]);
+      }
+      P.push(P[0].slice());
+      const yy = P.map(p => p[1]);
+      for (let k = 0; k < P.length; k++) {
+        const s = sf.sOf(P[k][0], P[k][2]),
+          kk = Math.round((s / sf.per) * M) % M;
+        if (P[k][1] > eTop.y[kk] - 0.3 || P[k][1] < eBot.y[kk] + 0.3)
+          return {
+            err: `${nmF} : sort de la pièce (trop près d'un bout). Change sa position (${Math.min(...yy).toFixed(1)} → ${Math.max(...yy).toFixed(1)} mm).`
+          };
+      }
+      ops.push({ name: nmF, step: 2, P, D: P.map(() => [-c.nx, 0, -c.nz]) });
+      holes.push(P);
+      kh++;
+    }
+    ring(eBot, 'Séparation ' + enm[eBot.kind], 4);
+    // ---- maillage : peau extérieure + intérieure + bords, trous retirés (dans le plan déroulé s, y)
+    const HP = holes.map(P => {
+      const ss = P.map(p => sf.sOf(p[0], p[2]));
+      const sc = ss[0];
+      const wrap = d => d - sf.per * Math.round(d / sf.per);
+      const poly = P.map((p, i) => [wrap(ss[i] - sc), p[1]]);
+      let u0 = 1e9,
+        u1 = -1e9,
+        y0 = 1e9,
+        y1 = -1e9;
+      poly.forEach(q => {
+        u0 = Math.min(u0, q[0]);
+        u1 = Math.max(u1, q[0]);
+        y0 = Math.min(y0, q[1]);
+        y1 = Math.max(y1, q[1]);
+      });
+      return { sc, poly, u0, u1, y0, y1, wrap };
+    });
+    const inHole = (s, y) =>
+      HP.some(h => {
+        const u = h.wrap(s - h.sc);
+        return u >= h.u0 && u <= h.u1 && y >= h.y0 && y <= h.y1 && G.inPoly(h.poly, u, y);
+      });
+    const pos = [],
+      idx = [];
+    let nv = 0;
+    const vtx = p => {
+      pos.push(p[0], p[1], p[2]);
+      return nv++;
+    };
+    let maxH = 0;
+    for (let k = 0; k < M; k++) maxH = Math.max(maxH, eTop.y[k] - eBot.y[k]);
+    const N = Math.max(2, Math.ceil(maxH / 0.6));
+    const ofs = (c, k, j, inner) => {
+      const y = eBot.y[k] + ((eTop.y[k] - eBot.y[k]) * j) / N;
+      return inner ? [c.x - ep * c.nx, y, c.z - ep * c.nz] : [c.x, y, c.z];
+    };
+    const grid = inner => {
+      const id = [];
+      for (let k = 0; k < M; k++) {
+        const row = [];
+        for (let j = 0; j <= N; j++) row.push(vtx(ofs(cols[k], k, j, inner)));
+        id.push(row);
+      }
+      return id;
+    };
+    const go = grid(false),
+      gi = grid(true);
+    for (let k = 0; k < M; k++) {
+      const k2 = (k + 1) % M;
+      for (let j = 0; j < N; j++) {
+        const sm = cols[k].s + sf.per / M / 2;
+        const ym =
+          (eBot.y[k] + eBot.y[k2]) / 2 + ((eTop.y[k] - eBot.y[k] + eTop.y[k2] - eBot.y[k2]) / 2) * ((j + 0.5) / N);
+        if (HP.length && inHole(sm, ym)) continue;
+        idx.push(go[k][j], go[k2][j], go[k2][j + 1], go[k][j], go[k2][j + 1], go[k][j + 1]);
+        idx.push(gi[k][j], gi[k2][j + 1], gi[k2][j], gi[k][j], gi[k][j + 1], gi[k2][j + 1]);
+      }
+      // bords (épaisseur) aux deux bouts
+      idx.push(go[k][0], gi[k][0], gi[k2][0], go[k][0], gi[k2][0], go[k2][0]);
+      idx.push(go[k][N], go[k2][N], gi[k2][N], go[k][N], gi[k2][N], gi[k][N]);
+    }
+    // tubes qui rentrent (affichés en rouge transparent)
+    bodies.forEach(b => {
+      const u = Math.abs(b.a2[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+      const e1 = V.nrm(V.cross(b.a2, u)),
+        e2 = V.cross(b.a2, e1);
+      const n = 48,
+        Lb = Math.max(3 * b.R2, 40);
+      const base = nv;
+      for (let k = 0; k < n; k++) {
+        const a = (2 * Math.PI * k) / n;
+        const r = V.add(V.mul(e1, b.R2 * Math.cos(a)), V.mul(e2, b.R2 * Math.sin(a)));
+        vtx(V.add(V.add(b.C, r), V.mul(b.a2, -Lb)));
+        vtx(V.add(V.add(b.C, r), V.mul(b.a2, Lb)));
+      }
+      for (let k = 0; k < n; k++) {
+        const a = base + 2 * k,
+          c = base + 2 * ((k + 1) % n);
+        idx.push(a, c, c + 1, a, c + 1, a + 1);
+      }
+    });
+    const nb = ops.filter(o => o.step === 2).length;
+    return {
+      ops,
+      pos,
+      idx,
+      L,
+      pp,
+      info: `${eTop.kind === 'brut' ? 'bout libre brut' : 'bout libre ' + enm[eTop.kind]}, ${nb} découpe(s), séparation ${enm[eBot.kind]}`
+    };
+  }
+  function cutMemLoad() {
+    try {
+      const v = (S.genMem && S.genMem.cut) || JSON.parse(localStorage.getItem('cipCut') || 'null');
+      if (!v || !v.end) return null;
+      return Object.assign(CUT_DEF(), JSON.parse(JSON.stringify(v)));
+    } catch (e) {
+      return null;
+    }
+  }
+  function cutMemSave() {
+    S.genMem = S.genMem || {};
+    S.genMem.cut = JSON.parse(JSON.stringify(S.cutDef));
+    try {
+      localStorage.setItem('cipCut', JSON.stringify(S.cutDef));
+    } catch (e) {}
+  }
+  function cutApply(first) {
+    S.srcMesh = null;
+    const def = S.cutDef;
+    const msg = $('cipCutMsg');
+    if ($('cipProc').value === 'soudure') {
+      if (msg)
+        msg.innerHTML = '<span class="cipBad">Le tube à découper, c\'est pour la DÉCOUPE : change le procédé.</span>';
+      return false;
+    }
+    let r;
+    try {
+      r = cutBuild(def);
+    } catch (e) {
+      console.warn(e);
+      r = { err: 'Calcul impossible : ' + e.message };
+    }
+    if (r.err) {
+      if (msg) msg.innerHTML = '<span class="cipBad">' + r.err + '</span>';
+      return false;
+    }
+    if (msg) msg.innerHTML = '<span class="cipOk">' + r.ops.length + ' contour(s) de découpe : ' + r.info + '.</span>';
+    cutMemSave();
+    const g = G.weld([
+      { attributes: { position: { array: new Float32Array(r.pos) } }, index: { array: new Uint32Array(r.idx) } }
+    ]);
+    G.triInfo(g);
+    const f = {
+      c: [0, 0, 0],
+      u: [1, 0, 0],
+      ax: [0, 1, 0],
+      v: [0, 0, 1],
+      round: def.prof === 'rond',
+      rOut: +def.d / 2,
+      rIn: +def.d / 2 - def.ep
+    };
+    G.toModel(g, f);
+    const keep = S.part && S.part.gen && S.part.gen.cut && !first;
+    const PN = {
+      rond: 'rond Ø' + def.d,
+      carre: 'carré ' + def.w,
+      rect: 'rect. ' + def.w + '×' + def.h,
+      oblong: 'oblong ' + def.w + '×' + def.h,
+      dxf: 'section DXF'
+    };
+    S.part = {
+      g,
+      base: g.M.map(p => p.slice()),
+      fit: f,
+      name: 'TUBE-DECOUPE',
+      info: `<b>Tube à découper</b> · ${PN[def.prof] || ''} ép. ${def.ep}, L ${def.L} mm<br>`,
+      gen: {
+        cut: true,
+        ops: r.ops,
+        seams: [],
+        R: r.pp.cust ? r.pp.cust.rmax : +def.d / 2,
+        L: r.L,
+        def: JSON.parse(JSON.stringify(def))
+      },
+      fitL: !keep
+    };
+    if (!keep) {
+      S.flip = false;
+      S.order = null;
+      S.inst = [{ a: 0, dy: 0 }];
+      S.starts = {};
+      S.startB = {};
+      S.off = {};
+      S.wz = { d1: false, d2: false, x: null, key: '' };
+      $('cipPRot').value = 0;
+      $('cipPOff').value = 20;
+    }
+    S.geoC = null;
+    Object.assign(S.cfg, r.pp.cfg);
+    if (r.pp.cust) S.custProf = r.pp.cust;
+    syncForm();
+    rebuildAll(true);
+    if (first) setMapping();
+    return true;
+  }
+  function cutSoon(now) {
+    cutMemSave();
+    clearTimeout(S.cutT);
+    S.cutT = setTimeout(() => cutApply(false), now ? 0 : 250);
+  }
+  // les contours, placés comme la pièce (rotation / décalage / retournement + pièces multiples)
+  function cutOpsPlaced() {
+    const pl = S.part.g.pl || { rho: 0, dy: 0, flip: false };
+    const XP = p => {
+        let q = pl.flip ? [-p[0], -p[1], p[2]] : p.slice();
+        q = rotM(q, pl.rho || 0);
+        q[1] += pl.dy || 0;
+        return q;
+      },
+      XV = v => rotM(pl.flip ? [-v[0], -v[1], v[2]] : v.slice(), pl.rho || 0);
+    const ops = [];
+    const inst = instList();
+    inst.forEach((ins, ii) =>
+      S.part.gen.ops.forEach(o => {
+        ops.push({
+          name: o.name + (inst.length > 1 ? ' · pièce ' + (ii + 1) : ''),
+          step: o.step,
+          P: o.P.map(p => {
+            const q = rotM(XP(p), ins.a);
+            return [q[0], q[1] + ins.dy, q[2]];
+          }),
+          D: o.D.map(d => rotM(XV(d), ins.a)),
+          mode: 'continu',
+          A: 0
+        });
+      })
+    );
+    return ops;
+  }
+  // ---- le panneau (tout est redessiné depuis S.cutDef)
+  function cutRender() {
+    const box = $('cipCutBody');
+    if (!box) return;
+    const D = S.cutDef;
+    const num = (path, lab, val, tip, st, extra) =>
+      `<div class="cipNum"${tip ? ` data-tip="${tip}"` : ''}><span>${lab}</span><input type="number" step="${st || 1}" value="${val}" data-ck="${path}" ${extra || ''}></div>`;
+    const sel = (path, lab, val, opts, tip) =>
+      `<div class="cipNum"${tip ? ` data-tip="${tip}"` : ''}><span>${lab}</span><select data-ck="${path}" style="width:150px">${opts.map(([v, t]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
+    const H = t => `<div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">${t}</div>`;
+    let h = H('LE TUBE');
+    h += sel('prof', 'Section', D.prof, [
+      ['rond', 'Rond'],
+      ['carre', 'Carré'],
+      ['rect', 'Rectangle'],
+      ['oblong', 'Oblong (ovale plat)'],
+      ['dxf', 'Section DXF importée']
+    ]);
+    if (D.prof === 'rond') h += num('d', 'Ø extérieur (mm)', D.d, '', 0.01);
+    else if (D.prof === 'dxf')
+      h += `<div class="cipRow"><button class="cipBtn" style="flex:1" onclick="cip_ui('cutdxf','prof')">📂 ${D.dxf ? 'Changer la section (' + D.dxf.name + ')' : 'Importer la section (DXF)'}</button></div>`;
+    else {
+      h += num('w', D.prof === 'carre' ? 'Côté (mm)' : 'Largeur (mm)', D.w, '', 0.01);
+      if (D.prof !== 'carre') h += num('h', 'Hauteur (mm)', D.h, '', 0.01);
+      if (D.prof !== 'oblong') h += num('r', 'Rayon des angles (mm)', D.r, '', 0.1);
+    }
+    h += num('ep', 'Épaisseur (mm)', D.ep, 'Épaisseur de paroi du tube.', 0.1);
+    h += num(
+      'L',
+      'Longueur hors tout (mm)',
+      D.L,
+      'Longueur de la pièce finie, du point le plus long au point le plus long.',
+      0.1
+    );
+    const endUI = (k, title, isFree) => {
+      const E = D[k];
+      let s = H(title);
+      s += sel(k + '.type', 'Coupe', E.type, [
+        ...(isFree ? [['brut', 'Aucune (bout déjà coupé)']] : []),
+        ['droit', 'Droite'],
+        ['biais', 'En biais (onglet)'],
+        ['gueule', 'Gueule de loup']
+      ]);
+      if (E.type === 'biais') {
+        s += num(
+          k + '.ang',
+          'Angle (°)',
+          E.ang,
+          "Angle de la coupe par rapport à une coupe droite (0 = droite, 45 = onglet d'un coude à 90°).",
+          0.5
+        );
+        s += num(
+          k + '.rot',
+          'Sens (tour, °)',
+          E.rot,
+          'De quel côté la coupe penche : 0 = dessus, 90 = sur le côté, 180 = dessous.',
+          1
+        );
+      } else if (E.type === 'gueule') {
+        s += num(
+          k + '.d2',
+          'Ø du tube qui vient dessus (mm)',
+          E.d2,
+          'Diamètre EXTÉRIEUR du tube sur lequel ce bout vient se poser.',
+          0.1
+        );
+        s += num(
+          k + '.beta',
+          'Angle entre les 2 tubes (°)',
+          E.beta,
+          '90 = en T. Moins = piquage incliné (mini 20°).',
+          0.5
+        );
+        s += num(
+          k + '.rot',
+          'Sens (tour, °)',
+          E.rot,
+          "Orientation de l'autre tube autour du tien : 0 = il est couché de gauche à droite (vu de dessus), 90 = d'avant en arrière.",
+          1
+        );
+        s += num(k + '.exc', 'Décalage (mm)', E.exc, 'Décalage entre les 2 axes (0 = centrés).', 0.1);
+      }
+      return s;
+    };
+    h += endUI('end', 'BOUT LIBRE (côté vide)', true);
+    h += H('DÉCOUPES SUR LE TUBE');
+    const NAMES = {
+      rond: 'Trou rond',
+      oblong: 'Trou oblong',
+      rect: 'Trou rectangle',
+      piq: 'Trou de piquage',
+      dxf: 'Forme DXF'
+    };
+    h += D.feats
+      .map((F, i) => {
+        const p = 'feats.' + i + '.';
+        let s = `<div class="cipGB"><div class="cipRow" style="justify-content:space-between;margin:0 0 4px"><b style="font-size:13px">${i + 1}. ${NAMES[F.type]}</b><button class="cipBtn" style="padding:1px 7px" onclick="cip_ui('cutdel',${i})" data-tip="Enlever cette découpe.">✕</button></div>`;
+        if (F.type === 'rond') s += num(p + 'd', 'Ø (mm)', F.d, '', 0.01);
+        if (F.type === 'oblong' || F.type === 'rect') {
+          s += num(p + 'l', 'Longueur (mm)', F.l, 'Le grand côté (le long du tube si « rotation » = 0).', 0.01);
+          s += num(p + 'w', 'Largeur (mm)', F.w, '', 0.01);
+          if (F.type === 'rect') s += num(p + 'r', 'Rayon des angles (mm)', F.r, '', 0.1);
+        }
+        if (F.type === 'dxf') {
+          s += `<div class="cipRow"><button class="cipBtn" style="flex:1" onclick="cip_ui('cutdxf',${i})">📂 ${F.pts ? 'Changer (' + F.name + ')' : 'Importer la forme (DXF à plat)'}</button></div>`;
+          s += num(p + 'sc', 'Échelle (%)', F.sc, '', 1);
+        }
+        if (F.type === 'piq') {
+          s += num(
+            p + 'd2',
+            'Ø du tube qui rentre (mm)',
+            F.d2,
+            'Diamètre EXTÉRIEUR du tube qui passe dans ce trou.',
+            0.01
+          );
+          s += num(
+            p + 'beta',
+            'Angle avec le tube (°)',
+            F.beta,
+            '90 = perpendiculaire. Moins = incliné vers le bout libre.',
+            0.5
+          );
+          s += num(p + 'exc', 'Décalage (mm)', F.exc, "Décalage de côté entre l'axe du trou et l'axe du tube.", 0.1);
+          s += `<label class="cipChk"><input type="checkbox" data-ck="${p}trav" ${F.trav ? 'checked' : ''}> Traversant (aussi la paroi d'en face)</label>`;
+        }
+        s += num(
+          p + 'pos',
+          'Position (mm depuis la séparation)',
+          F.pos,
+          'Distance du centre de la découpe au bout côté mandrin (séparation).',
+          0.1
+        );
+        s += num(p + 'rot', 'Tour (°)', F.rot, 'Où autour du tube : 0 = dessus, 90 = côté, 180 = dessous.', 1);
+        if (F.type !== 'rond' && F.type !== 'piq')
+          s += num(p + 'ang', 'Rotation de la forme (°)', F.ang, '0 = grand côté le long du tube, 90 = en travers.', 1);
+        return s + '</div>';
+      })
+      .join('');
+    h += `<div class="cipRow" style="flex-wrap:wrap"><button class="cipBtn" onclick="cip_ui('cutadd','rond')">+ Trou rond</button><button class="cipBtn" onclick="cip_ui('cutadd','oblong')">+ Oblong</button><button class="cipBtn" onclick="cip_ui('cutadd','rect')">+ Rectangle</button><button class="cipBtn" onclick="cip_ui('cutadd','piq')">+ Piquage</button><button class="cipBtn" onclick="cip_ui('cutadd','dxf')">+ Forme DXF</button></div>`;
+    h += endUI('sep', 'SÉPARATION (côté mandrin, coupée en dernier)', false);
+    box.innerHTML = h;
+  }
+  function cutField(el) {
+    const path = el.dataset.ck.split('.');
+    let o = S.cutDef;
+    for (let i = 0; i < path.length - 1; i++) o = o[path[i]];
+    const k = path[path.length - 1];
+    if (el.type === 'checkbox') o[k] = el.checked;
+    else if (el.tagName === 'SELECT') o[k] = el.value;
+    else o[k] = el.value === '' ? '' : +el.value;
+    if (el.tagName === 'SELECT' || el.type === 'checkbox') {
+      cutRender();
+      cutSoon(true);
+    } else cutSoon();
+  }
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
   // §12. CODE COULEUR DES COTES
   //     chaque cote a sa couleur, et la 3D montre ce qu'elle change
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -8625,7 +9441,7 @@ function cip_build() {
       mtHL(key.slice(2));
       return;
     }
-    if (!key || !S.part || !S.part.gen || !w || w.dataset.step !== 'build') return;
+    if (!key || !S.part || !S.part.gen || S.part.gen.cut || !w || w.dataset.step !== 'build') return;
     const Gn = S.part.gen,
       D = Gn.def,
       [who, k] = key.split(':');
@@ -9180,7 +9996,15 @@ function cip_build() {
   //     on tourne la pièce dans le soft pour que le 1er point soit sous la tête à C1 = 0
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
   function c0Fix() {
-    if (!S.part || !S.prog || S.prog.frames || !F.length || !$('cipC0') || !$('cipC0').checked) {
+    if (
+      !S.part ||
+      !S.prog ||
+      S.prog.frames ||
+      !F.length ||
+      !$('cipC0') ||
+      !$('cipC0').checked ||
+      (S.part.gen && S.part.gen.cut && S.profile && S.profile.type !== 'rond')
+    ) {
       S._c0 = null;
       return;
     }
@@ -9220,7 +10044,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v57',
+  const CIP_VER = 'CIP v58',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -13124,6 +13948,7 @@ function cip_build() {
     $('cipPartPage').style.display = '';
     const W = $('cipProc').value === 'soudure';
     if ($('cipCardMiter')) $('cipCardMiter').style.display = W ? '' : 'none';
+    if ($('cipCardCut')) $('cipCardCut').style.display = W ? 'none' : '';
     $('cipPartProc').textContent = W ? '🔥 Soudure' : '✂ Découpe laser';
     $('cipPartKeepBtn').textContent = S.part ? 'Garder la pièce actuelle →' : 'Continuer sans pièce →';
     $('cipCardDemoT').textContent = W ? '▶ Exemple : tube en T' : '▶ Exemple : tuiles';
@@ -14183,6 +15008,8 @@ function cip_build() {
       }
     };
     if (S.miter) P.part = { type: 'miter' };
+    else if (S.part && S.part.gen && S.part.gen.cut)
+      P.part = { type: 'cut', def: JSON.parse(JSON.stringify(S.cutDef)) };
     else if (S.part && S.part.gen) P.part = { type: 'gen', def: JSON.parse(JSON.stringify(S.genDef)) };
     else if (S.part && S.srcMesh)
       P.part = {
@@ -14239,7 +15066,14 @@ function cip_build() {
       return;
     }
     mtLeave();
-    if (t === 'gen') {
+    if (t === 'cut') {
+      S.genKind = 'cut';
+      S.cutDef = Object.assign(CUT_DEF(), JSON.parse(JSON.stringify(P.part.def)));
+      showWork('build');
+      uiFlags();
+      cutRender();
+      cutApply(true);
+    } else if (t === 'gen') {
       S.genKind = 'proj'; // un projet ouvert n'écrase pas les cotes gardées
       S.genDef = JSON.parse(JSON.stringify(P.part.def));
       showWork('build');
@@ -14353,6 +15187,73 @@ function cip_build() {
   // choix faits à la main : on ne les écrase plus avec les valeurs automatiques
   try {
     $('cipRetMode').addEventListener('change', () => (S.retUser = true));
+    {
+      const cb = $('cipCutBox');
+      if (cb) {
+        cb.addEventListener('input', e => {
+          if (e.target.dataset && e.target.dataset.ck && e.target.tagName === 'INPUT' && e.target.type !== 'checkbox')
+            cutField(e.target);
+        });
+        cb.addEventListener('change', e => {
+          if (
+            e.target.dataset &&
+            e.target.dataset.ck &&
+            (e.target.tagName === 'SELECT' || e.target.type === 'checkbox')
+          )
+            cutField(e.target);
+        });
+      }
+      const cf = $('cipCutFile');
+      if (cf)
+        cf.onchange = () => {
+          const f = cf.files[0];
+          cf.value = '';
+          if (!f) return;
+          f.text().then(t => {
+            let r;
+            try {
+              r = dxfParse(t);
+            } catch (e) {
+              r = { loops: [] };
+            }
+            const msg = $('cipCutMsg');
+            if (!r.loops.length) {
+              if (msg) msg.innerHTML = '<span class="cipBad">Aucun contour FERMÉ dans ce DXF.</span>';
+              return;
+            }
+            const k = r.units === 1 ? 25.4 : 1;
+            let big = r.loops[0];
+            r.loops.forEach(l => {
+              if (Math.abs(pArea(l)) > Math.abs(pArea(big))) big = l;
+            });
+            let x0 = 1e9,
+              x1 = -1e9,
+              y0 = 1e9,
+              y1 = -1e9;
+            big.forEach(q => {
+              x0 = Math.min(x0, q[0]);
+              x1 = Math.max(x1, q[0]);
+              y0 = Math.min(y0, q[1]);
+              y1 = Math.max(y1, q[1]);
+            });
+            const pts = big.map(q => [(q[0] - (x0 + x1) / 2) * k, (q[1] - (y0 + y1) / 2) * k]);
+            const nm = f.name.replace(/\.dxf$/i, '');
+            const D = S.cutDef;
+            if (S.cutDxfFor === 'prof') {
+              D.dxf = { out: pts, name: nm };
+              D.prof = 'dxf';
+            } else {
+              const F = D.feats[+S.cutDxfFor];
+              if (F) {
+                F.pts = pts;
+                F.name = nm;
+              }
+            }
+            cutRender();
+            cutSoon(true);
+          });
+        };
+    }
     ['cipMtName', 'cipMtTech', 'cipMtDry', 'cipLName', 'cipLTW', 'cipLDry'].forEach(id => {
       const e = $(id);
       if (e) ['input', 'change'].forEach(t => e.addEventListener(t, ev => ev.isTrusted && dlStale()));
@@ -14960,6 +15861,47 @@ function cip_build() {
           genRender();
           genApply(true);
         } else genRender();
+        return;
+      } else if (a === 'partcut') {
+        // tube à découper : profil au choix + coupes de bout + trous / piquages / formes
+        mtLeave();
+        if (S.genKind !== 'cut' || !(S.part && S.part.gen && S.part.gen.cut)) {
+          S.genKind = 'cut';
+          S.cutDef = cutMemLoad() || CUT_DEF();
+          showWork('build');
+          uiFlags();
+          cutRender();
+          cutApply(true);
+        } else {
+          showWork('build');
+          uiFlags();
+          cutRender();
+        }
+        return;
+      } else if (a === 'cutadd') {
+        const D = S.cutDef;
+        const y = Math.round(+D.L / 2);
+        D.feats.push(
+          {
+            rond: { type: 'rond', d: 6, pos: y, rot: 0 },
+            oblong: { type: 'oblong', l: 12, w: 5, pos: y, rot: 0, ang: 0 },
+            rect: { type: 'rect', l: 12, w: 6, r: 0.5, pos: y, rot: 0, ang: 0 },
+            piq: { type: 'piq', d2: 10, beta: 90, exc: 0, pos: y, rot: 0, trav: false },
+            dxf: { type: 'dxf', pts: null, name: '', sc: 100, pos: y, rot: 0, ang: 0 }
+          }[v]
+        );
+        cutRender();
+        if (v === 'dxf') cip_ui('cutdxf', D.feats.length - 1);
+        else cutSoon(true);
+        return;
+      } else if (a === 'cutdel') {
+        S.cutDef.feats.splice(+v, 1);
+        cutRender();
+        cutSoon(true);
+        return;
+      } else if (a === 'cutdxf') {
+        S.cutDxfFor = v;
+        $('cipCutFile').click();
         return;
       } else if (a === 'partcreate') {
         mtLeave();
