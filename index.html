@@ -6456,7 +6456,7 @@ function cip_build() {
     if (!S.part) return;
     const P = S.part;
     // tube à découper NON rond : la pièce ne tourne pas toute seule dans le tube (le profil ne suivrait pas)
-    const rho = P.gen && P.gen.cut && S.profile && S.profile.type !== 'rond' ? 0 : +$('cipPRot').value || 0;
+    const rho = P.gen && P.gen.cut ? 0 : +$('cipPRot').value || 0;
     // SOUDURE : la pièce EST le tube tenu dans les mors -> son bout libre est au bout (distance 0),
     // et c'est l'Offset X (90°) / Z (à plat) = ce qui dépasse des mors qui dit si la tête tape. On ne le change jamais.
     // corps DÉPORTÉ sur la face du bout : cette face doit être le bout libre (sinon le tube qui dépasse cache la face)
@@ -8577,6 +8577,7 @@ function cip_build() {
   //     Repère pièce comme « Créer ma pièce » : axe du tube = y (0 = côté mandrin / séparation, L = bout libre),
   //     tête côté +z. Angle « tour » : 0° = dessus, 90° = côté +x.
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  const CUT_C1SIGN = -1;
   const CUT_END = () => ({ type: 'droit', ang: 30, rot: 0, d2: 30, beta: 90, exc: 0 });
   const CUT_DEF = () => ({
     prof: 'oblong',
@@ -8586,6 +8587,7 @@ function cip_build() {
     r: 2,
     ep: 1.5,
     L: 100,
+    c1: 0,
     dxf: null,
     end: CUT_END(),
     sep: CUT_END(),
@@ -9065,6 +9067,53 @@ function cip_build() {
       }
     });
     const nb = ops.filter(o => o.step === 2).length;
+    // v59 : pièce serrée TOURNÉE dans le mandrin (dessus de la pièce sous la tête à C1 = c1) -> on tourne TOUT
+    // (contours, 3D, profil du tube) : le programme part alors à C1 = c1, et X/Y/Z suivent
+    const c1 = CUT_C1SIGN * (+D.c1 || 0);
+    if (Math.abs(c1) > 1e-9) {
+      ops.forEach(o => {
+        o.P = o.P.map(q => rotM(q, c1));
+        o.D = o.D.map(q => rotM(q, c1));
+      });
+      for (let i = 0; i < pos.length; i += 3) {
+        const q = rotM([pos[i], pos[i + 1], pos[i + 2]], c1);
+        pos[i] = q[0];
+        pos[i + 2] = q[2];
+      }
+      if (D.prof !== 'rond') {
+        const r2 = P2 =>
+          P2.map(q => {
+            const t = rotM([q[0], 0, q[1]], c1);
+            return [t[0], t[2]];
+          });
+        const base =
+          pp.cust ||
+          G.profile({ type: pp.cfg.prof, d: pp.cfg.d, w: pp.cfg.w, h: pp.cfg.h, r: pp.cfg.r, ep: pp.cfg.ep });
+        let x0 = 1e9,
+          x1 = -1e9,
+          z0 = 1e9,
+          z1 = -1e9;
+        const out2 = r2(base.out);
+        out2.forEach(q => {
+          x0 = Math.min(x0, q[0]);
+          x1 = Math.max(x1, q[0]);
+          z0 = Math.min(z0, q[1]);
+          z1 = Math.max(z1, q[1]);
+        });
+        pp.cust = {
+          type: 'perso',
+          out: out2,
+          inn: r2(base.inn),
+          rmax: base.rmax,
+          ep: base.ep,
+          R: null,
+          name: (base.name || 'Tube') + ' (tourné ' + (+D.c1).toFixed(1) + '°)',
+          w: x1 - x0,
+          h: z1 - z0
+        };
+        pp.cfg = { prof: 'perso', ep: base.ep };
+      }
+    }
     return {
       ops,
       pos,
@@ -9235,6 +9284,13 @@ function cip_build() {
       'Longueur hors tout (mm)',
       D.L,
       'Longueur de la pièce finie, du point le plus long au point le plus long.',
+      0.1
+    );
+    h += num(
+      'c1',
+      'C1 quand le dessus est sous la tête (°)',
+      D.c1 || 0,
+      "Ta pièce est serrée TOURNÉE dans le mandrin ? Tape l'angle C1 où le DESSUS de la pièce (tour 0° dans le soft) est face à la tête.\n0 = pièce serrée droite. Tout le programme est recalculé avec ce décalage : le départ se fait à ce C1, X/Y/Z suivent.",
       0.1
     );
     const endUI = (k, title, isFree) => {
@@ -10003,7 +10059,7 @@ function cip_build() {
       !F.length ||
       !$('cipC0') ||
       !$('cipC0').checked ||
-      (S.part.gen && S.part.gen.cut && S.profile && S.profile.type !== 'rond')
+      (S.part.gen && S.part.gen.cut)
     ) {
       S._c0 = null;
       return;
@@ -10044,7 +10100,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v58',
+  const CIP_VER = 'CIP v59',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
