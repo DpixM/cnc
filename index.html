@@ -10117,7 +10117,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v63',
+  const CIP_VER = 'CIP v64',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -13570,25 +13570,19 @@ function cip_build() {
     while (i < hm.length) {
       const f = hm[i];
       if (f.spin) {
-        // mandrin remis à l'angle de départ : tête immobile en l'air -> hors TRAORI, une seule ligne
+        // v64 : le mandrin refait ses tours en arrière EN TRAORI (la machine ne prenait pas le C1 hors TRAORI) :
+        // tête en l'air, un point tous les 45° -> le mandrin tourne, la tête reste quasi immobile
         let j = i;
         while (j < hm.length && hm[j].spin) j++;
-        const fl = hm[j - 1];
-        const f0 = F[F.indexOf(f) - 1] || f;
-        const C = toLst(pf(fl), fl.d, fl.th, o).C,
-          C0 = toLst(pf(f0), f0.d, f0.th, o).C;
-        // v63 : en RELATIF (G91) -> le mandrin refait VRAIMENT ses tours en arrière, même si l'axe C1 est « modulo »
-        // (en absolu, -360 et 0 c'est la même position : la machine ne bougeait pas)
-        out.push(
-          { t: 'TRAFOOF ;tete en l air, elle ne bouge plus', s: f.s },
-          {
-            t: `G91 G01 C1 = ${n3(C - C0)} ;le mandrin refait ses tours en arriere -> C1 de depart (${n3(C)})`,
-            s: fl.s
-          },
-          { t: 'G90', s: fl.s },
-          { t: `TC_SET_TRAFO("${o.trafo}")`, s: fl.s },
-          { t: 'TRAORI(1)', s: fl.s }
-        );
+        const seg = hm.slice(i, j);
+        const Cs = seg.map(x => toLst(pf(x), x.d, x.th, o).C);
+        const C0 = Cs[0] - (seg.length > 1 ? Cs[1] - Cs[0] : 0); // C1 juste avant le déroulage
+        out.push({ t: ';le mandrin refait ses tours en arriere (tete en l air)', s: f.s });
+        seg.forEach((x, q) => {
+          const C = Cs[q];
+          if (q === seg.length - 1 || Math.abs(Math.round((C - C0) / 45) * 45 - (C - C0)) < 1e-6)
+            out.push({ f: x, s: x.s });
+        });
         i = j;
       } else if (f.rev) {
         let j = i;
@@ -13982,7 +13976,8 @@ function cip_build() {
           // 1re ligne de déplacement du retour : f5000 en soudure (sinon : vitesse de soudure, très lent)
           const fx = W && !fset ? 'f5000 ;retour rapide (laser coupe)' : '';
           fset = true;
-          B.push(lstMv(toLst(sh(l.f), l.f.d, l.f.th, o), fx));
+          const ln = lstMv(toLst(sh(l.f), l.f.d, l.f.th, o), fx);
+          if (ln !== B[B.length - 1]) B.push(ln); // pas 2 fois la même ligne
         });
         B.push('');
       } else {
