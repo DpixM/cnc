@@ -10117,7 +10117,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v65',
+  const CIP_VER = 'CIP v66',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -13866,16 +13866,12 @@ function cip_build() {
     // v65 : FIN SIMPLE (comme à la main) : on lève la tête, TRAFOOF, puis tous les axes reviennent en coordonnées MACHINE
     // SET_POS : là où ils étaient au lancement (mémorisés au début) ; SET_G54 : position de dégagement du gabarit (Z 350, C1 0)
     const simpleEnd = !!(S.prog.home && !S.prog.home.noUnw);
-    const MEM = [
-      'STOPRE',
-      'R191 = $AA_IM[X] R192 = $AA_IM[Y] R193 = $AA_IM[Z] R194 = $AA_IM[B] R195 = $AA_IM[C1] ;position de depart memorisee (machine)'
-    ];
+
     // en-tête du corps (gabarits)
     if (W) {
       B.push(
         'TC_RESET',
         'G71',
-        ...(posMode && simpleEnd ? MEM : []),
         'G500',
         'g90',
         'TC_LASER_REQUEST(2)',
@@ -13897,7 +13893,6 @@ function cip_build() {
       B.push(
         'TC_RESET',
         'G71',
-        ...(posMode && simpleEnd ? MEM : []),
         'g90',
         'TC_DYNAMIC_LEVEL(0)',
         `TC_SET_TRAFO("${o.trafo}")`,
@@ -13973,6 +13968,21 @@ function cip_build() {
           lstMv(toLst(V.sub(sh(fl), V.mul(fl.d, 30)), fl.d, fl.th, o), W ? 'f5000' : '') +
             " ;tete levee de 30 mm dans l'axe du faisceau"
         );
+        if (posMode) {
+          // v66 : le mandrin refait ses tours A L'ENVERS jusqu'à l'angle de départ (valeur en clair), tête en l'air,
+          // puis la pointe revient sur le départ : TOUT est comme au lancement
+          const f0 = F.find(x => x.j >= 0);
+          const q0 = toLst(f0.p, f0.d, f0.th, o);
+          const a0 = toLst(V.sub(f0.p, V.mul(f0.d, 30 + DRYOFF)), f0.d, f0.th, o);
+          B.push(
+            'TRAFOOF',
+            `G01 G90 C1 = ${n3(q0.C)} F10000 ;le mandrin refait ses tours a l envers -> angle de depart`,
+            `TC_SET_TRAFO("${o.trafo}")`,
+            'TRAORI(1)',
+            lstMv(a0) + ' ;au-dessus du depart',
+            lstMv(q0) + ' ;pointe sur le depart : tout est comme au lancement, pret pour la piece suivante'
+          );
+        }
       } else if (hm.length) {
         B.push(';----- retour au point de depart -----');
         let fset = false;
@@ -14010,13 +14020,8 @@ function cip_build() {
       o.trafo === 'Bc1' ? 'G01 X =50 Y = 200' : 'G01 Y = 200',
       ';(position de depart du gabarit : prete pour la piece suivante)'
     ];
-    const BACK = [
-      'G01 Z = 350 F10000 ;tete en haut',
-      'G53 G01 B = R194 C1 = R195 ;mandrin et tete remis a l angle de depart',
-      'G53 G01 X = R191 Y = R192',
-      'G53 G01 Z = R193 F2000 ;pointe sur le depart : prete pour la piece suivante'
-    ];
-    const ENDMV = simpleEnd ? (posMode ? BACK : PARK) : null;
+
+    const ENDMV = simpleEnd ? (posMode ? [';(tout est revenu a la position de depart)'] : PARK) : null;
     if (W) {
       B.push(
         '',
