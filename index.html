@@ -8601,6 +8601,7 @@ function cip_build() {
     c1: 0,
     kerf: '',
     lead: { type: 'none', r: 2, over: 0, ends: true },
+    dir: { ring: 'auto', hole: 'auto' },
     dxf: null,
     end: CUT_END(),
     sep: CUT_END(),
@@ -8982,10 +8983,17 @@ function cip_build() {
           Po.push(V.add(L0, V.mul(a2, hi.t)));
           Pi.push(V.add(L0, V.mul(a2, lo.t)));
         }
-        ops.push({ name: nmF, step: 2, P: Po, D: Po.map(() => V.mul(a2, -1)), waste: 0 });
+        ops.push({ name: nmF, step: 2, P: Po, D: Po.map(() => V.mul(a2, -1)), waste: 0, sens: F.sens || '' });
         holes.push(Po);
         if (F.trav) {
-          ops.push({ name: nmF + ' (côté opposé)', step: 2, P: Pi, D: Pi.map(() => a2.slice()), waste: 0 });
+          ops.push({
+            name: nmF + ' (côté opposé)',
+            step: 2,
+            P: Pi,
+            D: Pi.map(() => a2.slice()),
+            waste: 0,
+            sens: F.sens || ''
+          });
           holes.push(Pi);
         }
         bodies.push({ C, a2, R2, tube: true });
@@ -9018,7 +9026,7 @@ function cip_build() {
             err: `${nmF} : sort de la pièce (trop près d'un bout). Change sa position (${Math.min(...yy).toFixed(1)} → ${Math.max(...yy).toFixed(1)} mm).`
           };
       }
-      ops.push({ name: nmF, step: 2, P, D: P.map(() => [-c.nx, 0, -c.nz]), waste: 0 }); // chute = dedans
+      ops.push({ name: nmF, step: 2, P, D: P.map(() => [-c.nx, 0, -c.nz]), waste: 0, sens: F.sens || '' }); // chute = dedans
       holes.push(P);
       kh++;
     }
@@ -9275,11 +9283,42 @@ function cip_build() {
     const ops = [];
     const inst = instList();
     let nRing = 0;
+    // v73 : SENS DE COUPE choisi (coupes de tour : C1 qui monte / qui descend ; trous : horaire / anti-horaire vu de la tête)
+    const Dg = (S.part.gen.def && S.part.gen.def.dir) || {};
+    const ringDir = Dg.ring || 'auto',
+      holeDir = Dg.hole || 'auto';
+    const oL = lstOpt(true);
+    const rev2 = q => {
+      q.P = q.P.slice().reverse();
+      q.D = q.D.slice().reverse();
+    };
+    // sens du mandrin au départ du contour (+1 : C1 augmente, -1 : C1 diminue)
+    const cSign = q => {
+      let k = 1;
+      while (k < q.P.length - 1 && V.len(V.sub(q.P[k], q.P[0])) < 0.2) k++;
+      const C = i => {
+        const d = q.D[i];
+        return toLst(q.P[i], d, Math.atan2(-d[0], -d[2]) / DEG, oL).C;
+      };
+      let dc = C(k) - C(0);
+      while (dc > 180) dc -= 360;
+      while (dc < -180) dc += 360;
+      return dc >= 0 ? 1 : -1;
+    };
+    // +1 : anti-horaire vu depuis la tête (en regardant le long du faisceau)
+    const hSign = q => {
+      let c = [0, 0, 0];
+      q.P.forEach(p => (c = V.add(c, p)));
+      c = V.mul(c, 1 / q.P.length);
+      let A = [0, 0, 0];
+      for (let i = 0; i + 1 < q.P.length; i++) A = V.add(A, V.cross(V.sub(q.P[i], c), V.sub(q.P[i + 1], c)));
+      return V.dot(A, V.mul(q.D[0], -1)) >= 0 ? 1 : -1;
+    };
     inst.forEach((ins, ii) =>
       S.part.gen.ops.forEach(o => {
         // coupe de tour (bout / séparation) : une sur deux dans l'autre sens -> le mandrin se « déroule » tout seul
         const ring = o.step === 1 || o.step === 4;
-        const rev = ring && nRing++ % 2 === 1;
+        const rev = ring && ringDir === 'auto' && nRing++ % 2 === 1;
         o = rev ? Object.assign({}, o, { P: o.P.slice().reverse(), D: o.D.slice().reverse() }) : o;
         ops.push({
           name: o.name + (inst.length > 1 ? ' · pièce ' + (ii + 1) : ''),
@@ -9293,6 +9332,10 @@ function cip_build() {
           A: 0,
           waste: o.waste ? (pl.flip ? -o.waste : o.waste) : 0
         });
+        const q = ops[ops.length - 1];
+        if (ring && ringDir !== 'auto' && cSign(q) !== (ringDir === '+' ? 1 : -1)) rev2(q);
+        const hd = o.step === 2 ? o.sens || holeDir : 'auto';
+        if (o.step === 2 && hd !== 'auto' && hSign(q) !== (hd === 'ccw' ? 1 : -1)) rev2(q);
       })
     );
     return ops;
@@ -9488,6 +9531,30 @@ function cip_build() {
     h += endUI('end', 'BOUT LIBRE (côté vide)', true);
     {
       const Lg = D.lead || (D.lead = { type: 'none', r: 2, over: 0, ends: true });
+      const Dr = D.dir || (D.dir = { ring: 'auto', hole: 'auto' });
+      h += H('SENS DE COUPE');
+      h += sel(
+        'dir.ring',
+        'Bout libre et séparation',
+        Dr.ring,
+        [
+          ['auto', 'Auto (en sens inverse, le mandrin se déroule)'],
+          ['+', 'C1 qui augmente (+)'],
+          ['-', 'C1 qui diminue (−)']
+        ],
+        'Sens de rotation du mandrin pendant les coupes de tour.\nAuto : la 2e coupe tourne dans l autre sens que la 1re, le mandrin revient tout seul (programme plus court).'
+      );
+      h += sel(
+        'dir.hole',
+        'Trous et formes',
+        Dr.hole,
+        [
+          ['auto', 'Auto'],
+          ['cw', 'Horaire (vu de la tête)'],
+          ['ccw', 'Anti-horaire (vu de la tête)']
+        ],
+        'Sens de la coupe autour de chaque trou, vu en regardant depuis la tête (le long du faisceau).\nChaque découpe peut avoir son propre sens (dans sa carte, plus bas).'
+      );
       h += H('ENTRÉE ET FIN DE COUPE');
       h += sel(
         'lead.type',
@@ -9567,6 +9634,11 @@ function cip_build() {
         s += num(p + 'rot', 'Tour (°)', F.rot, 'Où autour du tube : 0 = dessus, 90 = côté, 180 = dessous.', 1);
         if (F.type !== 'rond' && F.type !== 'piq')
           s += num(p + 'ang', 'Rotation de la forme (°)', F.ang, '0 = grand côté le long du tube, 90 = en travers.', 1);
+        s += sel(p + 'sens', 'Sens de coupe', F.sens || '', [
+          ['', 'Comme le réglage général'],
+          ['cw', 'Horaire (vu de la tête)'],
+          ['ccw', 'Anti-horaire (vu de la tête)']
+        ]);
         return s + '</div>';
       })
       .join('');
@@ -10281,7 +10353,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v72',
+  const CIP_VER = 'CIP v73',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
