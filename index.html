@@ -10281,7 +10281,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v71',
+  const CIP_VER = 'CIP v72',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -13831,9 +13831,9 @@ function cip_build() {
             ]
           : C[ci].leadN || C[ci].overN
             ? [
-                [0, C[ci].leadN || 0, `;entree ${C[ci].leadT} : percage dans la chute -> rejoint le trait`],
-                [C[ci].leadN || 0, Q.length - 1 - (C[ci].overN || 0), C[ci].leadN ? ';contour' : null],
-                [Q.length - 1 - (C[ci].overN || 0), Q.length - 1, `;depassement ${(+C[ci].overL).toFixed(2)} mm`]
+                [0, C[ci].leadN || 0, null],
+                [C[ci].leadN || 0, Q.length - 1 - (C[ci].overN || 0), null],
+                [Q.length - 1 - (C[ci].overN || 0), Q.length - 1, null]
               ]
             : [[0, Q.length - 1, null]];
       for (const [a, b, lab] of segs) {
@@ -14074,14 +14074,6 @@ function cip_build() {
       );
     }
     B.push(";=== mouvements generes par l'onglet CIP Trumpf (CNC 3018) ===");
-    {
-      const d = new Date(),
-        z = v => String(v).padStart(2, '0');
-      // pour savoir sur la machine QUEL fichier tourne (même nom de programme = on peut se tromper de version)
-      B.push(
-        `;fichier genere le ${z(d.getDate())}-${z(d.getMonth() + 1)}-${d.getFullYear()} a ${z(d.getHours())}h${z(d.getMinutes())} ${CIP_VER}`
-      );
-    }
     if (dry) B.push(';!!! VERSION TEST A VIDE : laser jamais allume (TC_WELD_ON / TC_LASER_ON en commentaire) !!!');
     // découpe : la trajectoire est SUR la pièce, c'est le palpage (techno LTT : distance buse 1,5 / 0,7 mm, perçage 3 mm) qui tient la buse au-dessus.
     // À vide il n'y a pas de palpage -> on recule toute la trajectoire de DRYOFF mm vers la tête, sinon la buse frotte la pièce.
@@ -14131,9 +14123,9 @@ function cip_build() {
             ]
           : C[ci].leadN || C[ci].overN
             ? [
-                [0, C[ci].leadN || 0, `;entree ${C[ci].leadT} : percage dans la chute -> rejoint le trait`],
-                [C[ci].leadN || 0, Q.length - 1 - (C[ci].overN || 0), C[ci].leadN ? ';contour' : null],
-                [Q.length - 1 - (C[ci].overN || 0), Q.length - 1, `;depassement ${(+C[ci].overL).toFixed(2)} mm`]
+                [0, C[ci].leadN || 0, null],
+                [C[ci].leadN || 0, Q.length - 1 - (C[ci].overN || 0), null],
+                [Q.length - 1 - (C[ci].overN || 0), Q.length - 1, null]
               ]
             : [[0, Q.length - 1, null]];
       for (const [a, b, lab] of segs) {
