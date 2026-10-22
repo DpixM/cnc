@@ -10109,7 +10109,7 @@ function cip_build() {
     S.c0 = on && cur <= 2;
     if (P && on && cur >= 3) {
       m.g.position.set(...P.f.p);
-      m.g.visible = true;
+      m.g.visible = cur === 3; // v71 : le point jaune seulement pendant l'étape 3 (après : il gêne la simu)
       if (S.wz.posFor !== P.key + cur) {
         const first = cur === 3 && S.wz.posFor.slice(-1) !== '3';
         S.wz.posFor = P.key + cur;
@@ -10281,7 +10281,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v70',
+  const CIP_VER = 'CIP v71',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
@@ -14079,7 +14079,7 @@ function cip_build() {
         z = v => String(v).padStart(2, '0');
       // pour savoir sur la machine QUEL fichier tourne (même nom de programme = on peut se tromper de version)
       B.push(
-        `;fichier genere le ${z(d.getDate())}/${z(d.getMonth() + 1)}/${d.getFullYear()} a ${z(d.getHours())}h${z(d.getMinutes())}:${z(d.getSeconds())} - ${CIP_VER}`
+        `;fichier genere le ${z(d.getDate())}-${z(d.getMonth() + 1)}-${d.getFullYear()} a ${z(d.getHours())}h${z(d.getMinutes())} ${CIP_VER}`
       );
     }
     if (dry) B.push(';!!! VERSION TEST A VIDE : laser jamais allume (TC_WELD_ON / TC_LASER_ON en commentaire) !!!');
