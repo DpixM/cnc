@@ -2537,6 +2537,10 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
     #cipBody .cipGB .cipNum{margin:3px 0}#cipBody .cipGB .cipNum input{width:72px}
     #cipBody .cipW.cipMtMode [data-mtno],#cipBody .cipW:not(.cipMtMode) [data-mtonly]{display:none!important}
     #cipBody .cipW.cipCutMode #cipGenBox,#cipBody .cipW:not(.cipCutMode) #cipCutBox{display:none!important}
+    #cipCutBody .cipSec{border:1px solid var(--brd2);border-left:4px solid var(--sc);border-radius:8px;padding:6px 10px 8px;margin:12px 0;background:rgba(255,255,255,.03)}
+    #cipCutBody .cipSecH{font:700 13px var(--sans);color:var(--sc);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 8px;display:flex;align-items:center;gap:7px;padding-bottom:5px;border-bottom:1px solid var(--brd2)}
+    #cipCutBody .cipSecH span{font-size:15px}
+    #cipCutBody .cipSec .cipGB{border-left:3px solid var(--sc)}
     #cipBody .cipGK{border-radius:4px;padding:1px 4px;margin-left:-4px;margin-right:-4px;transition:background .15s}
     #cipBody .cipGK>span:first-child::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c,#888);margin-right:7px;vertical-align:-1px}
     #cipBody .cipGK input{border-left:4px solid var(--c,#888)!important}
@@ -8946,7 +8950,14 @@ function cip_build() {
         P.push([c.x, e.y[k % M], c.z]);
         Dd.push(e.D[k % M].slice());
       }
-      ops.push({ name: nm, step, P, D: Dd, waste: step === 1 ? 1 : -1 }); // chute : côté vide (+y) / côté mandrin (-y)
+      ops.push({
+        name: nm,
+        step,
+        P,
+        D: Dd,
+        waste: step === 1 ? 1 : -1,
+        ringSens: (step === 1 ? D.end && D.end.sens : D.sep && D.sep.sens) || 'auto'
+      }); // chute : côté vide (+y) / côté mandrin (-y)
     };
     const enm = { droit: '(droite)', biais: '(en biais)', gueule: '(gueule de loup)' };
     if (eTop.kind !== 'brut') ring(eTopK, 'Bout libre ' + enm[eTop.kind], 1);
@@ -9282,11 +9293,17 @@ function cip_build() {
       XV = v => rotM(pl.flip ? [-v[0], -v[1], v[2]] : v.slice(), pl.rho || 0);
     const ops = [];
     const inst = instList();
-    let nRing = 0;
     // v73 : SENS DE COUPE choisi (coupes de tour : C1 qui monte / qui descend ; trous : horaire / anti-horaire vu de la tête)
     const Dg = (S.part.gen.def && S.part.gen.def.dir) || {};
-    const ringDir = Dg.ring || 'auto',
-      holeDir = Dg.hole || 'auto';
+    const holeDir = Dg.hole || 'auto';
+    let lastSign = 0;
+    // une coupe de tour en « auto » se met à l'opposé de l'autre, même si c'est l'autre qui est forcée (et vient après)
+    const forcedRing = (() => {
+      for (const o of S.part.gen.ops)
+        if ((o.step === 1 || o.step === 4) && (o.ringSens === '+' || o.ringSens === '-'))
+          return o.ringSens === '+' ? 1 : -1;
+      return 0;
+    })();
     const oL = lstOpt(true);
     const rev2 = q => {
       q.P = q.P.slice().reverse();
@@ -9318,8 +9335,7 @@ function cip_build() {
       S.part.gen.ops.forEach(o => {
         // coupe de tour (bout / séparation) : une sur deux dans l'autre sens -> le mandrin se « déroule » tout seul
         const ring = o.step === 1 || o.step === 4;
-        const rev = ring && ringDir === 'auto' && nRing++ % 2 === 1;
-        o = rev ? Object.assign({}, o, { P: o.P.slice().reverse(), D: o.D.slice().reverse() }) : o;
+
         ops.push({
           name: o.name + (inst.length > 1 ? ' · pièce ' + (ii + 1) : ''),
           step: o.step,
@@ -9333,7 +9349,14 @@ function cip_build() {
           waste: o.waste ? (pl.flip ? -o.waste : o.waste) : 0
         });
         const q = ops[ops.length - 1];
-        if (ring && ringDir !== 'auto' && cSign(q) !== (ringDir === '+' ? 1 : -1)) rev2(q);
+        if (ring) {
+          // sens choisi pour CETTE coupe ; « auto » = à l'opposé de la coupe de tour précédente (le mandrin se déroule)
+          const rs =
+            o.ringSens && o.ringSens !== 'auto' ? o.ringSens : Dg.ring && Dg.ring !== 'auto' ? Dg.ring : 'auto';
+          const want = rs === '+' ? 1 : rs === '-' ? -1 : lastSign ? -lastSign : forcedRing ? -forcedRing : 0;
+          if (want && cSign(q) !== want) rev2(q);
+          lastSign = cSign(q);
+        }
         const hd = o.step === 2 ? o.sens || holeDir : 'auto';
         if (o.step === 2 && hd !== 'auto' && hSign(q) !== (hd === 'ccw' ? 1 : -1)) rev2(q);
       })
@@ -9443,8 +9466,11 @@ function cip_build() {
     const num = (path, lab, val, tip, st, extra) =>
       `<div class="cipNum"${tip ? ` data-tip="${tip}"` : ''}><span>${lab}</span><input type="number" step="${st || 1}" value="${val}" data-ck="${path}" ${extra || ''}></div>`;
     const sel = (path, lab, val, opts, tip) =>
-      `<div class="cipNum"${tip ? ` data-tip="${tip}"` : ''}><span>${lab}</span><select data-ck="${path}" style="width:150px">${opts.map(([v, t]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
+      `<div class="cipNum"${tip ? ` data-tip="${tip}"` : ''}><span>${lab}</span><select data-ck="${path}" style="width:180px;max-width:60%">${opts.map(([v, t]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
     const H = t => `<div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">${t}</div>`;
+    // v74 : chaque partie dans son cadre, couleur = couleur du trajet dans la 3D
+    const SEC = (t, col, ic) =>
+      `<div class="cipSec" style="--sc:${col}"><div class="cipSecH"><span>${ic}</span>${t}</div>`;
     let h = `<div class="cipNum" style="border:2px solid var(--acc);border-radius:8px;padding:8px 10px;margin:4px 0 8px;background:rgba(245,166,35,.08)" data-tip="La pièce que tu RÉCUPÈRES à la fin : de la coupe du bout libre jusqu'à la séparation, au point le plus long.\nEx : 10 -> le soft coupe le bout, puis sépare 10 mm plus loin : ta pièce fait 10 mm."><span style="font:700 15px var(--sans)">📏 Longueur de la pièce finie (mm)</span><input type="number" step="0.1" value="${D.L}" data-ck="L" style="font:700 16px var(--mono);width:90px"></div>`;
     h += num(
       'kerf',
@@ -9454,7 +9480,7 @@ function cip_build() {
       0.01,
       'placeholder="vide = pas de correction"'
     );
-    h += H('LE TUBE');
+    h += SEC('Le tube', '#9aa5ae', '🔩');
     h += sel('prof', 'Section', D.prof, [
       ['rond', 'Rond'],
       ['carre', 'Carré'],
@@ -9478,9 +9504,10 @@ function cip_build() {
       "Ta pièce est serrée TOURNÉE dans le mandrin ? Tape l'angle C1 où le DESSUS de la pièce (tour 0° dans le soft) est face à la tête.\n0 = pièce serrée droite. Tout le programme est recalculé avec ce décalage : le départ se fait à ce C1, X/Y/Z suivent.",
       0.1
     );
+    h += '</div>';
     const endUI = (k, title, isFree) => {
       const E = D[k];
-      let s = H(title);
+      let s = SEC(title, isFree ? '#a283ff' : '#5fcf8f', isFree ? '✂' : '⛓');
       s += sel(k + '.type', 'Coupe', E.type, [
         ...(isFree ? [['brut', 'Aucune (bout déjà coupé)']] : []),
         ['droit', 'Droite'],
@@ -9526,65 +9553,22 @@ function cip_build() {
         );
         s += num(k + '.exc', 'Décalage (mm)', E.exc, 'Décalage entre les 2 axes (0 = centrés).', 0.1);
       }
-      return s;
-    };
-    h += endUI('end', 'BOUT LIBRE (côté vide)', true);
-    {
-      const Lg = D.lead || (D.lead = { type: 'none', r: 2, over: 0, ends: true });
-      const Dr = D.dir || (D.dir = { ring: 'auto', hole: 'auto' });
-      h += H('SENS DE COUPE');
-      h += sel(
-        'dir.ring',
-        'Bout libre et séparation',
-        Dr.ring,
-        [
-          ['auto', 'Auto (en sens inverse, le mandrin se déroule)'],
-          ['+', 'C1 qui augmente (+)'],
-          ['-', 'C1 qui diminue (−)']
-        ],
-        'Sens de rotation du mandrin pendant les coupes de tour.\nAuto : la 2e coupe tourne dans l autre sens que la 1re, le mandrin revient tout seul (programme plus court).'
-      );
-      h += sel(
-        'dir.hole',
-        'Trous et formes',
-        Dr.hole,
-        [
-          ['auto', 'Auto'],
-          ['cw', 'Horaire (vu de la tête)'],
-          ['ccw', 'Anti-horaire (vu de la tête)']
-        ],
-        'Sens de la coupe autour de chaque trou, vu en regardant depuis la tête (le long du faisceau).\nChaque découpe peut avoir son propre sens (dans sa carte, plus bas).'
-      );
-      h += H('ENTRÉE ET FIN DE COUPE');
-      h += sel(
-        'lead.type',
-        'Entrée (perçage)',
-        Lg.type,
-        [
-          ['none', 'Aucune (perce sur le trait)'],
-          ['arc', 'Arc de cercle'],
-          ['droite', 'Droite']
-        ],
-        "Le perçage se fait dans la CHUTE (dedans pour un trou, côté vide / mandrin pour un bout), puis la tête rejoint la vraie coupe en arc ou en droite.\nOù l'entrée rejoint la coupe : 📍 « Choisir le départ » dans la 3D."
-      );
-      if (Lg.type !== 'none')
-        h += num(
-          'lead.r',
-          Lg.type === 'arc' ? "Rayon de l'arc (mm)" : "Longueur de l'entrée (mm)",
-          Lg.r,
-          "Réduit tout seul dans les petits trous pour que l'entrée tienne dedans.",
-          0.1
+      if (E.type !== 'brut')
+        s += sel(
+          k + '.sens',
+          'Sens de coupe (mandrin)',
+          E.sens || 'auto',
+          [
+            ['auto', "Auto (à l'opposé de l'autre coupe)"],
+            ['+', 'C1 qui augmente (+)'],
+            ['-', 'C1 qui diminue (−)']
+          ],
+          "Sens dans lequel le mandrin tourne pendant CETTE coupe.\nAuto : à l'opposé de l'autre coupe de tour -> le mandrin se déroule tout seul (programme plus court)."
         );
-      h += num(
-        'lead.over',
-        'Dépassement en fin de coupe (mm)',
-        Lg.over,
-        '0 = la coupe s’arrête pile au départ. Sinon elle continue sur la même trajectoire de cette longueur (pour être sûr que ça tombe).',
-        0.1
-      );
-      h += `<label class="cipChk"><input type="checkbox" data-ck="lead.ends" ${Lg.ends !== false ? 'checked' : ''}> Aussi sur le bout libre et la séparation</label>`;
-    }
-    h += H('DÉCOUPES SUR LE TUBE');
+      return s + '</div>';
+    };
+    h += endUI('end', 'Bout libre (côté vide)', true);
+    h += SEC('Découpes sur le tube', '#3fc3e6', '◎');
     const NAMES = {
       rond: 'Trou rond',
       oblong: 'Trou oblong',
@@ -9635,15 +9619,59 @@ function cip_build() {
         if (F.type !== 'rond' && F.type !== 'piq')
           s += num(p + 'ang', 'Rotation de la forme (°)', F.ang, '0 = grand côté le long du tube, 90 = en travers.', 1);
         s += sel(p + 'sens', 'Sens de coupe', F.sens || '', [
-          ['', 'Comme le réglage général'],
+          ['', 'Comme le réglage par défaut'],
           ['cw', 'Horaire (vu de la tête)'],
           ['ccw', 'Anti-horaire (vu de la tête)']
         ]);
         return s + '</div>';
       })
       .join('');
-    h += `<div class="cipRow" style="flex-wrap:wrap"><button class="cipBtn" onclick="cip_ui('cutadd','rond')">+ Trou rond</button><button class="cipBtn" onclick="cip_ui('cutadd','oblong')">+ Oblong</button><button class="cipBtn" onclick="cip_ui('cutadd','rect')">+ Rectangle</button><button class="cipBtn" onclick="cip_ui('cutadd','piq')">+ Piquage</button><button class="cipBtn" onclick="cip_ui('cutadd','dxf')">+ Forme DXF</button></div>`;
-    h += endUI('sep', 'SÉPARATION (côté mandrin, coupée en dernier)', false);
+    h += `<div class="cipRow" style="flex-wrap:wrap"><button class="cipBtn" onclick="cip_ui('cutadd','rond')">+ Trou rond</button><button class="cipBtn" onclick="cip_ui('cutadd','oblong')">+ Oblong</button><button class="cipBtn" onclick="cip_ui('cutadd','rect')">+ Rectangle</button><button class="cipBtn" onclick="cip_ui('cutadd','piq')">+ Piquage</button><button class="cipBtn" onclick="cip_ui('cutadd','dxf')">+ Forme DXF</button></div></div>`;
+    h += endUI('sep', 'Séparation (côté mandrin, coupée en dernier)', false);
+    {
+      const Lg = D.lead || (D.lead = { type: 'none', r: 2, over: 0, ends: true });
+      const Dr = D.dir || (D.dir = { ring: 'auto', hole: 'auto' });
+      h += SEC('Entrée, fin de coupe et sens des trous', '#f5a623', '↪');
+      h += sel(
+        'dir.hole',
+        'Sens des trous (par défaut)',
+        Dr.hole,
+        [
+          ['auto', 'Auto'],
+          ['cw', 'Horaire (vu de la tête)'],
+          ['ccw', 'Anti-horaire (vu de la tête)']
+        ],
+        'Sens de la coupe autour de chaque trou, vu en regardant depuis la tête (le long du faisceau).\nChaque découpe peut avoir son propre sens (dans sa carte, plus bas).'
+      );
+      h += sel(
+        'lead.type',
+        'Entrée (perçage)',
+        Lg.type,
+        [
+          ['none', 'Aucune (perce sur le trait)'],
+          ['arc', 'Arc de cercle'],
+          ['droite', 'Droite']
+        ],
+        "Le perçage se fait dans la CHUTE (dedans pour un trou, côté vide / mandrin pour un bout), puis la tête rejoint la vraie coupe en arc ou en droite.\nOù l'entrée rejoint la coupe : 📍 « Choisir le départ » dans la 3D."
+      );
+      if (Lg.type !== 'none')
+        h += num(
+          'lead.r',
+          Lg.type === 'arc' ? "Rayon de l'arc (mm)" : "Longueur de l'entrée (mm)",
+          Lg.r,
+          "Réduit tout seul dans les petits trous pour que l'entrée tienne dedans.",
+          0.1
+        );
+      h += num(
+        'lead.over',
+        'Dépassement en fin de coupe (mm)',
+        Lg.over,
+        '0 = la coupe s’arrête pile au départ. Sinon elle continue sur la même trajectoire de cette longueur (pour être sûr que ça tombe).',
+        0.1
+      );
+      h += `<label class="cipChk"><input type="checkbox" data-ck="lead.ends" ${Lg.ends !== false ? 'checked' : ''}> Aussi sur le bout libre et la séparation</label>`;
+      h += '</div>';
+    }
     box.innerHTML = h;
   }
   function cutField(el) {
@@ -10353,7 +10381,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v73',
+  const CIP_VER = 'CIP v74',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
