@@ -6651,6 +6651,7 @@ function cip_build() {
           let C = bo.ops;
           S.tmW = performance.now() - _tw;
           if (!isWeld) C.forEach(o => applyStart(o));
+          if (!isWeld && S.part.gen && S.part.gen.cut) C.forEach(o => cutLead(o));
           S.tm = { geo: T1 - T0, ops: performance.now() - T1 };
           // ordre choisi par l'utilisateur (si mêmes opérations)
           if (S.order && S.order.length === C.length && S.order.every(nm => C.some(c => c.name === nm)))
@@ -8599,6 +8600,7 @@ function cip_build() {
     L: 100,
     c1: 0,
     kerf: '',
+    lead: { type: 'none', r: 2, over: 0, ends: true },
     dxf: null,
     end: CUT_END(),
     sep: CUT_END(),
@@ -8943,7 +8945,7 @@ function cip_build() {
         P.push([c.x, e.y[k % M], c.z]);
         Dd.push(e.D[k % M].slice());
       }
-      ops.push({ name: nm, step, P, D: Dd });
+      ops.push({ name: nm, step, P, D: Dd, waste: step === 1 ? 1 : -1 }); // chute : côté vide (+y) / côté mandrin (-y)
     };
     const enm = { droit: '(droite)', biais: '(en biais)', gueule: '(gueule de loup)' };
     if (eTop.kind !== 'brut') ring(eTopK, 'Bout libre ' + enm[eTop.kind], 1);
@@ -8980,10 +8982,10 @@ function cip_build() {
           Po.push(V.add(L0, V.mul(a2, hi.t)));
           Pi.push(V.add(L0, V.mul(a2, lo.t)));
         }
-        ops.push({ name: nmF, step: 2, P: Po, D: Po.map(() => V.mul(a2, -1)) });
+        ops.push({ name: nmF, step: 2, P: Po, D: Po.map(() => V.mul(a2, -1)), waste: 0 });
         holes.push(Po);
         if (F.trav) {
-          ops.push({ name: nmF + ' (côté opposé)', step: 2, P: Pi, D: Pi.map(() => a2.slice()) });
+          ops.push({ name: nmF + ' (côté opposé)', step: 2, P: Pi, D: Pi.map(() => a2.slice()), waste: 0 });
           holes.push(Pi);
         }
         bodies.push({ C, a2, R2, tube: true });
@@ -9016,7 +9018,7 @@ function cip_build() {
             err: `${nmF} : sort de la pièce (trop près d'un bout). Change sa position (${Math.min(...yy).toFixed(1)} → ${Math.max(...yy).toFixed(1)} mm).`
           };
       }
-      ops.push({ name: nmF, step: 2, P, D: P.map(() => [-c.nx, 0, -c.nz]) });
+      ops.push({ name: nmF, step: 2, P, D: P.map(() => [-c.nx, 0, -c.nz]), waste: 0 }); // chute = dedans
       holes.push(P);
       kh++;
     }
@@ -9288,11 +9290,104 @@ function cip_build() {
           }),
           D: o.D.map(d => rotM(XV(d), ins.a)),
           mode: 'continu',
-          A: 0
+          A: 0,
+          waste: o.waste ? (pl.flip ? -o.waste : o.waste) : 0
         });
       })
     );
     return ops;
+  }
+  // v69 : ENTRÉE (perçage dans la chute + arc de cercle ou droite jusqu'au départ) et DÉPASSEMENT en fin de coupe
+  // Le départ (là où l'entrée rejoint la vraie coupe) se choisit avec 📍 « Choisir le départ ».
+  function cutLead(o) {
+    const D0 = S.part && S.part.gen && S.part.gen.def;
+    const Lg = (D0 && D0.lead) || {};
+    if (o.waste === undefined || !o.P || o.P.length < 3) return;
+    if ((o.step === 1 || o.step === 4) && Lg.ends === false) return;
+    const type = Lg.type || 'none',
+      over = Math.max(0, +Lg.over || 0);
+    let R = Math.max(0, +Lg.r || 0);
+    if ((type === 'none' || R <= 0) && !over) return;
+    const pr = S.profile;
+    // point posé sur la surface du tube (le plus proche du contour du profil, même y)
+    const onS = q => {
+      const x = S.flip ? -q[0] : q[0];
+      let bd = 1e18,
+        bx = x,
+        bz = q[2];
+      const P = pr.out,
+        n = P.length;
+      for (let i = 0; i < n; i++) {
+        const a = P[i],
+          b = P[(i + 1) % n];
+        const dx = b[0] - a[0],
+          dz = b[1] - a[1];
+        let t = ((x - a[0]) * dx + (q[2] - a[1]) * dz) / (dx * dx + dz * dz || 1);
+        t = Math.max(0, Math.min(1, t));
+        const px = a[0] + t * dx,
+          pz = a[1] + t * dz,
+          d = (px - x) ** 2 + (pz - q[2]) ** 2;
+        if (d < bd) {
+          bd = d;
+          bx = px;
+          bz = pz;
+        }
+      }
+      return [S.flip ? -bx : bx, q[1], bz];
+    };
+    const P = o.P,
+      Dd = o.D;
+    const P0 = P[0];
+    // sens de la coupe au départ
+    let k1 = 1;
+    while (k1 < P.length - 1 && V.len(V.sub(P[k1], P0)) < 0.3) k1++;
+    const t = V.nrm(V.sub(P[k1], P0));
+    const nOut = V.mul(Dd[0], -1);
+    let w = V.nrm(V.cross(nOut, t));
+    // côté CHUTE : dedans pour un trou, vers le vide / le mandrin pour une coupe de tour
+    if (o.waste === 0) {
+      let c = [0, 0, 0];
+      P.forEach(p => (c = V.add(c, p)));
+      c = V.mul(c, 1 / P.length);
+      if (V.dot(w, V.sub(c, P0)) < 0) w = V.mul(w, -1);
+      // petit trou : l'entrée doit tenir dedans
+      let rmin = 1e9;
+      P.forEach(p => (rmin = Math.min(rmin, V.len(V.sub(p, c)))));
+      R = Math.min(R, rmin * 0.8);
+    } else if (w[1] * o.waste < 0) w = V.mul(w, -1);
+    const lead = [];
+    if (type === 'arc' && R > 0.05) {
+      const n = Math.max(6, Math.ceil((R * Math.PI) / 2 / 0.25));
+      const C = V.add(P0, V.mul(w, R));
+      for (let k = 0; k < n; k++) {
+        const ph = -Math.PI / 2 + ((Math.PI / 2) * k) / n;
+        lead.push(onS(V.add(V.sub(C, V.mul(w, R * Math.cos(ph))), V.mul(t, R * Math.sin(ph)))));
+      }
+    } else if (type === 'droite' && R > 0.05) {
+      const n = Math.max(2, Math.ceil(R / 0.25));
+      for (let k = 0; k < n; k++) lead.push(onS(V.add(P0, V.mul(w, R * (1 - k / n)))));
+    }
+    // dépassement : on continue sur la même trajectoire après la fin
+    const tail = [],
+      tailD = [];
+    if (over > 0) {
+      let acc = 0;
+      for (let i = 1; i < P.length && acc < over; i++) {
+        const sl = V.len(V.sub(P[i], P[i - 1]));
+        if (acc + sl >= over) {
+          const f = (over - acc) / (sl || 1);
+          tail.push(V.add(P[i - 1], V.mul(V.sub(P[i], P[i - 1]), f)));
+          tailD.push(Dd[i].slice());
+          break;
+        }
+        acc += sl;
+        tail.push(P[i].slice());
+        tailD.push(Dd[i].slice());
+      }
+    }
+    o.P = lead.concat(P, tail);
+    o.D = lead.map(() => Dd[0].slice()).concat(Dd, tailD);
+    o.leadN = lead.length;
   }
   // ---- le panneau (tout est redessiné depuis S.cutDef)
   function cutRender() {
@@ -9388,6 +9483,37 @@ function cip_build() {
       return s;
     };
     h += endUI('end', 'BOUT LIBRE (côté vide)', true);
+    {
+      const Lg = D.lead || (D.lead = { type: 'none', r: 2, over: 0, ends: true });
+      h += H('ENTRÉE ET FIN DE COUPE');
+      h += sel(
+        'lead.type',
+        'Entrée (perçage)',
+        Lg.type,
+        [
+          ['none', 'Aucune (perce sur le trait)'],
+          ['arc', 'Arc de cercle'],
+          ['droite', 'Droite']
+        ],
+        "Le perçage se fait dans la CHUTE (dedans pour un trou, côté vide / mandrin pour un bout), puis la tête rejoint la vraie coupe en arc ou en droite.\nOù l'entrée rejoint la coupe : 📍 « Choisir le départ » dans la 3D."
+      );
+      if (Lg.type !== 'none')
+        h += num(
+          'lead.r',
+          Lg.type === 'arc' ? "Rayon de l'arc (mm)" : "Longueur de l'entrée (mm)",
+          Lg.r,
+          "Réduit tout seul dans les petits trous pour que l'entrée tienne dedans.",
+          0.1
+        );
+      h += num(
+        'lead.over',
+        'Dépassement en fin de coupe (mm)',
+        Lg.over,
+        '0 = la coupe s’arrête pile au départ. Sinon elle continue sur la même trajectoire de cette longueur (pour être sûr que ça tombe).',
+        0.1
+      );
+      h += `<label class="cipChk"><input type="checkbox" data-ck="lead.ends" ${Lg.ends !== false ? 'checked' : ''}> Aussi sur le bout libre et la séparation</label>`;
+    }
     h += H('DÉCOUPES SUR LE TUBE');
     const NAMES = {
       rond: 'Trou rond',
@@ -10152,7 +10278,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v68',
+  const CIP_VER = 'CIP v69',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
