@@ -8598,6 +8598,7 @@ function cip_build() {
     ep: 1.5,
     L: 100,
     c1: 0,
+    kerf: '',
     dxf: null,
     end: CUT_END(),
     sep: CUT_END(),
@@ -8830,7 +8831,9 @@ function cip_build() {
     return { y, D, kind: t, body };
   }
   // ---- formes 2D (u = autour du tube, v = le long du tube), centrées
-  function cutShape(F) {
+  function cutShape(F, hk) {
+    // hk = demi-largeur du faisceau : le trou est la CHUTE -> la trajectoire passe hk à l'intérieur
+    hk = Math.max(0, +hk || 0);
     const out = [];
     const arcs = (w, h, r) => {
       r = Math.max(0, Math.min(r, w / 2, h / 2));
@@ -8857,19 +8860,29 @@ function cip_build() {
       return p;
     };
     if (F.type === 'rond') {
-      const R = Math.max(0.1, +F.d / 2 || 5),
+      const R = Math.max(0.05, (+F.d / 2 || 5) - hk),
         n = Math.max(48, Math.ceil((2 * Math.PI * R) / 0.25));
       for (let k = 0; k < n; k++) out.push([R * Math.cos((2 * Math.PI * k) / n), R * Math.sin((2 * Math.PI * k) / n)]);
     } else if (F.type === 'oblong') {
-      const l = Math.max(+F.l || 10, +F.w || 4),
-        w = Math.max(0.2, +F.w || 4);
-      arcs(w, l, w / 2).forEach(p => out.push(p));
+      const l = Math.max(+F.l || 10, +F.w || 4) - 2 * hk,
+        w = Math.max(0.1, (+F.w || 4) - 2 * hk);
+      arcs(w, Math.max(w, l), w / 2).forEach(p => out.push(p));
     } else if (F.type === 'rect')
-      arcs(Math.max(0.2, +F.w || 5), Math.max(0.2, +F.l || 10), +F.r || 0).forEach(p => out.push(p));
+      arcs(
+        Math.max(0.1, (+F.w || 5) - 2 * hk),
+        Math.max(0.1, (+F.l || 10) - 2 * hk),
+        Math.max(0, (+F.r || 0) - hk)
+      ).forEach(p => out.push(p));
     else if (F.type === 'dxf') {
       if (!F.pts || F.pts.length < 3) return null;
       const sc = (+F.sc || 100) / 100;
-      F.pts.forEach(p => out.push([p[0] * sc, p[1] * sc]));
+      let P = F.pts.map(p => [p[0] * sc, p[1] * sc]);
+      if (hk > 0) {
+        const In = pInset(pCCW(P), hk);
+        if (!In) return null;
+        P = In;
+      }
+      P.forEach(p => out.push(p));
     }
     const a = (+F.ang || 0) * DEG;
     // dédoublonne
@@ -8905,6 +8918,20 @@ function cip_build() {
     for (let k = 0; k < M; k++)
       if (eTop.y[k] - eBot.y[k] < 0.5)
         return { err: 'Les deux bouts se croisent : la pièce est trop courte pour ces coupes. Rallonge-la.' };
+    // v68 : LARGEUR DU FAISCEAU (vide = pas de correction). La trajectoire passe à mi-largeur du côté CHUTE :
+    // bout libre décalé vers le vide, séparation vers le mandrin, trous rétrécis -> les cotes de la pièce sont justes.
+    const hk = Math.max(0, +D.kerf || 0) / 2;
+    const shiftEnd = (e, sg) => {
+      if (!hk || !e.D) return e;
+      const ds = sf.per / M;
+      const y = e.y.map((v, k) => {
+        const sl = (e.y[(k + 1) % M] - e.y[(k - 1 + M) % M]) / (2 * ds);
+        return v + sg * hk * Math.sqrt(1 + sl * sl);
+      });
+      return Object.assign({}, e, { y });
+    };
+    const eTopK = shiftEnd(eTop, 1),
+      eBotK = shiftEnd(eBot, -1);
     const ops = [],
       holes = [],
       bodies = [];
@@ -8919,7 +8946,7 @@ function cip_build() {
       ops.push({ name: nm, step, P, D: Dd });
     };
     const enm = { droit: '(droite)', biais: '(en biais)', gueule: '(gueule de loup)' };
-    if (eTop.kind !== 'brut') ring(eTop, 'Bout libre ' + enm[eTop.kind], 1);
+    if (eTop.kind !== 'brut') ring(eTopK, 'Bout libre ' + enm[eTop.kind], 1);
     if (eTop.body) bodies.push(eTop.body);
     if (eBot.body) bodies.push(eBot.body);
     // découpes posées sur le tube
@@ -8930,7 +8957,7 @@ function cip_build() {
       const nmF = `${fi + 1}. ${NAMES[F.type] || 'Découpe'}${F.type === 'rond' ? F.d : ''}`;
       const pos = +F.pos || 0;
       if (F.type === 'piq') {
-        const R2 = Math.max(0.2, +F.d2 / 2 || 5),
+        const R2 = Math.max(0.1, (+F.d2 / 2 || 5) - hk),
           be = Math.max(15, Math.min(90, +F.beta || 90)) * DEG,
           ro = (+F.rot || 0) * DEG,
           exc = +F.exc || 0;
@@ -8962,7 +8989,7 @@ function cip_build() {
         bodies.push({ C, a2, R2, tube: true });
         continue;
       }
-      const sh = cutShape(F);
+      const sh = cutShape(F, hk);
       if (!sh || sh.length < 3) return { err: `${nmF} : forme vide (importe un DXF fermé).` };
       const c = cutAtRot(sf, +F.rot || 0);
       if (!c) return { err: `${nmF} : position autour du tube impossible.` };
@@ -8993,7 +9020,7 @@ function cip_build() {
       holes.push(P);
       kh++;
     }
-    ring(eBot, 'Séparation ' + enm[eBot.kind], 4);
+    ring(eBotK, 'Séparation ' + enm[eBot.kind], 4);
     // ---- maillage : peau extérieure + intérieure + bords, trous retirés (dans le plan déroulé s, y)
     const HP = holes.map(P => {
       const ss = P.map(p => sf.sOf(p[0], p[2]));
@@ -9130,7 +9157,7 @@ function cip_build() {
       idx,
       L,
       pp,
-      info: `${eTop.kind === 'brut' ? 'bout libre brut' : 'bout libre ' + enm[eTop.kind]}, ${nb} découpe(s), séparation ${enm[eBot.kind]}`
+      info: `${eTop.kind === 'brut' ? 'bout libre brut' : 'bout libre ' + enm[eTop.kind]}, ${nb} découpe(s), séparation ${enm[eBot.kind]}${hk ? ' · faisceau ' + (2 * hk).toFixed(2) + ' mm corrigé' : ''}`
     };
   }
   function cutMemLoad() {
@@ -9278,6 +9305,14 @@ function cip_build() {
       `<div class="cipNum"${tip ? ` data-tip="${tip}"` : ''}><span>${lab}</span><select data-ck="${path}" style="width:150px">${opts.map(([v, t]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
     const H = t => `<div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">${t}</div>`;
     let h = `<div class="cipNum" style="border:2px solid var(--acc);border-radius:8px;padding:8px 10px;margin:4px 0 8px;background:rgba(245,166,35,.08)" data-tip="La pièce que tu RÉCUPÈRES à la fin : de la coupe du bout libre jusqu'à la séparation, au point le plus long.\nEx : 10 -> le soft coupe le bout, puis sépare 10 mm plus loin : ta pièce fait 10 mm."><span style="font:700 15px var(--sans)">📏 Longueur de la pièce finie (mm)</span><input type="number" step="0.1" value="${D.L}" data-ck="L" style="font:700 16px var(--mono);width:90px"></div>`;
+    h += num(
+      'kerf',
+      '🔦 Largeur du faisceau (mm)',
+      D.kerf === undefined ? '' : D.kerf,
+      'Vide = pas de correction (comme avant).\nSi tu tapes une valeur, le soft corrige tout seul pour que les cotes de la pièce soient JUSTES :\n- les coupes de bout passent à mi-largeur côté chute (longueur exacte),\n- les trous sont rétrécis de la largeur (trous à la bonne taille).\nComment la mesurer : coupe une fente (un simple trait) dans une tôle et mesure sa largeur.',
+      0.01,
+      'placeholder="vide = pas de correction"'
+    );
     h += H('LE TUBE');
     h += sel('prof', 'Section', D.prof, [
       ['rond', 'Rond'],
@@ -10117,7 +10152,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v67',
+  const CIP_VER = 'CIP v68',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
