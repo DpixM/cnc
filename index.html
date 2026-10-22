@@ -2537,6 +2537,13 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
     #cipBody .cipGB .cipNum{margin:3px 0}#cipBody .cipGB .cipNum input{width:72px}
     #cipBody .cipW.cipMtMode [data-mtno],#cipBody .cipW:not(.cipMtMode) [data-mtonly]{display:none!important}
     #cipBody .cipW.cipCutMode #cipGenBox,#cipBody .cipW:not(.cipCutMode) #cipCutBox{display:none!important}
+    #cipBody .cipW .cipSide>.cipBox{border-left:4px solid var(--bc,var(--brd2))}
+    #cipBody .cipW .cipSide>.cipBox>h3{font:700 13px var(--sans);color:var(--bc,var(--txt2));letter-spacing:.06em;padding-bottom:6px;border-bottom:1px solid var(--brd2);margin-bottom:9px}
+    #cipBody .cipW .cipSide>.cipBox>h3 i{background:var(--bc,var(--acc))}
+    #cipBody .cipSub{font:700 12px var(--sans);text-transform:uppercase;letter-spacing:.05em;color:var(--bc,var(--txt2));margin:12px 0 6px;padding:4px 8px;border-left:3px solid var(--bc,var(--brd2));background:rgba(255,255,255,.04);border-radius:0 6px 6px 0}
+    #cipBody .cipBox .cipGB{border-left:3px solid var(--bc,var(--brd2))}
+    #cipBody .cipWzS{border-left:3px solid var(--brd2)}
+    #cipBody .cipWzS.cur{border-left:3px solid var(--acc)}
     #cipCutBody .cipSec{border:1px solid var(--brd2);border-left:4px solid var(--sc);border-radius:8px;padding:6px 10px 8px;margin:12px 0;background:rgba(255,255,255,.03)}
     #cipCutBody .cipSecH{font:700 13px var(--sans);color:var(--sc);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 8px;display:flex;align-items:center;gap:7px;padding-bottom:5px;border-bottom:1px solid var(--brd2)}
     #cipCutBody .cipSecH span{font-size:15px}
@@ -2644,15 +2651,15 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
       </div>
       <div class="cipSide">
         <div class="cipStepper" id="cipStepper"><button onclick="cip_ui('startscreen')">Mandrin</button><span>›</span><button onclick="cip_ui('procscreen')" id="cipStpProc">Procédé</button><span>›</span><button onclick="cip_ui('partscreen')" id="cipStpPart">Pièce</button><span>›</span><button onclick="cip_ui('gostep','sim')" id="cipStpPrep">Réglages</button><span>›</span><button onclick="cip_ui('gostep','mach')" id="cipStpMach">Mise en machine + simulation</button></div>
-        <div class="cipBox" data-st="build" id="cipMtBox" data-mtonly>
+        <div style="--bc:#f5a623" class="cipBox" data-st="build" id="cipMtBox" data-mtonly>
           <h3>↺ Soudure en onglet (coude)</h3>
           <div class="cipNote" style="margin-top:0">Tape les cotes : les 2 tubes se mettent à jour dans la 3D. Passe la souris sur une cote pour la voir en couleur sur la pièce. La pièce est tenue centrée dans un montage (jonction face au mandrin).</div>
-          <div style="font:600 12px var(--sans);color:var(--txt2);margin:8px 0 2px">LES 2 TUBES</div>
+          <div class="cipSub">LES 2 TUBES</div>
           <div class="cipNum cipGK" data-hk="M:d" data-tip="Diamètre extérieur des tubes (mm)."><span>Ø tube (mm)</span><input type="number" id="cipMtD" value="40" step="0.1" min="2" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:ep" data-only="decoupe" data-tip="Épaisseur des tubes (pour le dessin 3D)."><span>Épaisseur (mm)</span><input type="number" id="cipMtE" value="1.5" step="0.1" min="0.3" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:ang" data-tip="Angle entre les deux tubes. 90 = coude à angle droit. 180 = tubes alignés (jonction ronde)."><span>Angle entre les tubes (°)</span><input type="number" id="cipMtA" value="90" step="1" min="30" max="180" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:L" data-tip="Longueur de chaque tube depuis la jonction (sur son axe) : sert au dessin et au contrôle de collision de la tête."><span>Longueur des tubes (mm)</span><input type="number" id="cipMtL" value="80" step="1" min="10" oninput="cip_ui('mt')"></div>
-          <div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">LA SOUDURE</div>
+          <div class="cipSub">LA SOUDURE</div>
           <div class="cipNum cipGK" data-hk="M:pos" data-tip="Où la soudure démarre sur la jonction (là où tu poses la pointe pour le SET_G54).\n0° = petit axe (côté plat), 90° = grand axe (la pointe), 180° / 270° = en face.\nOu clique 📍 et choisis le point directement sur la pièce en 3D."><span>Départ (°)</span><span style="display:flex;gap:4px;align-items:center"><button class="cipBtn" style="padding:2px 7px" onclick="cip_ui('pickany')">📍</button><input type="number" id="cipMtS0" value="0" step="1" style="width:70px" oninput="cip_ui('mt')"></span></div>
           <div class="cipNum cipGK" data-hk="M:rot" data-tip="Inclinaison fixe de la tête pendant toute la soudure.\nVide = auto : le soft la place tout seul dans le plan de la jonction (bissectrice des 2 tubes = B 0°), le seul sens où la tête ne touche ni un tube ni l\'autre.\nTape une valeur seulement si tu veux forcer un autre angle."><span>B tête (°)</span><input type="number" id="cipMtB" value="" placeholder="auto" step="0.1" min="-134.9" max="134.9" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:p0" data-tip="Rampe de départ (°) : la puissance monte."><span>Pente début (°)</span><input type="number" id="cipMtP0" value="2" step="1" min="0" oninput="cip_ui('mt')"></div>
@@ -2665,7 +2672,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipStat" id="cipMtMsg"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','mach')">Suivant : mise en machine + simulation →</button></div>
         </div>
-        <div class="cipBox" data-st="build" id="cipCutBox" data-mtno>
+        <div style="--bc:#f5a623" class="cipBox" data-st="build" id="cipCutBox" data-mtno>
           <h3>✂ Tube à découper</h3>
           <div class="cipNote" style="margin-top:0">Choisis le tube, la coupe des bouts et pose tes découpes : la pièce se met à jour toute seule dans la 3D (les tubes qui viennent dessus en rouge transparent). Tout est calculé exact sur la surface du tube.</div>
           <div id="cipCutBody"></div>
@@ -2673,20 +2680,20 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipStat" id="cipCutMsg"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : réglages →</button></div>
         </div>
-        <div class="cipBox" data-st="build" id="cipGenBox" data-mtno>
+        <div style="--bc:#f5a623" class="cipBox" data-st="build" id="cipGenBox" data-mtno>
           <h3>🛠 Créer ma pièce</h3>
           <div class="cipNote" style="margin-top:0">Tape les cotes : la pièce se met à jour toute seule dans la 3D. Les lignes de soudure sont calculées exactement (pas devinées).</div>
-          <div style="font:600 12px var(--sans);color:var(--txt2);margin:8px 0 2px">TUBE PRINCIPAL</div>
+          <div class="cipSub">TUBE PRINCIPAL</div>
           <div class="cipNum cipGK" data-hk="T:d"><span>Ø extérieur (mm)</span><input type="number" id="cipGTD" value="56" min="4" step="0.1" oninput="cip_ui('gen')"></div>
           <div class="cipNum cipGK" data-hk="T:ep" data-only="decoupe" data-tip="Épaisseur du tube. Mets l'épaisseur = le rayon (ou plus) pour une pièce PLEINE (rond plein, cylindre)."><span>Épaisseur (mm)</span><input type="number" id="cipGTE" value="3" min="0.3" step="0.1" oninput="cip_ui('gen')"></div>
           <div class="cipNum cipGK" data-hk="T:L"><span>Longueur de la pièce (mm)</span><input type="number" id="cipGTL" value="120" min="10" step="1" oninput="cip_ui('gen')"></div>
-          <div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">CE QU'ON SOUDE DESSUS</div>
+          <div class="cipSub">CE QU'ON SOUDE DESSUS</div>
           <div id="cipGBodies"></div>
           <div class="cipRow"><button class="cipBtn" onclick="cip_ui('genadd','rond')">+ Tube / rond</button><button class="cipBtn" onclick="cip_ui('genadd','plat')">+ Plat</button><button class="cipBtn" onclick="cip_ui('genadd','bride')">+ Bride</button><button class="cipBtn" onclick="cip_ui('genadd','deport')">+ Déporté</button></div>
           <div class="cipStat" id="cipGMsg"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : réglages →</button></div>
         </div>
-        <div class="cipBox" data-st="sim mach" id="cipSimBox">
+        <div style="--bc:#4fc3f7" class="cipBox" data-st="sim mach" id="cipSimBox">
           <h3><span class="cipInSim">✔ Contrôle des collisions</span><span class="cipInMach">▶ Simulation (avec tes vraies valeurs)</span></h3>
           <div class="cipNote cipInSim" style="margin-top:0">Ici tu règles : le trajet et les collisions se recalculent en direct. La <b>simulation</b> (lecture) est à l'étape <b>Mise en machine</b>, une fois le SET_G54 et le Z lu tapés : elle utilise tes vraies valeurs.</div>
           <div class="cipNote" id="cipVerBan" style="display:none;margin:0 0 8px;border:1px solid var(--acc);border-radius:6px;padding:7px 9px">✅ <b>Simulation finale</b> : tu vois le fichier <b id="cipVerFile"></b> rejoué tel quel sur ta pièce (exactement ce que la machine va faire).<div class="cipRow" style="margin-top:6px"><button class="cipBtn" onclick="cip_ui('verifyexit')">↩ Revenir au calcul</button></div></div>
@@ -2704,7 +2711,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <textarea id="cipSnapTxt" readonly style="display:none;width:100%;height:90px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px;margin-top:4px"></textarea>
           <div class="cipRow"><button class="cipBtn" id="cipCodeShow" style="display:none" onclick="cip_ui('codeshow')">Afficher le code en direct</button></div>
         </div>
-        <div class="cipBox" data-st="sim" data-mtno data-only="decoupe" data-nogen>
+        <div style="--bc:#9aa5ae" class="cipBox" data-st="sim" data-mtno data-only="decoupe" data-nogen>
           <h3><i class="cipN"></i>Tube</h3>
           <div class="cipSeg" id="cipProfSeg">
             <button class="cipBtn" id="cipPf_rond" onclick="cip_ui('prof','rond')">Rond</button>
@@ -2720,7 +2727,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNum" id="cipRowR"><span>Rayon des angles (mm)</span><input type="number" id="cipTR" value="3" min="0" step="0.1" onchange="cip_ui('tube')"></div>
           <div class="cipNum" data-nodet><span>Épaisseur (mm)</span><input type="number" id="cipTE" value="2" min="0.2" step="0.1" onchange="cip_ui('tube')"></div>
         </div>
-        <div class="cipBox" data-st="sim" data-mtno>
+        <div style="--bc:#a283ff" class="cipBox" data-st="sim" data-mtno>
           <h3><i class="cipN"></i>Pièce</h3>
           <span id="cipChTxt" style="display:none"></span>
           <div class="cipNum" data-tip="Ton mandrin réel (cotes mesurées) : il sert au contrôle des collisions et à la distance face d'appui → face des mors."><span>Mors du mandrin</span><select id="cipMandrin" onchange="cip_ui('mandrin')" style="width:170px"><option value="rose">Points roses (mors en escalier)</option><option value="bronze">Mors bronze</option></select></div>
@@ -2750,7 +2757,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipRow"><button class="cipBtn" onclick="cip_ui('flip')" data-tip="Retourne la pièce bout pour bout sur cet axe.">↕ Inverser le sens</button><button class="cipBtn" id="cipFitBtn" data-only="decoupe" onclick="cip_ui('fit')" disabled>Adapter le tube à la pièce</button></div>
           <div class="cipStat" id="cipPartStat">Aucune pièce. Importe ton STEP : le tube et l'axe sont détectés tout seuls.</div>
         </div>
-        <div class="cipBox" data-st="sim" data-mtno>
+        <div style="--bc:#3fc3e6" class="cipBox" data-st="sim" data-mtno>
           <h3><i class="cipN"></i>Passages</h3>
           <select id="cipProc" onchange="cip_ui('proc')" style="display:none"><option value="decoupe">Découpe</option><option value="soudure">Soudure</option></select>
           <div class="cipRow" style="justify-content:space-between"><span style="font-size:13px">Procédé : <b id="cipProcTxt">—</b></span><button class="cipBtn" onclick="cip_ui('procscreen')">Changer</button></div>
@@ -2772,7 +2779,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipSt" id="cipSteps"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','mach')">Suivant : mise en machine →</button></div>
         </div>
-        <div class="cipBox" data-st="mach" id="cipMachBox">
+        <div style="--bc:#5fcf8f" class="cipBox" data-st="mach" id="cipMachBox">
           <h3>🔧 Mise en machine</h3>
           <div class="cipNote" style="margin-top:0">Fais les étapes dans l'ordre : chaque étape débloque la suivante.</div>
           <div id="cipWz" data-mtno></div>
@@ -2788,7 +2795,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           </div>
           <label class="cipChk" style="margin-top:8px" data-mtno><input type="checkbox" id="cipAdvChk" onchange="cip_ui('advtoggle')"> Réglages avancés (SET_G54, bloc CIP…)</label>
         </div>
-        <div class="cipBox cipAdv" id="cipLstBox" data-st="mach" data-mtno>
+        <div style="--bc:#8b949e" class="cipBox cipAdv" id="cipLstBox" data-st="mach" data-mtno>
           <h3>Réglages avancés du .LST</h3>
           <div class="cipNote" style="margin-bottom:6px">Le nom, la techno, le mode/page et le test à vide se règlent à l'étape 4 (repris ici tout seuls). Le bloc CIP + l'en-tête et la fin de tes vrais programmes. Valeurs machine copiées de tes fichiers qui tournent, rien d'inventé. <b>Toujours tester à vide d'abord.</b></div>
           <div class="cipNum" data-wz4><span>Nom du programme</span><input id="cipLName" style="width:170px" placeholder="ex : TUBE-PIQUAGE" onchange="cip_ui('lstclr')"></div>
@@ -2828,20 +2835,20 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <textarea id="cipGenTxt" readonly spellcheck="false" style="display:none;width:100%;height:160px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px;margin-top:4px;white-space:pre"></textarea>
         </details>
         </div>
-        <div class="cipBox" data-st="mach" id="cipDlBox" style="display:none"></div>
-        <div class="cipBox" data-st="mach" id="cipPosBox">
+        <div style="--bc:#f5a623" class="cipBox" data-st="mach" id="cipDlBox" style="display:none"></div>
+        <div style="--bc:#3fc3e6" class="cipBox" data-st="mach" id="cipPosBox">
           <h3>Position</h3>
           <dl class="cipRd" id="cipReadout"></dl>
           <div class="cipAl" id="cipAlert"></div>
         </div>
-        <div class="cipBox">
+        <div style="--bc:#f0a24a" class="cipBox">
           <h3>💾 Projet</h3>
           <div class="cipRow"><button class="cipBtn" style="flex:1" onclick="cip_ui('projsave')" data-tip="Enregistre TOUT dans un fichier .cip.json : mandrin, procédé, ta pièce (STEP ou créée), le placement, les départs et tous les réglages. Tu le rouvres plus tard avec « Ouvrir ».">💾 Enregistrer</button><button class="cipBtn" style="flex:1" onclick="cip_ui('projopen')" data-tip="Rouvre un projet .cip.json enregistré : tout revient comme tu l'avais laissé.">📂 Ouvrir</button></div>
           <div class="cipRow"><button class="cipBtn" style="flex:1" onclick="cip_ui('projreset')" data-tip="Remet tous les réglages à leur valeur d'origine (ta pièce et ton mandrin restent ; le Z max et la mesure du mandrin aussi).">↺ Remettre les réglages d'origine</button></div>
           <div class="cipNote" style="margin-top:2px">Astuce : double-clic sur le nom d'un réglage = remet juste celui-là.</div>
           <div class="cipStat" id="cipProjMsg"></div>
         </div>
-        <div class="cipBox">
+        <div style="--bc:#9aa5ae" class="cipBox">
           <h3>Affichage</h3>
           <div class="cipNote" style="margin-top:0">Cinématique : tête en X/Y/Z + inclinaison gauche/droite seulement (vers le mandrin ou vers le bout du tube). Le mandrin tourne pour le reste.</div>
           <label class="cipChk"><input type="checkbox" id="cipVec" onchange="cip_ui('upd')"> Vecteurs faisceau</label>
@@ -10381,7 +10388,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v74',
+  const CIP_VER = 'CIP v75',
     CIP_DATE = '19/10/2026';
   {
     const e = $('cipVer');
