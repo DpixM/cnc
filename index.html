@@ -2800,6 +2800,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNote" style="margin-bottom:6px">Le nom, la techno, le mode/page et le test à vide se règlent à l'étape 4 (repris ici tout seuls). Le bloc CIP + l'en-tête et la fin de tes vrais programmes. Valeurs machine copiées de tes fichiers qui tournent, rien d'inventé. <b>Toujours tester à vide d'abord.</b></div>
           <div class="cipNum" data-wz4><span>Nom du programme</span><input id="cipLName" style="width:170px" placeholder="ex : TUBE-PIQUAGE" onchange="cip_ui('lstclr')"></div>
           <div id="cipLWeld">
+            <div class="cipNum" data-tip="1er chiffre de TC_WELD_ON(…) : n° du paramètre de ta table techno soudure. C'est toi qui choisis (par défaut 1), le soft le garde en mémoire."><span>N° de paramètre</span><input type="number" id="cipLWNo" value="1" min="0" step="1" style="width:170px" onchange="cip_ui('lstclr')"></div>
             <div class="cipNum" data-wz4 data-tip="Mode de TC_WELD_ON (manuel TruLaser) :\n00 = sans rampe, sans fil · 01 = sans rampe, avec fil\n10 = rampe au départ, sans fil · 11 = rampe + fil"><span>Mode (rampe / fil)</span><select id="cipLWMode" onchange="cip_ui('lstclr')" style="width:170px"><option value="10">10 · rampe, sans fil</option><option value="00">00 · sans rampe, sans fil</option><option value="11">11 · rampe + fil</option><option value="01">01 · sans rampe, avec fil</option></select></div>
             <div class="cipNum" data-wz4 data-tip="Page de la table de soudage (WELDING_TYPE) appelée par TC_WELD_ON."><span>Page de la table</span><select id="cipLWPage" onchange="cip_ui('lstclr')" style="width:170px"><option value="100">100 · Soudage 1</option><option value="200">200 · Soudage 2</option><option value="300">300 · Soudage 3</option><option value="400">400 · Soudage 4</option><option value="500">500 · Marquage 5</option><option value="600">600 · Pointage rapide 6</option><option value="700">700 · Pointage lent 7</option></select></div>
             <div class="cipNum" data-tip="Fin de soudure TC_WELD_OFF(3, …) : 10 = avec pente de fin, 00 = sans pente."><span>Fin de soudure</span><select id="cipLWOff" onchange="cip_ui('lstclr')" style="width:170px"><option value="10">10 · avec pente</option><option value="00">00 · sans pente</option></select></div>
@@ -2807,6 +2808,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           </div>
           <div id="cipLCut" style="display:none">
             <div class="cipNum"><span>Techno découpe (LTT)</span><b id="cipLTC" style="font:13px var(--mono)">SS010MDN2S-0</b></div>
+            <div class="cipNum" data-tip="1er chiffre de TC_LASER_ON(…) : n° du paramètre de coupe dans ta table LTT. C'est toi qui choisis (par défaut 11), le soft le garde en mémoire."><span>N° de paramètre</span><input type="number" id="cipLCNo" value="11" min="0" step="1" style="width:170px" onchange="cip_ui('lstclr')"></div>
             <div class="cipRow"><button class="cipBtn" style="font-size:12px" onclick="document.getElementById('cipLRefFile').click()">Prendre la table d'un autre .LST découpe</button><input type="file" id="cipLRefFile" class="cipFile" accept=".lst,.LST" onchange="cip_ui('lstref')"></div>
             <div class="cipNum"><span>FGREF [c1] = rayon pièce (mm)</span><input type="number" id="cipLFg" step="0.1" onchange="cip_ui('lstclr')"></div>
           </div>
@@ -6834,7 +6836,9 @@ function cip_build() {
             hc.slice(0, -1).forEach(f => push(f[0], f[1], c.TH[0], ci, -1)); // le dernier point = 1er point du passage (poussé juste après)
           } else if (rx) {
             c.rapX = true;
-            rx.forEach(f => push(f[0], f[1], f[2], ci, -1));
+            (V.len(V.sub(rx[rx.length - 1][0], c.P[0])) < 1e-6 ? rx.slice(0, -1) : rx).forEach(f =>
+              push(f[0], f[1], f[2], ci, -1)
+            );
           } else {
             c.rapX = false;
             rapid(F[F.length - 1], c, ci, push, Rs);
@@ -7396,6 +7400,55 @@ function cip_build() {
     }
     return null;
   }
+  // v76 : programme LÉGER. Les étapes à angle de mandrin fixe sont des droites -> on garde seulement leur dernier point
+  // (la machine refait exactement la même droite). La rotation du mandrin (arc autour du tube) est découpée en cordes
+  // de 30° maxi, chaque corde contrôlée anti-collision ; si ça touche on resserre (15°, 10°, puis le pas d'origine).
+  function rxLight(fr) {
+    if (!fr || fr.length < 3) return fr;
+    const out = [];
+    const nl = (A, B, t) => V.nrm(A.map((v, i) => v + (B[i] - v) * t));
+    const lin = (A, B, t) => A.map((v, i) => v + (B[i] - v) * t);
+    const chordOk = (A, B) => {
+      for (let q = 1; q < 6; q++) {
+        const t = q / 6;
+        if (clearance(lin(A[0], B[0], t), nl(A[1], B[1], t), 'mid') < 1) return false;
+      }
+      return true;
+    };
+    let i = 0;
+    while (i < fr.length) {
+      let j = i;
+      while (j + 1 < fr.length && fr[j + 1][3] === fr[i][3]) j++;
+      if (fr[i][3] === 5 && j > i) {
+        const dth = Math.abs(fr[j][2] - (i > 0 ? fr[i - 1][2] : fr[i][2])) / (j - i + 1) || 1;
+        let done = false;
+        for (const deg of [45, 30, 15, 10]) {
+          const k = Math.max(1, Math.floor(deg / dth));
+          if (k <= 1) break;
+          const idx = [];
+          for (let m = i + k - 1; m < j; m += k) idx.push(m);
+          idx.push(j);
+          let prev = out.length ? out[out.length - 1] : fr[Math.max(0, i - 1)],
+            ok = true;
+          for (const m of idx) {
+            if (!chordOk(prev, fr[m])) {
+              ok = false;
+              break;
+            }
+            prev = fr[m];
+          }
+          if (ok) {
+            idx.forEach(m => out.push(fr[m]));
+            done = true;
+            break;
+          }
+        }
+        if (!done) for (let m = i; m <= j; m++) out.push(fr[m]);
+      } else out.push(fr[j]);
+      i = j + 1;
+    }
+    return out;
+  }
   // passage bas d'abord (limite réglable), sinon plus haut avec alerte
   function zLim() {
     const v = parseFloat(($('cipZMax') || {}).value);
@@ -7403,9 +7456,9 @@ function cip_build() {
   }
   function rapidXlim(a, c) {
     const zl = zLim();
-    let r = rapidX(a, c, zl);
+    let r = rxLight(rapidX(a, c, zl));
     if (r) return r;
-    r = zl < 90 ? rapidX(a, c, 90) : null; // (même recherche si la limite est déjà ≥ 90)
+    r = zl < 90 ? rxLight(rapidX(a, c, 90)) : null; // (même recherche si la limite est déjà ≥ 90)
     if (r) {
       let mh = 0;
       r.forEach(f => {
@@ -7432,6 +7485,11 @@ function cip_build() {
     const fromCyl = (r, ph, y) => [r * Math.sin(ph), y, r * Math.cos(ph)];
     const nl = (A, B, t) => V.nrm(A.map((v, i) => v + (B[i] - v) * t));
     const lin = (A, B, t) => A.map((v, i) => v + (B[i] - v) * t);
+    const rotY = (v, al) => [
+      v[0] * Math.cos(al) + v[2] * Math.sin(al),
+      v[1],
+      -v[0] * Math.sin(al) + v[2] * Math.cos(al)
+    ];
     // v60 : le MOINS de lignes possible -> on essaie d'abord en 1 seule ligne (pas de 180°), puis 90°, 45°, 20°, 12°
     // (chaque ligne droite est contrôlée anti-collision ; si ça touche, on prend un pas plus fin / un recul plus grand)
     for (const stepDeg of [180, 90, 45, 20, 12])
@@ -7451,7 +7509,12 @@ function cip_build() {
         const L = [[E1, a.d]];
         for (let k = 1; k < n; k++) {
           const t = k / n;
-          L.push([fromCyl(ce.r + (cs.r - ce.r) * t, ce.ph + dph * t, ce.y + (cs.y - ce.y) * t), nl(a.d, D0, t)]);
+          // v76 : la tête tourne AVEC le mandrin (faisceau qui garde son angle par rapport au tube), sinon à mi-chemin
+          // le corps de tête traverse le tube (l'ancien mélange direct des 2 directions passait par le travers)
+          L.push([
+            fromCyl(ce.r + (cs.r - ce.r) * t, ce.ph + dph * t, ce.y + (cs.y - ce.y) * t),
+            nl(rotY(a.d, dph * t), rotY(D0, -dph * (1 - t)), t)
+          ]);
         }
         L.push([S1, D0], [P0.slice(), D0]);
         // contrôle : chaque ligne droite (ce que fait la machine entre 2 points), finement, avec 1 mm de marge
@@ -7514,15 +7577,16 @@ function cip_build() {
         push(f[0], f[1], f[2], ci, -1);
       }
     };
-    seg(8, t => [sub(p0, d0, L1 * t), d0, a.th]);
-    seg(10, t => [lerp(r0, S0, t), V.nrm(lerp(d0, radIn(ph0), t)), a.th]);
-    const n3 = Math.max(6, Math.ceil(Math.abs(ph1 - ph0) / 6 + Math.abs(r1[1] - r0[1]) / 6));
+    // v76 : programme LÉGER -> 1 ligne par étape (la machine fait la droite toute seule), le tour du tube par pas de 45° maxi.
+    // Le dernier point (descente sur le contour) est le 1er point du contour, poussé juste après.
+    seg(1, t => [sub(p0, d0, L1 * t), d0, a.th]);
+    seg(1, t => [lerp(r0, S0, t), V.nrm(lerp(d0, radIn(ph0), t)), a.th]);
+    const n3 = Math.max(1, Math.ceil(Math.abs(ph1 - ph0) / 45));
     seg(n3, t => {
       const ph = ph0 + (ph1 - ph0) * t;
       return [cyl(ph, r0[1] + (r1[1] - r0[1]) * t), radIn(ph), 90 - ph + offS + (offE - offS) * t];
     });
-    seg(10, t => [lerp(S1, r1, t), V.nrm(lerp(radIn(ph1), d1, t)), c.TH[0]]);
-    seg(7, t => [lerp(r1, p1, t), d1, c.TH[0]]);
+    seg(1, t => [lerp(S1, r1, t), V.nrm(lerp(radIn(ph1), d1, t)), c.TH[0]]);
   }
   function frameAt(s) {
     if (!F.length) return null;
@@ -9374,9 +9438,15 @@ function cip_build() {
   // Le départ (là où l'entrée rejoint la vraie coupe) se choisit avec 📍 « Choisir le départ ».
   function cutLead(o) {
     const D0 = S.part && S.part.gen && S.part.gen.def;
-    const Lg = (D0 && D0.lead) || {};
+    let Lg = (D0 && D0.lead) || {};
     if (o.waste === undefined || !o.P || o.P.length < 3) return;
-    if ((o.step === 1 || o.step === 4) && Lg.ends === false) return;
+    if (o.step === 1 || o.step === 4) {
+      // v76 : chaque côté (bout libre / séparation) peut avoir sa propre entrée
+      const side = D0 && (o.step === 1 ? D0.end : D0.sep);
+      const sl = side && side.lead;
+      if (sl && sl.type && sl.type !== 'same') Lg = { type: sl.type, r: sl.r, over: sl.over };
+      else if (Lg.ends === false) return;
+    }
     const type = Lg.type || 'none',
       over = Math.max(0, +Lg.over || 0);
     let R = Math.max(0, +Lg.r || 0);
@@ -9572,6 +9642,38 @@ function cip_build() {
           ],
           "Sens dans lequel le mandrin tourne pendant CETTE coupe.\nAuto : à l'opposé de l'autre coupe de tour -> le mandrin se déroule tout seul (programme plus court)."
         );
+      if (E.type !== 'brut') {
+        // v76 : entrée / dépassement propres à CE côté
+        const El = E.lead || (E.lead = { type: 'same', r: 2, over: 0 });
+        s += sel(
+          k + '.lead.type',
+          'Entrée (perçage)',
+          El.type || 'same',
+          [
+            ['same', 'Comme les trous'],
+            ['none', 'Aucune (perce sur le trait)'],
+            ['arc', 'Arc de cercle'],
+            ['droite', 'Droite']
+          ],
+          'Comment la tête entre dans CETTE coupe. Le perçage se fait dans la chute (côté vide pour le bout libre, côté mandrin pour la séparation).\n« Comme les trous » = le réglage de la section Entrée plus bas.'
+        );
+        if (El.type === 'arc' || El.type === 'droite') {
+          s += num(
+            k + '.lead.r',
+            El.type === 'arc' ? "Rayon de l'arc (mm)" : "Longueur de l'entrée (mm)",
+            El.r,
+            '',
+            0.1
+          );
+          s += num(
+            k + '.lead.over',
+            'Dépassement en fin de coupe (mm)',
+            El.over,
+            '0 = la coupe s’arrête pile au départ. Sinon elle continue de cette longueur.',
+            0.1
+          );
+        } else if (El.type === 'none') s += num(k + '.lead.over', 'Dépassement en fin de coupe (mm)', El.over, '', 0.1);
+      }
       return s + '</div>';
     };
     h += endUI('end', 'Bout libre (côté vide)', true);
@@ -9637,6 +9739,14 @@ function cip_build() {
     h += endUI('sep', 'Séparation (côté mandrin, coupée en dernier)', false);
     {
       const Lg = D.lead || (D.lead = { type: 'none', r: 2, over: 0, ends: true });
+      if (Lg.ends === false) {
+        // ancien réglage « pas sur les bouts » -> chaque côté passe en « Aucune »
+        ['end', 'sep'].forEach(k => {
+          D[k].lead = D[k].lead || { type: 'same', r: 2, over: 0 };
+          if (D[k].lead.type === 'same') D[k].lead.type = 'none';
+        });
+        Lg.ends = true;
+      }
       const Dr = D.dir || (D.dir = { ring: 'auto', hole: 'auto' });
       h += SEC('Entrée, fin de coupe et sens des trous', '#f5a623', '↪');
       h += sel(
@@ -9652,7 +9762,7 @@ function cip_build() {
       );
       h += sel(
         'lead.type',
-        'Entrée (perçage)',
+        'Entrée des trous (perçage)',
         Lg.type,
         [
           ['none', 'Aucune (perce sur le trait)'],
@@ -9676,7 +9786,7 @@ function cip_build() {
         '0 = la coupe s’arrête pile au départ. Sinon elle continue sur la même trajectoire de cette longueur (pour être sûr que ça tombe).',
         0.1
       );
-      h += `<label class="cipChk"><input type="checkbox" data-ck="lead.ends" ${Lg.ends !== false ? 'checked' : ''}> Aussi sur le bout libre et la séparation</label>`;
+      h += `<div class="cipNote" style="margin:2px 0 0">Bout libre et séparation : chacun a son entrée dans sa propre section (par défaut « Comme les trous »).</div>`;
       h += '</div>';
     }
     box.innerHTML = h;
@@ -10154,8 +10264,10 @@ function cip_build() {
     ${
       W
         ? `<div class="cipNum"><span>Techno soudure (WTT)</span><input id="cipWzTech" list="cipLTWl" style="width:150px" value="${($('cipLTW').value || '').replace(/"/g, '')}" placeholder="ex : TUBECOUDE-DORE"></div>` +
+          `<div class="cipNum" data-tip="1er chiffre de TC_WELD_ON(…) : n° du paramètre de ta table (par défaut 1)."><span>N° de paramètre</span><input type="number" data-mirror="cipLWNo" min="0" step="1" style="width:150px" value="${($('cipLWNo') || {}).value || '1'}"></div>` +
           `<div class="cipNum"><span>Mode / page</span><span class="cipRow" style="margin:0;gap:4px"><select data-mirror="cipLWMode" style="width:70px">${[...$('cipLWMode').options].map(o => `<option value="${o.value}" ${o.value === $('cipLWMode').value ? 'selected' : ''}>${o.value}</option>`).join('')}</select><select data-mirror="cipLWPage" style="width:76px">${[...$('cipLWPage').options].map(o => `<option value="${o.value}" ${o.value === $('cipLWPage').value ? 'selected' : ''}>${o.value}</option>`).join('')}</select></span></div>`
-        : `<div class="cipNum"><span>Techno découpe (LTT)</span><b style="font:13px var(--mono)">${$('cipLTC').textContent}</b></div>`
+        : `<div class="cipNum"><span>Techno découpe (LTT)</span><b style="font:13px var(--mono)">${$('cipLTC').textContent}</b></div>` +
+          `<div class="cipNum" data-tip="1er chiffre de TC_LASER_ON(…) : n° du paramètre de coupe dans ta table LTT (par défaut 11)."><span>N° de paramètre</span><input type="number" data-mirror="cipLCNo" min="0" step="1" style="width:150px" value="${($('cipLCNo') || {}).value || '11'}"></div>`
     }
     <label class="cipChk" data-tip="Test à vide : le laser ne s'allume jamais (allumage en commentaire), même nom de fichier. En découpe, la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint). Toujours passer à vide avant le vrai !"><input type="checkbox" id="cipWzDry" ${dry ? 'checked' : ''}> <b>Test à vide</b> (laser jamais allumé)</label>
     <div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',3)">←</button><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('wzgen')">▶ Générer et simuler le .LST</button></div>
@@ -10198,8 +10310,9 @@ function cip_build() {
       h.appendChild(b);
     });
     box.querySelectorAll('[data-mirror]').forEach(el => {
-      el.onchange = () => {
+      el.onchange = el.oninput = () => {
         $(el.dataset.mirror).value = el.value;
+        if (/^cipL[WC]No$/.test(el.dataset.mirror)) parSave();
       };
       const t = $(el.dataset.mirror);
       const opt = t && t.options ? t.options[t.selectedIndex] : null;
@@ -10297,12 +10410,19 @@ function cip_build() {
     dlRender();
   }
   // Nom / techno / test à vide modifié après la génération : on retire l'ancien fichier (sinon on téléchargerait l'ancien nom)
+  function parSave() {
+    try {
+      ['cipLWNo', 'cipLCNo'].forEach(id => $(id) && localStorage.setItem(id, $(id).value));
+    } catch (e) {}
+  }
   function dlSig() {
     const v = id => {
       const e = $(id);
       return e ? (e.type === 'checkbox' ? e.checked : e.value) : '';
     };
-    return ['cipLName', 'cipLTW', 'cipLDry', 'cipMtName', 'cipMtTech', 'cipMtDry'].map(v).join('|');
+    return ['cipLName', 'cipLTW', 'cipLDry', 'cipMtName', 'cipMtTech', 'cipMtDry', 'cipLWNo', 'cipLCNo']
+      .map(v)
+      .join('|');
   }
   function dlStale() {
     if (!S.lastGen && !S.lastLST) return;
@@ -10388,8 +10508,8 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v75',
-    CIP_DATE = '19/10/2026';
+  const CIP_VER = 'CIP v76',
+    CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
     if (e) {
@@ -11888,7 +12008,8 @@ function cip_build() {
       lstMv(Q[0], 'f5000') + "   ; point d'approche",
       'm0',
       '',
-      A + `TC_WELD_ON(1, "${tech}", ${mode}, ${page}); ROTATIONCW`
+      A +
+        `TC_WELD_ON(${parNo('cipLWNo', 1) === null ? 1 : parNo('cipLWNo', 1)}, "${tech}", ${mode}, ${page}); ROTATIONCW`
     );
     const segs = [
       [cut[0], cut[1], ';pente de debut'],
@@ -12027,6 +12148,12 @@ function cip_build() {
   try {
     const o = JSON.parse(localStorage.getItem('cipMtVals') || 'null');
     if (o) MT_IDS.forEach(id => $(id) && o[id] !== undefined && ($(id).value = o[id]));
+  } catch (e) {}
+  try {
+    ['cipLWNo', 'cipLCNo'].forEach(id => {
+      const v = localStorage.getItem(id);
+      if (v !== null && $(id)) $(id).value = v;
+    });
   } catch (e) {}
   try {
     const zt = localStorage.getItem('cipZTop');
@@ -14091,6 +14218,12 @@ function cip_build() {
       return null;
     }
   }
+  function parNo(id, def) {
+    const e = $(id);
+    const v = e ? String(e.value).trim() : '';
+    if (v === '') return def;
+    return /^\d{1,4}$/.test(v) ? +v : null;
+  }
   function lstMv(q, f) {
     return ` G01 X = ${n3(q.X)} Y = ${n3(q.Y)} Z = ${n3(q.Z)} B = ${n3(q.B)} C1 = ${n3(q.C)}` + (f ? ' ' + f : '');
   }
@@ -14136,9 +14269,13 @@ function cip_build() {
     const WM = ($('cipLWMode') && $('cipLWMode').value) || '10',
       WP = ($('cipLWPage') && $('cipLWPage').value) || '100',
       WO = ($('cipLWOff') && $('cipLWOff').value) || '10';
+    // v76 : n° de paramètre choisi par toi (1er chiffre de TC_WELD_ON / TC_LASER_ON)
+    const WN = parNo('cipLWNo', 1),
+      CN = parNo('cipLCNo', 11);
+    if (WN === null || CN === null) return { err: 'Le n° de paramètre doit être un nombre entier (ex : 1, 2, 11…).' };
     const ON = W
-      ? rot => `TC_WELD_ON(1, "${tech}", ${WM}, ${WP});` + (rot > 0 ? ' ROTATIONCW' : rot < 0 ? ' ROTATIONCCW' : '')
-      : () => `TC_LASER_ON(11,"${tech}",0,300)`;
+      ? rot => `TC_WELD_ON(${WN}, "${tech}", ${WM}, ${WP});` + (rot > 0 ? ' ROTATIONCW' : rot < 0 ? ' ROTATIONCCW' : '')
+      : () => `TC_LASER_ON(${CN},"${tech}",0,300)`;
     const OFF = W ? `TC_WELD_OFF(3,${WO}) ;(00 sans pente,10 avec pente)` : 'TC_LASER_OFF(2)';
     // v65 : FIN SIMPLE (comme à la main) : on lève la tête, TRAFOOF, puis tous les axes reviennent en coordonnées MACHINE
     // SET_POS : là où ils étaient au lancement (mémorisés au début) ; SET_G54 : position de dégagement du gabarit (Z 350, C1 0)
@@ -15711,7 +15848,7 @@ function cip_build() {
           });
         };
     }
-    ['cipMtName', 'cipMtTech', 'cipMtDry', 'cipLName', 'cipLTW', 'cipLDry'].forEach(id => {
+    ['cipMtName', 'cipMtTech', 'cipMtDry', 'cipLName', 'cipLTW', 'cipLDry', 'cipLWNo', 'cipLCNo'].forEach(id => {
       const e = $(id);
       if (e) ['input', 'change'].forEach(t => e.addEventListener(t, ev => ev.isTrusted && dlStale()));
     });
@@ -16444,6 +16581,7 @@ function cip_build() {
         computeProgram();
         return;
       } else if (a === 'lstclr') {
+        parSave();
         $('cipLMsg').innerHTML = '';
         lstForget(); // un réglage du .LST a changé : il faut le regénérer
         return;
