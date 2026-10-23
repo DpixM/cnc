@@ -2799,13 +2799,13 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <h3>Réglages avancés du .LST</h3>
           <div class="cipNote" style="margin-bottom:6px">Le nom, la techno, le mode/page et le test à vide se règlent à l'étape 4 (repris ici tout seuls). Le bloc CIP + l'en-tête et la fin de tes vrais programmes. Valeurs machine copiées de tes fichiers qui tournent, rien d'inventé. <b>Toujours tester à vide d'abord.</b></div>
           <div class="cipNum" data-wz4><span>Nom du programme</span><input id="cipLName" style="width:170px" placeholder="ex : TUBE-PIQUAGE" onchange="cip_ui('lstclr')"></div>
-          <div class="cipNum" data-tip="Variable qui contient le nom du tableau techno, en haut du programme : TM_LTTNAME=&quot;INOX4MM&quot;.\nSur la machine tu changes juste cette ligne pour prendre un autre tableau."><span>Variable du tableau techno</span><input id="cipLVar" value="TM_LTTNAME" style="width:170px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></div>
+          <div class="cipNum" id="cipLVarRow" data-tip="DÉCOUPE : variable qui contient le nom du tableau techno, en haut du programme : TM_LTTNAME=&quot;INOX4MM&quot;.\nSur la machine tu changes juste cette ligne pour prendre un autre tableau."><span>Variable du tableau techno</span><input id="cipLVar" value="TM_LTTNAME" style="width:170px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></div>
           <div id="cipLWeld">
             <div class="cipNum" data-tip="1er chiffre de TC_WELD_ON(…) : n° du paramètre de ta table techno soudure. C'est toi qui choisis (par défaut 1), le soft le garde en mémoire."><span>N° de paramètre</span><input type="number" id="cipLWNo" value="1" min="0" step="1" style="width:170px" onchange="cip_ui('lstclr')"></div>
             <div class="cipNum" data-wz4 data-tip="Mode de TC_WELD_ON (manuel TruLaser) :\n00 = sans rampe, sans fil · 01 = sans rampe, avec fil\n10 = rampe au départ, sans fil · 11 = rampe + fil"><span>Mode (rampe / fil)</span><select id="cipLWMode" onchange="cip_ui('lstclr')" style="width:170px"><option value="10">10 · rampe, sans fil</option><option value="00">00 · sans rampe, sans fil</option><option value="11">11 · rampe + fil</option><option value="01">01 · sans rampe, avec fil</option></select></div>
             <div class="cipNum" data-wz4 data-tip="Page de la table de soudage (WELDING_TYPE) appelée par TC_WELD_ON."><span>Page de la table</span><select id="cipLWPage" onchange="cip_ui('lstclr')" style="width:170px"><option value="100">100 · Soudage 1</option><option value="200">200 · Soudage 2</option><option value="300">300 · Soudage 3</option><option value="400">400 · Soudage 4</option><option value="500">500 · Marquage 5</option><option value="600">600 · Pointage rapide 6</option><option value="700">700 · Pointage lent 7</option></select></div>
             <div class="cipNum" data-tip="Fin de soudure TC_WELD_OFF(3, …) : 10 = avec pente de fin, 00 = sans pente."><span>Fin de soudure</span><select id="cipLWOff" onchange="cip_ui('lstclr')" style="width:170px"><option value="10">10 · avec pente</option><option value="00">00 · sans pente</option></select></div>
-            <div class="cipNum" data-wz4 data-tip="Nom de ton tableau techno soudure (WTT). Il est écrit UNE fois en haut du programme dans la variable, puis TC_WELD_ON utilise la variable.\n＋ pour ajouter un nom à la liste, ✕ pour l'enlever."><span>Tableau techno (WTT)</span><input id="cipLTW" type="hidden"><span data-techslot="W"></span></div>
+            <div class="cipNum" data-wz4 data-tip="Nom de ton tableau techno soudure (WTT), écrit dans TC_WELD_ON(…).\n＋ pour ajouter un nom à la liste, ✕ pour l'enlever."><span>Tableau techno (WTT)</span><input id="cipLTW" type="hidden"><span data-techslot="W"></span></div>
           </div>
           <div id="cipLCut" style="display:none">
             <div class="cipNum" data-tip="Nom de ton tableau techno découpe (LTT). Il est écrit UNE fois en haut du programme dans la variable, puis TC_LASER_ON utilise la variable.\n＋ pour ajouter un nom à la liste, ✕ pour l'enlever."><span>Tableau techno (LTT)</span><b id="cipLTC" style="display:none">SS010MDN2S-0</b><input id="cipLTCv" type="hidden"><span data-techslot="C"></span></div>
@@ -10521,7 +10521,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v78',
+  const CIP_VER = 'CIP v79',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -11990,7 +11990,6 @@ function cip_build() {
     const A = dry ? ';A VIDE ' : '';
     const B = [
       'TC_RESET',
-      `${techVar() || 'TM_LTTNAME'}="${tech}" ;nom du tableau techno : pour en prendre un autre, change juste cette ligne`,
       'G71',
       'G500',
       'g90',
@@ -12023,7 +12022,7 @@ function cip_build() {
       'm0',
       '',
       A +
-        `TC_WELD_ON(${parNo('cipLWNo', 1) === null ? 1 : parNo('cipLWNo', 1)}, ${techVar() || 'TM_LTTNAME'}, ${mode}, ${page}); ROTATIONCW`
+        `TC_WELD_ON(${parNo('cipLWNo', 1) === null ? 1 : parNo('cipLWNo', 1)}, "${tech}", ${mode}, ${page}); ROTATIONCW`
     );
     const segs = [
       [cut[0], cut[1], ';pente de debut'],
@@ -14376,7 +14375,7 @@ function cip_build() {
       CN = parNo('cipLCNo', 11);
     if (WN === null || CN === null) return { err: 'Le n° de paramètre doit être un nombre entier (ex : 1, 2, 11…).' };
     const ON = W
-      ? rot => `TC_WELD_ON(${WN}, ${TV}, ${WM}, ${WP});` + (rot > 0 ? ' ROTATIONCW' : rot < 0 ? ' ROTATIONCCW' : '')
+      ? rot => `TC_WELD_ON(${WN}, "${tech}", ${WM}, ${WP});` + (rot > 0 ? ' ROTATIONCW' : rot < 0 ? ' ROTATIONCCW' : '')
       : () => `TC_LASER_ON(${CN},${TV},0,300)`;
     const TLINE = `${TV}="${tech}" ;nom du tableau techno : pour en prendre un autre, change juste cette ligne`;
     const OFF = W ? `TC_WELD_OFF(3,${WO}) ;(00 sans pente,10 avec pente)` : 'TC_LASER_OFF(2)';
@@ -14388,7 +14387,6 @@ function cip_build() {
     if (W) {
       B.push(
         'TC_RESET',
-        TLINE,
         'G71',
         'G500',
         'g90',
@@ -14757,6 +14755,7 @@ function cip_build() {
     }
     $('cipLWeld').style.display = W ? '' : 'none';
     $('cipLCut').style.display = W ? 'none' : '';
+    if ($('cipLVarRow')) $('cipLVarRow').style.display = W ? 'none' : ''; // la variable du tableau techno : découpe seulement
     const t = lttTable();
     if (t) $('cipLTC').textContent = t.name;
     techRefresh();
