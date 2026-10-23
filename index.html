@@ -2799,15 +2799,16 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <h3>Réglages avancés du .LST</h3>
           <div class="cipNote" style="margin-bottom:6px">Le nom, la techno, le mode/page et le test à vide se règlent à l'étape 4 (repris ici tout seuls). Le bloc CIP + l'en-tête et la fin de tes vrais programmes. Valeurs machine copiées de tes fichiers qui tournent, rien d'inventé. <b>Toujours tester à vide d'abord.</b></div>
           <div class="cipNum" data-wz4><span>Nom du programme</span><input id="cipLName" style="width:170px" placeholder="ex : TUBE-PIQUAGE" onchange="cip_ui('lstclr')"></div>
+          <div class="cipNum" data-tip="Variable qui contient le nom du tableau techno, en haut du programme : TM_LTTNAME=&quot;INOX4MM&quot;.\nSur la machine tu changes juste cette ligne pour prendre un autre tableau."><span>Variable du tableau techno</span><input id="cipLVar" value="TM_LTTNAME" style="width:170px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></div>
           <div id="cipLWeld">
             <div class="cipNum" data-tip="1er chiffre de TC_WELD_ON(…) : n° du paramètre de ta table techno soudure. C'est toi qui choisis (par défaut 1), le soft le garde en mémoire."><span>N° de paramètre</span><input type="number" id="cipLWNo" value="1" min="0" step="1" style="width:170px" onchange="cip_ui('lstclr')"></div>
             <div class="cipNum" data-wz4 data-tip="Mode de TC_WELD_ON (manuel TruLaser) :\n00 = sans rampe, sans fil · 01 = sans rampe, avec fil\n10 = rampe au départ, sans fil · 11 = rampe + fil"><span>Mode (rampe / fil)</span><select id="cipLWMode" onchange="cip_ui('lstclr')" style="width:170px"><option value="10">10 · rampe, sans fil</option><option value="00">00 · sans rampe, sans fil</option><option value="11">11 · rampe + fil</option><option value="01">01 · sans rampe, avec fil</option></select></div>
             <div class="cipNum" data-wz4 data-tip="Page de la table de soudage (WELDING_TYPE) appelée par TC_WELD_ON."><span>Page de la table</span><select id="cipLWPage" onchange="cip_ui('lstclr')" style="width:170px"><option value="100">100 · Soudage 1</option><option value="200">200 · Soudage 2</option><option value="300">300 · Soudage 3</option><option value="400">400 · Soudage 4</option><option value="500">500 · Marquage 5</option><option value="600">600 · Pointage rapide 6</option><option value="700">700 · Pointage lent 7</option></select></div>
             <div class="cipNum" data-tip="Fin de soudure TC_WELD_OFF(3, …) : 10 = avec pente de fin, 00 = sans pente."><span>Fin de soudure</span><select id="cipLWOff" onchange="cip_ui('lstclr')" style="width:170px"><option value="10">10 · avec pente</option><option value="00">00 · sans pente</option></select></div>
-            <div class="cipNum" data-wz4><span>Techno soudure (WTT)</span><input id="cipLTW" list="cipLTWl" style="width:170px" placeholder="ex : TUBECOUDE-DORE" onchange="cip_ui('lstclr')"><datalist id="cipLTWl"><option value="TUBECOUDE-DORE"><option value="TUBECOUDE-DORE-GROS"><option value="MERCKD81-NORBERT"></datalist></div>
+            <div class="cipNum" data-wz4 data-tip="Nom de ton tableau techno soudure (WTT). Il est écrit UNE fois en haut du programme dans la variable, puis TC_WELD_ON utilise la variable.\n＋ pour ajouter un nom à la liste, ✕ pour l'enlever."><span>Tableau techno (WTT)</span><input id="cipLTW" type="hidden"><span data-techslot="W"></span></div>
           </div>
           <div id="cipLCut" style="display:none">
-            <div class="cipNum"><span>Techno découpe (LTT)</span><b id="cipLTC" style="font:13px var(--mono)">SS010MDN2S-0</b></div>
+            <div class="cipNum" data-tip="Nom de ton tableau techno découpe (LTT). Il est écrit UNE fois en haut du programme dans la variable, puis TC_LASER_ON utilise la variable.\n＋ pour ajouter un nom à la liste, ✕ pour l'enlever."><span>Tableau techno (LTT)</span><b id="cipLTC" style="display:none">SS010MDN2S-0</b><input id="cipLTCv" type="hidden"><span data-techslot="C"></span></div>
             <div class="cipNum" data-tip="1er chiffre de TC_LASER_ON(…) : n° du paramètre de coupe dans ta table LTT. C'est toi qui choisis (par défaut 11), le soft le garde en mémoire."><span>N° de paramètre</span><input type="number" id="cipLCNo" value="11" min="0" step="1" style="width:170px" onchange="cip_ui('lstclr')"></div>
             <div class="cipRow"><button class="cipBtn" style="font-size:12px" onclick="document.getElementById('cipLRefFile').click()">Prendre la table d'un autre .LST découpe</button><input type="file" id="cipLRefFile" class="cipFile" accept=".lst,.LST" onchange="cip_ui('lstref')"></div>
             <div class="cipNum"><span>FGREF [c1] = rayon pièce (mm)</span><input type="number" id="cipLFg" step="0.1" onchange="cip_ui('lstclr')"></div>
@@ -10263,10 +10264,10 @@ function cip_build() {
     <div class="cipNum"><span>Nom du programme</span><input id="cipWzName" style="width:150px" value="${nm.replace(/"/g, '')}" placeholder="ex : TUBE-EN-T"></div>
     ${
       W
-        ? `<div class="cipNum"><span>Techno soudure (WTT)</span><input id="cipWzTech" list="cipLTWl" style="width:150px" value="${($('cipLTW').value || '').replace(/"/g, '')}" placeholder="ex : TUBECOUDE-DORE"></div>` +
+        ? `<div class="cipNum"><span>Tableau techno (WTT)</span><span data-techslot="W"></span></div>` +
           `<div class="cipNum" data-tip="1er chiffre de TC_WELD_ON(…) : n° du paramètre de ta table (par défaut 1)."><span>N° de paramètre</span><input type="number" data-mirror="cipLWNo" min="0" step="1" style="width:150px" value="${($('cipLWNo') || {}).value || '1'}"></div>` +
           `<div class="cipNum"><span>Mode / page</span><span class="cipRow" style="margin:0;gap:4px"><select data-mirror="cipLWMode" style="width:70px">${[...$('cipLWMode').options].map(o => `<option value="${o.value}" ${o.value === $('cipLWMode').value ? 'selected' : ''}>${o.value}</option>`).join('')}</select><select data-mirror="cipLWPage" style="width:76px">${[...$('cipLWPage').options].map(o => `<option value="${o.value}" ${o.value === $('cipLWPage').value ? 'selected' : ''}>${o.value}</option>`).join('')}</select></span></div>`
-        : `<div class="cipNum"><span>Techno découpe (LTT)</span><b style="font:13px var(--mono)">${$('cipLTC').textContent}</b></div>` +
+        : `<div class="cipNum"><span>Tableau techno (LTT)</span><span data-techslot="C"></span></div>` +
           `<div class="cipNum" data-tip="1er chiffre de TC_LASER_ON(…) : n° du paramètre de coupe dans ta table LTT (par défaut 11)."><span>N° de paramètre</span><input type="number" data-mirror="cipLCNo" min="0" step="1" style="width:150px" value="${($('cipLCNo') || {}).value || '11'}"></div>`
     }
     <label class="cipChk" data-tip="Test à vide : le laser ne s'allume jamais (allumage en commentaire), même nom de fichier. En découpe, la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint). Toujours passer à vide avant le vrai !"><input type="checkbox" id="cipWzDry" ${dry ? 'checked' : ''}> <b>Test à vide</b> (laser jamais allumé)</label>
@@ -10309,6 +10310,7 @@ function cip_build() {
       b.onclick = () => cip_ui('wzback', k + 1);
       h.appendChild(b);
     });
+    techRefresh();
     box.querySelectorAll('[data-mirror]').forEach(el => {
       el.onchange = el.oninput = () => {
         $(el.dataset.mirror).value = el.value;
@@ -10412,7 +10414,7 @@ function cip_build() {
   // Nom / techno / test à vide modifié après la génération : on retire l'ancien fichier (sinon on téléchargerait l'ancien nom)
   function parSave() {
     try {
-      ['cipLWNo', 'cipLCNo'].forEach(id => $(id) && localStorage.setItem(id, $(id).value));
+      ['cipLWNo', 'cipLCNo', 'cipLVar'].forEach(id => $(id) && localStorage.setItem(id, $(id).value));
     } catch (e) {}
   }
   function dlSig() {
@@ -10420,7 +10422,18 @@ function cip_build() {
       const e = $(id);
       return e ? (e.type === 'checkbox' ? e.checked : e.value) : '';
     };
-    return ['cipLName', 'cipLTW', 'cipLDry', 'cipMtName', 'cipMtTech', 'cipMtDry', 'cipLWNo', 'cipLCNo']
+    return [
+      'cipLName',
+      'cipLTW',
+      'cipLDry',
+      'cipMtName',
+      'cipMtTech',
+      'cipMtDry',
+      'cipLWNo',
+      'cipLCNo',
+      'cipLTCv',
+      'cipLVar'
+    ]
       .map(v)
       .join('|');
   }
@@ -10508,7 +10521,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v76',
+  const CIP_VER = 'CIP v77',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -11977,6 +11990,7 @@ function cip_build() {
     const A = dry ? ';A VIDE ' : '';
     const B = [
       'TC_RESET',
+      `${techVar() || 'TM_LTTNAME'}="${tech}" ;nom du tableau techno : pour en prendre un autre, change juste cette ligne`,
       'G71',
       'G500',
       'g90',
@@ -12009,7 +12023,7 @@ function cip_build() {
       'm0',
       '',
       A +
-        `TC_WELD_ON(${parNo('cipLWNo', 1) === null ? 1 : parNo('cipLWNo', 1)}, "${tech}", ${mode}, ${page}); ROTATIONCW`
+        `TC_WELD_ON(${parNo('cipLWNo', 1) === null ? 1 : parNo('cipLWNo', 1)}, ${techVar() || 'TM_LTTNAME'}, ${mode}, ${page}); ROTATIONCW`
     );
     const segs = [
       [cut[0], cut[1], ';pente de debut'],
@@ -12150,10 +12164,16 @@ function cip_build() {
     if (o) MT_IDS.forEach(id => $(id) && o[id] !== undefined && ($(id).value = o[id]));
   } catch (e) {}
   try {
-    ['cipLWNo', 'cipLCNo'].forEach(id => {
+    ['cipLWNo', 'cipLCNo', 'cipLVar'].forEach(id => {
       const v = localStorage.getItem(id);
       if (v !== null && $(id)) $(id).value = v;
     });
+    ['W', 'C'].forEach(k => {
+      const v = localStorage.getItem('cipTechCur_' + k);
+      const e = techEl(k);
+      if (v !== null && e && !e.value) e.value = v;
+    });
+    techRefresh();
   } catch (e) {}
   try {
     const zt = localStorage.getItem('cipZTop');
@@ -14218,6 +14238,85 @@ function cip_build() {
       return null;
     }
   }
+  // v77 : nom du tableau techno = une VARIABLE en haut du programme (TM_LTTNAME="…"), choisie dans une liste qu'on complète
+  function techEl(k) {
+    return k === 'W' ? $('cipLTW') : $('cipLTCv');
+  }
+  function techCur(k) {
+    const e = techEl(k);
+    const v = e ? String(e.value || '').trim() : '';
+    if (v || k === 'W') return v;
+    const t = lttTable();
+    return t ? t.name : '';
+  }
+  function techList(k) {
+    let l = null;
+    try {
+      l = JSON.parse(localStorage.getItem('cipTechL_' + k) || 'null');
+    } catch (e) {}
+    if (!Array.isArray(l)) {
+      l = k === 'W' ? ['TUBECOUDE-DORE', 'TUBECOUDE-DORE-GROS', 'MERCKD81-NORBERT'] : ['INOX4MM'];
+      if (k === 'C') {
+        const t = lttTable();
+        if (t && !l.includes(t.name)) l.unshift(t.name);
+      }
+    }
+    const c = techCur(k);
+    if (c && !l.includes(c)) l.unshift(c);
+    return l;
+  }
+  function techSave(k, l) {
+    try {
+      localStorage.setItem('cipTechL_' + k, JSON.stringify(l));
+    } catch (e) {}
+  }
+  function techSet(k, v) {
+    const e = techEl(k);
+    if (!e) return;
+    e.value = v;
+    try {
+      localStorage.setItem('cipTechCur_' + k, v);
+    } catch (er) {}
+    if ($('cipLMsg')) $('cipLMsg').innerHTML = '';
+    lstForget();
+    dlStale();
+    techRefresh();
+  }
+  function techRefresh() {
+    const h = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    document.querySelectorAll('[data-techslot]').forEach(sl => {
+      const k = sl.dataset.techslot,
+        cur = techCur(k),
+        L = techList(k);
+      sl.innerHTML =
+        `<span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><select style="width:140px;max-width:100%;font:12px var(--mono)">${cur ? '' : '<option value="">— choisis —</option>'}${L.map(n => `<option value="${h(n)}" ${n === cur ? 'selected' : ''}>${h(n)}</option>`).join('')}</select>` +
+        `<button class="cipBtn" data-tadd style="padding:1px 7px" title="Ajouter un nom de tableau techno à la liste">＋</button><button class="cipBtn" data-tdel style="padding:1px 7px" title="Enlever ce nom de la liste">✕</button></span>`;
+      sl.querySelector('select').onchange = e => techSet(k, e.target.value);
+      sl.querySelector('[data-tadd]').onclick = () => {
+        const v = (prompt('Nom du tableau techno, EXACTEMENT comme sur la machine :', '') || '').trim();
+        if (!v) return;
+        if (/["',;]/.test(v)) {
+          alert('Pas de guillemet, virgule ou point-virgule dans le nom.');
+          return;
+        }
+        const l = techList(k).filter(n => n !== v);
+        l.unshift(v);
+        techSave(k, l);
+        techSet(k, v);
+      };
+      sl.querySelector('[data-tdel]').onclick = () => {
+        const c = techCur(k);
+        if (!c) return;
+        const l = techList(k).filter(n => n !== c);
+        techSave(k, l);
+        techSet(k, l[0] || '');
+      };
+    });
+  }
+  function techVar() {
+    const v = String(($('cipLVar') || {}).value || '').trim() || 'TM_LTTNAME';
+    return /^[A-Za-z_][A-Za-z0-9_]{0,31}$/.test(v) ? v : null;
+  }
   function parNo(id, def) {
     const e = $(id);
     const v = e ? String(e.value).trim() : '';
@@ -14240,13 +14339,15 @@ function cip_build() {
     if (!prog) return { err: 'Donne un nom au programme.' };
     let tech;
     if (kind === 'soudure') {
-      tech = ($('cipLTW').value || '').trim();
-      if (!tech) return { err: 'Donne le nom de la techno soudure (table WTT), comme dans TC_WELD_ON.' };
+      tech = techCur('W');
+      if (!tech) return { err: 'Choisis le tableau techno soudure (WTT) dans la liste (＋ pour en ajouter un).' };
     } else {
-      const t = lttTable();
-      if (!t) return { err: 'Table techno découpe introuvable.' };
-      tech = t.name;
+      if (!lttTable()) return { err: 'Table techno découpe introuvable.' };
+      tech = techCur('C');
+      if (!tech) return { err: 'Choisis le tableau techno découpe (LTT) dans la liste (＋ pour en ajouter un).' };
     }
+    const TV = techVar();
+    if (!TV) return { err: 'Nom de variable du tableau techno invalide (lettres, chiffres, _ ; ex : TM_LTTNAME).' };
     if (/["',]/.test(tech)) return { err: 'Le nom de techno ne doit pas contenir de guillemet ni de virgule.' };
     const OX = $('cipLOX').value,
       OY = $('cipLOY').value,
@@ -14274,8 +14375,9 @@ function cip_build() {
       CN = parNo('cipLCNo', 11);
     if (WN === null || CN === null) return { err: 'Le n° de paramètre doit être un nombre entier (ex : 1, 2, 11…).' };
     const ON = W
-      ? rot => `TC_WELD_ON(${WN}, "${tech}", ${WM}, ${WP});` + (rot > 0 ? ' ROTATIONCW' : rot < 0 ? ' ROTATIONCCW' : '')
-      : () => `TC_LASER_ON(${CN},"${tech}",0,300)`;
+      ? rot => `TC_WELD_ON(${WN}, ${TV}, ${WM}, ${WP});` + (rot > 0 ? ' ROTATIONCW' : rot < 0 ? ' ROTATIONCCW' : '')
+      : () => `TC_LASER_ON(${CN},${TV},0,300)`;
+    const TLINE = `${TV}="${tech}" ;nom du tableau techno : pour en prendre un autre, change juste cette ligne`;
     const OFF = W ? `TC_WELD_OFF(3,${WO}) ;(00 sans pente,10 avec pente)` : 'TC_LASER_OFF(2)';
     // v65 : FIN SIMPLE (comme à la main) : on lève la tête, TRAFOOF, puis tous les axes reviennent en coordonnées MACHINE
     // SET_POS : là où ils étaient au lancement (mémorisés au début) ; SET_G54 : position de dégagement du gabarit (Z 350, C1 0)
@@ -14285,6 +14387,7 @@ function cip_build() {
     if (W) {
       B.push(
         'TC_RESET',
+        TLINE,
         'G71',
         'G500',
         'g90',
@@ -14306,6 +14409,7 @@ function cip_build() {
     } else {
       B.push(
         'TC_RESET',
+        TLINE,
         'G71',
         'g90',
         'TC_DYNAMIC_LEVEL(0)',
@@ -14654,6 +14758,7 @@ function cip_build() {
     $('cipLCut').style.display = W ? 'none' : '';
     const t = lttTable();
     if (t) $('cipLTC').textContent = t.name;
+    techRefresh();
     if ((!S.fgUser || $('cipLFg').value === '') && S.profile) $('cipLFg').value = (S.profile.rmax || 0).toFixed(3); // suit le tube tant que tu ne l'as pas tapé toi-même
     const o = lstOpt();
     const og = { bout: 'du bout libre du tube', mors: 'de la face des mors', p1: 'du 1er point du 1er contour' }[
@@ -15275,6 +15380,7 @@ function cip_build() {
       const dry = raw.match(/^\s*;\s*A VIDE\s+(TC_(?:LASER|WELD)_(?:ON|OFF)[^;]*)/i);
       let l = dry ? dry[1] : raw.split(';')[0].trim();
       if (!l) continue;
+      if (/^[A-Z_][A-Z0-9_]*\s*=\s*"/i.test(l)) continue; // TM_LTTNAME="…" : nom du tableau techno, pas un mouvement
       // saut de bloc « / », numéro de ligne « N10 », et G90 / G91 en tête de ligne
       const U = l
         .toUpperCase()
@@ -16661,6 +16767,7 @@ function cip_build() {
             return;
           }
           S.lttRef = { name: nm, table: t.slice(i, j + 'ENDE_LTT_STAMM'.length), src: f.name };
+          techSet('C', nm); // la table reprise devient le tableau choisi (et entre dans la liste)
           lstSync();
           $('cipLMsg').innerHTML = '<span class="cipOk">Table ' + nm + ' reprise de ' + f.name + '.</span>';
         });
