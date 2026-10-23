@@ -2620,14 +2620,17 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNum" data-tip="Largeur du trait de coupe. Les coupes sont espacées de largeur + saignée, pour que chaque rondelle fasse la bonne largeur."><span>Largeur du faisceau / saignée (mm)</span><input type="number" id="cipTsK" value="0.2" step="0.01" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
           <div class="cipNum" data-tip="La coupe continue un peu après le tour complet, pour être sûr que la rondelle tombe. 0 = s'arrête pile."><span>Dépassement fin de coupe (mm)</span><input type="number" id="cipTsO" value="0" step="0.1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
           <div class="cipNum" data-tip="Dans quel sens le soft avance d'une coupe à la suivante, le long du tube. À vérifier À VIDE la première fois."><span>Coupes suivantes vers</span><select id="cipTsDir" style="width:150px" onchange="cip_ui('tst')"><option value="1">le mandrin (X+)</option><option value="-1">le bout du tube (X−)</option></select></div>
-          <div class="cipNote">Départ : pose la pointe <b>sur le dessus du tube</b>, pile sur le <b>1er trait de coupe</b> (celui du bout), tête à <b>B = 0</b>, mandrin à <b>C1 = 0</b>, TRAORI actif. Le programme déclare <b>SET_POS(0, 0, 0)</b> = « la pointe est ici » et part de là.</div>
+          <div class="cipNote">Départ : pose la pointe <b>sur le dessus du tube</b>, pile sur le <b>1er trait de coupe</b> (celui du bout), tête à <b>B = 0</b>, mandrin à <b>C1 = 0</b> (pas besoin de TRAORI). Le programme déclare <b>SET_POS(0, 0, 0)</b> = « la pointe est ici » et part de là.</div>
         </div>
         <div class="cipBox" style="margin:0;border-left:4px solid #f5a623">
           <h3 style="margin:0 0 6px">Le programme</h3>
           <div class="cipNum"><span>Nom du programme</span><input id="cipTsName" value="TEST-RONDELLES" style="width:150px" oninput="cip_ui('tst')"></div>
           <div class="cipNum"><span>Tableau techno (LTT)</span><span data-techslot="C"></span></div>
-          <div class="cipNum" data-tip="1er chiffre de TC_LASER_ON (même réglage que dans le .LST normal)."><span>N° de paramètre</span><b id="cipTsNo" style="font:13px var(--mono)">11</b></div>
-          <div class="cipNum" data-tip="Dernier chiffre de TC_LASER_ON (manuel p. 5-17/5-18) :\n300 = petit contour (comme TC_CIRC2 et les programmes normaux), 200 = moyen, 100 = grand.\n⚠ Chaque taille prend SA ligne du tableau LTT (puissance + vitesse) : sur SS010MDN2S-0, grand = 2000 W pour 17 m/min, petit = 500 W pour 2 m/min.\nSur un petit tube, le mandrin ne tourne pas assez vite pour 17 m/min -> 2000 W sur place = brûlé."><span>Taille de contour</span><select id="cipTsSz" style="width:150px" onchange="cip_ui('tst')"><option value="300">300 · petit contour</option><option value="200">200 · moyen</option><option value="100">100 · grand contour</option></select></div>
+          <div class="cipSub" style="margin-top:6px">TC_LASER_ON( méthode , tableau , perçage , contour )</div>
+          <div class="cipNum" data-tip="1er chiffre : méthode laser (manuel p. 5-17).\n11 = découpe avec suiveur de profil (programmes normaux).\n9 = perçage avec suiveur de profil (ton TC_CIRC2)."><span>Méthode</span><input type="number" id="cipTsM" value="11" step="1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="3e chiffre : type de perçage.\n0 = programmes normaux. Ton TC_CIRC2 met 11."><span>Perçage</span><input type="number" id="cipTsP" value="0" step="1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="4e chiffre : quelle ligne du tableau LTT (puissance + vitesse).\nSur SS010MDN2S-0 : 100 = grand (2000 W, 17 m/min) · 200 = moyen (1800 W, 10 m/min) · 300 = petit (500 W, 2 m/min).\nTon TC_CIRC2 met 300."><span>Contour</span><select id="cipTsSz" style="width:150px" onchange="cip_ui('tst')"><option value="100">100 · grand</option><option value="200">200 · moyen</option><option value="300">300 · petit</option></select></div>
+          <div class="cipRow"><button class="cipBtn" style="font-size:12px" onclick="cip_ui('tstcirc')" data-tip="Met les mêmes chiffres que ton TC_CIRC2(2.5,0.5,0,9,11,300,…) qui coupe propre : méthode 9, perçage 11, contour 300.">Mêmes chiffres que mon TC_CIRC2 (9 · 11 · 300)</button><button class="cipBtn" style="font-size:12px" onclick="cip_ui('tstnorm')">Remettre 11 · 0 · 100</button></div>
           <label class="cipChk"><input type="checkbox" id="cipTsDry" checked onchange="cip_ui('tst')"> <b>Test à vide</b> (laser jamais allumé, trajet reculé de 3 mm)</label>
           <div class="cipNote">TC_LASER_OFF(2) reste comme dans les programmes normaux (laser partagé).</div>
           <div class="cipRow"><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('tstdl')">⬇ Télécharger le .LST</button><button class="cipBtn" onclick="cip_ui('tstsim')">▶ Voir dans la simu</button></div>
@@ -10554,7 +10557,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v84',
+  const CIP_VER = 'CIP v85',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -14671,7 +14674,9 @@ function cip_build() {
       k: g('cipTsK'),
       ov: g('cipTsO'),
       dir: g('cipTsDir') < 0 ? -1 : 1,
-      sz: ($('cipTsSz') || {}).value || '300',
+      sz: ($('cipTsSz') || {}).value || '100',
+      lm: ($('cipTsM') || {}).value,
+      lp: ($('cipTsP') || {}).value,
       dry: !!($('cipTsDry') || {}).checked,
       name: ($('cipTsName') || {}).value || ''
     };
@@ -14696,8 +14701,9 @@ function cip_build() {
     if (!tech) return { err: 'Choisis le tableau techno (LTT) dans la liste.' };
     const TV = techVar();
     if (!TV) return { err: 'Nom de variable du tableau techno invalide (réglages avancés).' };
-    const CN = parNo('cipLCNo', 11);
-    if (CN === null) return { err: 'N° de paramètre invalide (réglages avancés).' };
+    const CN = /^\d{1,3}$/.test(String(v.lm).trim()) ? +v.lm : null,
+      PC = /^\d{1,3}$/.test(String(v.lp).trim()) ? +v.lp : null;
+    if (CN === null || PC === null) return { err: 'Méthode / perçage : des nombres entiers (ex : 11 et 0).' };
     const R = v.D / 2,
       pitch = v.w + v.k,
       ovDeg = (v.ov / R) * (180 / Math.PI),
@@ -14728,7 +14734,7 @@ function cip_build() {
       B.push('', `;----- coupe ${k + 1}/${nCut} -----`);
       if (k > 0) B.push(`G01 X = ${n3(x)} ;decalage`);
       c = k % 2 === 0 ? -(360 + ovDeg) : 0; // un tour dans un sens, le suivant dans l'autre
-      B.push(A + `TC_LASER_ON(${CN},${TV},0,${v.sz})`, `G01 C1 = ${n3(c)}`, A + 'TC_LASER_OFF(2)');
+      B.push(A + `TC_LASER_ON(${CN},${TV},${PC},${v.sz})`, `G01 C1 = ${n3(c)}`, A + 'TC_LASER_OFF(2)');
     }
     B.push(
       '',
@@ -14776,7 +14782,6 @@ function cip_build() {
     return { txt, file: prog + '.LST', n: nCut, lines: B.length, sim: S2.join('\n') };
   }
   function tstRender() {
-    if ($('cipTsNo')) $('cipTsNo').textContent = String(parNo('cipLCNo', 11) ?? '?');
     const r = tstGen();
     S.tstLast = r.err ? null : r;
     $('cipTsMsg').innerHTML = r.err
@@ -16908,6 +16913,13 @@ function cip_build() {
         tstRender();
         return;
       } else if (a === 'tst') {
+        tstRender();
+        return;
+      } else if (a === 'tstcirc' || a === 'tstnorm') {
+        const c = a === 'tstcirc' ? ['9', '11', '300'] : ['11', '0', '100'];
+        $('cipTsM').value = c[0];
+        $('cipTsP').value = c[1];
+        $('cipTsSz').value = c[2];
         tstRender();
         return;
       } else if (a === 'tstback') {
