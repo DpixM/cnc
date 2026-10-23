@@ -2627,10 +2627,10 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNum"><span>Nom du programme</span><input id="cipTsName" value="TEST-RONDELLES" style="width:150px" oninput="cip_ui('tst')"></div>
           <div class="cipNum"><span>Tableau techno (LTT)</span><span data-techslot="C"></span></div>
           <div class="cipSub" style="margin-top:6px">TC_LASER_ON( méthode , tableau , perçage , contour )</div>
-          <div class="cipNum" data-tip="1er chiffre : méthode laser.\n1 = ton programme tôle (et l'exemple standard du manuel).\n9 = ton TC_CIRC2. 11 = les programmes de tube actuels."><span>Méthode</span><input type="number" id="cipTsM" value="1" step="1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
-          <div class="cipNum" data-tip="3e chiffre : type de perçage.\n10 = ton programme tôle (perçage selon le tableau LTT). 11 = ton TC_CIRC2. 0 = pas de perçage."><span>Perçage</span><input type="number" id="cipTsP" value="10" step="1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
-          <div class="cipNum" data-tip="4e chiffre : quelle ligne du tableau LTT (puissance + vitesse).\nSur SS010MDN2S-0 : 100 = grand (2000 W, 17 m/min) · 200 = moyen (1800 W, 10 m/min) · 300 = petit (500 W, 2 m/min).\nTon TC_CIRC2 met 300."><span>Contour</span><select id="cipTsSz" style="width:150px" onchange="cip_ui('tst')"><option value="100">100 · grand</option><option value="200">200 · moyen</option><option value="300">300 · petit</option></select></div>
-          <div class="cipRow"><button class="cipBtn" style="font-size:12px" onclick="cip_ui('tstcirc')" data-tip="Met les mêmes chiffres que ton TC_CIRC2(2.5,0.5,0,9,11,300,…) qui coupe propre : méthode 9, perçage 11, contour 300.">Mêmes chiffres que mon TC_CIRC2 (9 · 11 · 300)</button><button class="cipBtn" style="font-size:12px" onclick="cip_ui('tstnorm')" data-tip="Les chiffres de ton programme tôle qui coupe bien : TC_LASER_ON(1, TM_LTTNAME, 10, 100) = méthode 1, perçage 10, grand contour (c'est aussi l'exemple standard du manuel).">Comme mon programme tôle (1 · 10 · 100)</button></div>
+          <div class="cipNum" data-tip="1er chiffre de TC_LASER_ON."><span>Méthode</span><input type="number" id="cipTsM" value="1" step="1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="3e chiffre de TC_LASER_ON."><span>Perçage</span><input type="number" id="cipTsP" value="10" step="1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="4e chiffre de TC_LASER_ON."><span>Contour</span><select id="cipTsSz" style="width:150px" onchange="cip_ui('tst')"><option value="100">100 · grand</option><option value="200">200 · moyen</option><option value="300">300 · petit</option></select></div>
+          
           <label class="cipChk"><input type="checkbox" id="cipTsDry" checked onchange="cip_ui('tst')"> <b>Test à vide</b> (laser jamais allumé, trajet reculé de 3 mm)</label>
           <div class="cipNote">TC_LASER_OFF(2) reste comme dans les programmes normaux (laser partagé).</div>
           <div class="cipRow"><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('tstdl')">⬇ Télécharger le .LST</button><button class="cipBtn" onclick="cip_ui('tstsim')">▶ Voir dans la simu</button></div>
@@ -10557,7 +10557,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v89',
+  const CIP_VER = 'CIP v90',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -14473,7 +14473,7 @@ function cip_build() {
         ';TC_DIST(1);distance buse piece en mm',
         g54,
         'G01 F = 2000',
-        'TC_LASER_REQUEST(1)'
+        'TC_LASER_REQUEST(2)'
       );
     }
     B.push(";=== mouvements generes par l'onglet CIP Trumpf (CNC 3018) ===");
@@ -14726,7 +14726,7 @@ function cip_build() {
       ';----- depart -----',
       "SET_POS(0.000, 0.000, 0.000) ;la pointe est sur le dessus du tube, au 1er trait de coupe (B 0, C1 0) : on part d'ici",
       'G01 F = 2000',
-      'TC_LASER_REQUEST(1)',
+      'TC_LASER_REQUEST(2)',
       `fgroup(X,Y,Z,c1)`,
       `FGREF [c1] = ${n3(R)} ;vitesse de coupe tenue sur le tube (rayon ${n3(R)})`
     ];
