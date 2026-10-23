@@ -10521,7 +10521,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v77',
+  const CIP_VER = 'CIP v78',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -13994,13 +13994,14 @@ function cip_build() {
         while (j < hm.length && hm[j].spin) j++;
         const seg = hm.slice(i, j);
         const Cs = seg.map(x => toLst(pf(x), x.d, x.th, o).C);
-        const C0 = Cs[0] - (seg.length > 1 ? Cs[1] - Cs[0] : 0); // C1 juste avant le déroulage
-        out.push({ t: ';le mandrin refait ses tours en arriere (tete en l air)', s: f.s });
-        seg.forEach((x, q) => {
-          const C = Cs[q];
-          if (q === seg.length - 1 || Math.abs(Math.round((C - C0) / 45) * 45 - (C - C0)) < 1e-6)
-            out.push({ f: x, s: x.s });
+        // v78 : UNE ligne, comme à la main : tête en l'air, le mandrin refait ses tours en arrière d'un coup
+        const xl = seg[seg.length - 1];
+        out.push({ t: 'TRAFOOF', s: f.s });
+        out.push({
+          t: `G01 G90 C1 = ${n3(Cs[Cs.length - 1])} F10000 ;le mandrin refait ses tours a l envers (tete en l air)`,
+          s: xl.s
         });
+        out.push({ t: `TC_SET_TRAFO("${o.trafo}")`, s: xl.s }, { t: 'TRAORI(1)', s: xl.s });
         i = j;
       } else if (f.rev) {
         let j = i;
