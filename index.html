@@ -10554,7 +10554,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v81',
+  const CIP_VER = 'CIP v82',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -14677,38 +14677,42 @@ function cip_build() {
       ovDeg = (v.ov / R) * (180 / Math.PI),
       nCut = v.n + 1,
       A = v.dry ? ';A VIDE ' : '';
+    // v82 : programme AÉRÉ (blocs séparés par une ligne vide + un titre) : plus lisible sur la machine
     const B = [
+      `;=== RONDELLES : tube D${n3(v.D)} - ${v.n} x ${n3(v.w)} mm - saignee ${n3(v.k)} - pas ${n3(pitch)} mm ===`,
+      '',
+      ';----- reglages -----',
       'TC_RESET',
       `${TV}="${tech}" ;nom du tableau techno : pour en prendre un autre, change juste cette ligne`,
       'G71',
       'G90',
       'TC_DYNAMIC_LEVEL(0)',
+      '',
+      ';----- depart -----',
       "SET_POS(0.000, 0.000, 0.000) ;la pointe est sur le dessus du tube, au 1er trait de coupe (B 0, C1 0) : on part d'ici",
       'G01 F = 2000',
       'TC_LASER_REQUEST(1)',
       `fgroup(X,Y,Z,c1)`,
-      `FGREF [c1] = ${n3(R)} ;vitesse de coupe tenue sur le tube (rayon ${n3(R)})`,
-      `;=== RONDELLES : tube D${n3(v.D)} - ${v.n} x ${n3(v.w)} mm - saignee ${n3(v.k)} - pas ${n3(pitch)} mm ===`
+      `FGREF [c1] = ${n3(R)} ;vitesse de coupe tenue sur le tube (rayon ${n3(R)})`
     ];
-    if (v.dry) B.push(';!!! TEST A VIDE : laser jamais allume, buse 3 mm plus haut !!!', 'G01 Z = 3.000');
+    if (v.dry) B.push('', ';!!! TEST A VIDE : laser jamais allume, buse 3 mm plus haut !!!', 'G01 Z = 3.000');
     let c = 0;
     for (let k = 0; k < nCut; k++) {
       const x = v.dir * k * pitch;
+      B.push('', `;----- coupe ${k + 1}/${nCut} -----`);
       if (k > 0) B.push(`G01 X = ${n3(x)} ;decalage`);
       c = k % 2 === 0 ? -(360 + ovDeg) : 0; // un tour dans un sens, le suivant dans l'autre
-      B.push(
-        A + `TC_LASER_ON(${CN},${TV},0,${v.sz})`,
-        `G01 C1 = ${n3(c)} ;coupe ${k + 1}/${nCut}`,
-        A + 'TC_LASER_OFF(2)'
-      );
+      B.push(A + `TC_LASER_ON(${CN},${TV},0,${v.sz})`, `G01 C1 = ${n3(c)}`, A + 'TC_LASER_OFF(2)');
     }
     B.push(
+      '',
       ';----- fin : retour a la position de depart -----',
       'G01 Z = 30.000 F10000 ;tete en l air',
       'G01 G90 C1 = 0.000 ;mandrin a 0',
       'G01 X = 0.000',
       'G01 Z = 0.000 ;pointe sur le depart',
       '',
+      ';----- fin de programme -----',
       'G500',
       'G90',
       'TC_LASER_REQUEST(0)',
