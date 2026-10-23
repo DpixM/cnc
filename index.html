@@ -2608,6 +2608,38 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
       </div>
       <p><u style="cursor:pointer" onclick="cip_ui('mtbuild')">← Retour à la pièce 3D</u></p>
     </div>
+    <div id="cipTestPage" style="display:none">
+      <h2>🧪 Test : rondelles</h2>
+      <p>Carte d'<b>essai</b>, à part : elle ne change <b>rien</b> aux autres programmes. Tube <b>rond</b>, mandrin à 90° (BA1). La tête reste à <b>B = 0</b> sur le dessus du tube, seul le mandrin tourne : chaque coupe fait un tour complet (un tour dans un sens, le suivant dans l'autre).</p>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start" class="cipMtGrid">
+        <div class="cipBox" style="margin:0;--bc:#9aa5ae;border-left:4px solid #9aa5ae">
+          <h3 style="margin:0 0 6px">Le tube et les rondelles</h3>
+          <div class="cipNum"><span>Ø extérieur du tube (mm)</span><input type="number" id="cipTsD" value="20" step="0.01" min="1" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum"><span>Largeur d'une rondelle (mm)</span><input type="number" id="cipTsW" value="5" step="0.01" min="0.1" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum"><span>Nombre de rondelles</span><input type="number" id="cipTsN" value="3" step="1" min="1" max="200" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="Largeur du trait de coupe. Les coupes sont espacées de largeur + saignée, pour que chaque rondelle fasse la bonne largeur."><span>Largeur du faisceau / saignée (mm)</span><input type="number" id="cipTsK" value="0.2" step="0.01" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="La coupe continue un peu après le tour complet, pour être sûr que la rondelle tombe. 0 = s'arrête pile."><span>Dépassement fin de coupe (mm)</span><input type="number" id="cipTsO" value="0" step="0.1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="Dans quel sens le soft avance d'une coupe à la suivante, le long du tube. À vérifier À VIDE la première fois."><span>Coupes suivantes vers</span><select id="cipTsDir" style="width:150px" onchange="cip_ui('tst')"><option value="1">le mandrin (X+)</option><option value="-1">le bout du tube (X−)</option></select></div>
+          <div class="cipNote">Départ : pose la pointe <b>sur le dessus du tube</b>, pile sur le <b>1er trait de coupe</b> (celui du bout), tête à <b>B = 0</b>, mandrin à <b>C1 = 0</b>, TRAORI actif. Le programme déclare <b>SET_POS</b> et part de là.</div>
+        </div>
+        <div class="cipBox" style="margin:0;border-left:4px solid #f5a623">
+          <h3 style="margin:0 0 6px">Les commandes à tester</h3>
+          <div class="cipNum"><span>Nom du programme</span><input id="cipTsName" value="TEST-RONDELLES" style="width:150px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum"><span>Tableau techno (LTT)</span><span data-techslot="C"></span></div>
+          <div class="cipNum" data-tip="1er chiffre de TC_LASER_ON (même réglage que dans le .LST normal)."><span>N° de paramètre</span><b id="cipTsNo" style="font:13px var(--mono)">11</b></div>
+          <div class="cipNum" data-tip="Dernier chiffre de TC_LASER_ON (manuel p. 5-17/5-18) :\n100 = grand contour, 200 = moyen, 300 = petit contour.\nLes programmes normaux mettent 300."><span>Taille de contour</span><select id="cipTsSz" style="width:150px" onchange="cip_ui('tst')"><option value="100">100 · grand contour</option><option value="200">200 · moyen</option><option value="300">300 · petit (comme avant)</option></select></div>
+          <label class="cipChk" data-tip="Manuel p. 3-65 : TC_TRAFO_ON / TC_TRAFO_OFF remplacent TRAORI(1) / TRAFOOF (toujours acceptés)."><input type="checkbox" id="cipTsTrafo" checked onchange="cip_ui('tst')"> <b>TC_TRAFO_ON / TC_TRAFO_OFF</b> (au lieu de TRAORI / TRAFOOF)</label>
+          <label class="cipChk" data-tip="Manuel p. 3-33 : lisse les mouvements de B et C1 (TruTops met 5°). Réglage machine d'origine : 0,5°."><input type="checkbox" id="cipTsOst" checked onchange="cip_ui('tst')"> <b>TC_OST(5)</b> : lissage B / C1</label>
+          <div class="cipNum" data-tip="Fin de programme : le mandrin doit revenir à C1 = 0.\nDérouler : tête en l'air, le mandrin refait ses tours à l'envers (comme les autres programmes).\nTC_MODULO (manuel p. 3-71) : remet le compteur du C1 entre −180 et +180 SANS bouger, puis finit le petit bout qui manque."><span>Retour du mandrin à 0</span><select id="cipTsEnd" style="width:150px" onchange="cip_ui('tst')"><option value="unw">dérouler (G01 C1 = 0)</option><option value="mod">TC_MODULO(C1)</option></select></div>
+          <label class="cipChk"><input type="checkbox" id="cipTsDry" checked onchange="cip_ui('tst')"> <b>Test à vide</b> (laser jamais allumé, trajet reculé de 3 mm)</label>
+          <div class="cipNote">TC_LASER_OFF(2) reste comme dans les programmes normaux (laser partagé).</div>
+          <div class="cipRow"><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('tstdl')">⬇ Télécharger le .LST</button><button class="cipBtn" onclick="cip_ui('tstsim')">▶ Voir dans la simu</button></div>
+          <div class="cipStat" id="cipTsMsg"></div>
+        </div>
+      </div>
+      <textarea id="cipTsTxt" readonly spellcheck="false" style="width:100%;height:320px;margin-top:12px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:6px;white-space:pre"></textarea>
+      <p><u style="cursor:pointer" onclick="cip_ui('tstback')">← Retour au choix de la pièce</u></p>
+    </div>
     <div id="cipPartPage" style="display:none">
       <h2>Ta pièce</h2>
       <p>Procédé : <b id="cipPartProc">—</b> · <u style="cursor:pointer" onclick="cip_ui('procscreen')">changer</u></p>
@@ -2631,6 +2663,10 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
         <button class="cipCard" id="cipCardCut" onclick="cip_ui('partcut')" data-tip="N'importe quel tube (rond, carré, rectangle, oblong ou section DXF) : tu choisis la coupe des bouts (droite, biais, gueule de loup) et tu poses des trous, oblongs, piquages ou formes DXF. Tout est calculé exact sur le tube.">
           <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="20" y="50" width="160" height="34" rx="17" fill="#9aa5ae"/><rect x="20" y="62" width="160" height="10" fill="#7d8890"/><rect x="70" y="58" width="26" height="12" rx="6" fill="#2a3036" stroke="#f5a623" stroke-width="3"/><circle cx="125" cy="64" r="7" fill="#2a3036" stroke="#f5a623" stroke-width="3"/><path d="M180 50q-14 17 0 34" stroke="#f5a623" stroke-width="4" fill="none"/><path d="M28 30l14 10M28 40l14-10" stroke="#f5a623" stroke-width="4"/></svg>
           <b>✂ Tube à découper</b><span>Tout profil (rond, carré, oblong, DXF) : coupes droites, en biais, gueules de loup, trous, oblongs, piquages, formes DXF.</span>
+        </button>
+        <button class="cipCard" id="cipCardTest" onclick="cip_ui('tstopen')" style="border-style:dashed" data-tip="Carte d'ESSAI, à part : rien ne change dans les autres programmes.\nCoupe des rondelles dans un tube rond : tête à B = 0, seul le mandrin tourne.\nSert à tester les nouvelles commandes du manuel (TC_TRAFO_ON, TC_OST, taille de contour…).">
+          <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="20" y="52" width="160" height="30" rx="4" fill="#9aa5ae"/><rect x="20" y="61" width="160" height="10" fill="#7d8890"/><g stroke="#ff5252" stroke-width="3" stroke-dasharray="5 3"><line x1="70" y1="44" x2="70" y2="90"/><line x1="100" y1="44" x2="100" y2="90"/><line x1="130" y1="44" x2="130" y2="90"/></g><text x="100" y="118" text-anchor="middle" font-size="18" font-weight="700" fill="#f5a623">TEST</text></svg>
+          <b>🧪 Test : rondelles</b><span>Essai à part : couper des rondelles, tête à 0, seul le mandrin tourne. Pour tester les nouvelles commandes sans toucher au reste.</span>
         </button>
         <button class="cipCard" id="cipCardDemo" onclick="cip_ui('partdemo')">
           <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="20" y="66" width="160" height="30" rx="4" fill="#9aa5ae"/><rect x="20" y="76" width="160" height="10" fill="#7d8890"/><rect x="88" y="22" width="24" height="46" fill="#b9c3cb"/><path d="M84 66q16-7 32 0" stroke="#4fc3f7" stroke-width="4" fill="none"/><path d="M150 18l20 12-20 12z" fill="#f5a623"/></svg>
@@ -10521,7 +10557,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v79',
+  const CIP_VER = 'CIP v80',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -14281,6 +14317,7 @@ function cip_build() {
     lstForget();
     dlStale();
     techRefresh();
+    if ($('cipTestPage') && $('cipTestPage').style.display !== 'none') tstRender();
   }
   function techRefresh() {
     const h = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -14598,10 +14635,161 @@ function cip_build() {
     return { txt, file: prog + '.LST', kind, tech, n: C.length, o };
   }
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  // §23b. CARTE D'ESSAI « RONDELLES » (v80) : programme à part, ne touche à RIEN d'autre.
+  //     Tube rond, BA1, tête à B = 0 sur le dessus, seul le mandrin tourne (1 tour par coupe, sens alterné).
+  //     Repère pièce TRAORI : X le long du tube, Y = R·sin(C1), Z = R·cos(C1) (comme les .LST validés).
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  function tstVals() {
+    const g = id => +(($(id) || {}).value || 0);
+    return {
+      D: g('cipTsD'),
+      w: g('cipTsW'),
+      n: Math.round(g('cipTsN')),
+      k: g('cipTsK'),
+      ov: g('cipTsO'),
+      dir: g('cipTsDir') < 0 ? -1 : 1,
+      sz: ($('cipTsSz') || {}).value || '100',
+      trafoOn: !!($('cipTsTrafo') || {}).checked,
+      ost: !!($('cipTsOst') || {}).checked,
+      mod: ($('cipTsEnd') || {}).value === 'mod',
+      dry: !!($('cipTsDry') || {}).checked,
+      name: ($('cipTsName') || {}).value || ''
+    };
+  }
+  function tstGen() {
+    const v = tstVals();
+    const prog = String(v.name)
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (!prog) return { err: 'Donne un nom au programme.' };
+    if (!(v.D > 0.5)) return { err: 'Ø du tube invalide.' };
+    if (!(v.w > 0)) return { err: 'Largeur de rondelle invalide.' };
+    if (!(v.n >= 1 && v.n <= 200)) return { err: 'Nombre de rondelles : de 1 à 200.' };
+    if (!(v.k >= 0) || !(v.ov >= 0)) return { err: 'Saignée / dépassement : valeurs positives.' };
+    if (!lttTable()) return { err: 'Table techno découpe introuvable.' };
+    const tech = techCur('C');
+    if (!tech) return { err: 'Choisis le tableau techno (LTT) dans la liste.' };
+    const TV = techVar();
+    if (!TV) return { err: 'Nom de variable du tableau techno invalide (réglages avancés).' };
+    const CN = parNo('cipLCNo', 11);
+    if (CN === null) return { err: 'N° de paramètre invalide (réglages avancés).' };
+    const R = v.D / 2,
+      Rd = R + (v.dry ? 3 : 0),
+      Ru = R + 30,
+      pitch = v.w + v.k,
+      ovDeg = (v.ov / R) * (180 / Math.PI);
+    const ON = v.trafoOn ? 'TC_TRAFO_ON' : 'TRAORI(1)',
+      OFFT = v.trafoOn ? 'TC_TRAFO_OFF' : 'TRAFOOF';
+    const A = v.dry ? ';A VIDE ' : '';
+    const pt = (x, r, c) => ({ X: x, Y: r * Math.sin(c * DEG), Z: r * Math.cos(c * DEG), B: 0, C: c });
+    const mv = (q, t) => lstMv(q) + (t ? ' ;' + t : '');
+    const B = [
+      'TC_RESET',
+      `${TV}="${tech}" ;nom du tableau techno : pour en prendre un autre, change juste cette ligne`,
+      'G71',
+      'g90',
+      'TC_DYNAMIC_LEVEL(0)',
+      'TC_SET_TRAFO("BA1")',
+      ON,
+      ...(v.ost ? ['TC_OST(5) ;TEST : lissage des axes B et C1 (manuel p. 3-33)'] : []),
+      `SET_POS(0.000, 0.000, ${n3(R)}) ;la pointe est sur le dessus du tube, au 1er trait de coupe (B 0, C1 0) : on part d'ici`,
+      'G01 F = 2000',
+      'TC_LASER_REQUEST(1)',
+      ";=== CARTE D'ESSAI RONDELLES (onglet CIP) ===",
+      `;tube D${n3(v.D)} - ${v.n} rondelle(s) de ${n3(v.w)} mm - saignee ${n3(v.k)} mm - pas ${n3(pitch)} mm`
+    ];
+    if (v.dry) B.push(';!!! VERSION TEST A VIDE : laser jamais allume, trajet recule de 3 mm vers la tete !!!');
+    B.push('fgroup(X,Y,Z,c1)', `FGREF [c1] = ${n3(R)}`);
+    let c = 0;
+    const nCut = v.n + 1;
+    for (let k = 0; k < nCut; k++) {
+      const x = v.dir * k * pitch;
+      const s = k % 2 === 0 ? -1 : 1; // un tour dans un sens, le suivant dans l'autre : le mandrin ne s'enroule pas
+      B.push('', `;----- COUPE ${k + 1}/${nCut} : X = ${n3(x)} -----`);
+      if (k > 0) B.push(mv(pt(x, Ru, c), 'au-dessus de la coupe suivante'));
+      B.push(mv(pt(x, Rd, c), k === 0 ? 'point de depart' : 'descente sur le trait'));
+      B.push(A + `TC_LASER_ON(${CN},${TV},0,${v.sz})`);
+      const tot = 360 + ovDeg,
+        nArc = Math.max(3, Math.ceil(tot / 120));
+      for (let a = 1; a <= nArc; a++) {
+        const c0 = c + (s * tot * (a - 1)) / nArc,
+          c1 = c + (s * tot * a) / nArc,
+          cm = (c0 + c1) / 2,
+          e = pt(x, Rd, c1),
+          mm = pt(x, Rd, cm);
+        B.push(lineOf({ t: 'CIP', m: mm, e }));
+      }
+      c += s * tot;
+      B.push(A + 'TC_LASER_OFF(2)');
+      B.push(mv(pt(x, Ru, c), 'tete levee de 30 mm'));
+    }
+    B.push('', ';----- fin : retour a la position de depart -----');
+    if (Math.abs(c) > 1e-6) {
+      let cc = c;
+      if (v.mod) {
+        cc = c - 360 * Math.round(c / 360);
+        B.push(`TC_MODULO(C1) ;TEST : compteur C1 remis entre -180 et +180 sans bouger (${n3(c)} -> ${n3(cc)})`);
+      }
+      if (Math.abs(cc) > 1e-6)
+        B.push(
+          OFFT,
+          'G01 G90 C1 = 0.000 F10000 ;le mandrin revient a 0 (tete en l air, elle ne bouge pas)',
+          'TC_SET_TRAFO("BA1")',
+          ON
+        );
+    }
+    B.push(
+      mv(pt(0, Ru, 0), 'au-dessus du depart'),
+      mv(pt(0, R, 0), 'pointe sur le depart : tout est comme au lancement'),
+      '',
+      OFFT,
+      '',
+      'G500',
+      'G90',
+      ';(tout est revenu a la position de depart)',
+      '',
+      'TC_LASER_REQUEST(0)',
+      'TC_RESET',
+      'TC_OPEN_DOOR(0,1,0,0)',
+      '',
+      'M30'
+    );
+    const L = lstHead(prog, 'decoupe', tech).concat(B, ['STOP_TEXT', 'C', 'ENDE_PROGRAMM', 'C']);
+    L.push(...lttTable().table.split('\n'), 'C', 'ED');
+    const txt = L.join('\r\n').replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '') + '\r\n';
+    if (/NaN|Infinity/.test(txt)) return { err: 'Calcul invalide (NaN) : programme pas généré.' };
+    return { txt, file: prog + '.LST', n: nCut, lines: B.length };
+  }
+  function tstRender() {
+    if ($('cipTsNo')) $('cipTsNo').textContent = String(parNo('cipLCNo', 11) ?? '?');
+    const r = tstGen();
+    S.tstLast = r.err ? null : r;
+    $('cipTsMsg').innerHTML = r.err
+      ? '<span class="cipBad">' + r.err + '</span>'
+      : `<span class="cipOk">${r.n - 1} rondelle(s) = ${r.n} coupes (le bout + 1 par rondelle) · ${r.lines} lignes</span> · fichier <b>${r.file}</b>` +
+        ($('cipTsDry').checked ? ' <b>(à vide)</b>' : ' <b style="color:#ef5350">(AVEC laser)</b>');
+    // on montre le programme lui-même (l'en-tête et la table LTT sont dans le fichier téléchargé)
+    if (r.err) $('cipTsTxt').value = '';
+    else {
+      const t = r.txt.replace(/\r/g, '');
+      const i = t.indexOf('START_TEXT'),
+        j = t.indexOf('STOP_TEXT');
+      $('cipTsTxt').value = i >= 0 && j > i ? t.slice(i + 11, j) : t;
+    }
+  }
+  function tstShow(on) {
+    const p = $('cipTestPage');
+    if (!p) return;
+    p.style.display = on ? '' : 'none';
+  }
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
   // §24. NAVIGATION ENTRE LES ÉCRANS + RÉGLAGES DU .LST
   //     showProcPage / showPartPage / showWork / setStep, g54Calc, lstSync
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
   function showProcPage() {
+    tstShow(false);
     if ($('cipMiterPage')) $('cipMiterPage').style.display = 'none';
     $('cipStart').style.display = 'none';
     $('cipWork').style.display = 'none';
@@ -14615,6 +14803,7 @@ function cip_build() {
     S.procChosen = true;
   }
   function showPartPage() {
+    tstShow(false);
     if ($('cipMiterPage')) $('cipMiterPage').style.display = 'none';
     $('cipStart').style.display = 'none';
     $('cipProcPage').style.display = 'none';
@@ -14623,6 +14812,7 @@ function cip_build() {
     const W = $('cipProc').value === 'soudure';
     if ($('cipCardMiter')) $('cipCardMiter').style.display = W ? '' : 'none';
     if ($('cipCardCut')) $('cipCardCut').style.display = W ? 'none' : '';
+    if ($('cipCardTest')) $('cipCardTest').style.display = W || S.cfg.chuck !== 'vertical' ? 'none' : '';
     $('cipPartProc').textContent = W ? '🔥 Soudure' : '✂ Découpe laser';
     $('cipPartKeepBtn').textContent = S.part ? 'Garder la pièce actuelle →' : 'Continuer sans pièce →';
     $('cipCardDemoT').textContent = W ? '▶ Exemple : tube en T' : '▶ Exemple : tuiles';
@@ -14631,6 +14821,7 @@ function cip_build() {
       : '3 tuiles à 120° dans un tube Ø54×2 : biseau, trous, lamelles, séparation.';
   }
   function showWork(st) {
+    tstShow(false);
     if ($('cipMiterPage')) $('cipMiterPage').style.display = 'none';
     $('cipStart').style.display = 'none';
     $('cipProcPage').style.display = 'none';
@@ -15392,12 +15583,16 @@ function cip_build() {
         trafo = tf[1].toUpperCase() === 'BA1' ? 'BA1' : 'Bc1';
         continue;
       }
-      if (/TRAORI/.test(U)) {
+      if (/TRAORI|TC_TRAFO_ON/.test(U)) {
         inT = true;
         continue;
       }
-      if (/TRAFOOF/.test(U)) {
+      if (/TRAFOOF|TC_TRAFO_OFF/.test(U)) {
         inT = false;
+        continue;
+      }
+      if (/TC_MODULO\(\s*C1\s*\)/.test(U)) {
+        st.C -= 360 * Math.round(st.C / 360); // compteur remis entre -180 et +180, le mandrin ne bouge pas
         continue;
       }
       if (/TC_(LASER|WELD)_ON/.test(U)) {
@@ -16051,6 +16246,13 @@ function cip_build() {
           const vis = el => el && el.style.display !== 'none';
           const pp2 = $('cipPartPage');
           const mp = $('cipMiterPage');
+          const tp = $('cipTestPage');
+          if (tp && tp.style.display !== 'none') {
+            e.stopPropagation();
+            e.preventDefault();
+            showPartPage();
+            return;
+          }
           if (mp && mp.style.display !== 'none') {
             e.stopPropagation();
             e.preventDefault();
@@ -16685,6 +16887,50 @@ function cip_build() {
         buildHead();
         S.order = null;
         computeProgram();
+        return;
+      } else if (a === 'tstopen') {
+        $('cipPartPage').style.display = 'none';
+        tstShow(true);
+        techRefresh();
+        tstRender();
+        return;
+      } else if (a === 'tst') {
+        tstRender();
+        return;
+      } else if (a === 'tstback') {
+        showPartPage();
+        return;
+      } else if (a === 'tstdl') {
+        tstRender();
+        const r = S.tstLast;
+        if (!r) return;
+        const blob = new Blob([r.txt], { type: 'application/octet-stream' });
+        const u = URL.createObjectURL(blob);
+        const lk = document.createElement('a');
+        lk.href = u;
+        lk.download = r.file;
+        document.body.appendChild(lk);
+        lk.click();
+        lk.remove();
+        setTimeout(() => URL.revokeObjectURL(u), 2000);
+        return;
+      } else if (a === 'tstsim') {
+        tstRender();
+        const r = S.tstLast;
+        if (!r) return;
+        showWork('sim');
+        loadLST(r.txt, r.file);
+        // le vrai Ø du tube (la lecture du fichier l'estime depuis les points : faux à vide, trajet reculé de 3 mm)
+        if (S.prog && S.prog.frames) {
+          const v = tstVals();
+          S.cfg.d = v.D;
+          S.cfg.ep = Math.max(0.5, +(v.D * 0.04).toFixed(1));
+          syncForm();
+          buildStatic();
+          setMapping();
+          rebuildPaths();
+          $('cipPartStat').innerHTML = `<b>${r.file}</b> · carte d'essai rondelles · tube Ø${v.D}`;
+        }
         return;
       } else if (a === 'lstclr') {
         parSave();
