@@ -2627,7 +2627,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNum"><span>Nom du programme</span><input id="cipTsName" value="TEST-RONDELLES" style="width:150px" oninput="cip_ui('tst')"></div>
           <div class="cipNum"><span>Tableau techno (LTT)</span><span data-techslot="C"></span></div>
           <div class="cipNum" data-tip="1er chiffre de TC_LASER_ON (même réglage que dans le .LST normal)."><span>N° de paramètre</span><b id="cipTsNo" style="font:13px var(--mono)">11</b></div>
-          <div class="cipNum" data-tip="Dernier chiffre de TC_LASER_ON (manuel p. 5-17/5-18) :\n100 = grand contour, 200 = moyen, 300 = petit contour.\nLes programmes normaux mettent 300."><span>Taille de contour</span><select id="cipTsSz" style="width:150px" onchange="cip_ui('tst')"><option value="100">100 · grand contour</option><option value="200">200 · moyen</option><option value="300">300 · petit (comme avant)</option></select></div>
+          <div class="cipNum" data-tip="Dernier chiffre de TC_LASER_ON (manuel p. 5-17/5-18) :\n300 = petit contour (comme TC_CIRC2 et les programmes normaux), 200 = moyen, 100 = grand.\n⚠ Chaque taille prend SA ligne du tableau LTT (puissance + vitesse) : sur SS010MDN2S-0, grand = 2000 W pour 17 m/min, petit = 500 W pour 2 m/min.\nSur un petit tube, le mandrin ne tourne pas assez vite pour 17 m/min -> 2000 W sur place = brûlé."><span>Taille de contour</span><select id="cipTsSz" style="width:150px" onchange="cip_ui('tst')"><option value="300">300 · petit contour</option><option value="200">200 · moyen</option><option value="100">100 · grand contour</option></select></div>
           <label class="cipChk"><input type="checkbox" id="cipTsDry" checked onchange="cip_ui('tst')"> <b>Test à vide</b> (laser jamais allumé, trajet reculé de 3 mm)</label>
           <div class="cipNote">TC_LASER_OFF(2) reste comme dans les programmes normaux (laser partagé).</div>
           <div class="cipRow"><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('tstdl')">⬇ Télécharger le .LST</button><button class="cipBtn" onclick="cip_ui('tstsim')">▶ Voir dans la simu</button></div>
@@ -10554,7 +10554,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v83',
+  const CIP_VER = 'CIP v84',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -14671,7 +14671,7 @@ function cip_build() {
       k: g('cipTsK'),
       ov: g('cipTsO'),
       dir: g('cipTsDir') < 0 ? -1 : 1,
-      sz: ($('cipTsSz') || {}).value || '100',
+      sz: ($('cipTsSz') || {}).value || '300',
       dry: !!($('cipTsDry') || {}).checked,
       name: ($('cipTsName') || {}).value || ''
     };
