@@ -2616,7 +2616,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <h3 style="margin:0 0 6px">Le tube et les rondelles</h3>
           <div class="cipNum"><span>Ø extérieur du tube (mm)</span><input type="number" id="cipTsD" value="20" step="0.01" min="1" style="width:110px" oninput="cip_ui('tst')"></div>
           <div class="cipNum"><span>Largeur d'une rondelle (mm)</span><input type="number" id="cipTsW" value="5" step="0.01" min="0.1" style="width:110px" oninput="cip_ui('tst')"></div>
-          <div class="cipNum"><span>Nombre de rondelles</span><input type="number" id="cipTsN" value="3" step="1" min="1" max="200" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="0 = une seule coupe (affranchir le bout du tube)."><span>Nombre de rondelles (0 = juste affranchir)</span><input type="number" id="cipTsN" value="3" step="1" min="0" max="200" style="width:110px" oninput="cip_ui('tst')"></div>
           <div class="cipNum" data-tip="Largeur du trait de coupe. Les coupes sont espacées de largeur + saignée, pour que chaque rondelle fasse la bonne largeur."><span>Largeur du faisceau / saignée (mm)</span><input type="number" id="cipTsK" value="0.2" step="0.01" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
           <div class="cipNum" data-tip="La coupe continue un peu après le tour complet, pour être sûr que la rondelle tombe. 0 = s'arrête pile."><span>Dépassement fin de coupe (mm)</span><input type="number" id="cipTsO" value="0" step="0.1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
           <div class="cipNum" data-tip="Dans quel sens le soft avance d'une coupe à la suivante, le long du tube. À vérifier À VIDE la première fois."><span>Coupes suivantes vers</span><select id="cipTsDir" style="width:150px" onchange="cip_ui('tst')"><option value="1">le mandrin (X+)</option><option value="-1">le bout du tube (X−)</option></select></div>
@@ -10557,7 +10557,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v85',
+  const CIP_VER = 'CIP v86',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -14694,7 +14694,7 @@ function cip_build() {
     if (!prog) return { err: 'Donne un nom au programme.' };
     if (!(v.D > 0.5)) return { err: 'Ø du tube invalide.' };
     if (!(v.w > 0)) return { err: 'Largeur de rondelle invalide.' };
-    if (!(v.n >= 1 && v.n <= 200)) return { err: 'Nombre de rondelles : de 1 à 200.' };
+    if (!(v.n >= 0 && v.n <= 200)) return { err: 'Nombre de rondelles : de 0 (juste affranchir) à 200.' };
     if (!(v.k >= 0) || !(v.ov >= 0)) return { err: 'Saignée / dépassement : valeurs positives.' };
     if (!lttTable()) return { err: 'Table techno découpe introuvable.' };
     const tech = techCur('C');
@@ -14711,7 +14711,9 @@ function cip_build() {
       A = v.dry ? ';A VIDE ' : '';
     // v82 : programme AÉRÉ (blocs séparés par une ligne vide + un titre) : plus lisible sur la machine
     const B = [
-      `;=== RONDELLES : tube D${n3(v.D)} - ${v.n} x ${n3(v.w)} mm - saignee ${n3(v.k)} - pas ${n3(pitch)} mm ===`,
+      v.n
+        ? `;=== RONDELLES : tube D${n3(v.D)} - ${v.n} x ${n3(v.w)} mm - saignee ${n3(v.k)} - pas ${n3(pitch)} mm ===`
+        : `;=== AFFRANCHISSAGE : tube D${n3(v.D)} - une seule coupe ===`,
       '',
       ';----- reglages -----',
       'TC_RESET',
@@ -14786,7 +14788,7 @@ function cip_build() {
     S.tstLast = r.err ? null : r;
     $('cipTsMsg').innerHTML = r.err
       ? '<span class="cipBad">' + r.err + '</span>'
-      : `<span class="cipOk">${r.n - 1} rondelle(s) = ${r.n} coupes (le bout + 1 par rondelle) · ${r.lines} lignes</span> · fichier <b>${r.file}</b>` +
+      : `<span class="cipOk">${r.n > 1 ? `${r.n - 1} rondelle(s) = ${r.n} coupes (le bout + 1 par rondelle)` : '1 seule coupe : affranchir le bout'} · ${r.lines} lignes</span> · fichier <b>${r.file}</b>` +
         ($('cipTsDry').checked ? ' <b>(à vide)</b>' : ' <b style="color:#ef5350">(AVEC laser)</b>');
     // on montre le programme lui-même (l'en-tête et la table LTT sont dans le fichier téléchargé)
     if (r.err) $('cipTsTxt').value = '';
