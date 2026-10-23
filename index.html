@@ -2631,7 +2631,6 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNum" data-tip="3e chiffre : type de perçage.\n0 = programmes normaux. Ton TC_CIRC2 met 11."><span>Perçage</span><input type="number" id="cipTsP" value="0" step="1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
           <div class="cipNum" data-tip="4e chiffre : quelle ligne du tableau LTT (puissance + vitesse).\nSur SS010MDN2S-0 : 100 = grand (2000 W, 17 m/min) · 200 = moyen (1800 W, 10 m/min) · 300 = petit (500 W, 2 m/min).\nTon TC_CIRC2 met 300."><span>Contour</span><select id="cipTsSz" style="width:150px" onchange="cip_ui('tst')"><option value="100">100 · grand</option><option value="200">200 · moyen</option><option value="300">300 · petit</option></select></div>
           <div class="cipRow"><button class="cipBtn" style="font-size:12px" onclick="cip_ui('tstcirc')" data-tip="Met les mêmes chiffres que ton TC_CIRC2(2.5,0.5,0,9,11,300,…) qui coupe propre : méthode 9, perçage 11, contour 300.">Mêmes chiffres que mon TC_CIRC2 (9 · 11 · 300)</button><button class="cipBtn" style="font-size:12px" onclick="cip_ui('tstnorm')">Remettre 11 · 0 · 100</button></div>
-          <label class="cipChk" data-tip="Coché : le programme tourne avec TRAORI, comme tes programmes de découpe qui coupent bien (le tour = 3 lignes CIP, la tête ne bouge pas).\nLe capteur de la buse tient la distance de TON TABLEAU LTT (rien à régler dans le programme).\nDécoché : programme simple sans TRAORI (une ligne C1 par coupe).\nCoupe une rondelle de chaque et compare."><input type="checkbox" id="cipTsTrao" onchange="cip_ui('tst')"> <b>Mode TRAORI</b> (comme les programmes de découpe normaux)</label>
           <label class="cipChk"><input type="checkbox" id="cipTsDry" checked onchange="cip_ui('tst')"> <b>Test à vide</b> (laser jamais allumé, trajet reculé de 3 mm)</label>
           <div class="cipNote">TC_LASER_OFF(2) reste comme dans les programmes normaux (laser partagé).</div>
           <div class="cipRow"><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('tstdl')">⬇ Télécharger le .LST</button><button class="cipBtn" onclick="cip_ui('tstsim')">▶ Voir dans la simu</button></div>
@@ -10558,7 +10557,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v87',
+  const CIP_VER = 'CIP v88',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -14678,7 +14677,6 @@ function cip_build() {
       sz: ($('cipTsSz') || {}).value || '100',
       lm: ($('cipTsM') || {}).value,
       lp: ($('cipTsP') || {}).value,
-      trao: !!($('cipTsTrao') || {}).checked,
       dry: !!($('cipTsDry') || {}).checked,
       name: ($('cipTsName') || {}).value || ''
     };
@@ -14731,10 +14729,24 @@ function cip_build() {
       `fgroup(X,Y,Z,c1)`,
       `FGREF [c1] = ${n3(R)} ;vitesse de coupe tenue sur le tube (rayon ${n3(R)})`
     ];
-    const END = [
+    if (v.dry) B.push('', ';!!! TEST A VIDE : laser jamais allume, buse 3 mm plus haut !!!', 'G01 Z = 3.000');
+    let c = 0;
+    for (let k = 0; k < nCut; k++) {
+      const x = v.dir * k * pitch;
+      B.push('', `;----- coupe ${k + 1}/${nCut} -----`);
+      if (k > 0) B.push(`G01 X = ${n3(x)} ;decalage`);
+      c = k % 2 === 0 ? -(360 + ovDeg) : 0; // un tour dans un sens, le suivant dans l'autre
+      B.push(A + `TC_LASER_ON(${CN},${TV},${PC},${v.sz})`, `G01 C1 = ${n3(c)}`, A + 'TC_LASER_OFF(2)');
+    }
+    B.push(
+      '',
+      ';----- fin : retour a la position de depart -----',
+      'G01 Z = 30.000 F10000 ;tete en l air',
+      'G01 G90 C1 = 0.000 ;mandrin a 0',
+      'G01 X = 0.000',
+      'G01 Z = 0.000 ;pointe sur le depart',
       '',
       ';----- fin de programme -----',
-      ...(v.trao ? ['TRAFOOF'] : []),
       'G500',
       'G90',
       'TC_LASER_REQUEST(0)',
@@ -14742,61 +14754,7 @@ function cip_build() {
       'TC_OPEN_DOOR(0,1,0,0)',
       '',
       'M30'
-    ];
-    let c = 0;
-    if (!v.trao) {
-      if (v.dry) B.push('', ';!!! TEST A VIDE : laser jamais allume, buse 3 mm plus haut !!!', 'G01 Z = 3.000');
-      for (let k = 0; k < nCut; k++) {
-        const x = v.dir * k * pitch;
-        B.push('', `;----- coupe ${k + 1}/${nCut} -----`);
-        if (k > 0) B.push(`G01 X = ${n3(x)} ;decalage`);
-        c = k % 2 === 0 ? -(360 + ovDeg) : 0; // un tour dans un sens, le suivant dans l'autre
-        B.push(A + `TC_LASER_ON(${CN},${TV},${PC},${v.sz})`, `G01 C1 = ${n3(c)}`, A + 'TC_LASER_OFF(2)');
-      }
-      B.push(
-        '',
-        ';----- fin : retour a la position de depart -----',
-        'G01 Z = 30.000 F10000 ;tete en l air',
-        'G01 G90 C1 = 0.000 ;mandrin a 0',
-        'G01 X = 0.000',
-        'G01 Z = 0.000 ;pointe sur le depart',
-        ...END
-      );
-    } else {
-      // v87 MODE TRAORI : comme les programmes de découpe normaux (trajectoire SUR le tube, le capteur de la buse
-      // tient la distance du tableau LTT). Le tour = 3 arcs CIP, la tête ne bouge pas (B 0, faisceau au centre).
-      const Rd = R + (v.dry ? 3 : 0);
-      const pt = (x, r, cc) => ({ X: x, Y: r * Math.sin(cc * DEG), Z: r * Math.cos(cc * DEG), B: 0, C: cc });
-      const i0 = B.findIndex(l => /^SET_POS/.test(l));
-      B.splice(
-        i0,
-        1,
-        'TC_SET_TRAFO("BA1")',
-        'TRAORI(1)',
-        `SET_POS(0.000, 0.000, ${n3(R)}) ;la pointe est sur le dessus du tube, au 1er trait de coupe (B 0, C1 0) : on part d'ici`
-      );
-      if (v.dry) B.push('', ';!!! TEST A VIDE : laser jamais allume, trajet recule de 3 mm !!!', lstMv(pt(0, Rd, 0)));
-      for (let k = 0; k < nCut; k++) {
-        const x = v.dir * k * pitch;
-        B.push('', `;----- coupe ${k + 1}/${nCut} -----`);
-        if (k > 0) B.push(lstMv(pt(x, Rd, c)) + ' ;decalage');
-        const ce = k % 2 === 0 ? -(360 + ovDeg) : 0,
-          nA = Math.max(3, Math.ceil(Math.abs(ce - c) / 120));
-        B.push(A + `TC_LASER_ON(${CN},${TV},${PC},${v.sz})`);
-        for (let a = 1; a <= nA; a++) {
-          const c0 = c + ((ce - c) * (a - 1)) / nA,
-            c1 = c + ((ce - c) * a) / nA;
-          B.push(lineOf({ t: 'CIP', m: pt(x, Rd, (c0 + c1) / 2), e: pt(x, Rd, c1) }));
-        }
-        c = ce;
-        B.push(A + 'TC_LASER_OFF(2)');
-      }
-      const xl = v.dir * (nCut - 1) * pitch;
-      B.push('', ';----- fin : retour a la position de depart -----', lstMv(pt(xl, R + 30, c)) + ' ;tete en l air');
-      if (Math.abs(c) > 1e-6)
-        B.push('TRAFOOF', 'G01 G90 C1 = 0.000 F10000 ;mandrin a 0', 'TC_SET_TRAFO("BA1")', 'TRAORI(1)');
-      B.push(lstMv(pt(0, R + 30, 0)) + ' ;au-dessus du depart', lstMv(pt(0, R, 0)) + ' ;pointe sur le depart', ...END);
-    }
+    );
     const L = lstHead(prog, 'decoupe', tech).concat(B, ['STOP_TEXT', 'C', 'ENDE_PROGRAMM', 'C']);
     L.push(...lttTable().table.split('\n'), 'C', 'ED');
     const txt = L.join('\r\n').replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '') + '\r\n';
@@ -14823,7 +14781,7 @@ function cip_build() {
     }
     S2.push(lstMv(pt(v.dir * (nCut - 1) * pitch, Ru, cc)), 'TRAFOOF', 'G01 C1 = 0', 'TRAORI(1)');
     S2.push(lstMv(pt(v.dir * (nCut - 1) * pitch, Ru, 0)), lstMv(pt(0, Ru, 0)), lstMv(pt(0, R, 0)));
-    return { txt, file: prog + '.LST', n: nCut, lines: B.length, sim: v.trao ? txt : S2.join('\n') };
+    return { txt, file: prog + '.LST', n: nCut, lines: B.length, sim: S2.join('\n') };
   }
   function tstRender() {
     const r = tstGen();
