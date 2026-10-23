@@ -2847,6 +2847,17 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div id="cipLCut" style="display:none">
             <div class="cipNum" data-tip="Nom de ton tableau techno découpe (LTT). Il est écrit UNE fois en haut du programme dans la variable, puis TC_LASER_ON utilise la variable.\n＋ pour ajouter un nom à la liste, ✕ pour l'enlever."><span>Tableau techno (LTT)</span><b id="cipLTC" style="display:none">SS010MDN2S-0</b><input id="cipLTCv" type="hidden"><span data-techslot="C"></span></div>
             <div class="cipNum" data-tip="1er chiffre de TC_LASER_ON(…) : n° du paramètre de coupe dans ta table LTT. C'est toi qui choisis (par défaut 11), le soft le garde en mémoire."><span>N° de paramètre</span><input type="number" id="cipLCNo" value="11" min="0" step="1" style="width:170px" onchange="cip_ui('lstclr')"></div>
+            <div class="cipGB" id="cipSmBox" style="margin:6px 0">
+            <label class="cipChk" data-tip="Comme ton programme test qui coupe nickel : tête droite, SANS TRAORI ni CIP.\nTours (bout, séparation) = une ligne C1 · trous ronds = TC_CIRC2 · lignes (lamelles…) = G01 X / C1.\nfgroup + FGREF = rayon du tube : la vitesse est tenue sur le tube.\nBiseau du bout (tête inclinée) : TRAORI sert juste à placer la tête, la coupe = une ligne C1.\nLes coupes où la tête doit pencher en avançant (lamelle en biais…) passent en TRAORI, avec leurs propres chiffres.\nTube rond, mandrin à 90° seulement."><input type="checkbox" id="cipLSimple" checked onchange="cip_ui('lstclr')"> <b>Programme simple</b> (sans TRAORI ni CIP, comme mon test)</label>
+            <div class="cipNum" data-tip="Hauteur de la buse au-dessus du tube avant chaque coupe : au TC_LASER_ON le capteur va chercher la pièce (distance de ton tableau). Entre deux coupes elle monte de 5 mm de plus."><span>Buse au-dessus du tube (mm)</span><input type="number" id="cipSmZ" value="5" step="0.5" style="width:70px" onchange="cip_ui('lstclr')"></div>
+            <div class="cipSub">TC_LASER_ON( méthode, tableau, perçage, contour )</div>
+<div class="cipNum" data-tip="Les 3 chiffres de TC_LASER_ON pour les coupes qui font le tour (une ligne C1)."><span>Tours (bout, séparation)</span><span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><input type="number" id="cipSmRM" value="11" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmRP" value="0" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmRC" value="300" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></span></div>
+<div class="cipNum" data-tip="Les 3 chiffres de TC_LASER_ON pour les autres coupes (lignes G01 X / C1)."><span>Lignes et formes (lamelles…)</span><span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><input type="number" id="cipSmLM" value="11" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmLP" value="0" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmLC" value="300" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></span></div>
+            <div class="cipNum" data-tip="Les 3 chiffres de TC_LASER_ON pour les coupes où la tête doit pencher (lamelle en biais, gueule de loup…). Celles-là passent en TRAORI : la vitesse n'est pas comptée pareil, mets-y la ligne de ton tableau qui va avec."><span>Coupes tête inclinée (TRAORI)</span><span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><input type="number" id="cipSmTM" value="11" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmTP" value="0" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmTC" value="300" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></span></div>
+            <div class="cipSub">Trous ronds (TC_CIRC2) et oblongs (TC_RECT2)</div>
+<div class="cipNum" data-tip="Les 3 chiffres de TC_CIRC2 pour les trous ronds (méthode, perçage, contour)."><span>Trous ronds</span><span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><input type="number" id="cipSmHM" value="9" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmHP" value="11" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmHC" value="300" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></span></div>
+            <div class="cipNum"><span>Entrée des trous (mm)</span><input type="number" id="cipSmHA" value="0.5" step="0.1" style="width:70px" onchange="cip_ui('lstclr')"></div>
+            </div>
             <div class="cipRow"><button class="cipBtn" style="font-size:12px" onclick="document.getElementById('cipLRefFile').click()">Prendre la table d'un autre .LST découpe</button><input type="file" id="cipLRefFile" class="cipFile" accept=".lst,.LST" onchange="cip_ui('lstref')"></div>
             <div class="cipNum"><span>FGREF [c1] = rayon pièce (mm)</span><input type="number" id="cipLFg" step="0.1" onchange="cip_ui('lstclr')"></div>
           </div>
@@ -10305,7 +10316,8 @@ function cip_build() {
           `<div class="cipNum" data-tip="1er chiffre de TC_WELD_ON(…) : n° du paramètre de ta table (par défaut 1)."><span>N° de paramètre</span><input type="number" data-mirror="cipLWNo" min="0" step="1" style="width:150px" value="${($('cipLWNo') || {}).value || '1'}"></div>` +
           `<div class="cipNum"><span>Mode / page</span><span class="cipRow" style="margin:0;gap:4px"><select data-mirror="cipLWMode" style="width:70px">${[...$('cipLWMode').options].map(o => `<option value="${o.value}" ${o.value === $('cipLWMode').value ? 'selected' : ''}>${o.value}</option>`).join('')}</select><select data-mirror="cipLWPage" style="width:76px">${[...$('cipLWPage').options].map(o => `<option value="${o.value}" ${o.value === $('cipLWPage').value ? 'selected' : ''}>${o.value}</option>`).join('')}</select></span></div>`
         : `<div class="cipNum"><span>Tableau techno (LTT)</span><span data-techslot="C"></span></div>` +
-          `<div class="cipNum" data-tip="1er chiffre de TC_LASER_ON(…) : n° du paramètre de coupe dans ta table LTT (par défaut 11)."><span>N° de paramètre</span><input type="number" data-mirror="cipLCNo" min="0" step="1" style="width:150px" value="${($('cipLCNo') || {}).value || '11'}"></div>`
+          `<div class="cipNum" data-tip="1er chiffre de TC_LASER_ON(…) : n° du paramètre de coupe dans ta table LTT (par défaut 11)."><span>N° de paramètre</span><input type="number" data-mirror="cipLCNo" min="0" step="1" style="width:150px" value="${($('cipLCNo') || {}).value || '11'}"></div>` +
+          `<label class="cipChk" data-tip="Tête droite, sans TRAORI ni CIP : tours = 1 ligne C1, trous ronds = TC_CIRC2, lignes = G01 X / C1. Réglages dans les réglages avancés (Fichier .LST)."><input type="checkbox" data-mirchk="cipLSimple" ${($('cipLSimple') || {}).checked ? 'checked' : ''}> <b>Programme simple</b> (sans TRAORI ni CIP)</label>`
     }
     <label class="cipChk" data-tip="Test à vide : le laser ne s'allume jamais (allumage en commentaire), même nom de fichier. En découpe, la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint). Toujours passer à vide avant le vrai !"><input type="checkbox" id="cipWzDry" ${dry ? 'checked' : ''}> <b>Test à vide</b> (laser jamais allumé)</label>
     <div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',3)">←</button><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('wzgen')">▶ Générer et simuler le .LST</button></div>
@@ -10348,6 +10360,14 @@ function cip_build() {
       h.appendChild(b);
     });
     techRefresh();
+    box.querySelectorAll('[data-mirchk]').forEach(el => {
+      el.onchange = () => {
+        $(el.dataset.mirchk).checked = el.checked;
+        parSave();
+        lstForget();
+        dlStale();
+      };
+    });
     box.querySelectorAll('[data-mirror]').forEach(el => {
       el.onchange = el.oninput = () => {
         $(el.dataset.mirror).value = el.value;
@@ -10431,7 +10451,13 @@ function cip_build() {
       S.wz.msg = '';
       S.dlMsg =
         `<span class="cipOk">${r.file} prêt.</span> ` +
-        (dry && !W ? 'À vide, la buse passe 3 mm au-dessus de la pièce (pas de palpage laser éteint). ' : '') +
+        (r.simple
+          ? `<b>Programme simple</b> (${r.simple.ring + r.simple.bis} tour(s), ${r.simple.hole} trou(s) en cycle, ${r.simple.line} ligne(s)${r.simple.trao ? `, <span class="cipWarn">${r.simple.trao} en TRAORI (tête inclinée)</span>` : ''}). `
+          : '') +
+        (r.warn ? `<span class="cipWarn">${r.warn}</span> ` : '') +
+        (dry && !W && !r.simple
+          ? 'À vide, la buse passe 3 mm au-dessus de la pièce (pas de palpage laser éteint). '
+          : '') +
         (dry
           ? "Passe-le d'abord à vide : la pointe doit suivre " +
             (W ? 'la jonction' : 'les contours') +
@@ -10452,6 +10478,22 @@ function cip_build() {
   function parSave() {
     try {
       ['cipLWNo', 'cipLCNo', 'cipLVar'].forEach(id => $(id) && localStorage.setItem(id, $(id).value));
+      [
+        'cipLSimple',
+        'cipSmZ',
+        'cipSmRM',
+        'cipSmRP',
+        'cipSmRC',
+        'cipSmLM',
+        'cipSmLP',
+        'cipSmLC',
+        'cipSmHM',
+        'cipSmHP',
+        'cipSmHC',
+        'cipSmHA'
+      ].forEach(
+        id => $(id) && localStorage.setItem(id, $(id).type === 'checkbox' ? ($(id).checked ? '1' : '0') : $(id).value)
+      );
     } catch (e) {}
   }
   function dlSig() {
@@ -10469,7 +10511,19 @@ function cip_build() {
       'cipLWNo',
       'cipLCNo',
       'cipLTCv',
-      'cipLVar'
+      'cipLVar',
+      'cipLSimple',
+      'cipSmZ',
+      'cipSmRM',
+      'cipSmRP',
+      'cipSmRC',
+      'cipSmLM',
+      'cipSmLP',
+      'cipSmLC',
+      'cipSmHM',
+      'cipSmHP',
+      'cipSmHC',
+      'cipSmHA'
     ]
       .map(v)
       .join('|');
@@ -10558,7 +10612,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v91',
+  const CIP_VER = 'CIP v92',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -12212,6 +12266,25 @@ function cip_build() {
     ['cipLWNo', 'cipLCNo', 'cipLVar'].forEach(id => {
       const v = localStorage.getItem(id);
       if (v !== null && $(id)) $(id).value = v;
+    });
+    [
+      'cipLSimple',
+      'cipSmZ',
+      'cipSmRM',
+      'cipSmRP',
+      'cipSmRC',
+      'cipSmLM',
+      'cipSmLP',
+      'cipSmLC',
+      'cipSmHM',
+      'cipSmHP',
+      'cipSmHC',
+      'cipSmHA'
+    ].forEach(id => {
+      const v = localStorage.getItem(id);
+      if (v === null || !$(id)) return;
+      if ($(id).type === 'checkbox') $(id).checked = v === '1';
+      else $(id).value = v;
     });
     ['W', 'C'].forEach(k => {
       const v = localStorage.getItem('cipTechCur_' + k);
@@ -14380,6 +14453,512 @@ function cip_build() {
     }
     return out;
   }
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  // v92 PROGRAMME SIMPLE (découpe, tube rond, BA1) — comme le programme test de Seb qui coupe nickel :
+  //  · tête droite (B 0), TRAFOOF + SET_POS + fgroup/FGREF : X le long du tube, C1 = rotation, Z = hauteur buse
+  //  · tours (bout, séparation) = UNE ligne C1 · trous ronds = cycle TC_CIRC2 · le reste = lignes G01 X / C1
+  //  · biseau (tête inclinée) en 1er contour : TRAORI seulement pour placer la tête, la coupe = une ligne C1 en TRAFOOF
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  function simpleVals() {
+    const g = (id, d) => {
+      const e = $(id);
+      const s = e ? String(e.value).trim() : '';
+      if (s === '') return d;
+      return /^-?\d+(\.\d+)?$/.test(s) ? +s : NaN;
+    };
+    const tri = (k, d) => [g('cipSm' + k + 'M', d[0]), g('cipSm' + k + 'P', d[1]), g('cipSm' + k + 'C', d[2])];
+    const v = {
+      zh: g('cipSmZ', 5),
+      ring: tri('R', [11, 0, 300]),
+      hole: tri('H', [9, 11, 300]),
+      ap: g('cipSmHA', 0.5),
+      line: tri('L', [11, 0, 300]),
+      trao: tri('T', [11, 0, 300])
+    };
+    const all = [v.zh, v.ap].concat(v.ring, v.hole, v.line, v.trao);
+    if (all.some(x => !isFinite(x))) return { err: 'Programme simple : un des réglages n’est pas un nombre.' };
+    if (!(v.zh >= 1 && v.zh <= 20)) return { err: 'Programme simple : hauteur de buse entre 1 et 20 mm.' };
+    return v;
+  }
+  function simpleOn() {
+    return !S._simpleOff && !!($('cipLSimple') && $('cipLSimple').checked);
+  }
+  // cercle par 3+ points (moindres carrés) -> {u, v, r, dev}
+  function fitCircle(P) {
+    let su = 0,
+      sv = 0;
+    P.forEach(p => {
+      su += p[0];
+      sv += p[1];
+    });
+    const mu = su / P.length,
+      mv = sv / P.length;
+    let Suu = 0,
+      Svv = 0,
+      Suv = 0,
+      Suuu = 0,
+      Svvv = 0,
+      Suvv = 0,
+      Svuu = 0;
+    P.forEach(p => {
+      const u = p[0] - mu,
+        v = p[1] - mv;
+      Suu += u * u;
+      Svv += v * v;
+      Suv += u * v;
+      Suuu += u * u * u;
+      Svvv += v * v * v;
+      Suvv += u * v * v;
+      Svuu += v * u * u;
+    });
+    const det = Suu * Svv - Suv * Suv;
+    if (Math.abs(det) < 1e-12) return null;
+    const a = (Suuu + Suvv) / 2,
+      b = (Svvv + Svuu) / 2;
+    const uc = (a * Svv - b * Suv) / det,
+      vc = (b * Suu - a * Suv) / det;
+    const r = Math.sqrt(uc * uc + vc * vc + (Suu + Svv) / P.length);
+    let dev = 0;
+    P.forEach(p => {
+      dev = Math.max(dev, Math.abs(Math.hypot(p[0] - mu - uc, p[1] - mv - vc) - r));
+    });
+    return { u: uc + mu, v: vc + mv, r, dev };
+  }
+  // simplification d'une polyligne (Douglas-Peucker) en coordonnées déroulées (mm)
+  function dpSimplify(P, tol) {
+    if (P.length < 3) return P.map((_, i) => i);
+    const keep = new Array(P.length).fill(false);
+    keep[0] = keep[P.length - 1] = true;
+    const st = [[0, P.length - 1]];
+    const sub = (a, b) => a.map((x, i) => x - b[i]);
+    const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
+    while (st.length) {
+      const [a, b] = st.pop();
+      const d = sub(P[b], P[a]),
+        l2 = dot(d, d);
+      let im = -1,
+        dm = tol;
+      for (let i = a + 1; i < b; i++) {
+        const w = sub(P[i], P[a]);
+        const t = l2 > 1e-12 ? Math.max(0, Math.min(1, dot(w, d) / l2)) : 0;
+        const e = w.map((x, j) => x - t * d[j]);
+        const dd = Math.sqrt(dot(e, e));
+        if (dd > dm) {
+          dm = dd;
+          im = i;
+        }
+      }
+      if (im >= 0) {
+        keep[im] = true;
+        st.push([a, im], [im, b]);
+      }
+    }
+    return keep.map((k, i) => (k ? i : -1)).filter(i => i >= 0);
+  }
+  function simpleBody(x) {
+    const { o, C, posMode, dry, TV, sh, fg } = x;
+    const pr = S.profile;
+    let Rr = pr && pr.type === 'rond' ? pr.R : null;
+    if (pr && !Rr && pr.out && pr.out.length > 8) {
+      // profil « perso » mais rond quand même (tube tourné dans le mandrin)
+      let a = 1e9,
+        b = 0;
+      pr.out.forEach(q => {
+        const r = Math.hypot(q[0], q[1]);
+        a = Math.min(a, r);
+        b = Math.max(b, r);
+      });
+      if (b - a < 0.02) Rr = (a + b) / 2;
+    }
+    if (!Rr)
+      return { err: 'Programme simple : seulement pour un tube ROND. Décoche « Programme simple » pour ce tube.' };
+    if (o.trafo !== 'BA1') return { err: 'Programme simple : seulement mandrin à 90° (BA1).' };
+    if (!posMode)
+      return {
+        err: 'Programme simple : il faut le départ « SET_POS » (pointe posée sur le départ, comme tes rondelles). Choisis-le à l’étape 3 de l’assistant, ou décoche « Programme simple ».'
+      };
+    const v = simpleVals();
+    if (v.err) return v;
+    const R = Rr,
+      zh = v.zh,
+      zt = zh + 5;
+    const A = dry ? ';A VIDE ' : '';
+    const ySg = o.xdir === '-X' ? 1 : -1; // Y machine = ySg * côté (repère du modèle tourné)
+    const cuts = C.map((c, ci) => F.filter(f => f.ci === ci && f.j >= 0));
+    const nm = ci =>
+      C[ci].name
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^\x20-\x7e]/g, '');
+    // un point vu de la MACHINE (sans TRAORI) : X le long du tube, Y sur le côté, C1, faisceau vertical ?
+    const mach = f => {
+      const Pm = rotM(f.p, f.th),
+        Dm = rotM(f.d, f.th);
+      const q = toLst(f.p, f.d, f.th, o);
+      return {
+        X: q.X,
+        Y: ySg * Pm[0],
+        H: Pm[2],
+        C: q.C,
+        B: q.B,
+        vert: Math.abs(Dm[0]) < 0.006 && Math.abs(Dm[1]) < 0.006 && Dm[2] < 0
+      };
+    };
+    // pointe au-dessus de l'axe (Y machine 0), à la hauteur R + z, pour l'angle de mandrin de ce point
+    const topOf = (f, z) => {
+      const Pm = [0, f.p[1], R + z];
+      return toLst(rotM(Pm, -f.th), rotM([0, 0, -1], -f.th), f.th, o);
+    };
+    // 1. classer chaque contour
+    const K = [];
+    for (let ci = 0; ci < C.length; ci++) {
+      const fr = cuts[ci];
+      if (!fr.length) {
+        K.push(null);
+        continue;
+      }
+      const M = fr.map(mach);
+      let flat = true,
+        xmin = 1e9,
+        xmax = -1e9,
+        ymax = 0,
+        bmin = 1e9,
+        bmax = -1e9;
+      M.forEach(q => {
+        if (!q.vert || q.H < R * 0.3 || q.H > R + 0.15) flat = false; // faisceau vertical (sur le dessus ou décalé sur le côté)
+        xmin = Math.min(xmin, q.X);
+        xmax = Math.max(xmax, q.X);
+        ymax = Math.max(ymax, Math.abs(q.Y));
+        bmin = Math.min(bmin, q.B);
+        bmax = Math.max(bmax, q.B);
+      });
+      const cspan = Math.abs(M[M.length - 1].C - M[0].C);
+      const ringX = cspan >= 359 && xmax - xmin < 0.05;
+      if (ci === 0 && ringX && bmax - bmin < 0.3 && Math.abs(M[0].B) >= 0.3) {
+        K.push({ t: 'bis', M, fr });
+        continue;
+      }
+      if (!flat || ymax > R * 0.95) {
+        K.push({ t: 'trao', M, fr }); // tête inclinée : ce contour passe en TRAORI
+        continue;
+      }
+      if (ringX && ymax < 0.02) {
+        K.push({ t: 'ring', M, fr });
+        continue;
+      }
+      // trou rond ? (sans l'entrée / le dépassement du soft : TC_CIRC2 a les siens)
+      const a0 = C[ci].leadN || 0,
+        a1 = M.length - 1 - (C[ci].overN || 0);
+      const core = M.slice(a0, a1 + 1);
+      let hole = null;
+      if (core.length >= 8) {
+        const c0 = core[0].C;
+        const cFix = core.every(q => Math.abs(q.C - c0) < 0.05);
+        // tête fixe (C1 bloqué) : cercle dans le plan X / Y de la machine ; sinon cercle sur le tube déroulé
+        const pts = cFix ? core.map(q => [q.X, q.Y]) : core.map(q => [q.X, R * q.C * DEG]);
+        const fc = fitCircle(pts);
+        const cl = Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]);
+        if (
+          fc &&
+          fc.dev < 0.03 &&
+          cl < Math.max(0.2, 0.15 * fc.r) &&
+          fc.r > 0.2 &&
+          fc.r < R * 0.6 &&
+          (cFix || ymax < 0.02)
+        )
+          hole = cFix ? { X: fc.u, Y: fc.v, C: c0, D: 2 * fc.r } : { X: fc.u, Y: 0, C: fc.v / (R * DEG), D: 2 * fc.r };
+      }
+      if (hole) {
+        K.push({ t: 'hole', M, fr, hole });
+        continue;
+      }
+      // trou oblong ? (tête fixe, C1 bloqué) -> cycle TC_RECT2 (rayon d'angle = largeur / 2)
+      if (core.length >= 8 && core.every(q => Math.abs(q.C - core[0].C) < 0.05)) {
+        const pts = core.map(q => [q.X, q.Y]);
+        const mx = pts.reduce((s, p) => s + p[0], 0) / pts.length,
+          my = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+        let sxx = 0,
+          syy = 0,
+          sxy = 0;
+        pts.forEach(p => {
+          sxx += (p[0] - mx) ** 2;
+          syy += (p[1] - my) ** 2;
+          sxy += (p[0] - mx) * (p[1] - my);
+        });
+        let an = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+        {
+          // angle affiné : celui qui donne la largeur la plus petite
+          const wid = a => {
+            let lo = 1e9,
+              hi = -1e9;
+            pts.forEach(p => {
+              const t = -(p[0] - mx) * Math.sin(a) + (p[1] - my) * Math.cos(a);
+              lo = Math.min(lo, t);
+              hi = Math.max(hi, t);
+            });
+            return hi - lo;
+          };
+          let best = an,
+            bw = wid(an);
+          for (let d = -3; d <= 3; d += 0.02) {
+            const a = an + (d * Math.PI) / 180,
+              w = wid(a);
+            if (w < bw) {
+              bw = w;
+              best = a;
+            }
+          }
+          an = best;
+        }
+        const ca = Math.cos(an),
+          sa = Math.sin(an);
+        const ST = pts.map(p => [(p[0] - mx) * ca + (p[1] - my) * sa, -(p[0] - mx) * sa + (p[1] - my) * ca]);
+        let s0 = 1e9,
+          s1 = -1e9,
+          t0 = 1e9,
+          t1 = -1e9;
+        ST.forEach(p => {
+          s0 = Math.min(s0, p[0]);
+          s1 = Math.max(s1, p[0]);
+          t0 = Math.min(t0, p[1]);
+          t1 = Math.max(t1, p[1]);
+        });
+        const Lo = s1 - s0,
+          Wo = t1 - t0,
+          cs = (s0 + s1) / 2,
+          ct = (t0 + t1) / 2,
+          hl = (Lo - Wo) / 2;
+        let dev = 0;
+        ST.forEach(p => {
+          const s = Math.max(-hl, Math.min(hl, p[0] - cs));
+          dev = Math.max(dev, Math.abs(Math.hypot(p[0] - cs - s, p[1] - ct) - Wo / 2));
+        });
+        const cl = Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]);
+        if (Lo > Wo + 0.2 && Wo > 0.4 && dev < 0.03 && cl < 0.3) {
+          let deg = (an * 180) / Math.PI;
+          if (deg > 90) deg -= 180;
+          if (deg <= -90) deg += 180;
+          K.push({
+            t: 'obl',
+            M,
+            fr,
+            obl: { X: mx + cs * ca - ct * sa, Y: my + cs * sa + ct * ca, C: core[0].C, L: Lo, W: Wo, a: deg }
+          });
+          continue;
+        }
+      }
+      K.push({
+        t: 'line',
+        M,
+        fr,
+        keep: dpSimplify(
+          M.map(q => [q.X, q.Y, R * q.C * DEG]),
+          0.01
+        )
+      });
+    }
+    const first = K.findIndex(k => k && k.t !== 'bis');
+    if (first < 0) return { err: 'Programme simple : aucun contour.' };
+    const hasBis = !!(K[0] && K[0].t === 'bis');
+    const out = [];
+    const f0 = cuts.find(c => c.length)[0];
+    const q0 = toLst(f0.p, f0.d, f0.th, o);
+    const info = { ring: 0, hole: 0, line: 0, bis: 0, trao: 0 };
+    const FG = [
+      'fgroup(X,Y,Z,c1)',
+      `FGREF [c1] = ${(+fg).toFixed(3)} ;rayon du tube : la vitesse est tenue SUR le tube`
+    ];
+    const LON = t => A + `TC_LASER_ON(${t[0]},${TV},${t[1]},${t[2]})`;
+    // 2. biseau (1er contour, tête inclinée) : TRAORI pour se placer, la coupe = 1 ligne C1 sans TRAORI
+    if (hasBis) {
+      const k = K[0];
+      const f = k.fr[0];
+      const a = toLst(V.sub(f.p, V.mul(f.d, 30 + (dry ? 3 : 0))), f.d, f.th, o);
+      out.push(
+        `;----- CONTOUR 1 : ${nm(0)} (tete inclinee B ${n3(k.M[0].B)}) -----`,
+        lstMv(a) + " ;pre-approche 30 mm dans l'axe du faisceau",
+        lstMv(toLst(sh(f), f.d, f.th, o)) + ' ;tete placee sur le biseau',
+        'TRAFOOF ;la coupe : juste la rotation du mandrin',
+        ...FG,
+        LON(v.ring),
+        `G01 C1 = ${n3(k.M[k.M.length - 1].C)}`,
+        A + 'TC_LASER_OFF(2)',
+        'TC_SET_TRAFO("BA1")',
+        'TRAORI(1)'
+      );
+      info.bis++;
+    }
+    // 3. passage en mode simple : buse au-dessus du tube, tête droite, au départ des coupes
+    const fr0 = K[first].fr[0];
+    const Xref = toLst(fr0.p, fr0.d, fr0.th, o).X;
+    if (hasBis) {
+      out.push('', ';----- tete droite, au-dessus du depart des coupes -----');
+      F.filter(f => f.ci === first && f.j < 0).forEach(f => out.push(lstMv(toLst(f.p, f.d, f.th, o))));
+      out.push(lstMv(topOf(fr0, 30)));
+    } else if (!posMode) {
+      out.push(lstMv(topOf(fr0, 30)) + ' ;au-dessus du depart');
+    }
+    out.push(
+      lstMv(topOf(fr0, zh)) + ` ;buse ${n3(zh)} mm au-dessus du tube`,
+      'TRAFOOF',
+      `SET_POS(0.000, 0.000, ${n3(zh)}) ;ici : X = 0, Z = 0 = la surface du tube`,
+      ...FG
+    );
+    // 4. les coupes
+    const c0r = mach(fr0).C;
+    let cx = 0,
+      cy = 0,
+      cc = c0r,
+      lastTh = fr0.th;
+    const xyc = (xx, yy, c) => {
+      const s = [];
+      if (Math.abs(xx - cx) > 5e-4) s.push(`X = ${n3(xx)}`);
+      if (Math.abs(yy - cy) > 5e-4) s.push(`Y = ${n3(yy)}`);
+      if (Math.abs(c - cc) > 5e-4) s.push(`C1 = ${n3(c)}`);
+      cx = xx;
+      cy = yy;
+      cc = c;
+      return s.length ? 'G01 ' + s.join(' ') : null;
+    };
+    const go = (xx, yy, c, lab) => {
+      const L = [];
+      const far = Math.abs(xx - cx) > 5e-4 || Math.abs(yy - cy) > 5e-4 || Math.abs(c - cc) > 5e-4;
+      if (far) {
+        L.push(`G01 Z = ${n3(zt)}`);
+        L.push(xyc(xx, yy, c) + (lab ? ' ;' + lab : ''));
+      }
+      L.push(`G01 Z = ${n3(zh)}`);
+      return L;
+    };
+    for (let ci = first; ci < K.length; ci++) {
+      const k = K[ci];
+      if (!k) continue;
+      out.push('', `;----- CONTOUR ${ci + 1} : ${nm(ci)} -----`);
+      if (k.t === 'ring') {
+        const s = k.M[0],
+          e = k.M[k.M.length - 1];
+        out.push(...go(s.X - Xref, 0, s.C), LON(v.ring), xyc(cx, 0, e.C), A + 'TC_LASER_OFF(2)');
+        lastTh = k.fr[k.fr.length - 1].th;
+        info.ring++;
+      } else if (k.t === 'hole') {
+        const h = k.hole;
+        out.push(
+          ...go(h.X - Xref, h.Y, h.C, 'centre du trou'),
+          `R1 = ${n3(h.X - Xref)} R2 = ${n3(h.Y)} R3 = 0 R4 = 0 R5 = ${n3(h.C)} ;centre du trou : X Y Z B C1`,
+          A + `TC_CIRC2(${n3(h.D)},${n3(v.ap)},0,${v.hole[0]},${v.hole[1]},${v.hole[2]},${TV}) ;trou D${n3(h.D)}`
+        );
+        lastTh = k.fr[0].th;
+        info.hole++;
+      } else if (k.t === 'obl') {
+        const h = k.obl;
+        out.push(
+          ...go(h.X - Xref, h.Y, h.C, 'centre de l oblong'),
+          `R1 = ${n3(h.X - Xref)} R2 = ${n3(h.Y)} R3 = 0 R4 = 0 R5 = ${n3(h.C)} R9 = ${n3(Math.abs(h.a) < 0.05 ? 0 : h.a)} ;centre : X Y Z B C1 + rotation`,
+          A +
+            `TC_RECT2(${n3(h.L)},${n3(h.W)},${n3(h.W / 2)},${n3(v.ap)},0,${v.hole[0]},${v.hole[1]},${v.hole[2]},${TV}) ;oblong ${n3(h.L)} x ${n3(h.W)}`
+        );
+        lastTh = k.fr[0].th;
+        info.hole++;
+      } else if (k.t === 'line') {
+        const P = k.keep.map(i => k.M[i]);
+        out.push(...go(P[0].X - Xref, P[0].Y, P[0].C), LON(v.line));
+        for (let i = 1; i < P.length; i++) {
+          const l = xyc(P[i].X - Xref, P[i].Y, P[i].C);
+          if (l) out.push(l);
+        }
+        out.push(A + 'TC_LASER_OFF(2)');
+        lastTh = k.fr[k.keep[k.keep.length - 1]].th;
+        info.line++;
+      } else {
+        // tête inclinée : ce contour passe en TRAORI ; on dit à la machine où est la pointe, et au retour pareil
+        const f = k.fr[0],
+          fe = k.fr[k.fr.length - 1];
+        const ms = mach(f),
+          me = mach(fe);
+        out.push(`G01 Z = ${n3(zt)}`);
+        const l = xyc(ms.X - Xref, 0, ms.C);
+        if (l) out.push(l + ' ;au-dessus du depart');
+        const ts = topOf(f, zt);
+        out.push(
+          ';(tete inclinee : ce contour se fait en TRAORI)',
+          'TC_SET_TRAFO("BA1")',
+          'TRAORI(1)',
+          `SET_POS(${n3(ts.X)}, ${n3(ts.Y)}, ${n3(ts.Z)}) ;on dit a la machine ou est la pointe (en TRAORI)`,
+          'FGROUP() ;vitesse normale TRAORI (a la pointe)',
+          lstMv(toLst(V.sub(f.p, V.mul(f.d, 30)), f.d, f.th, o)) + " ;pre-approche 30 mm dans l'axe du faisceau",
+          lstMv(toLst(sh(f), f.d, f.th, o)) + ' ;depart du contour',
+          LON(v.trao)
+        );
+        for (const bl of fitBlocks(k.fr.map(ff => toLst(sh(ff), ff.d, ff.th, o)))) out.push(lineOf(bl));
+        out.push(
+          A + 'TC_LASER_OFF(2)',
+          lstMv(toLst(V.sub(fe.p, V.mul(fe.d, 30)), fe.d, fe.th, o)) + ' ;tete levee de 30 mm',
+          lstMv(topOf(fe, zt)) + ' ;tete droite au-dessus du tube',
+          'TRAFOOF',
+          `SET_POS(${n3(me.X - Xref)}, 0.000, ${n3(zt)}) ;retour sans TRAORI (memes reperes qu avant)`,
+          ...FG
+        );
+        cx = me.X - Xref;
+        cy = 0;
+        cc = me.C;
+        lastTh = fe.th;
+        info.trao++;
+      }
+    }
+    // 5. fin : tout revient comme au lancement
+    out.push('', ';----- fin : retour a la position de depart -----', 'G01 Z = 30.000 F10000 ;tete en l air');
+    let inTrao = false;
+    if (posMode) {
+      if (!hasBis) {
+        const m0 = mach(f0);
+        out.push(
+          `G01 G90 C1 = ${n3(q0.C)} ;le mandrin refait ses tours a l envers -> angle de depart`,
+          `G01 X = 0.000 Y = ${n3(m0.Y)}`,
+          `G01 Z = ${n3(m0.H - R)} ;pointe sur le depart : tout est comme au lancement`
+        );
+      } else {
+        // la tête doit revenir inclinée sur le biseau : on repasse en TRAORI (on redit où est la pointe)
+        const Pm = [0, fr0.p[1], R + 30];
+        const qn = toLst(rotM(Pm, -lastTh), rotM([0, 0, -1], -lastTh), lastTh, o);
+        const a0 = toLst(V.sub(f0.p, V.mul(f0.d, 30)), f0.d, f0.th, o);
+        out.push(
+          'G01 X = 0.000 Y = 0.000',
+          'TC_SET_TRAFO("BA1")',
+          'TRAORI(1)',
+          `SET_POS(${n3(qn.X)}, ${n3(qn.Y)}, ${n3(qn.Z)}) ;on redit a la machine ou est la pointe (en TRAORI)`,
+          'TRAFOOF',
+          `G01 G90 C1 = ${n3(q0.C)} F10000 ;le mandrin refait ses tours a l envers -> angle de depart`,
+          'TC_SET_TRAFO("BA1")',
+          'TRAORI(1)',
+          lstMv(a0) + ' ;au-dessus du depart',
+          lstMv(q0) + ' ;pointe sur le depart : tout est comme au lancement'
+        );
+        inTrao = true;
+      }
+    }
+    out.push(
+      '',
+      ';----- fin de programme -----',
+      ...(inTrao ? ['TRAFOOF'] : []),
+      'G500',
+      'G90',
+      ...(posMode
+        ? [';(tout est revenu a la position de depart)']
+        : [
+            'G01 Z = 350 F10000 ;tete en haut',
+            'G01 B = 0 C1 =0',
+            'G01 Y = 200',
+            ';(position de depart du gabarit : prete pour la piece suivante)'
+          ]),
+      '',
+      'TC_LASER_REQUEST(0)',
+      'TC_RESET',
+      'TC_OPEN_DOOR(0,1,0,0)',
+      '',
+      'M30'
+    );
+    return { lines: out, info };
+  }
   function lstMv(q, f) {
     return ` G01 X = ${n3(q.X)} Y = ${n3(q.Y)} Z = ${n3(q.Z)} B = ${n3(q.B)} C1 = ${n3(q.C)}` + (f ? ' ' + f : '');
   }
@@ -14489,6 +15068,50 @@ function cip_build() {
           DRYOFF +
           ' mm vers la tete (pas de palpage laser eteint) !!!'
       );
+    if (!W && simpleOn()) {
+      const sr = simpleBody({ o, C, posMode, dry, TV, sh, fg });
+      if (sr.err) {
+        // pas possible pour cette pièce : on sort le programme normal (TRAORI) et on le dit
+        S._simpleOff = true;
+        try {
+          const nr = genLST();
+          if (nr && !nr.err)
+            nr.warn = sr.err.replace(/ ?Décoche[^.]*\./, '') + ' → programme normal (TRAORI) généré à la place.';
+          return nr;
+        } finally {
+          S._simpleOff = false;
+        }
+      }
+      B.splice(
+        B.indexOf(";=== mouvements generes par l'onglet CIP Trumpf (CNC 3018) ==="),
+        1,
+        ';=== PROGRAMME SIMPLE : tete droite, sans TRAORI ni CIP (TC_CIRC2 pour les trous) ==='
+      );
+      {
+        const i = B.findIndex(l => /^;!!! A VIDE : toute la trajectoire/.test(l));
+        if (i >= 0) B.splice(i, 1, ';!!! A VIDE : la buse reste au-dessus du tube (pas de palpage laser eteint) !!!');
+      }
+      B.push(...sr.lines);
+      const L = lstHead(prog, kind, tech).concat(airLST([';----- reglages -----'].concat(B)), [
+        'STOP_TEXT',
+        'C',
+        'ENDE_PROGRAMM',
+        'C'
+      ]);
+      L.push(...lttTable().table.split('\n'), 'C', 'ED');
+      const txt = L.join('\r\n').replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '') + '\r\n';
+      if (/NaN|Infinity/.test(txt)) return { err: 'Calcul invalide (NaN) : le programme n’est pas généré.' };
+      // simu : la même trajectoire écrite en TRAORI (le simulateur ne relit que TRAORI)
+      S._simpleOff = true;
+      let simTxt = null;
+      try {
+        const nr = genLST();
+        simTxt = nr && nr.txt;
+      } finally {
+        S._simpleOff = false;
+      }
+      return { txt, sim: simTxt, file: prog + '.LST', kind, tech, n: C.length, o, simple: sr.info };
+    }
     for (let ci = 0; ci < C.length; ci++) {
       const fr = F.filter(f => f.ci === ci);
       const rap = fr.filter(f => f.j < 0),
@@ -15774,7 +16397,7 @@ function cip_build() {
   function lstVerify() {
     const L0 = S.lastGen || S.lastLST;
     if (!L0 || !L0.o) return;
-    const r = parseLST(L0.txt);
+    const r = parseLST(L0.sim || L0.txt);
     if (!r.moves.length) return;
     const pts = lstSample(r, L0.o);
     const FB = lstFrames(r, pts, L0.o);
@@ -16998,6 +17621,8 @@ function cip_build() {
         $('cipLDl').textContent = 'Télécharger ' + r.file;
         $('cipLMsg').innerHTML =
           `<span class="cipOk">${r.file} prêt (${r.kind}, techno ${r.tech}, ${r.n} contour(s))${$('cipLDry').checked ? ' — VERSION À VIDE, laser jamais allumé' : ''}.</span>` +
+          (r.simple ? ' <b>Programme simple</b>.' : '') +
+          (r.warn ? ` <span class="cipWarn">${r.warn}</span>` : '') +
           (r.n > 1
             ? ` <span class="cipWarn">Plusieurs contours : ${r.kind === 'soudure' ? 'TC_WELD_ON/OFF' : 'TC_LASER_ON/OFF'} répété pour chacun — pas vu dans tes fichiers, à tester à vide.</span>`
             : '') +
