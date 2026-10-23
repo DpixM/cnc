@@ -10554,7 +10554,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v82',
+  const CIP_VER = 'CIP v83',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -12001,7 +12001,7 @@ function cip_build() {
     if (g === '') return { err: 'Pointe posée sur le point de départ : tape la valeur lue sur la machine.' };
     if (Math.abs(v.B) > BLIM) return { err: 'B dépasse la butée (±' + BLIM + '°).' };
     // CIP sous TRAORI : la jonction (ellipse) est dans le plan perpendiculaire à l'axe du mandrin ; X (ou Z à plat) = 0 sur ce plan
-    const { o, Dm, fr, tot, st } = mtCore(v);
+    const { o, fr, tot, st } = mtCore(v);
     // points de calcul : chaque morceau (pente / soudure / recouvrement / pente de fin) a ses bornes EXACTES,
     // découpé comme dans la simulation (mtBuild) pour que le programme = ce qu'on voit
     const lims = [0, v.p0, v.p0 + Math.min(v.rot, 360), v.p0 + v.rot, tot];
@@ -12082,6 +12082,7 @@ function cip_build() {
       B.push(
         ';(tete pile sur le point de depart, C1 = 1 tour plus loin = meme position)',
         '',
+        ';----- fin de programme -----',
         'TRAFOOF',
         '',
         'G500',
@@ -12090,20 +12091,22 @@ function cip_build() {
     } else {
       // retour au départ : dégagement 30 mm, le mandrin se déroule tête en l'air (la tête ne bouge pas dans la machine), puis redescente
       const fe = fr(tot);
-      const Pm = rotM(V.sub(fe.p, V.mul(fe.d, 30)), fe.th);
       B.push(
         ';----- retour au point de depart -----',
         lstMv(toLst(V.sub(fe.p, V.mul(fe.d, 30)), fe.d, fe.th, o)) + ' ;degagement 30 mm'
       );
-      const nU = Math.max(2, Math.ceil(tot / 10));
-      for (let k = 1; k <= nU; k++) {
-        const th = tot * (1 - k / nU);
-        B.push(lstMv(toLst(rotM(Pm, -th), rotM(Dm, -th), th, o)));
-      }
+      // v83 : comme les autres programmes : tête en l'air, le mandrin refait ses tours à l'envers EN UNE LIGNE
+      B.push(
+        'TRAFOOF',
+        `G01 G90 C1 = ${n3(Q[0].C)} F10000 ;le mandrin refait ses tours a l envers -> angle de depart`,
+        `TC_SET_TRAFO("${o.trafo}")`,
+        'TRAORI(1)'
+      );
       B.push(
         lstMv(pre) + ' ;au-dessus du depart',
         lstMv(Q[0]) + ' ;tete revenue sur le point de depart',
         '',
+        ';----- fin de programme -----',
         'TRAFOOF',
         '',
         'G500',
@@ -12121,7 +12124,13 @@ function cip_build() {
       '',
       'M30'
     );
-    const L = lstHead(prog, 'soudure', tech).concat(B, ['STOP_TEXT', 'C', 'ENDE_PROGRAMM', 'C', 'ED']);
+    const L = lstHead(prog, 'soudure', tech).concat(airLST([';----- reglages -----'].concat(B)), [
+      'STOP_TEXT',
+      'C',
+      'ENDE_PROGRAMM',
+      'C',
+      'ED'
+    ]);
     const txt = L.join('\r\n').replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '') + '\r\n';
     if (/NaN|Infinity/.test(txt)) return { err: "Calcul invalide (NaN) : le programme n'est pas généré." };
     return { txt, file: prog + '.LST', n: B.length, Q, o };
@@ -14357,6 +14366,16 @@ function cip_build() {
     if (v === '') return def;
     return /^\d{1,4}$/.test(v) ? +v : null;
   }
+  // v83 : programme AÉRÉ : une ligne vide avant chaque titre (;----- / ;===), jamais deux lignes vides de suite
+  function airLST(B) {
+    const out = [];
+    for (const l of B) {
+      if (l === '' && (!out.length || out[out.length - 1] === '')) continue;
+      if (/^;(-----|===)/.test(l) && out.length && out[out.length - 1] !== '') out.push('');
+      out.push(l);
+    }
+    return out;
+  }
   function lstMv(q, f) {
     return ` G01 X = ${n3(q.X)} Y = ${n3(q.Y)} Z = ${n3(q.Z)} B = ${n3(q.B)} C1 = ${n3(q.C)}` + (f ? ' ' + f : '');
   }
@@ -14582,6 +14601,7 @@ function cip_build() {
     if (W) {
       B.push(
         '',
+        ';----- fin de programme -----',
         'TRAFOOF',
         '',
         'G500',
@@ -14607,6 +14627,7 @@ function cip_build() {
       // v62 : découpe aussi : fin propre + PORTES OUVERTES (la tête est déjà sur le départ, prête pour la pièce suivante)
       B.push(
         '',
+        ';----- fin de programme -----',
         'TRAFOOF',
         '',
         'G500',
@@ -14621,7 +14642,12 @@ function cip_build() {
         '',
         'M30'
       );
-    const L = lstHead(prog, kind, tech).concat(B, ['STOP_TEXT', 'C', 'ENDE_PROGRAMM', 'C']);
+    const L = lstHead(prog, kind, tech).concat(airLST([';----- reglages -----'].concat(B)), [
+      'STOP_TEXT',
+      'C',
+      'ENDE_PROGRAMM',
+      'C'
+    ]);
     if (!W) {
       L.push(...lttTable().table.split('\n'), 'C');
     }
