@@ -164,6 +164,12 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-26 — JQ : CNC 3018 — montée progressive de la broche avant l'usinage (nouvelle broche 775)
+ [AJOUT] Avant chaque usinage (CNC normal + 4 fichiers d'incrustation) : la broche monte par paliers de 1 s
+   (S250, 500, 750 puis S2500, 5000, 7500, puis la vitesse demandée). Marche que la carte soit réglée en $30=1000
+   ou $30=10000+ : sur une carte en 1000, les 3 premiers paliers font 25/50/75 %. ~8 s de plus au démarrage.
+   Le reste du G-code est identique. Laser / CIP pas touchés.
+
 -- 2026-10-20 — JP : INCRUSTATION — « angle des murs » séparé de l'angle de la fraise + 📘 guide
  [AJOUT] Réglages V-bit : « ∠ Angle des murs » (coché « = angle de la fraise » par défaut -> G-code IDENTIQUE à avant).
    Décoché : tu choisis la pente des murs (poche ♀ et bouchon ♂). Si la fraise est plus fine que le mur, la finition
@@ -2385,7 +2391,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-20-JP ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-26-JQ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -20401,6 +20407,13 @@ function wzGenLaser(){
     if(typeof _p10Refresh==='function') _p10Refresh();
   }catch(e){ if(stEl){ stEl.className='al al-err'; stEl.textContent='❌ Erreur laser : '+e.message; } }
 }
+// JQ : MONTÉE PROGRESSIVE DE LA BROCHE avant l'usinage (paliers de 1 s) — ménage la carte et l'alim (broche 775).
+// Marche quel que soit le réglage $30 de la carte (1000 ou 10000+) : paliers à 25/50/75 % de 1000 PUIS de 10000,
+// en gardant seulement ceux sous la vitesse demandée, puis la vitesse demandée.
+function kerfSpinUp(S){ S=Math.round(+S||12000); const st=[];
+  for(const base of [1000,10000]) for(const f of [0.25,0.5,0.75]){ const v=Math.round(base*f); if(v<S*0.9 && !st.includes(v)) st.push(v); }
+  const L=['; montée progressive de la broche (paliers de 1 s)']; for(const v of st) L.push('M3 S'+v,'G4 P1');
+  L.push('M3 S'+S+' ; broche ON','G4 P2'); return L; }
 function wzGenNormal(){
   const safeZ=parseFloat(document.getElementById('safeZ2')?.value||5);
   const date=new Date().toLocaleString('fr-FR');
@@ -20533,7 +20546,7 @@ function wzGenNormal(){
       if(hasCutF) gc+=`; ⚠️ Contient la DÉCOUPE : à lancer EN DERNIER\n`;
       gc+=`; Avance XY:${tool.fxy||600}mm/min  Z:${tool.fz||150}mm/min  Broche:${tool.spin||12000}RPM\n`;
       gc+=`; Zéro Z = surface de la pièce\n`;
-      gc+=`G21\nG90\nG17\nG0 Z${safeZ} ; sécurité\nM3 S${tool.spin||12000} ; broche ON\nG4 P2\n`;
+      gc+=`G21\nG90\nG17\nG0 Z${safeZ} ; sécurité\n`+kerfSpinUp(tool.spin||12000).join('\n')+'\n';
       for(const job of g.jobs){
         gc+=`; ── ${job.modeLbl} : ${job.shapeName} (#${job.obj.id}) — ${job.totalDepth.toFixed(2)}mm en ${job.passes} passe(s) ──\n`;
         gc+=job.body;
@@ -29996,7 +30009,7 @@ function buildInlayRoughGcodeWiz(inlayObjs, gender, safeZ, hdr, tool, tabs){
   const lines=[
     hdr,
     `; ── ${gender==='female'?'♀ FEMELLE':'♂ MÂLE'} — ÉBAUCHE (fraise plate Ø${tool.dia}mm) ──`,
-    `M3 S${tool.spin}`,'G4 P2'
+    ...kerfSpinUp(tool.spin)
   ];
   for(const o of inlayObjs){
     const tp=toolpaths.find(tp=>tp.objIds.includes(o.id))||{depth:3};
@@ -30102,7 +30115,7 @@ function buildInlayFinishGcodeWiz(inlayObjs, gender, safeZ, hdr, tool, glueGap){
     hdr,
     `; ── ${gender==='female'?'♀ FEMELLE':'♂ MÂLE'} — FINITION V-bit ${tool.angle}° ──`,
     `; Profondeur variable selon largeur locale du trait`,
-    `M3 S${tool.spin}`,'G4 P2'
+    ...kerfSpinUp(tool.spin)
   ];
   for(const o of inlayObjs){
     const tp=toolpaths.find(tp=>tp.objIds.includes(o.id))||{depth:3};
@@ -30149,7 +30162,7 @@ function buildInlayRoughGcode(inlayObjs, gender, safeZ, hdr){
     `; Fraise plate Ø${flatTool.dia||3}mm — dégagement rapide de matière`,
     `; Ponts automatiques sur les îlots (lettres fermées O,B,D...)`,
     '; ════════════════════════════════════════════',
-    'G90 G21 G17',`M3 S${flatTool.spin||12000}`,'G4 P2'
+    'G90 G21 G17',...kerfSpinUp(flatTool.spin||12000)
   ];
 
   for(const o of inlayObjs){
@@ -30313,7 +30326,7 @@ function buildInlayGcode(inlayObjs, gender, safeZ, hdr){
     `; V-CARVE INLAY — ${gender==='female'?'♀ FEMELLE (creuser le noyer)':'♂ MÂLE (découper l\'érable)'}`,
     `; V-bit: ${vbit.name||vAngle+'°'}  Ø${vbit.dia||3.175}mm`,
     '; ════════════════════════════════════════════',
-    'G90 G21 G17',`M3 S${vbit.spin}`,'G4 P2'
+    'G90 G21 G17',...kerfSpinUp(vbit.spin)
   ];
 
   for(const o of inlayObjs){
@@ -31143,7 +31156,7 @@ _IL.gen = function(objects, p, date, male, rough){
   const Wr=_IL.writer(P, org, P.safeZ, rough?P.rFxy:P.vFxy, rough?P.rFz:P.vFz);
   const out=_IL.head('INLAY '+name, P, lines);
   if (!F){ return out.concat(['; (aucune forme)','M30']).join('\n')+'\n'; }
-  out.push('G0 Z'+P.safeZ, 'M3 S'+(rough?P.rSpin:P.vSpin), 'G4 P2');
+  out.push('G0 Z'+P.safeZ, ...((typeof kerfSpinUp==='function')?kerfSpinUp(rough?P.rSpin:P.vSpin):['M3 S'+(rough?P.rSpin:P.vSpin),'G4 P2']));   // JQ : montée progressive
   let nb = rough ? _IL.rough(F,P,Wr) : _IL.finish(F,P,Wr,true);
   _IL.tail(Wr, P.safeZ);
   if (!rough && nb===0) Wr.out.unshift('; (rien à faire en V-bit)');
