@@ -164,6 +164,13 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-26 — JR : DÉCOUPE LASER — les entrées en arc des SVG sont revenues (cassé depuis IN, le 14/10)
+ [FIX] Un SVG (ex. xTool) dont un chemin revient à quelques millièmes de mm de son départ (0,004 mm) était pris
+   pour un trait OUVERT. Depuis IN, un trait ouvert ne compte plus pour savoir ce qui est chute ou pièce -> tout le
+   dessin à l'intérieur de ce grand contour était mal classé : perçages SUR le trait, pas d'arc (5 arcs sur 320 au
+   lieu de 120). Maintenant un chemin SVG qui se referme à 0,05 mm près = forme FERMÉE. « little wich » : 121 arcs,
+   toutes les formes assez larges (> 0,6 mm) ont leur arc. Rien d'autre ne change.
+
 -- 2026-10-26 — JQ : CNC 3018 — montée progressive de la broche avant l'usinage (nouvelle broche 775)
  [AJOUT] Avant chaque usinage (CNC normal + 4 fichiers d'incrustation) : la broche monte par paliers de 1 s
    (S250, 500, 750 puis S2500, 5000, 7500, puis la vitesse demandée). Marche que la carte soit réglée en $30=1000
@@ -2391,7 +2398,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-26-JQ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-26-JR ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -19998,6 +20005,7 @@ function buildLaserBody(){
       if(_isClosed && egap<=_tol){ if(egap>1e-6) s=s.concat([[a[0],a[1]]]); closed=true; }
       else if(_prim){ if(egap>1e-6) s=s.concat([[a[0],a[1]]]); closed=true; } // primitive (rect/tri/star…) -> TOUJOURS refermée (sinon carré coupé ouvert)
       else if(o.type==='free' && !o._arc && s.length>=4 && egap>1e-6 && egap<=_tol){ s=s.concat([[a[0],a[1]]]); closed=true; }   // tracé main levée presque fermé (≤ 0,3 mm) = forme fermée (amorce, sens…)
+      else if(o.type==='svg' && s.length>=4 && egap>1e-6 && egap<=0.05){ s=s.concat([[a[0],a[1]]]); closed=true; }   // JR : chemin SVG qui revient à 0,05 mm près de son départ (arrondis du logiciel de dessin) = forme FERMÉE (sinon ni amorce ni chute justes)
       else { closed=(s.length>2 && egap<1e-6); }
       const moves=[]; for(let i=1;i<s.length;i++) moves.push('G1 X'+_lc(s[i][0])+' Y'+_lc(s[i][1]));
       add(s.slice(), [s[0][0],s[0][1]], moves, closed, _prim);
