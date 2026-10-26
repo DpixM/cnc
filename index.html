@@ -2583,6 +2583,18 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
     #cipBody .cipGB{border:1px solid var(--brd2);border-radius:6px;padding:6px 8px;margin:6px 0;background:var(--bg)}
     #cipBody .cipGB .cipNum{margin:3px 0}#cipBody .cipGB .cipNum input{width:72px}
     #cipBody .cipW.cipMtMode [data-mtno],#cipBody .cipW:not(.cipMtMode) [data-mtonly]{display:none!important}
+    #cipBody .cipW.cipCutMode #cipGenBox,#cipBody .cipW:not(.cipCutMode) #cipCutBox{display:none!important}
+    #cipBody .cipW .cipSide>.cipBox{border-left:4px solid var(--bc,var(--brd2))}
+    #cipBody .cipW .cipSide>.cipBox>h3{font:700 13px var(--sans);color:var(--bc,var(--txt2));letter-spacing:.06em;padding-bottom:6px;border-bottom:1px solid var(--brd2);margin-bottom:9px}
+    #cipBody .cipW .cipSide>.cipBox>h3 i{background:var(--bc,var(--acc))}
+    #cipBody .cipSub{font:700 12px var(--sans);text-transform:uppercase;letter-spacing:.05em;color:var(--bc,var(--txt2));margin:12px 0 6px;padding:4px 8px;border-left:3px solid var(--bc,var(--brd2));background:rgba(255,255,255,.04);border-radius:0 6px 6px 0}
+    #cipBody .cipBox .cipGB{border-left:3px solid var(--bc,var(--brd2))}
+    #cipBody .cipWzS{border-left:3px solid var(--brd2)}
+    #cipBody .cipWzS.cur{border-left:3px solid var(--acc)}
+    #cipCutBody .cipSec{border:1px solid var(--brd2);border-left:4px solid var(--sc);border-radius:8px;padding:6px 10px 8px;margin:12px 0;background:rgba(255,255,255,.03)}
+    #cipCutBody .cipSecH{font:700 13px var(--sans);color:var(--sc);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 8px;display:flex;align-items:center;gap:7px;padding-bottom:5px;border-bottom:1px solid var(--brd2)}
+    #cipCutBody .cipSecH span{font-size:15px}
+    #cipCutBody .cipSec .cipGB{border-left:3px solid var(--sc)}
     #cipBody .cipGK{border-radius:4px;padding:1px 4px;margin-left:-4px;margin-right:-4px;transition:background .15s}
     #cipBody .cipGK>span:first-child::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c,#888);margin-right:7px;vertical-align:-1px}
     #cipBody .cipGK input{border-left:4px solid var(--c,#888)!important}
@@ -2643,6 +2655,39 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
       </div>
       <p><u style="cursor:pointer" onclick="cip_ui('mtbuild')">← Retour à la pièce 3D</u></p>
     </div>
+    <div id="cipTestPage" style="display:none">
+      <h2>🧪 Test : rondelles</h2>
+      <p>Carte d'<b>essai</b>, à part : elle ne change <b>rien</b> aux autres programmes. Tube <b>rond</b>, mandrin à 90°. Programme <b>simple, sans TRAORI ni CIP</b> : la tête reste à <b>B = 0</b> sur le dessus du tube, une coupe = <b>une ligne C1</b> (le mandrin fait un tour), puis on décale en <b>X</b>, on coupe, on décale… À la fin : Z monte, C1 revient à 0, X revient, Z redescend sur le départ.</p>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start" class="cipMtGrid">
+        <div class="cipBox" style="margin:0;--bc:#9aa5ae;border-left:4px solid #9aa5ae">
+          <h3 style="margin:0 0 6px">Le tube et les rondelles</h3>
+          <div class="cipNum"><span>Ø extérieur du tube (mm)</span><input type="number" id="cipTsD" value="20" step="0.01" min="1" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum"><span>Largeur d'une rondelle (mm)</span><input type="number" id="cipTsW" value="5" step="0.01" min="0.1" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="0 = une seule coupe (affranchir le bout du tube)."><span>Nombre de rondelles (0 = juste affranchir)</span><input type="number" id="cipTsN" value="3" step="1" min="0" max="200" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="Largeur du trait de coupe. Les coupes sont espacées de largeur + saignée, pour que chaque rondelle fasse la bonne largeur."><span>Largeur du faisceau / saignée (mm)</span><input type="number" id="cipTsK" value="0.2" step="0.01" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="La coupe continue un peu après le tour complet, pour être sûr que la rondelle tombe. 0 = s'arrête pile."><span>Dépassement fin de coupe (mm)</span><input type="number" id="cipTsO" value="0" step="0.1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="Avant chaque coupe la buse monte à cette hauteur au-dessus du tube, puis au TC_LASER_ON le capteur va chercher la pièce et se met à la distance de ton tableau LTT."><span>Buse au départ, au-dessus du tube (mm)</span><input type="number" id="cipTsZ" value="5" step="0.5" min="0" max="20" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="Dans quel sens le soft avance d'une coupe à la suivante, le long du tube. À vérifier À VIDE la première fois."><span>Coupes suivantes vers</span><select id="cipTsDir" style="width:150px" onchange="cip_ui('tst')"><option value="1">le mandrin (X+)</option><option value="-1">le bout du tube (X−)</option></select></div>
+          <div class="cipNote">Départ : pose la pointe <b>sur le dessus du tube</b>, pile sur le <b>1er trait de coupe</b> (celui du bout), tête à <b>B = 0</b>, mandrin à <b>C1 = 0</b> (pas besoin de TRAORI). Le programme déclare <b>SET_POS(0, 0, 0)</b> = « la pointe est ici » et part de là.</div>
+        </div>
+        <div class="cipBox" style="margin:0;border-left:4px solid #f5a623">
+          <h3 style="margin:0 0 6px">Le programme</h3>
+          <div class="cipNum"><span>Nom du programme</span><input id="cipTsName" value="TEST-RONDELLES" style="width:150px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum"><span>Tableau techno (LTT)</span><span data-techslot="C"></span></div>
+          <div class="cipSub" style="margin-top:6px">TC_LASER_ON( méthode , tableau , perçage , contour )</div>
+          <div class="cipNum" data-tip="1er chiffre de TC_LASER_ON."><span>Méthode</span><input type="number" id="cipTsM" value="1" step="1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="3e chiffre de TC_LASER_ON."><span>Perçage</span><input type="number" id="cipTsP" value="10" step="1" min="0" style="width:110px" oninput="cip_ui('tst')"></div>
+          <div class="cipNum" data-tip="4e chiffre de TC_LASER_ON."><span>Contour</span><select id="cipTsSz" style="width:150px" onchange="cip_ui('tst')"><option value="100">100 · grand</option><option value="200">200 · moyen</option><option value="300">300 · petit</option></select></div>
+          
+          <label class="cipChk"><input type="checkbox" id="cipTsDry" checked onchange="cip_ui('tst')"> <b>Test à vide</b> (laser jamais allumé)</label>
+          <div class="cipNote">TC_LASER_OFF(2) reste comme dans les programmes normaux (laser partagé).</div>
+          <div class="cipRow"><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('tstdl')">⬇ Télécharger le .LST</button><button class="cipBtn" onclick="cip_ui('tstsim')">▶ Voir dans la simu</button></div>
+          <div class="cipStat" id="cipTsMsg"></div>
+        </div>
+      </div>
+      <textarea id="cipTsTxt" readonly spellcheck="false" style="width:100%;height:320px;margin-top:12px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:6px;white-space:pre"></textarea>
+      <p><u style="cursor:pointer" onclick="cip_ui('tstback')">← Retour au choix de la pièce</u></p>
+    </div>
     <div id="cipPartPage" style="display:none">
       <h2>Ta pièce</h2>
       <p>Procédé : <b id="cipPartProc">—</b> · <u style="cursor:pointer" onclick="cip_ui('procscreen')">changer</u></p>
@@ -2663,6 +2708,14 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <svg viewBox="0 0 200 130" aria-hidden="true"><path d="M30 95 L95 40 L170 95" fill="none" stroke="#9aa5ae" stroke-width="26" stroke-linejoin="miter"/><path d="M95 26 L95 56" stroke="#4fc3f7" stroke-width="4"/><ellipse cx="95" cy="40" rx="8" ry="20" fill="none" stroke="#f5a623" stroke-width="3"/></svg>
           <b>↺ Soudure en onglet</b><span>Coude : 2 tubes coupés en biais, pièce centrée. Programme CIP lissé, B fixe.</span>
         </button>
+        <button class="cipCard" id="cipCardCut" onclick="cip_ui('partcut')" data-tip="N'importe quel tube (rond, carré, rectangle, oblong ou section DXF) : tu choisis la coupe des bouts (droite, biais, gueule de loup) et tu poses des trous, oblongs, piquages ou formes DXF. Tout est calculé exact sur le tube.">
+          <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="20" y="50" width="160" height="34" rx="17" fill="#9aa5ae"/><rect x="20" y="62" width="160" height="10" fill="#7d8890"/><rect x="70" y="58" width="26" height="12" rx="6" fill="#2a3036" stroke="#f5a623" stroke-width="3"/><circle cx="125" cy="64" r="7" fill="#2a3036" stroke="#f5a623" stroke-width="3"/><path d="M180 50q-14 17 0 34" stroke="#f5a623" stroke-width="4" fill="none"/><path d="M28 30l14 10M28 40l14-10" stroke="#f5a623" stroke-width="4"/></svg>
+          <b>✂ Tube à découper</b><span>Tout profil (rond, carré, oblong, DXF) : coupes droites, en biais, gueules de loup, trous, oblongs, piquages, formes DXF.</span>
+        </button>
+        <button class="cipCard" id="cipCardTest" onclick="cip_ui('tstopen')" style="border-style:dashed" data-tip="Carte d'ESSAI, à part : rien ne change dans les autres programmes.\nCoupe des rondelles dans un tube rond : tête à B = 0, seul le mandrin tourne.\nSert à tester les nouvelles commandes du manuel (TC_TRAFO_ON, TC_OST, taille de contour…).">
+          <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="20" y="52" width="160" height="30" rx="4" fill="#9aa5ae"/><rect x="20" y="61" width="160" height="10" fill="#7d8890"/><g stroke="#ff5252" stroke-width="3" stroke-dasharray="5 3"><line x1="70" y1="44" x2="70" y2="90"/><line x1="100" y1="44" x2="100" y2="90"/><line x1="130" y1="44" x2="130" y2="90"/></g><text x="100" y="118" text-anchor="middle" font-size="18" font-weight="700" fill="#f5a623">TEST</text></svg>
+          <b>🧪 Test : rondelles</b><span>Essai à part : couper des rondelles, tête à 0, seul le mandrin tourne. Pour tester les nouvelles commandes sans toucher au reste.</span>
+        </button>
         <button class="cipCard" id="cipCardDemo" onclick="cip_ui('partdemo')">
           <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="20" y="66" width="160" height="30" rx="4" fill="#9aa5ae"/><rect x="20" y="76" width="160" height="10" fill="#7d8890"/><rect x="88" y="22" width="24" height="46" fill="#b9c3cb"/><path d="M84 66q16-7 32 0" stroke="#4fc3f7" stroke-width="4" fill="none"/><path d="M150 18l20 12-20 12z" fill="#f5a623"/></svg>
           <b id="cipCardDemoT">▶ Voir un exemple</b><span id="cipCardDemoS">Une pièce toute prête, calculée en vrai, pour essayer.</span>
@@ -2682,15 +2735,15 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
       </div>
       <div class="cipSide">
         <div class="cipStepper" id="cipStepper"><button onclick="cip_ui('startscreen')">Mandrin</button><span>›</span><button onclick="cip_ui('procscreen')" id="cipStpProc">Procédé</button><span>›</span><button onclick="cip_ui('partscreen')" id="cipStpPart">Pièce</button><span>›</span><button onclick="cip_ui('gostep','sim')" id="cipStpPrep">Réglages</button><span>›</span><button onclick="cip_ui('gostep','mach')" id="cipStpMach">Mise en machine + simulation</button></div>
-        <div class="cipBox" data-st="build" id="cipMtBox" data-mtonly>
+        <div style="--bc:#f5a623" class="cipBox" data-st="build" id="cipMtBox" data-mtonly>
           <h3>↺ Soudure en onglet (coude)</h3>
           <div class="cipNote" style="margin-top:0">Tape les cotes : les 2 tubes se mettent à jour dans la 3D. Passe la souris sur une cote pour la voir en couleur sur la pièce. La pièce est tenue centrée dans un montage (jonction face au mandrin).</div>
-          <div style="font:600 12px var(--sans);color:var(--txt2);margin:8px 0 2px">LES 2 TUBES</div>
+          <div class="cipSub">LES 2 TUBES</div>
           <div class="cipNum cipGK" data-hk="M:d" data-tip="Diamètre extérieur des tubes (mm)."><span>Ø tube (mm)</span><input type="number" id="cipMtD" value="40" step="0.1" min="2" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:ep" data-only="decoupe" data-tip="Épaisseur des tubes (pour le dessin 3D)."><span>Épaisseur (mm)</span><input type="number" id="cipMtE" value="1.5" step="0.1" min="0.3" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:ang" data-tip="Angle entre les deux tubes. 90 = coude à angle droit. 180 = tubes alignés (jonction ronde)."><span>Angle entre les tubes (°)</span><input type="number" id="cipMtA" value="90" step="1" min="30" max="180" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:L" data-tip="Longueur de chaque tube depuis la jonction (sur son axe) : sert au dessin et au contrôle de collision de la tête."><span>Longueur des tubes (mm)</span><input type="number" id="cipMtL" value="80" step="1" min="10" oninput="cip_ui('mt')"></div>
-          <div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">LA SOUDURE</div>
+          <div class="cipSub">LA SOUDURE</div>
           <div class="cipNum cipGK" data-hk="M:pos" data-tip="Où la soudure démarre sur la jonction (là où tu poses la pointe pour le SET_G54).\n0° = petit axe (côté plat), 90° = grand axe (la pointe), 180° / 270° = en face.\nOu clique 📍 et choisis le point directement sur la pièce en 3D."><span>Départ (°)</span><span style="display:flex;gap:4px;align-items:center"><button class="cipBtn" style="padding:2px 7px" onclick="cip_ui('pickany')">📍</button><input type="number" id="cipMtS0" value="0" step="1" style="width:70px" oninput="cip_ui('mt')"></span></div>
           <div class="cipNum cipGK" data-hk="M:rot" data-tip="Inclinaison fixe de la tête pendant toute la soudure.\nVide = auto : le soft la place tout seul dans le plan de la jonction (bissectrice des 2 tubes = B 0°), le seul sens où la tête ne touche ni un tube ni l\'autre.\nTape une valeur seulement si tu veux forcer un autre angle."><span>B tête (°)</span><input type="number" id="cipMtB" value="" placeholder="auto" step="0.1" min="-134.9" max="134.9" oninput="cip_ui('mt')"></div>
           <div class="cipNum cipGK" data-hk="M:p0" data-tip="Rampe de départ (°) : la puissance monte."><span>Pente début (°)</span><input type="number" id="cipMtP0" value="2" step="1" min="0" oninput="cip_ui('mt')"></div>
@@ -2703,20 +2756,28 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipStat" id="cipMtMsg"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','mach')">Suivant : mise en machine + simulation →</button></div>
         </div>
-        <div class="cipBox" data-st="build" id="cipGenBox" data-mtno>
+        <div style="--bc:#f5a623" class="cipBox" data-st="build" id="cipCutBox" data-mtno>
+          <h3>✂ Tube à découper</h3>
+          <div class="cipNote" style="margin-top:0">Choisis le tube, la coupe des bouts et pose tes découpes : la pièce se met à jour toute seule dans la 3D (les tubes qui viennent dessus en rouge transparent). Tout est calculé exact sur la surface du tube.</div>
+          <div id="cipCutBody"></div>
+          <input type="file" id="cipCutFile" accept=".dxf,.DXF" style="display:none">
+          <div class="cipStat" id="cipCutMsg"></div>
+          <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : réglages →</button></div>
+        </div>
+        <div style="--bc:#f5a623" class="cipBox" data-st="build" id="cipGenBox" data-mtno>
           <h3>🛠 Créer ma pièce</h3>
           <div class="cipNote" style="margin-top:0">Tape les cotes : la pièce se met à jour toute seule dans la 3D. Les lignes de soudure sont calculées exactement (pas devinées).</div>
-          <div style="font:600 12px var(--sans);color:var(--txt2);margin:8px 0 2px">TUBE PRINCIPAL</div>
+          <div class="cipSub">TUBE PRINCIPAL</div>
           <div class="cipNum cipGK" data-hk="T:d"><span>Ø extérieur (mm)</span><input type="number" id="cipGTD" value="56" min="4" step="0.1" oninput="cip_ui('gen')"></div>
           <div class="cipNum cipGK" data-hk="T:ep" data-only="decoupe" data-tip="Épaisseur du tube. Mets l'épaisseur = le rayon (ou plus) pour une pièce PLEINE (rond plein, cylindre)."><span>Épaisseur (mm)</span><input type="number" id="cipGTE" value="3" min="0.3" step="0.1" oninput="cip_ui('gen')"></div>
           <div class="cipNum cipGK" data-hk="T:L"><span>Longueur de la pièce (mm)</span><input type="number" id="cipGTL" value="120" min="10" step="1" oninput="cip_ui('gen')"></div>
-          <div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">CE QU'ON SOUDE DESSUS</div>
+          <div class="cipSub">CE QU'ON SOUDE DESSUS</div>
           <div id="cipGBodies"></div>
           <div class="cipRow"><button class="cipBtn" onclick="cip_ui('genadd','rond')">+ Tube / rond</button><button class="cipBtn" onclick="cip_ui('genadd','plat')">+ Plat</button><button class="cipBtn" onclick="cip_ui('genadd','bride')">+ Bride</button><button class="cipBtn" onclick="cip_ui('genadd','deport')">+ Déporté</button></div>
           <div class="cipStat" id="cipGMsg"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : réglages →</button></div>
         </div>
-        <div class="cipBox" data-st="sim mach" id="cipSimBox">
+        <div style="--bc:#4fc3f7" class="cipBox" data-st="sim mach" id="cipSimBox">
           <h3><span class="cipInSim">✔ Contrôle des collisions</span><span class="cipInMach">▶ Simulation (avec tes vraies valeurs)</span></h3>
           <div class="cipNote cipInSim" style="margin-top:0">Ici tu règles : le trajet et les collisions se recalculent en direct. La <b>simulation</b> (lecture) est à l'étape <b>Mise en machine</b>, une fois le SET_G54 et le Z lu tapés : elle utilise tes vraies valeurs.</div>
           <div class="cipNote" id="cipVerBan" style="display:none;margin:0 0 8px;border:1px solid var(--acc);border-radius:6px;padding:7px 9px">✅ <b>Simulation finale</b> : tu vois le fichier <b id="cipVerFile"></b> rejoué tel quel sur ta pièce (exactement ce que la machine va faire).<div class="cipRow" style="margin-top:6px"><button class="cipBtn" onclick="cip_ui('verifyexit')">↩ Revenir au calcul</button></div></div>
@@ -2734,7 +2795,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <textarea id="cipSnapTxt" readonly style="display:none;width:100%;height:90px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px;margin-top:4px"></textarea>
           <div class="cipRow"><button class="cipBtn" id="cipCodeShow" style="display:none" onclick="cip_ui('codeshow')">Afficher le code en direct</button></div>
         </div>
-        <div class="cipBox" data-st="sim" data-mtno data-only="decoupe" data-nogen>
+        <div style="--bc:#9aa5ae" class="cipBox" data-st="sim" data-mtno data-only="decoupe" data-nogen>
           <h3><i class="cipN"></i>Tube</h3>
           <div class="cipSeg" id="cipProfSeg">
             <button class="cipBtn" id="cipPf_rond" onclick="cip_ui('prof','rond')">Rond</button>
@@ -2750,7 +2811,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNum" id="cipRowR"><span>Rayon des angles (mm)</span><input type="number" id="cipTR" value="3" min="0" step="0.1" onchange="cip_ui('tube')"></div>
           <div class="cipNum" data-nodet><span>Épaisseur (mm)</span><input type="number" id="cipTE" value="2" min="0.2" step="0.1" onchange="cip_ui('tube')"></div>
         </div>
-        <div class="cipBox" data-st="sim" data-mtno>
+        <div style="--bc:#a283ff" class="cipBox" data-st="sim" data-mtno>
           <h3><i class="cipN"></i>Pièce</h3>
           <span id="cipChTxt" style="display:none"></span>
           <div class="cipNum" data-tip="Ton mandrin réel (cotes mesurées) : il sert au contrôle des collisions et à la distance face d'appui → face des mors."><span>Mors du mandrin</span><select id="cipMandrin" onchange="cip_ui('mandrin')" style="width:170px"><option value="rose">Points roses (mors en escalier)</option><option value="bronze">Mors bronze</option></select></div>
@@ -2780,7 +2841,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipRow"><button class="cipBtn" onclick="cip_ui('flip')" data-tip="Retourne la pièce bout pour bout sur cet axe.">↕ Inverser le sens</button><button class="cipBtn" id="cipFitBtn" data-only="decoupe" onclick="cip_ui('fit')" disabled>Adapter le tube à la pièce</button></div>
           <div class="cipStat" id="cipPartStat">Aucune pièce. Importe ton STEP : le tube et l'axe sont détectés tout seuls.</div>
         </div>
-        <div class="cipBox" data-st="sim" data-mtno>
+        <div style="--bc:#3fc3e6" class="cipBox" data-st="sim" data-mtno>
           <h3><i class="cipN"></i>Passages</h3>
           <select id="cipProc" onchange="cip_ui('proc')" style="display:none"><option value="decoupe">Découpe</option><option value="soudure">Soudure</option></select>
           <div class="cipRow" style="justify-content:space-between"><span style="font-size:13px">Procédé : <b id="cipProcTxt">—</b></span><button class="cipBtn" onclick="cip_ui('procscreen')">Changer</button></div>
@@ -2802,7 +2863,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipSt" id="cipSteps"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','mach')">Suivant : mise en machine →</button></div>
         </div>
-        <div class="cipBox" data-st="mach" id="cipMachBox">
+        <div style="--bc:#5fcf8f" class="cipBox" data-st="mach" id="cipMachBox">
           <h3>🔧 Mise en machine</h3>
           <div class="cipNote" style="margin-top:0">Fais les étapes dans l'ordre : chaque étape débloque la suivante.</div>
           <div id="cipWz" data-mtno></div>
@@ -2818,18 +2879,32 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           </div>
           <label class="cipChk" style="margin-top:8px" data-mtno><input type="checkbox" id="cipAdvChk" onchange="cip_ui('advtoggle')"> Réglages avancés (SET_G54, bloc CIP…)</label>
         </div>
-        <div class="cipBox cipAdv" id="cipLstBox" data-st="mach" data-mtno>
+        <div style="--bc:#8b949e" class="cipBox cipAdv" id="cipLstBox" data-st="mach" data-mtno>
           <h3>Réglages avancés du .LST</h3>
           <div class="cipNote" style="margin-bottom:6px">Le nom, la techno, le mode/page et le test à vide se règlent à l'étape 4 (repris ici tout seuls). Le bloc CIP + l'en-tête et la fin de tes vrais programmes. Valeurs machine copiées de tes fichiers qui tournent, rien d'inventé. <b>Toujours tester à vide d'abord.</b></div>
           <div class="cipNum" data-wz4><span>Nom du programme</span><input id="cipLName" style="width:170px" placeholder="ex : TUBE-PIQUAGE" onchange="cip_ui('lstclr')"></div>
+          <div class="cipNum" id="cipLVarRow" data-tip="DÉCOUPE : variable qui contient le nom du tableau techno, en haut du programme : TM_LTTNAME=&quot;INOX4MM&quot;.\nSur la machine tu changes juste cette ligne pour prendre un autre tableau."><span>Variable du tableau techno</span><input id="cipLVar" value="TM_LTTNAME" style="width:170px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></div>
           <div id="cipLWeld">
+            <div class="cipNum" data-tip="1er chiffre de TC_WELD_ON(…) : n° du paramètre de ta table techno soudure. C'est toi qui choisis (par défaut 1), le soft le garde en mémoire."><span>N° de paramètre</span><input type="number" id="cipLWNo" value="1" min="0" step="1" style="width:170px" onchange="cip_ui('lstclr')"></div>
             <div class="cipNum" data-wz4 data-tip="Mode de TC_WELD_ON (manuel TruLaser) :\n00 = sans rampe, sans fil · 01 = sans rampe, avec fil\n10 = rampe au départ, sans fil · 11 = rampe + fil"><span>Mode (rampe / fil)</span><select id="cipLWMode" onchange="cip_ui('lstclr')" style="width:170px"><option value="10">10 · rampe, sans fil</option><option value="00">00 · sans rampe, sans fil</option><option value="11">11 · rampe + fil</option><option value="01">01 · sans rampe, avec fil</option></select></div>
             <div class="cipNum" data-wz4 data-tip="Page de la table de soudage (WELDING_TYPE) appelée par TC_WELD_ON."><span>Page de la table</span><select id="cipLWPage" onchange="cip_ui('lstclr')" style="width:170px"><option value="100">100 · Soudage 1</option><option value="200">200 · Soudage 2</option><option value="300">300 · Soudage 3</option><option value="400">400 · Soudage 4</option><option value="500">500 · Marquage 5</option><option value="600">600 · Pointage rapide 6</option><option value="700">700 · Pointage lent 7</option></select></div>
             <div class="cipNum" data-tip="Fin de soudure TC_WELD_OFF(3, …) : 10 = avec pente de fin, 00 = sans pente."><span>Fin de soudure</span><select id="cipLWOff" onchange="cip_ui('lstclr')" style="width:170px"><option value="10">10 · avec pente</option><option value="00">00 · sans pente</option></select></div>
-            <div class="cipNum" data-wz4><span>Techno soudure (WTT)</span><input id="cipLTW" list="cipLTWl" style="width:170px" placeholder="ex : TUBECOUDE-DORE" onchange="cip_ui('lstclr')"><datalist id="cipLTWl"><option value="TUBECOUDE-DORE"><option value="TUBECOUDE-DORE-GROS"><option value="MERCKD81-NORBERT"></datalist></div>
+            <div class="cipNum" data-wz4 data-tip="Nom de ton tableau techno soudure (WTT), écrit dans TC_WELD_ON(…).\n＋ pour ajouter un nom à la liste, ✕ pour l'enlever."><span>Tableau techno (WTT)</span><input id="cipLTW" type="hidden"><span data-techslot="W"></span></div>
           </div>
           <div id="cipLCut" style="display:none">
-            <div class="cipNum"><span>Techno découpe (LTT)</span><b id="cipLTC" style="font:13px var(--mono)">SS010MDN2S-0</b></div>
+            <div class="cipNum" data-tip="Nom de ton tableau techno découpe (LTT). Il est écrit UNE fois en haut du programme dans la variable, puis TC_LASER_ON utilise la variable.\n＋ pour ajouter un nom à la liste, ✕ pour l'enlever."><span>Tableau techno (LTT)</span><b id="cipLTC" style="display:none">SS010MDN2S-0</b><input id="cipLTCv" type="hidden"><span data-techslot="C"></span></div>
+            <div class="cipNum" data-tip="1er chiffre de TC_LASER_ON(…) : n° du paramètre de coupe dans ta table LTT. C'est toi qui choisis (par défaut 11), le soft le garde en mémoire."><span>N° de paramètre</span><input type="number" id="cipLCNo" value="11" min="0" step="1" style="width:170px" onchange="cip_ui('lstclr')"></div>
+            <div class="cipGB" id="cipSmBox" style="margin:6px 0">
+            <label class="cipChk" data-tip="Comme ton programme test qui coupe nickel : tête droite, SANS TRAORI ni CIP.\nTours (bout, séparation) = une ligne C1 · trous ronds = TC_CIRC2 · lignes (lamelles…) = G01 X / C1.\nfgroup + FGREF = rayon du tube : la vitesse est tenue sur le tube.\nBiseau du bout (tête inclinée) : TRAORI sert juste à placer la tête, la coupe = une ligne C1.\nLes coupes où la tête doit pencher en avançant (lamelle en biais…) passent en TRAORI, avec leurs propres chiffres.\nTube rond, mandrin à 90° seulement."><input type="checkbox" id="cipLSimple" checked onchange="cip_ui('lstclr')"> <b>Programme simple</b> (sans TRAORI ni CIP, comme mon test)</label>
+            <div class="cipNum" data-tip="Hauteur de la buse au-dessus du tube avant chaque coupe : au TC_LASER_ON le capteur va chercher la pièce (distance de ton tableau). Entre deux coupes elle monte de 5 mm de plus."><span>Buse au-dessus du tube (mm)</span><input type="number" id="cipSmZ" value="5" step="0.5" style="width:70px" onchange="cip_ui('lstclr')"></div>
+            <div class="cipSub">TC_LASER_ON( méthode, tableau, perçage, contour )</div>
+<div class="cipNum" data-tip="Les 3 chiffres de TC_LASER_ON pour les coupes qui font le tour (une ligne C1)."><span>Tours (bout, séparation)</span><span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><input type="number" id="cipSmRM" value="11" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmRP" value="0" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmRC" value="300" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></span></div>
+<div class="cipNum" data-tip="Les 3 chiffres de TC_LASER_ON pour les autres coupes (lignes G01 X / C1)."><span>Lignes et formes (lamelles…)</span><span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><input type="number" id="cipSmLM" value="11" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmLP" value="0" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmLC" value="300" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></span></div>
+            <div class="cipNum" data-tip="Les 3 chiffres de TC_LASER_ON pour les coupes où la tête doit pencher (lamelle en biais, gueule de loup…). Celles-là passent en TRAORI : la vitesse n'est pas comptée pareil, mets-y la ligne de ton tableau qui va avec."><span>Coupes tête inclinée (TRAORI)</span><span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><input type="number" id="cipSmTM" value="11" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmTP" value="0" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmTC" value="300" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></span></div>
+            <div class="cipSub">Trous ronds (TC_CIRC2) et oblongs (TC_RECT2)</div>
+<div class="cipNum" data-tip="Les 3 chiffres de TC_CIRC2 pour les trous ronds (méthode, perçage, contour)."><span>Trous ronds</span><span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><input type="number" id="cipSmHM" value="9" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmHP" value="11" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmHC" value="300" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></span></div>
+            <div class="cipNum"><span>Entrée des trous (mm)</span><input type="number" id="cipSmHA" value="0.5" step="0.1" style="width:70px" onchange="cip_ui('lstclr')"></div>
+            </div>
             <div class="cipRow"><button class="cipBtn" style="font-size:12px" onclick="document.getElementById('cipLRefFile').click()">Prendre la table d'un autre .LST découpe</button><input type="file" id="cipLRefFile" class="cipFile" accept=".lst,.LST" onchange="cip_ui('lstref')"></div>
             <div class="cipNum"><span>FGREF [c1] = rayon pièce (mm)</span><input type="number" id="cipLFg" step="0.1" onchange="cip_ui('lstclr')"></div>
           </div>
@@ -2858,20 +2933,20 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <textarea id="cipGenTxt" readonly spellcheck="false" style="display:none;width:100%;height:160px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px;margin-top:4px;white-space:pre"></textarea>
         </details>
         </div>
-        <div class="cipBox" data-st="mach" id="cipDlBox" style="display:none"></div>
-        <div class="cipBox" data-st="mach" id="cipPosBox">
+        <div style="--bc:#f5a623" class="cipBox" data-st="mach" id="cipDlBox" style="display:none"></div>
+        <div style="--bc:#3fc3e6" class="cipBox" data-st="mach" id="cipPosBox">
           <h3>Position</h3>
           <dl class="cipRd" id="cipReadout"></dl>
           <div class="cipAl" id="cipAlert"></div>
         </div>
-        <div class="cipBox">
+        <div style="--bc:#f0a24a" class="cipBox">
           <h3>💾 Projet</h3>
           <div class="cipRow"><button class="cipBtn" style="flex:1" onclick="cip_ui('projsave')" data-tip="Enregistre TOUT dans un fichier .cip.json : mandrin, procédé, ta pièce (STEP ou créée), le placement, les départs et tous les réglages. Tu le rouvres plus tard avec « Ouvrir ».">💾 Enregistrer</button><button class="cipBtn" style="flex:1" onclick="cip_ui('projopen')" data-tip="Rouvre un projet .cip.json enregistré : tout revient comme tu l'avais laissé.">📂 Ouvrir</button></div>
           <div class="cipRow"><button class="cipBtn" style="flex:1" onclick="cip_ui('projreset')" data-tip="Remet tous les réglages à leur valeur d'origine (ta pièce et ton mandrin restent ; le Z max et la mesure du mandrin aussi).">↺ Remettre les réglages d'origine</button></div>
           <div class="cipNote" style="margin-top:2px">Astuce : double-clic sur le nom d'un réglage = remet juste celui-là.</div>
           <div class="cipStat" id="cipProjMsg"></div>
         </div>
-        <div class="cipBox">
+        <div style="--bc:#9aa5ae" class="cipBox">
           <h3>Affichage</h3>
           <div class="cipNote" style="margin-top:0">Cinématique : tête en X/Y/Z + inclinaison gauche/droite seulement (vers le mandrin ou vers le bout du tube). Le mandrin tourne pour le reste.</div>
           <label class="cipChk"><input type="checkbox" id="cipVec" onchange="cip_ui('upd')"> Vecteurs faisceau</label>
@@ -6495,12 +6570,14 @@ function cip_build() {
   function placeAndShow(dragging) {
     if (!S.part) return;
     const P = S.part;
-    const rho = +$('cipPRot').value || 0;
+    // tube à découper NON rond : la pièce ne tourne pas toute seule dans le tube (le profil ne suivrait pas)
+    const rho = P.gen && P.gen.cut ? 0 : +$('cipPRot').value || 0;
     // SOUDURE : la pièce EST le tube tenu dans les mors -> son bout libre est au bout (distance 0),
     // et c'est l'Offset X (90°) / Z (à plat) = ce qui dépasse des mors qui dit si la tête tape. On ne le change jamais.
     // corps DÉPORTÉ sur la face du bout : cette face doit être le bout libre (sinon le tube qui dépasse cache la face)
     const W =
-      $('cipProc').value === 'soudure' || !!(P.gen && P.gen.def && P.gen.def.bodies.some(b => b.type === 'deport'));
+      $('cipProc').value === 'soudure' ||
+      !!(P.gen && P.gen.def && P.gen.def.bodies && P.gen.def.bodies.some(b => b.type === 'deport'));
     let off = W ? 0 : Math.max(0, +$('cipPOff').value || 0);
     const [ymin, ymax] = partSpan();
     const len = ymax - ymin;
@@ -6622,7 +6699,9 @@ function cip_build() {
         // + si on a seulement TOURNÉ (tube rond) ou GLISSÉ la pièce le long du tube : on déplace le résultat au lieu de tout recalculer
         const pl = g.pl || {},
           gc = S.geoC;
-        if (S.part.gen) {
+        if (S.part.gen && S.part.gen.cut) {
+          r = { C: [] }; // tube à découper : les contours sont déjà calculés exacts (cutBuild)
+        } else if (S.part.gen) {
           r = genSeams($('cipProc').value === 'soudure');
         } else if (gc && gc.M === g.M && gc.pr === S.profile) {
           r = structuredClone(gc.r);
@@ -6662,7 +6741,16 @@ function cip_build() {
           // (pas un détourage de tube : buildOps prendrait ce cercle pour le profil du tube)
           const depC = !isWeld && S.part.gen ? r.C.filter(c => c.NS) : [];
           const restC = depC.length ? r.C.filter(c => !c.NS) : r.C;
-          const bo = isWeld ? weldOps(r.C) : restC.length ? buildOps(restC) : { ops: [], notes: [] };
+          const bo =
+            S.part.gen && S.part.gen.cut
+              ? isWeld
+                ? { ops: [], notes: ['Tube à découper : passe le procédé en Découpe.'] }
+                : { ops: cutOpsPlaced(), notes: [] }
+              : isWeld
+                ? weldOps(r.C)
+                : restC.length
+                  ? buildOps(restC)
+                  : { ops: [], notes: [] };
           if (depC.length) {
             let kd = 0;
             instList().forEach(ins =>
@@ -6678,6 +6766,7 @@ function cip_build() {
           let C = bo.ops;
           S.tmW = performance.now() - _tw;
           if (!isWeld) C.forEach(o => applyStart(o));
+          if (!isWeld && S.part.gen && S.part.gen.cut) C.forEach(o => cutLead(o));
           S.tm = { geo: T1 - T0, ops: performance.now() - T1 };
           // ordre choisi par l'utilisateur (si mêmes opérations)
           if (S.order && S.order.length === C.length && S.order.every(nm => C.some(c => c.name === nm)))
@@ -6849,7 +6938,9 @@ function cip_build() {
             hc.slice(0, -1).forEach(f => push(f[0], f[1], c.TH[0], ci, -1)); // le dernier point = 1er point du passage (poussé juste après)
           } else if (rx) {
             c.rapX = true;
-            rx.forEach(f => push(f[0], f[1], f[2], ci, -1));
+            (V.len(V.sub(rx[rx.length - 1][0], c.P[0])) < 1e-6 ? rx.slice(0, -1) : rx).forEach(f =>
+              push(f[0], f[1], f[2], ci, -1)
+            );
           } else {
             c.rapX = false;
             rapid(F[F.length - 1], c, ci, push, Rs);
@@ -6948,6 +7039,9 @@ function cip_build() {
           const f = F[i0];
           const Pm = rotM(f.p, f.th),
             Dm = rotM(f.d, f.th);
+          // v60 : tête immobile en l'air, le mandrin tourne : en TRAORI ça s'écrit en quelques lignes (pas de 90° si
+          // ça passe sans toucher, sinon plus fin). Chaque ligne droite est contrôlée.
+          // v61 : tête IMMOBILE en l'air, seul le mandrin tourne (écrit dans le .LST : TRAFOOF, G01 C1 = départ, TRAORI)
           const n = Math.ceil((Math.abs(k) * 360) / 5);
           const add = [];
           let ok = true;
@@ -6959,7 +7053,7 @@ function cip_build() {
               ok = false;
               break;
             }
-            add.push({ p: pp, d: dd, th, ci: H.ci, j: -1, s: 0 });
+            add.push({ p: pp, d: dd, th, ci: H.ci, j: -1, s: 0, spin: true });
           }
           if (ok) {
             const ds = (2 * Math.PI * Math.hypot(Pm[0], Pm[2]) * Math.abs(k) * 0.3) / n;
@@ -7408,6 +7502,55 @@ function cip_build() {
     }
     return null;
   }
+  // v76 : programme LÉGER. Les étapes à angle de mandrin fixe sont des droites -> on garde seulement leur dernier point
+  // (la machine refait exactement la même droite). La rotation du mandrin (arc autour du tube) est découpée en cordes
+  // de 30° maxi, chaque corde contrôlée anti-collision ; si ça touche on resserre (15°, 10°, puis le pas d'origine).
+  function rxLight(fr) {
+    if (!fr || fr.length < 3) return fr;
+    const out = [];
+    const nl = (A, B, t) => V.nrm(A.map((v, i) => v + (B[i] - v) * t));
+    const lin = (A, B, t) => A.map((v, i) => v + (B[i] - v) * t);
+    const chordOk = (A, B) => {
+      for (let q = 1; q < 6; q++) {
+        const t = q / 6;
+        if (clearance(lin(A[0], B[0], t), nl(A[1], B[1], t), 'mid') < 1) return false;
+      }
+      return true;
+    };
+    let i = 0;
+    while (i < fr.length) {
+      let j = i;
+      while (j + 1 < fr.length && fr[j + 1][3] === fr[i][3]) j++;
+      if (fr[i][3] === 5 && j > i) {
+        const dth = Math.abs(fr[j][2] - (i > 0 ? fr[i - 1][2] : fr[i][2])) / (j - i + 1) || 1;
+        let done = false;
+        for (const deg of [45, 30, 15, 10]) {
+          const k = Math.max(1, Math.floor(deg / dth));
+          if (k <= 1) break;
+          const idx = [];
+          for (let m = i + k - 1; m < j; m += k) idx.push(m);
+          idx.push(j);
+          let prev = out.length ? out[out.length - 1] : fr[Math.max(0, i - 1)],
+            ok = true;
+          for (const m of idx) {
+            if (!chordOk(prev, fr[m])) {
+              ok = false;
+              break;
+            }
+            prev = fr[m];
+          }
+          if (ok) {
+            idx.forEach(m => out.push(fr[m]));
+            done = true;
+            break;
+          }
+        }
+        if (!done) for (let m = i; m <= j; m++) out.push(fr[m]);
+      } else out.push(fr[j]);
+      i = j + 1;
+    }
+    return out;
+  }
   // passage bas d'abord (limite réglable), sinon plus haut avec alerte
   function zLim() {
     const v = parseFloat(($('cipZMax') || {}).value);
@@ -7415,9 +7558,9 @@ function cip_build() {
   }
   function rapidXlim(a, c) {
     const zl = zLim();
-    let r = rapidX(a, c, zl);
+    let r = rxLight(rapidX(a, c, zl));
     if (r) return r;
-    r = zl < 90 ? rapidX(a, c, 90) : null; // (même recherche si la limite est déjà ≥ 90)
+    r = zl < 90 ? rxLight(rapidX(a, c, 90)) : null; // (même recherche si la limite est déjà ≥ 90)
     if (r) {
       let mh = 0;
       r.forEach(f => {
@@ -7444,39 +7587,56 @@ function cip_build() {
     const fromCyl = (r, ph, y) => [r * Math.sin(ph), y, r * Math.cos(ph)];
     const nl = (A, B, t) => V.nrm(A.map((v, i) => v + (B[i] - v) * t));
     const lin = (A, B, t) => A.map((v, i) => v + (B[i] - v) * t);
-    for (const R of Rl) {
-      const E1 = V.sub(a.p, V.mul(a.d, R)),
-        S1 = V.sub(P0, V.mul(D0, R));
-      const ce = cylOf(E1),
-        cs = cylOf(S1);
-      let dph = cs.ph - ce.ph;
-      while (dph > Math.PI) dph -= 2 * Math.PI;
-      while (dph < -Math.PI) dph += 2 * Math.PI;
-      const n = Math.max(1, Math.ceil(Math.abs(dph) / (12 * DEG)), Math.ceil(Math.abs(cs.y - ce.y) / 40));
-      const L = [[E1, a.d]];
-      for (let k = 1; k < n; k++) {
-        const t = k / n;
-        L.push([fromCyl(ce.r + (cs.r - ce.r) * t, ce.ph + dph * t, ce.y + (cs.y - ce.y) * t), nl(a.d, D0, t)]);
-      }
-      L.push([S1, D0], [P0.slice(), D0]);
-      // contrôle : chaque ligne droite (ce que fait la machine entre 2 points), finement, avec 1 mm de marge
-      let ok = true;
-      const pts = [[a.p, a.d]].concat(L);
-      for (let i = 0; ok && i + 1 < pts.length; i++) {
-        const last = i + 2 === pts.length;
-        for (let q = 1; q <= 8; q++) {
-          const t = q / 8;
-          if ((i === 0 && t < 0.25) || (last && t > 0.75)) continue; // tout près de la pièce : c'est le faisceau, pas la tête
-          const p = lin(pts[i][0], pts[i + 1][0], t),
-            d = nl(pts[i][1], pts[i + 1][1], t);
-          if (clearance(p, d, 'mid') < 1) {
-            ok = false;
-            break;
+    const rotY = (v, al) => [
+      v[0] * Math.cos(al) + v[2] * Math.sin(al),
+      v[1],
+      -v[0] * Math.sin(al) + v[2] * Math.cos(al)
+    ];
+    // v60 : le MOINS de lignes possible -> on essaie d'abord en 1 seule ligne (pas de 180°), puis 90°, 45°, 20°, 12°
+    // (chaque ligne droite est contrôlée anti-collision ; si ça touche, on prend un pas plus fin / un recul plus grand)
+    for (const stepDeg of [180, 90, 45, 20, 12])
+      for (const R of Rl) {
+        const E1 = V.sub(a.p, V.mul(a.d, R)),
+          S1 = V.sub(P0, V.mul(D0, R));
+        const ce = cylOf(E1),
+          cs = cylOf(S1);
+        let dph = cs.ph - ce.ph;
+        while (dph > Math.PI) dph -= 2 * Math.PI;
+        while (dph < -Math.PI) dph += 2 * Math.PI;
+        const n = Math.max(
+          1,
+          Math.ceil(Math.abs(dph) / (stepDeg * DEG - 1e-9)),
+          stepDeg >= 90 ? 1 : Math.ceil(Math.abs(cs.y - ce.y) / 40)
+        );
+        const L = [[E1, a.d]];
+        for (let k = 1; k < n; k++) {
+          const t = k / n;
+          // v76 : la tête tourne AVEC le mandrin (faisceau qui garde son angle par rapport au tube), sinon à mi-chemin
+          // le corps de tête traverse le tube (l'ancien mélange direct des 2 directions passait par le travers)
+          L.push([
+            fromCyl(ce.r + (cs.r - ce.r) * t, ce.ph + dph * t, ce.y + (cs.y - ce.y) * t),
+            nl(rotY(a.d, dph * t), rotY(D0, -dph * (1 - t)), t)
+          ]);
+        }
+        L.push([S1, D0], [P0.slice(), D0]);
+        // contrôle : chaque ligne droite (ce que fait la machine entre 2 points), finement, avec 1 mm de marge
+        let ok = true;
+        const pts = [[a.p, a.d]].concat(L);
+        for (let i = 0; ok && i + 1 < pts.length; i++) {
+          const last = i + 2 === pts.length;
+          for (let q = 1; q <= 8; q++) {
+            const t = q / 8;
+            if ((i === 0 && t < 0.25) || (last && t > 0.75)) continue; // tout près de la pièce : c'est le faisceau, pas la tête
+            const p = lin(pts[i][0], pts[i + 1][0], t),
+              d = nl(pts[i][1], pts[i + 1][1], t);
+            if (clearance(p, d, 'mid') < 1) {
+              ok = false;
+              break;
+            }
           }
         }
+        if (ok) return L;
       }
-      if (ok) return L;
-    }
     return null;
   }
   function rapid(a, c, ci, push, Rs) {
@@ -7519,15 +7679,16 @@ function cip_build() {
         push(f[0], f[1], f[2], ci, -1);
       }
     };
-    seg(8, t => [sub(p0, d0, L1 * t), d0, a.th]);
-    seg(10, t => [lerp(r0, S0, t), V.nrm(lerp(d0, radIn(ph0), t)), a.th]);
-    const n3 = Math.max(6, Math.ceil(Math.abs(ph1 - ph0) / 6 + Math.abs(r1[1] - r0[1]) / 6));
+    // v76 : programme LÉGER -> 1 ligne par étape (la machine fait la droite toute seule), le tour du tube par pas de 45° maxi.
+    // Le dernier point (descente sur le contour) est le 1er point du contour, poussé juste après.
+    seg(1, t => [sub(p0, d0, L1 * t), d0, a.th]);
+    seg(1, t => [lerp(r0, S0, t), V.nrm(lerp(d0, radIn(ph0), t)), a.th]);
+    const n3 = Math.max(1, Math.ceil(Math.abs(ph1 - ph0) / 45));
     seg(n3, t => {
       const ph = ph0 + (ph1 - ph0) * t;
       return [cyl(ph, r0[1] + (r1[1] - r0[1]) * t), radIn(ph), 90 - ph + offS + (offE - offS) * t];
     });
-    seg(10, t => [lerp(S1, r1, t), V.nrm(lerp(radIn(ph1), d1, t)), c.TH[0]]);
-    seg(7, t => [lerp(r1, p1, t), d1, c.TH[0]]);
+    seg(1, t => [lerp(S1, r1, t), V.nrm(lerp(radIn(ph1), d1, t)), c.TH[0]]);
   }
   function frameAt(s) {
     if (!F.length) return null;
@@ -7661,6 +7822,7 @@ function cip_build() {
     w.classList.toggle('cipProcW', W);
     w.classList.toggle('cipProcC', !W);
     w.classList.toggle('cipHasGen', !!(S.part && S.part.gen));
+    w.classList.toggle('cipCutMode', S.genKind === 'cut');
     w.classList.toggle('cipHasDet', !!(S.part && S.part.det));
   }
   function syncProc() {
@@ -8596,6 +8758,1155 @@ function cip_build() {
     S.genT = setTimeout(() => genApply(false), 250);
   }
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  // §11b. TUBE À DÉCOUPER (v58)
+  //     n'importe quel profil (rond, carré, rectangle, oblong, section DXF) + des découpes posées dessus :
+  //     bout libre / séparation (droite, biais, gueule de loup), trous ronds / oblongs / rectangles,
+  //     trou de piquage (tube qui rentre), forme DXF. Tout est calculé EXACT sur la surface du tube.
+  //     Repère pièce comme « Créer ma pièce » : axe du tube = y (0 = côté mandrin / séparation, L = bout libre),
+  //     tête côté +z. Angle « tour » : 0° = dessus, 90° = côté +x.
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  const CUT_C1SIGN = -1;
+  const CUT_END = () => ({ type: 'droit', ang: 30, rot: 0, d2: 30, beta: 90, exc: 0 });
+  const CUT_DEF = () => ({
+    prof: 'oblong',
+    d: 40,
+    w: 29.38,
+    h: 12.88,
+    r: 2,
+    ep: 1.5,
+    L: 100,
+    c1: 0,
+    kerf: '',
+    lead: { type: 'none', r: 2, over: 0, ends: true },
+    dir: { ring: 'auto', hole: 'auto' },
+    dxf: null,
+    end: CUT_END(),
+    sep: CUT_END(),
+    feats: []
+  });
+  // contour extérieur DENSE (arcs fins) dans le plan (x, z), sens trigo
+  function cutOuter(D) {
+    const rr = (w, h, r) => {
+      r = Math.max(0.01, Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4));
+      const n = Math.max(12, Math.ceil((r * Math.PI) / 2 / 0.2));
+      const cs = [
+        [w / 2 - r, h / 2 - r, 0],
+        [-w / 2 + r, h / 2 - r, 90],
+        [-w / 2 + r, -h / 2 + r, 180],
+        [w / 2 - r, -h / 2 + r, 270]
+      ];
+      const pts = [];
+      for (const [cx, cy, a0] of cs)
+        for (let k = 0; k <= n; k++) {
+          const a = (a0 + (90 * k) / n) * DEG;
+          pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+        }
+      return pts;
+    };
+    let out;
+    if (D.prof === 'rond') {
+      const R = Math.max(1, +D.d / 2 || 20),
+        n = Math.max(180, Math.ceil((2 * Math.PI * R) / 0.3));
+      out = [];
+      for (let k = 0; k < n; k++) out.push([R * Math.cos((2 * Math.PI * k) / n), R * Math.sin((2 * Math.PI * k) / n)]);
+    } else if (D.prof === 'carre') out = rr(+D.w, +D.w, +D.r);
+    else if (D.prof === 'rect') out = rr(+D.w, +D.h, +D.r);
+    else if (D.prof === 'oblong') {
+      const a = Math.max(+D.w, +D.h),
+        b = Math.min(+D.w, +D.h);
+      out = rr(a, b, b / 2);
+    } else {
+      if (!D.dxf || !D.dxf.out || D.dxf.out.length < 3) return null;
+      out = pDensify(pCCW(D.dxf.out), 0.3);
+    }
+    // points en double (arcs qui se touchent) -> dehors
+    const o2 = [];
+    out.forEach(p => {
+      const q = o2[o2.length - 1];
+      if (!q || Math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-5) o2.push(p);
+    });
+    if (Math.hypot(o2[0][0] - o2[o2.length - 1][0], o2[0][1] - o2[o2.length - 1][1]) < 1e-5) o2.pop();
+    return pCCW(o2);
+  }
+  // le profil pour le reste du soft (collisions, tube dans les mors…)
+  function cutProfile(D, out) {
+    const ep = Math.max(0.2, +D.ep || 1);
+    if (D.prof === 'rond') return { cfg: { prof: 'rond', d: +D.d, ep } };
+    if (D.prof === 'carre') return { cfg: { prof: 'carre', w: +D.w, r: +D.r, ep } };
+    if (D.prof === 'rect') return { cfg: { prof: 'rect', w: +D.w, h: +D.h, r: +D.r, ep } };
+    if (D.prof === 'oblong') {
+      const a = Math.max(+D.w, +D.h),
+        b = Math.min(+D.w, +D.h);
+      return { cfg: { prof: 'rect', w: a, h: b, r: b / 2 - 1e-3, ep } };
+    }
+    const inn = pInset(out, ep);
+    if (!inn) return { err: 'Épaisseur trop grande pour cette section.' };
+    let rmax = 0,
+      x0 = 1e9,
+      x1 = -1e9,
+      z0 = 1e9,
+      z1 = -1e9;
+    out.forEach(q => {
+      rmax = Math.max(rmax, Math.hypot(q[0], q[1]));
+      x0 = Math.min(x0, q[0]);
+      x1 = Math.max(x1, q[0]);
+      z0 = Math.min(z0, q[1]);
+      z1 = Math.max(z1, q[1]);
+    });
+    return {
+      cfg: { prof: 'perso', ep },
+      cust: { type: 'perso', out, inn, rmax, ep, R: null, name: (D.dxf && D.dxf.name) || 'DXF', w: x1 - x0, h: z1 - z0 }
+    };
+  }
+  // surface du tube paramétrée par s (longueur le long du contour) : point + normale extérieure
+  function cutSurf(out) {
+    const n = out.length,
+      S0 = [0],
+      en = [];
+    for (let i = 0; i < n; i++) {
+      const a = out[i],
+        b = out[(i + 1) % n];
+      const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      S0.push(S0[i] + l);
+      en.push([(b[1] - a[1]) / (l || 1), -(b[0] - a[0]) / (l || 1)]);
+    }
+    const vn = out.map((_, i) => {
+      const a = en[(i - 1 + n) % n],
+        b = en[i];
+      const x = a[0] + b[0],
+        z = a[1] + b[1],
+        l = Math.hypot(x, z) || 1;
+      return [x / l, z / l];
+    });
+    const per = S0[n];
+    const at = s => {
+      s = ((s % per) + per) % per;
+      let lo = 0,
+        hi = n;
+      while (hi - lo > 1) {
+        const m = (lo + hi) >> 1;
+        if (S0[m] <= s) lo = m;
+        else hi = m;
+      }
+      const i = lo,
+        j = (i + 1) % n,
+        t = (s - S0[i]) / (S0[i + 1] - S0[i] || 1);
+      const nx = vn[i][0] * (1 - t) + vn[j][0] * t,
+        nz = vn[i][1] * (1 - t) + vn[j][1] * t,
+        l = Math.hypot(nx, nz) || 1;
+      return {
+        x: out[i][0] + (out[j][0] - out[i][0]) * t,
+        z: out[i][1] + (out[j][1] - out[i][1]) * t,
+        nx: nx / l,
+        nz: nz / l,
+        s
+      };
+    };
+    // s du point du contour le plus proche de (x, z)
+    const sOf = (x, z) => {
+      let bd = 1e18,
+        bs = 0;
+      for (let i = 0; i < n; i++) {
+        const a = out[i],
+          b = out[(i + 1) % n];
+        const dx = b[0] - a[0],
+          dz = b[1] - a[1];
+        let t = ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz || 1);
+        t = Math.max(0, Math.min(1, t));
+        const d = (a[0] + t * dx - x) ** 2 + (a[1] + t * dz - z) ** 2;
+        if (d < bd) {
+          bd = d;
+          bs = S0[i] + t * (S0[i + 1] - S0[i]);
+        }
+      }
+      return bs;
+    };
+    // toutes les rencontres d'une droite (ox,oz)+t(dx,dz) avec le contour : [{t, s}]
+    const hits = (ox, oz, dx, dz) => {
+      const r = [];
+      for (let i = 0; i < n; i++) {
+        const a = out[i],
+          b = out[(i + 1) % n];
+        const ex = b[0] - a[0],
+          ez = b[1] - a[1];
+        const den = dx * ez - dz * ex;
+        if (Math.abs(den) < 1e-12) continue;
+        const wx = a[0] - ox,
+          wz = a[1] - oz;
+        const t = (wx * ez - wz * ex) / den,
+          u = (wx * dz - wz * dx) / den;
+        if (u >= -1e-9 && u < 1 - 1e-9) r.push({ t, s: S0[i] + u * (S0[i + 1] - S0[i]) });
+      }
+      return r.sort((p, q) => p.t - q.t);
+    };
+    return { out, n, S0, per, at, sOf, hits };
+  }
+  // point du contour dans la direction « tour » rot (0 = dessus +z, 90 = côté +x)
+  function cutAtRot(sf, rot) {
+    const dx = Math.sin(rot * DEG),
+      dz = Math.cos(rot * DEG);
+    const h = sf.hits(0, 0, dx, dz).filter(q => q.t > 0);
+    return h.length ? sf.at(h[h.length - 1].s) : null;
+  }
+  // ---- bouts : y(s) sur chaque colonne du contour + faisceau
+  function cutEnd(E, sf, cols, L, free) {
+    const M = cols.length;
+    let y = new Array(M),
+      D = new Array(M),
+      body = null;
+    const t = E.type || 'droit';
+    const lab = free ? 'bout libre' : 'séparation';
+    if (t === 'droit' || t === 'brut') {
+      for (let k = 0; k < M; k++) {
+        y[k] = free ? L : 0;
+        D[k] = [-cols[k].nx, 0, -cols[k].nz];
+      }
+      return { y, D, kind: t };
+    }
+    if (t === 'biais') {
+      const a = Math.max(-75, Math.min(75, +E.ang || 0)) * DEG,
+        ux = Math.sin((+E.rot || 0) * DEG),
+        uz = Math.cos((+E.rot || 0) * DEG);
+      const m = [Math.sin(a) * ux, Math.cos(a), Math.sin(a) * uz];
+      for (let k = 0; k < M; k++) {
+        const c = cols[k];
+        y[k] = -Math.tan(a) * (c.x * ux + c.z * uz);
+        let d = [-c.nx, 0, -c.nz];
+        d = V.nrm(V.sub(d, V.mul(m, V.dot(d, m))));
+        D[k] = d;
+      }
+    } else if (t === 'gueule') {
+      const R2 = Math.max(0.5, +E.d2 / 2 || 10),
+        be = Math.max(20, Math.min(90, +E.beta || 90)) * DEG,
+        ro = (+E.rot || 0) * DEG,
+        exc = +E.exc || 0;
+      const ap = [Math.cos(ro), 0, -Math.sin(ro)],
+        w = [Math.sin(ro), 0, Math.cos(ro)];
+      const a2 = V.nrm(V.add(V.mul([0, 1, 0], Math.cos(be)), V.mul(ap, Math.sin(be))));
+      const C = V.mul(w, exc);
+      const A = V.sub([0, 1, 0], V.mul(a2, a2[1]));
+      const aa = V.dot(A, A);
+      for (let k = 0; k < M; k++) {
+        const c = cols[k];
+        const w0 = V.sub([c.x, 0, c.z], C);
+        const B = V.sub(w0, V.mul(a2, V.dot(w0, a2)));
+        const bb = 2 * V.dot(A, B),
+          cc = V.dot(B, B) - R2 * R2;
+        const disc = bb * bb - 4 * aa * cc;
+        if (disc < 0)
+          return {
+            err: `Gueule de loup (${lab}) : le tube qui rentre (Ø${(2 * R2).toFixed(1)}) est trop petit, il ne couvre pas toute la largeur du tube. Prends un Ø plus grand, ou fais plutôt un « trou de piquage ».`
+          };
+        const r1 = (-bb - Math.sqrt(disc)) / (2 * aa),
+          r2 = (-bb + Math.sqrt(disc)) / (2 * aa);
+        y[k] = free ? r1 : r2;
+        D[k] = [-c.nx, 0, -c.nz];
+      }
+      body = { C, a2, R2 };
+    } else return { err: 'Type de bout inconnu.' };
+    // cote = longueur HORS TOUT : le point le plus long tombe sur L (bout libre) / sur 0 (séparation)
+    const sh = free ? L - Math.max(...y) : -Math.min(...y);
+    y = y.map(v => v + sh);
+    if (body) body.C = V.add(body.C, [0, sh, 0]);
+    return { y, D, kind: t, body };
+  }
+  // ---- formes 2D (u = autour du tube, v = le long du tube), centrées
+  function cutShape(F, hk) {
+    // hk = demi-largeur du faisceau : le trou est la CHUTE -> la trajectoire passe hk à l'intérieur
+    hk = Math.max(0, +hk || 0);
+    const out = [];
+    const arcs = (w, h, r) => {
+      r = Math.max(0, Math.min(r, w / 2, h / 2));
+      if (r < 1e-3)
+        return [
+          [w / 2, h / 2],
+          [-w / 2, h / 2],
+          [-w / 2, -h / 2],
+          [w / 2, -h / 2]
+        ];
+      const n = Math.max(8, Math.ceil((r * Math.PI) / 2 / 0.25)),
+        p = [];
+      [
+        [w / 2 - r, h / 2 - r, 0],
+        [-w / 2 + r, h / 2 - r, 90],
+        [-w / 2 + r, -h / 2 + r, 180],
+        [w / 2 - r, -h / 2 + r, 270]
+      ].forEach(([cx, cy, a0]) => {
+        for (let k = 0; k <= n; k++) {
+          const a = (a0 + (90 * k) / n) * DEG;
+          p.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+        }
+      });
+      return p;
+    };
+    if (F.type === 'rond') {
+      const R = Math.max(0.05, (+F.d / 2 || 5) - hk),
+        n = Math.max(48, Math.ceil((2 * Math.PI * R) / 0.25));
+      for (let k = 0; k < n; k++) out.push([R * Math.cos((2 * Math.PI * k) / n), R * Math.sin((2 * Math.PI * k) / n)]);
+    } else if (F.type === 'oblong') {
+      const l = Math.max(+F.l || 10, +F.w || 4) - 2 * hk,
+        w = Math.max(0.1, (+F.w || 4) - 2 * hk);
+      arcs(w, Math.max(w, l), w / 2).forEach(p => out.push(p));
+    } else if (F.type === 'rect')
+      arcs(
+        Math.max(0.1, (+F.w || 5) - 2 * hk),
+        Math.max(0.1, (+F.l || 10) - 2 * hk),
+        Math.max(0, (+F.r || 0) - hk)
+      ).forEach(p => out.push(p));
+    else if (F.type === 'dxf') {
+      if (!F.pts || F.pts.length < 3) return null;
+      const sc = (+F.sc || 100) / 100;
+      let P = F.pts.map(p => [p[0] * sc, p[1] * sc]);
+      if (hk > 0) {
+        const In = pInset(pCCW(P), hk);
+        if (!In) return null;
+        P = In;
+      }
+      P.forEach(p => out.push(p));
+    }
+    const a = (+F.ang || 0) * DEG;
+    // dédoublonne
+    const r = [];
+    out.forEach(p => {
+      const q = [p[0] * Math.cos(a) - p[1] * Math.sin(a), p[0] * Math.sin(a) + p[1] * Math.cos(a)];
+      const z = r[r.length - 1];
+      if (!z || Math.hypot(q[0] - z[0], q[1] - z[1]) > 1e-5) r.push(q);
+    });
+    return r;
+  }
+  // ---- tout le calcul : contours (ops) + maillage 3D
+  function cutBuild(D) {
+    const out = cutOuter(D);
+    if (!out) return { err: 'Importe la section du tube (DXF) ou choisis une forme.' };
+    const pp = cutProfile(D, out);
+    if (pp.err) return { err: pp.err };
+    const L = +D.L;
+    if (!(L > 1)) return { err: 'Longueur impossible.' };
+    const ep = Math.max(0.2, +D.ep || 1);
+    const sf = cutSurf(out);
+    const M = Math.max(120, Math.ceil(sf.per / 0.4));
+    // colonnes : on part du DESSUS (tour 0°) -> le départ des coupes de bout est sous la tête à C1 = 0
+    const top = cutAtRot(sf, 0);
+    const s0 = top ? top.s : 0;
+    const cols = [];
+    for (let k = 0; k < M; k++) cols.push(sf.at(s0 + (k * sf.per) / M));
+    const eTop =
+      D.end.type === 'brut' ? { y: cols.map(() => L), D: null, kind: 'brut' } : cutEnd(D.end, sf, cols, L, true);
+    if (eTop.err) return { err: eTop.err };
+    const eBot = cutEnd(D.sep, sf, cols, L, false);
+    if (eBot.err) return { err: eBot.err };
+    for (let k = 0; k < M; k++)
+      if (eTop.y[k] - eBot.y[k] < 0.5)
+        return { err: 'Les deux bouts se croisent : la pièce est trop courte pour ces coupes. Rallonge-la.' };
+    // v68 : LARGEUR DU FAISCEAU (vide = pas de correction). La trajectoire passe à mi-largeur du côté CHUTE :
+    // bout libre décalé vers le vide, séparation vers le mandrin, trous rétrécis -> les cotes de la pièce sont justes.
+    const hk = Math.max(0, +D.kerf || 0) / 2;
+    const shiftEnd = (e, sg) => {
+      if (!hk || !e.D) return e;
+      const ds = sf.per / M;
+      const y = e.y.map((v, k) => {
+        const sl = (e.y[(k + 1) % M] - e.y[(k - 1 + M) % M]) / (2 * ds);
+        return v + sg * hk * Math.sqrt(1 + sl * sl);
+      });
+      return Object.assign({}, e, { y });
+    };
+    const eTopK = shiftEnd(eTop, 1),
+      eBotK = shiftEnd(eBot, -1);
+    const ops = [],
+      holes = [],
+      bodies = [];
+    const ring = (e, nm, step) => {
+      const P = [],
+        Dd = [];
+      for (let k = 0; k <= M; k++) {
+        const c = cols[k % M];
+        P.push([c.x, e.y[k % M], c.z]);
+        Dd.push(e.D[k % M].slice());
+      }
+      ops.push({
+        name: nm,
+        step,
+        P,
+        D: Dd,
+        waste: step === 1 ? 1 : -1,
+        ringSens: (step === 1 ? D.end && D.end.sens : D.sep && D.sep.sens) || 'auto'
+      }); // chute : côté vide (+y) / côté mandrin (-y)
+    };
+    const enm = { droit: '(droite)', biais: '(en biais)', gueule: '(gueule de loup)' };
+    if (eTop.kind !== 'brut') ring(eTopK, 'Bout libre ' + enm[eTop.kind], 1);
+    if (eTop.body) bodies.push(eTop.body);
+    if (eBot.body) bodies.push(eBot.body);
+    // découpes posées sur le tube
+    let kh = 0;
+    const NAMES = { rond: 'Trou Ø', oblong: 'Oblong', rect: 'Rectangle', piq: 'Piquage', dxf: 'Forme' };
+    for (let fi = 0; fi < D.feats.length; fi++) {
+      const F = D.feats[fi];
+      const nmF = `${fi + 1}. ${NAMES[F.type] || 'Découpe'}${F.type === 'rond' ? F.d : ''}`;
+      const pos = +F.pos || 0;
+      if (F.type === 'piq') {
+        const R2 = Math.max(0.1, (+F.d2 / 2 || 5) - hk),
+          be = Math.max(15, Math.min(90, +F.beta || 90)) * DEG,
+          ro = (+F.rot || 0) * DEG,
+          exc = +F.exc || 0;
+        const nr = [Math.sin(ro), 0, Math.cos(ro)],
+          w = [Math.cos(ro), 0, -Math.sin(ro)];
+        const a2 = V.nrm(V.add(V.mul([0, 1, 0], Math.cos(be)), V.mul(nr, Math.sin(be))));
+        const e2 = V.nrm(V.cross(a2, w));
+        const C = V.add([0, pos, 0], V.mul(w, exc));
+        const n = Math.max(72, Math.ceil((2 * Math.PI * R2) / 0.3));
+        const Po = [],
+          Pi = [];
+        for (let k = 0; k <= n; k++) {
+          const ps = (2 * Math.PI * (k % n)) / n;
+          const L0 = V.add(C, V.add(V.mul(w, R2 * Math.cos(ps)), V.mul(e2, R2 * Math.sin(ps))));
+          const h = sf.hits(L0[0], L0[2], a2[0], a2[2]);
+          if (h.length < 2)
+            return { err: `${nmF} : le tube qui rentre déborde du tube (Ø trop grand ou décalage trop grand).` };
+          const hi = h[h.length - 1],
+            lo = h[0];
+          Po.push(V.add(L0, V.mul(a2, hi.t)));
+          Pi.push(V.add(L0, V.mul(a2, lo.t)));
+        }
+        ops.push({ name: nmF, step: 2, P: Po, D: Po.map(() => V.mul(a2, -1)), waste: 0, sens: F.sens || '' });
+        holes.push(Po);
+        if (F.trav) {
+          ops.push({
+            name: nmF + ' (côté opposé)',
+            step: 2,
+            P: Pi,
+            D: Pi.map(() => a2.slice()),
+            waste: 0,
+            sens: F.sens || ''
+          });
+          holes.push(Pi);
+        }
+        bodies.push({ C, a2, R2, tube: true });
+        continue;
+      }
+      const sh = cutShape(F, hk);
+      if (!sh || sh.length < 3) return { err: `${nmF} : forme vide (importe un DXF fermé).` };
+      const c = cutAtRot(sf, +F.rot || 0);
+      if (!c) return { err: `${nmF} : position autour du tube impossible.` };
+      const t = [c.nz, -c.nx]; // autour du tube (dans le plan x,z)
+      const H = 3 * (sf.per / 2 + 10);
+      const P = [];
+      for (const [u, v] of sh) {
+        const ox = c.x + u * t[0] + H * c.nx,
+          oz = c.z + u * t[1] + H * c.nz;
+        const h = sf.hits(ox, oz, -c.nx, -c.nz).filter(q => q.t > 0);
+        if (!h.length) return { err: `${nmF} : la forme est plus large que la face du tube.` };
+        const q = sf.at(h[0].s);
+        if (q.nx * c.nx + q.nz * c.nz < Math.cos(70 * DEG))
+          return { err: `${nmF} : la forme déborde sur un arrondi / une autre face (le faisceau serait trop rasant).` };
+        P.push([q.x, pos + v, q.z]);
+      }
+      P.push(P[0].slice());
+      const yy = P.map(p => p[1]);
+      for (let k = 0; k < P.length; k++) {
+        const s = sf.sOf(P[k][0], P[k][2]),
+          kk = Math.round((s / sf.per) * M) % M;
+        if (P[k][1] > eTop.y[kk] - 0.3 || P[k][1] < eBot.y[kk] + 0.3)
+          return {
+            err: `${nmF} : sort de la pièce (trop près d'un bout). Change sa position (${Math.min(...yy).toFixed(1)} → ${Math.max(...yy).toFixed(1)} mm).`
+          };
+      }
+      ops.push({ name: nmF, step: 2, P, D: P.map(() => [-c.nx, 0, -c.nz]), waste: 0, sens: F.sens || '' }); // chute = dedans
+      holes.push(P);
+      kh++;
+    }
+    ring(eBotK, 'Séparation ' + enm[eBot.kind], 4);
+    // ---- maillage : peau extérieure + intérieure + bords, trous retirés (dans le plan déroulé s, y)
+    const HP = holes.map(P => {
+      const ss = P.map(p => sf.sOf(p[0], p[2]));
+      const sc = ss[0];
+      const wrap = d => d - sf.per * Math.round(d / sf.per);
+      const poly = P.map((p, i) => [wrap(ss[i] - sc), p[1]]);
+      let u0 = 1e9,
+        u1 = -1e9,
+        y0 = 1e9,
+        y1 = -1e9;
+      poly.forEach(q => {
+        u0 = Math.min(u0, q[0]);
+        u1 = Math.max(u1, q[0]);
+        y0 = Math.min(y0, q[1]);
+        y1 = Math.max(y1, q[1]);
+      });
+      return { sc, poly, u0, u1, y0, y1, wrap };
+    });
+    const inHole = (s, y) =>
+      HP.some(h => {
+        const u = h.wrap(s - h.sc);
+        return u >= h.u0 && u <= h.u1 && y >= h.y0 && y <= h.y1 && G.inPoly(h.poly, u, y);
+      });
+    const pos = [],
+      idx = [];
+    let nv = 0;
+    const vtx = p => {
+      pos.push(p[0], p[1], p[2]);
+      return nv++;
+    };
+    let maxH = 0;
+    for (let k = 0; k < M; k++) maxH = Math.max(maxH, eTop.y[k] - eBot.y[k]);
+    const N = Math.max(2, Math.ceil(maxH / 0.6));
+    const ofs = (c, k, j, inner) => {
+      const y = eBot.y[k] + ((eTop.y[k] - eBot.y[k]) * j) / N;
+      return inner ? [c.x - ep * c.nx, y, c.z - ep * c.nz] : [c.x, y, c.z];
+    };
+    const grid = inner => {
+      const id = [];
+      for (let k = 0; k < M; k++) {
+        const row = [];
+        for (let j = 0; j <= N; j++) row.push(vtx(ofs(cols[k], k, j, inner)));
+        id.push(row);
+      }
+      return id;
+    };
+    const go = grid(false),
+      gi = grid(true);
+    for (let k = 0; k < M; k++) {
+      const k2 = (k + 1) % M;
+      for (let j = 0; j < N; j++) {
+        const sm = cols[k].s + sf.per / M / 2;
+        const ym =
+          (eBot.y[k] + eBot.y[k2]) / 2 + ((eTop.y[k] - eBot.y[k] + eTop.y[k2] - eBot.y[k2]) / 2) * ((j + 0.5) / N);
+        if (HP.length && inHole(sm, ym)) continue;
+        idx.push(go[k][j], go[k2][j], go[k2][j + 1], go[k][j], go[k2][j + 1], go[k][j + 1]);
+        idx.push(gi[k][j], gi[k2][j + 1], gi[k2][j], gi[k][j], gi[k][j + 1], gi[k2][j + 1]);
+      }
+      // bords (épaisseur) aux deux bouts
+      idx.push(go[k][0], gi[k][0], gi[k2][0], go[k][0], gi[k2][0], go[k2][0]);
+      idx.push(go[k][N], go[k2][N], gi[k2][N], go[k][N], gi[k2][N], gi[k][N]);
+    }
+    // tubes qui rentrent (affichés en rouge transparent)
+    bodies.forEach(b => {
+      const u = Math.abs(b.a2[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+      const e1 = V.nrm(V.cross(b.a2, u)),
+        e2 = V.cross(b.a2, e1);
+      const n = 48,
+        Lb = Math.max(3 * b.R2, 40);
+      const base = nv;
+      for (let k = 0; k < n; k++) {
+        const a = (2 * Math.PI * k) / n;
+        const r = V.add(V.mul(e1, b.R2 * Math.cos(a)), V.mul(e2, b.R2 * Math.sin(a)));
+        vtx(V.add(V.add(b.C, r), V.mul(b.a2, -Lb)));
+        vtx(V.add(V.add(b.C, r), V.mul(b.a2, Lb)));
+      }
+      for (let k = 0; k < n; k++) {
+        const a = base + 2 * k,
+          c = base + 2 * ((k + 1) % n);
+        idx.push(a, c, c + 1, a, c + 1, a + 1);
+      }
+    });
+    const nb = ops.filter(o => o.step === 2).length;
+    // v59 : pièce serrée TOURNÉE dans le mandrin (dessus de la pièce sous la tête à C1 = c1) -> on tourne TOUT
+    // (contours, 3D, profil du tube) : le programme part alors à C1 = c1, et X/Y/Z suivent
+    const c1 = CUT_C1SIGN * (+D.c1 || 0);
+    if (Math.abs(c1) > 1e-9) {
+      ops.forEach(o => {
+        o.P = o.P.map(q => rotM(q, c1));
+        o.D = o.D.map(q => rotM(q, c1));
+      });
+      for (let i = 0; i < pos.length; i += 3) {
+        const q = rotM([pos[i], pos[i + 1], pos[i + 2]], c1);
+        pos[i] = q[0];
+        pos[i + 2] = q[2];
+      }
+      if (D.prof !== 'rond') {
+        const r2 = P2 =>
+          P2.map(q => {
+            const t = rotM([q[0], 0, q[1]], c1);
+            return [t[0], t[2]];
+          });
+        const base =
+          pp.cust ||
+          G.profile({ type: pp.cfg.prof, d: pp.cfg.d, w: pp.cfg.w, h: pp.cfg.h, r: pp.cfg.r, ep: pp.cfg.ep });
+        let x0 = 1e9,
+          x1 = -1e9,
+          z0 = 1e9,
+          z1 = -1e9;
+        const out2 = r2(base.out);
+        out2.forEach(q => {
+          x0 = Math.min(x0, q[0]);
+          x1 = Math.max(x1, q[0]);
+          z0 = Math.min(z0, q[1]);
+          z1 = Math.max(z1, q[1]);
+        });
+        pp.cust = {
+          type: 'perso',
+          out: out2,
+          inn: r2(base.inn),
+          rmax: base.rmax,
+          ep: base.ep,
+          R: null,
+          name: (base.name || 'Tube') + ' (tourné ' + (+D.c1).toFixed(1) + '°)',
+          w: x1 - x0,
+          h: z1 - z0
+        };
+        pp.cfg = { prof: 'perso', ep: base.ep };
+      }
+    }
+    return {
+      ops,
+      pos,
+      idx,
+      L,
+      pp,
+      info: `${eTop.kind === 'brut' ? 'bout libre brut' : 'bout libre ' + enm[eTop.kind]}, ${nb} découpe(s), séparation ${enm[eBot.kind]}${hk ? ' · faisceau ' + (2 * hk).toFixed(2) + ' mm corrigé' : ''}`
+    };
+  }
+  function cutMemLoad() {
+    try {
+      const v = (S.genMem && S.genMem.cut) || JSON.parse(localStorage.getItem('cipCut') || 'null');
+      if (!v || !v.end) return null;
+      return Object.assign(CUT_DEF(), JSON.parse(JSON.stringify(v)));
+    } catch (e) {
+      return null;
+    }
+  }
+  function cutMemSave() {
+    S.genMem = S.genMem || {};
+    S.genMem.cut = JSON.parse(JSON.stringify(S.cutDef));
+    try {
+      localStorage.setItem('cipCut', JSON.stringify(S.cutDef));
+    } catch (e) {}
+  }
+  function cutApply(first) {
+    S.srcMesh = null;
+    const def = S.cutDef;
+    const msg = $('cipCutMsg');
+    if ($('cipProc').value === 'soudure') {
+      if (msg)
+        msg.innerHTML = '<span class="cipBad">Le tube à découper, c\'est pour la DÉCOUPE : change le procédé.</span>';
+      return false;
+    }
+    let r;
+    try {
+      r = cutBuild(def);
+    } catch (e) {
+      console.warn(e);
+      r = { err: 'Calcul impossible : ' + e.message };
+    }
+    if (r.err) {
+      if (msg) msg.innerHTML = '<span class="cipBad">' + r.err + '</span>';
+      return false;
+    }
+    if (msg) msg.innerHTML = '<span class="cipOk">' + r.ops.length + ' contour(s) de découpe : ' + r.info + '.</span>';
+    cutMemSave();
+    const g = G.weld([
+      { attributes: { position: { array: new Float32Array(r.pos) } }, index: { array: new Uint32Array(r.idx) } }
+    ]);
+    G.triInfo(g);
+    const f = {
+      c: [0, 0, 0],
+      u: [1, 0, 0],
+      ax: [0, 1, 0],
+      v: [0, 0, 1],
+      round: def.prof === 'rond',
+      rOut: +def.d / 2,
+      rIn: +def.d / 2 - def.ep
+    };
+    G.toModel(g, f);
+    const keep = S.part && S.part.gen && S.part.gen.cut && !first;
+    const PN = {
+      rond: 'rond Ø' + def.d,
+      carre: 'carré ' + def.w,
+      rect: 'rect. ' + def.w + '×' + def.h,
+      oblong: 'oblong ' + def.w + '×' + def.h,
+      dxf: 'section DXF'
+    };
+    S.part = {
+      g,
+      base: g.M.map(p => p.slice()),
+      fit: f,
+      name: 'TUBE-DECOUPE',
+      info: `<b>Tube à découper</b> · ${PN[def.prof] || ''} ép. ${def.ep}, L ${def.L} mm<br>`,
+      gen: {
+        cut: true,
+        ops: r.ops,
+        seams: [],
+        R: r.pp.cust ? r.pp.cust.rmax : +def.d / 2,
+        L: r.L,
+        def: JSON.parse(JSON.stringify(def))
+      },
+      fitL: !keep
+    };
+    if (!keep) {
+      S.flip = false;
+      S.order = null;
+      S.inst = [{ a: 0, dy: 0 }];
+      S.starts = {};
+      S.startB = {};
+      S.off = {};
+      S.wz = { d1: false, d2: false, x: null, key: '' };
+      $('cipPRot').value = 0;
+      $('cipPOff').value = 20;
+    }
+    S.geoC = null;
+    Object.assign(S.cfg, r.pp.cfg);
+    if (r.pp.cust) S.custProf = r.pp.cust;
+    syncForm();
+    rebuildAll(true);
+    if (first) setMapping();
+    return true;
+  }
+  function cutSoon(now) {
+    cutMemSave();
+    clearTimeout(S.cutT);
+    S.cutT = setTimeout(() => cutApply(false), now ? 0 : 250);
+  }
+  // les contours, placés comme la pièce (rotation / décalage / retournement + pièces multiples)
+  function cutOpsPlaced() {
+    const pl = S.part.g.pl || { rho: 0, dy: 0, flip: false };
+    const XP = p => {
+        let q = pl.flip ? [-p[0], -p[1], p[2]] : p.slice();
+        q = rotM(q, pl.rho || 0);
+        q[1] += pl.dy || 0;
+        return q;
+      },
+      XV = v => rotM(pl.flip ? [-v[0], -v[1], v[2]] : v.slice(), pl.rho || 0);
+    const ops = [];
+    const inst = instList();
+    // v73 : SENS DE COUPE choisi (coupes de tour : C1 qui monte / qui descend ; trous : horaire / anti-horaire vu de la tête)
+    const Dg = (S.part.gen.def && S.part.gen.def.dir) || {};
+    const holeDir = Dg.hole || 'auto';
+    let lastSign = 0;
+    // une coupe de tour en « auto » se met à l'opposé de l'autre, même si c'est l'autre qui est forcée (et vient après)
+    const forcedRing = (() => {
+      for (const o of S.part.gen.ops)
+        if ((o.step === 1 || o.step === 4) && (o.ringSens === '+' || o.ringSens === '-'))
+          return o.ringSens === '+' ? 1 : -1;
+      return 0;
+    })();
+    const oL = lstOpt(true);
+    const rev2 = q => {
+      q.P = q.P.slice().reverse();
+      q.D = q.D.slice().reverse();
+    };
+    // sens du mandrin au départ du contour (+1 : C1 augmente, -1 : C1 diminue)
+    const cSign = q => {
+      let k = 1;
+      while (k < q.P.length - 1 && V.len(V.sub(q.P[k], q.P[0])) < 0.2) k++;
+      const C = i => {
+        const d = q.D[i];
+        return toLst(q.P[i], d, Math.atan2(-d[0], -d[2]) / DEG, oL).C;
+      };
+      let dc = C(k) - C(0);
+      while (dc > 180) dc -= 360;
+      while (dc < -180) dc += 360;
+      return dc >= 0 ? 1 : -1;
+    };
+    // +1 : anti-horaire vu depuis la tête (en regardant le long du faisceau)
+    const hSign = q => {
+      let c = [0, 0, 0];
+      q.P.forEach(p => (c = V.add(c, p)));
+      c = V.mul(c, 1 / q.P.length);
+      let A = [0, 0, 0];
+      for (let i = 0; i + 1 < q.P.length; i++) A = V.add(A, V.cross(V.sub(q.P[i], c), V.sub(q.P[i + 1], c)));
+      return V.dot(A, V.mul(q.D[0], -1)) >= 0 ? 1 : -1;
+    };
+    inst.forEach((ins, ii) =>
+      S.part.gen.ops.forEach(o => {
+        // coupe de tour (bout / séparation) : une sur deux dans l'autre sens -> le mandrin se « déroule » tout seul
+        const ring = o.step === 1 || o.step === 4;
+
+        ops.push({
+          name: o.name + (inst.length > 1 ? ' · pièce ' + (ii + 1) : ''),
+          step: o.step,
+          P: o.P.map(p => {
+            const q = rotM(XP(p), ins.a);
+            return [q[0], q[1] + ins.dy, q[2]];
+          }),
+          D: o.D.map(d => rotM(XV(d), ins.a)),
+          mode: 'continu',
+          A: 0,
+          waste: o.waste ? (pl.flip ? -o.waste : o.waste) : 0
+        });
+        const q = ops[ops.length - 1];
+        if (ring) {
+          // sens choisi pour CETTE coupe ; « auto » = à l'opposé de la coupe de tour précédente (le mandrin se déroule)
+          const rs =
+            o.ringSens && o.ringSens !== 'auto' ? o.ringSens : Dg.ring && Dg.ring !== 'auto' ? Dg.ring : 'auto';
+          const want = rs === '+' ? 1 : rs === '-' ? -1 : lastSign ? -lastSign : forcedRing ? -forcedRing : 0;
+          if (want && cSign(q) !== want) rev2(q);
+          lastSign = cSign(q);
+        }
+        const hd = o.step === 2 ? o.sens || holeDir : 'auto';
+        if (o.step === 2 && hd !== 'auto' && hSign(q) !== (hd === 'ccw' ? 1 : -1)) rev2(q);
+      })
+    );
+    return ops;
+  }
+  // v69 : ENTRÉE (perçage dans la chute + arc de cercle ou droite jusqu'au départ) et DÉPASSEMENT en fin de coupe
+  // Le départ (là où l'entrée rejoint la vraie coupe) se choisit avec 📍 « Choisir le départ ».
+  function cutLead(o) {
+    const D0 = S.part && S.part.gen && S.part.gen.def;
+    let Lg = (D0 && D0.lead) || {};
+    if (o.waste === undefined || !o.P || o.P.length < 3) return;
+    if (o.step === 1 || o.step === 4) {
+      // v76 : chaque côté (bout libre / séparation) peut avoir sa propre entrée
+      const side = D0 && (o.step === 1 ? D0.end : D0.sep);
+      const sl = side && side.lead;
+      if (sl && sl.type && sl.type !== 'same') Lg = { type: sl.type, r: sl.r, over: sl.over };
+      else if (Lg.ends === false) return;
+    }
+    const type = Lg.type || 'none',
+      over = Math.max(0, +Lg.over || 0);
+    let R = Math.max(0, +Lg.r || 0);
+    if ((type === 'none' || R <= 0) && !over) return;
+    const pr = S.profile;
+    // point posé sur la surface du tube (le plus proche du contour du profil, même y)
+    const onS = q => {
+      const x = S.flip ? -q[0] : q[0];
+      let bd = 1e18,
+        bx = x,
+        bz = q[2];
+      const P = pr.out,
+        n = P.length;
+      for (let i = 0; i < n; i++) {
+        const a = P[i],
+          b = P[(i + 1) % n];
+        const dx = b[0] - a[0],
+          dz = b[1] - a[1];
+        let t = ((x - a[0]) * dx + (q[2] - a[1]) * dz) / (dx * dx + dz * dz || 1);
+        t = Math.max(0, Math.min(1, t));
+        const px = a[0] + t * dx,
+          pz = a[1] + t * dz,
+          d = (px - x) ** 2 + (pz - q[2]) ** 2;
+        if (d < bd) {
+          bd = d;
+          bx = px;
+          bz = pz;
+        }
+      }
+      return [S.flip ? -bx : bx, q[1], bz];
+    };
+    const P = o.P,
+      Dd = o.D;
+    const P0 = P[0];
+    // sens de la coupe au départ
+    let k1 = 1;
+    while (k1 < P.length - 1 && V.len(V.sub(P[k1], P0)) < 0.3) k1++;
+    const t = V.nrm(V.sub(P[k1], P0));
+    const nOut = V.mul(Dd[0], -1);
+    let w = V.nrm(V.cross(nOut, t));
+    // côté CHUTE : dedans pour un trou, vers le vide / le mandrin pour une coupe de tour
+    if (o.waste === 0) {
+      let c = [0, 0, 0];
+      P.forEach(p => (c = V.add(c, p)));
+      c = V.mul(c, 1 / P.length);
+      if (V.dot(w, V.sub(c, P0)) < 0) w = V.mul(w, -1);
+      // petit trou : l'entrée doit tenir dedans
+      let rmin = 1e9;
+      P.forEach(p => (rmin = Math.min(rmin, V.len(V.sub(p, c)))));
+      R = Math.min(R, rmin * 0.8);
+    } else if (w[1] * o.waste < 0) w = V.mul(w, -1);
+    const lead = [];
+    if (type === 'arc' && R > 0.05) {
+      const n = Math.max(6, Math.ceil((R * Math.PI) / 2 / 0.25));
+      const C = V.add(P0, V.mul(w, R));
+      for (let k = 0; k < n; k++) {
+        const ph = -Math.PI / 2 + ((Math.PI / 2) * k) / n;
+        lead.push(onS(V.add(V.sub(C, V.mul(w, R * Math.cos(ph))), V.mul(t, R * Math.sin(ph)))));
+      }
+    } else if (type === 'droite' && R > 0.05) {
+      const n = Math.max(2, Math.ceil(R / 0.25));
+      for (let k = 0; k < n; k++) lead.push(onS(V.add(P0, V.mul(w, R * (1 - k / n)))));
+    }
+    // dépassement : on continue sur la même trajectoire après la fin
+    const tail = [],
+      tailD = [];
+    if (over > 0) {
+      let acc = 0;
+      for (let i = 1; i < P.length && acc < over; i++) {
+        const sl = V.len(V.sub(P[i], P[i - 1]));
+        if (acc + sl >= over) {
+          const f = (over - acc) / (sl || 1);
+          tail.push(V.add(P[i - 1], V.mul(V.sub(P[i], P[i - 1]), f)));
+          tailD.push(Dd[i].slice());
+          break;
+        }
+        acc += sl;
+        tail.push(P[i].slice());
+        tailD.push(Dd[i].slice());
+      }
+    }
+    o.P = lead.concat(P, tail);
+    o.D = lead.map(() => Dd[0].slice()).concat(Dd, tailD);
+    o.leadN = lead.length;
+    o.overN = tail.length;
+    o.leadT = lead.length ? (type === 'arc' ? 'arc de cercle R' : 'droite L') + (+R).toFixed(2) + ' mm' : '';
+    o.overL = tail.length ? over : 0;
+  }
+  // ---- le panneau (tout est redessiné depuis S.cutDef)
+  function cutRender() {
+    const box = $('cipCutBody');
+    if (!box) return;
+    const D = S.cutDef;
+    const num = (path, lab, val, tip, st, extra) =>
+      `<div class="cipNum"${tip ? ` data-tip="${tip}"` : ''}><span>${lab}</span><input type="number" step="${st || 1}" value="${val}" data-ck="${path}" ${extra || ''}></div>`;
+    const sel = (path, lab, val, opts, tip) =>
+      `<div class="cipNum"${tip ? ` data-tip="${tip}"` : ''}><span>${lab}</span><select data-ck="${path}" style="width:180px;max-width:60%">${opts.map(([v, t]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
+    const H = t => `<div style="font:600 12px var(--sans);color:var(--txt2);margin:10px 0 2px">${t}</div>`;
+    // v74 : chaque partie dans son cadre, couleur = couleur du trajet dans la 3D
+    const SEC = (t, col, ic) =>
+      `<div class="cipSec" style="--sc:${col}"><div class="cipSecH"><span>${ic}</span>${t}</div>`;
+    let h = `<div class="cipNum" style="border:2px solid var(--acc);border-radius:8px;padding:8px 10px;margin:4px 0 8px;background:rgba(245,166,35,.08)" data-tip="La pièce que tu RÉCUPÈRES à la fin : de la coupe du bout libre jusqu'à la séparation, au point le plus long.\nEx : 10 -> le soft coupe le bout, puis sépare 10 mm plus loin : ta pièce fait 10 mm."><span style="font:700 15px var(--sans)">📏 Longueur de la pièce finie (mm)</span><input type="number" step="0.1" value="${D.L}" data-ck="L" style="font:700 16px var(--mono);width:90px"></div>`;
+    h += num(
+      'kerf',
+      '🔦 Largeur du faisceau (mm)',
+      D.kerf === undefined ? '' : D.kerf,
+      'Vide = pas de correction (comme avant).\nSi tu tapes une valeur, le soft corrige tout seul pour que les cotes de la pièce soient JUSTES :\n- les coupes de bout passent à mi-largeur côté chute (longueur exacte),\n- les trous sont rétrécis de la largeur (trous à la bonne taille).\nComment la mesurer : coupe une fente (un simple trait) dans une tôle et mesure sa largeur.',
+      0.01,
+      'placeholder="vide = pas de correction"'
+    );
+    h += SEC('Le tube', '#9aa5ae', '🔩');
+    h += sel('prof', 'Section', D.prof, [
+      ['rond', 'Rond'],
+      ['carre', 'Carré'],
+      ['rect', 'Rectangle'],
+      ['oblong', 'Oblong (ovale plat)'],
+      ['dxf', 'Section DXF importée']
+    ]);
+    if (D.prof === 'rond') h += num('d', 'Ø extérieur (mm)', D.d, '', 0.01);
+    else if (D.prof === 'dxf')
+      h += `<div class="cipRow"><button class="cipBtn" style="flex:1" onclick="cip_ui('cutdxf','prof')">📂 ${D.dxf ? 'Changer la section (' + D.dxf.name + ')' : 'Importer la section (DXF)'}</button></div>`;
+    else {
+      h += num('w', D.prof === 'carre' ? 'Côté (mm)' : 'Largeur (mm)', D.w, '', 0.01);
+      if (D.prof !== 'carre') h += num('h', 'Hauteur (mm)', D.h, '', 0.01);
+      if (D.prof !== 'oblong') h += num('r', 'Rayon des angles (mm)', D.r, '', 0.1);
+    }
+    h += num('ep', 'Épaisseur (mm)', D.ep, 'Épaisseur de paroi du tube.', 0.1);
+    h += num(
+      'c1',
+      'C1 quand le dessus est sous la tête (°)',
+      D.c1 || 0,
+      "Ta pièce est serrée TOURNÉE dans le mandrin ? Tape l'angle C1 où le DESSUS de la pièce (tour 0° dans le soft) est face à la tête.\n0 = pièce serrée droite. Tout le programme est recalculé avec ce décalage : le départ se fait à ce C1, X/Y/Z suivent.",
+      0.1
+    );
+    h += '</div>';
+    const endUI = (k, title, isFree) => {
+      const E = D[k];
+      let s = SEC(title, isFree ? '#a283ff' : '#5fcf8f', isFree ? '✂' : '⛓');
+      s += sel(k + '.type', 'Coupe', E.type, [
+        ...(isFree ? [['brut', 'Aucune (bout déjà coupé)']] : []),
+        ['droit', 'Droite'],
+        ['biais', 'En biais (onglet)'],
+        ['gueule', 'Gueule de loup']
+      ]);
+      if (E.type === 'biais') {
+        s += num(
+          k + '.ang',
+          'Angle (°)',
+          E.ang,
+          "Angle de la coupe par rapport à une coupe droite (0 = droite, 45 = onglet d'un coude à 90°).",
+          0.5
+        );
+        s += num(
+          k + '.rot',
+          'Sens (tour, °)',
+          E.rot,
+          'De quel côté la coupe penche : 0 = dessus, 90 = sur le côté, 180 = dessous.',
+          1
+        );
+      } else if (E.type === 'gueule') {
+        s += num(
+          k + '.d2',
+          'Ø du tube qui vient dessus (mm)',
+          E.d2,
+          'Diamètre EXTÉRIEUR du tube sur lequel ce bout vient se poser.',
+          0.1
+        );
+        s += num(
+          k + '.beta',
+          'Angle entre les 2 tubes (°)',
+          E.beta,
+          '90 = en T. Moins = piquage incliné (mini 20°).',
+          0.5
+        );
+        s += num(
+          k + '.rot',
+          'Sens (tour, °)',
+          E.rot,
+          "Orientation de l'autre tube autour du tien : 0 = il est couché de gauche à droite (vu de dessus), 90 = d'avant en arrière.",
+          1
+        );
+        s += num(k + '.exc', 'Décalage (mm)', E.exc, 'Décalage entre les 2 axes (0 = centrés).', 0.1);
+      }
+      if (E.type !== 'brut')
+        s += sel(
+          k + '.sens',
+          'Sens de coupe (mandrin)',
+          E.sens || 'auto',
+          [
+            ['auto', "Auto (à l'opposé de l'autre coupe)"],
+            ['+', 'C1 qui augmente (+)'],
+            ['-', 'C1 qui diminue (−)']
+          ],
+          "Sens dans lequel le mandrin tourne pendant CETTE coupe.\nAuto : à l'opposé de l'autre coupe de tour -> le mandrin se déroule tout seul (programme plus court)."
+        );
+      if (E.type !== 'brut') {
+        // v76 : entrée / dépassement propres à CE côté
+        const El = E.lead || (E.lead = { type: 'same', r: 2, over: 0 });
+        s += sel(
+          k + '.lead.type',
+          'Entrée (perçage)',
+          El.type || 'same',
+          [
+            ['same', 'Comme les trous'],
+            ['none', 'Aucune (perce sur le trait)'],
+            ['arc', 'Arc de cercle'],
+            ['droite', 'Droite']
+          ],
+          'Comment la tête entre dans CETTE coupe. Le perçage se fait dans la chute (côté vide pour le bout libre, côté mandrin pour la séparation).\n« Comme les trous » = le réglage de la section Entrée plus bas.'
+        );
+        if (El.type === 'arc' || El.type === 'droite') {
+          s += num(
+            k + '.lead.r',
+            El.type === 'arc' ? "Rayon de l'arc (mm)" : "Longueur de l'entrée (mm)",
+            El.r,
+            '',
+            0.1
+          );
+          s += num(
+            k + '.lead.over',
+            'Dépassement en fin de coupe (mm)',
+            El.over,
+            '0 = la coupe s’arrête pile au départ. Sinon elle continue de cette longueur.',
+            0.1
+          );
+        } else if (El.type === 'none') s += num(k + '.lead.over', 'Dépassement en fin de coupe (mm)', El.over, '', 0.1);
+      }
+      return s + '</div>';
+    };
+    h += endUI('end', 'Bout libre (côté vide)', true);
+    h += SEC('Découpes sur le tube', '#3fc3e6', '◎');
+    const NAMES = {
+      rond: 'Trou rond',
+      oblong: 'Trou oblong',
+      rect: 'Trou rectangle',
+      piq: 'Trou de piquage',
+      dxf: 'Forme DXF'
+    };
+    h += D.feats
+      .map((F, i) => {
+        const p = 'feats.' + i + '.';
+        let s = `<div class="cipGB"><div class="cipRow" style="justify-content:space-between;margin:0 0 4px"><b style="font-size:13px">${i + 1}. ${NAMES[F.type]}</b><button class="cipBtn" style="padding:1px 7px" onclick="cip_ui('cutdel',${i})" data-tip="Enlever cette découpe.">✕</button></div>`;
+        if (F.type === 'rond') s += num(p + 'd', 'Ø (mm)', F.d, '', 0.01);
+        if (F.type === 'oblong' || F.type === 'rect') {
+          s += num(p + 'l', 'Longueur (mm)', F.l, 'Le grand côté (le long du tube si « rotation » = 0).', 0.01);
+          s += num(p + 'w', 'Largeur (mm)', F.w, '', 0.01);
+          if (F.type === 'rect') s += num(p + 'r', 'Rayon des angles (mm)', F.r, '', 0.1);
+        }
+        if (F.type === 'dxf') {
+          s += `<div class="cipRow"><button class="cipBtn" style="flex:1" onclick="cip_ui('cutdxf',${i})">📂 ${F.pts ? 'Changer (' + F.name + ')' : 'Importer la forme (DXF à plat)'}</button></div>`;
+          s += num(p + 'sc', 'Échelle (%)', F.sc, '', 1);
+        }
+        if (F.type === 'piq') {
+          s += num(
+            p + 'd2',
+            'Ø du tube qui rentre (mm)',
+            F.d2,
+            'Diamètre EXTÉRIEUR du tube qui passe dans ce trou.',
+            0.01
+          );
+          s += num(
+            p + 'beta',
+            'Angle avec le tube (°)',
+            F.beta,
+            '90 = perpendiculaire. Moins = incliné vers le bout libre.',
+            0.5
+          );
+          s += num(p + 'exc', 'Décalage (mm)', F.exc, "Décalage de côté entre l'axe du trou et l'axe du tube.", 0.1);
+          s += `<label class="cipChk"><input type="checkbox" data-ck="${p}trav" ${F.trav ? 'checked' : ''}> Traversant (aussi la paroi d'en face)</label>`;
+        }
+        s += num(
+          p + 'pos',
+          'Position (mm depuis la séparation)',
+          F.pos,
+          'Distance du centre de la découpe au bout côté mandrin (séparation).',
+          0.1
+        );
+        s += num(p + 'rot', 'Tour (°)', F.rot, 'Où autour du tube : 0 = dessus, 90 = côté, 180 = dessous.', 1);
+        if (F.type !== 'rond' && F.type !== 'piq')
+          s += num(p + 'ang', 'Rotation de la forme (°)', F.ang, '0 = grand côté le long du tube, 90 = en travers.', 1);
+        s += sel(p + 'sens', 'Sens de coupe', F.sens || '', [
+          ['', 'Comme le réglage par défaut'],
+          ['cw', 'Horaire (vu de la tête)'],
+          ['ccw', 'Anti-horaire (vu de la tête)']
+        ]);
+        return s + '</div>';
+      })
+      .join('');
+    h += `<div class="cipRow" style="flex-wrap:wrap"><button class="cipBtn" onclick="cip_ui('cutadd','rond')">+ Trou rond</button><button class="cipBtn" onclick="cip_ui('cutadd','oblong')">+ Oblong</button><button class="cipBtn" onclick="cip_ui('cutadd','rect')">+ Rectangle</button><button class="cipBtn" onclick="cip_ui('cutadd','piq')">+ Piquage</button><button class="cipBtn" onclick="cip_ui('cutadd','dxf')">+ Forme DXF</button></div></div>`;
+    h += endUI('sep', 'Séparation (côté mandrin, coupée en dernier)', false);
+    {
+      const Lg = D.lead || (D.lead = { type: 'none', r: 2, over: 0, ends: true });
+      if (Lg.ends === false) {
+        // ancien réglage « pas sur les bouts » -> chaque côté passe en « Aucune »
+        ['end', 'sep'].forEach(k => {
+          D[k].lead = D[k].lead || { type: 'same', r: 2, over: 0 };
+          if (D[k].lead.type === 'same') D[k].lead.type = 'none';
+        });
+        Lg.ends = true;
+      }
+      const Dr = D.dir || (D.dir = { ring: 'auto', hole: 'auto' });
+      h += SEC('Entrée, fin de coupe et sens des trous', '#f5a623', '↪');
+      h += sel(
+        'dir.hole',
+        'Sens des trous (par défaut)',
+        Dr.hole,
+        [
+          ['auto', 'Auto'],
+          ['cw', 'Horaire (vu de la tête)'],
+          ['ccw', 'Anti-horaire (vu de la tête)']
+        ],
+        'Sens de la coupe autour de chaque trou, vu en regardant depuis la tête (le long du faisceau).\nChaque découpe peut avoir son propre sens (dans sa carte, plus bas).'
+      );
+      h += sel(
+        'lead.type',
+        'Entrée des trous (perçage)',
+        Lg.type,
+        [
+          ['none', 'Aucune (perce sur le trait)'],
+          ['arc', 'Arc de cercle'],
+          ['droite', 'Droite']
+        ],
+        "Le perçage se fait dans la CHUTE (dedans pour un trou, côté vide / mandrin pour un bout), puis la tête rejoint la vraie coupe en arc ou en droite.\nOù l'entrée rejoint la coupe : 📍 « Choisir le départ » dans la 3D."
+      );
+      if (Lg.type !== 'none')
+        h += num(
+          'lead.r',
+          Lg.type === 'arc' ? "Rayon de l'arc (mm)" : "Longueur de l'entrée (mm)",
+          Lg.r,
+          "Réduit tout seul dans les petits trous pour que l'entrée tienne dedans.",
+          0.1
+        );
+      h += num(
+        'lead.over',
+        'Dépassement en fin de coupe (mm)',
+        Lg.over,
+        '0 = la coupe s’arrête pile au départ. Sinon elle continue sur la même trajectoire de cette longueur (pour être sûr que ça tombe).',
+        0.1
+      );
+      h += `<div class="cipNote" style="margin:2px 0 0">Bout libre et séparation : chacun a son entrée dans sa propre section (par défaut « Comme les trous »).</div>`;
+      h += '</div>';
+    }
+    box.innerHTML = h;
+  }
+  function cutField(el) {
+    const path = el.dataset.ck.split('.');
+    let o = S.cutDef;
+    for (let i = 0; i < path.length - 1; i++) o = o[path[i]];
+    const k = path[path.length - 1];
+    if (el.type === 'checkbox') o[k] = el.checked;
+    else if (el.tagName === 'SELECT') o[k] = el.value;
+    else o[k] = el.value === '' ? '' : +el.value;
+    if (el.tagName === 'SELECT' || el.type === 'checkbox') {
+      cutRender();
+      cutSoon(true);
+    } else cutSoon();
+  }
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
   // §12. CODE COULEUR DES COTES
   //     chaque cote a sa couleur, et la 3D montre ce qu'elle change
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -8678,7 +9989,7 @@ function cip_build() {
       mtHL(key.slice(2));
       return;
     }
-    if (!key || !S.part || !S.part.gen || !w || w.dataset.step !== 'build') return;
+    if (!key || !S.part || !S.part.gen || S.part.gen.cut || !w || w.dataset.step !== 'build') return;
     const Gn = S.part.gen,
       D = Gn.def,
       [who, k] = key.split(':');
@@ -9054,11 +10365,14 @@ function cip_build() {
     <div class="cipNum"><span>Nom du programme</span><input id="cipWzName" style="width:150px" value="${nm.replace(/"/g, '')}" placeholder="ex : TUBE-EN-T"></div>
     ${
       W
-        ? `<div class="cipNum"><span>Techno soudure (WTT)</span><input id="cipWzTech" list="cipLTWl" style="width:150px" value="${($('cipLTW').value || '').replace(/"/g, '')}" placeholder="ex : TUBECOUDE-DORE"></div>` +
+        ? `<div class="cipNum"><span>Tableau techno (WTT)</span><span data-techslot="W"></span></div>` +
+          `<div class="cipNum" data-tip="1er chiffre de TC_WELD_ON(…) : n° du paramètre de ta table (par défaut 1)."><span>N° de paramètre</span><input type="number" data-mirror="cipLWNo" min="0" step="1" style="width:150px" value="${($('cipLWNo') || {}).value || '1'}"></div>` +
           `<div class="cipNum"><span>Mode / page</span><span class="cipRow" style="margin:0;gap:4px"><select data-mirror="cipLWMode" style="width:70px">${[...$('cipLWMode').options].map(o => `<option value="${o.value}" ${o.value === $('cipLWMode').value ? 'selected' : ''}>${o.value}</option>`).join('')}</select><select data-mirror="cipLWPage" style="width:76px">${[...$('cipLWPage').options].map(o => `<option value="${o.value}" ${o.value === $('cipLWPage').value ? 'selected' : ''}>${o.value}</option>`).join('')}</select></span></div>`
-        : `<div class="cipNum"><span>Techno découpe (LTT)</span><b style="font:13px var(--mono)">${$('cipLTC').textContent}</b></div>`
+        : `<div class="cipNum"><span>Tableau techno (LTT)</span><span data-techslot="C"></span></div>` +
+          `<div class="cipNum" data-tip="1er chiffre de TC_LASER_ON(…) : n° du paramètre de coupe dans ta table LTT (par défaut 11)."><span>N° de paramètre</span><input type="number" data-mirror="cipLCNo" min="0" step="1" style="width:150px" value="${($('cipLCNo') || {}).value || '11'}"></div>` +
+          `<label class="cipChk" data-tip="Tête droite, sans TRAORI ni CIP : tours = 1 ligne C1, trous ronds = TC_CIRC2, lignes = G01 X / C1. Réglages dans les réglages avancés (Fichier .LST)."><input type="checkbox" data-mirchk="cipLSimple" ${($('cipLSimple') || {}).checked ? 'checked' : ''}> <b>Programme simple</b> (sans TRAORI ni CIP)</label>`
     }
-    <label class="cipChk" data-tip="Test à vide : le laser ne s'allume jamais (allumage en commentaire), fichier « -VIDE ». En découpe, la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint). Toujours passer à vide avant le vrai !"><input type="checkbox" id="cipWzDry" ${dry ? 'checked' : ''}> <b>Test à vide</b> (laser jamais allumé)</label>
+    <label class="cipChk" data-tip="Test à vide : le laser ne s'allume jamais (allumage en commentaire), même nom de fichier. En découpe, la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint). Toujours passer à vide avant le vrai !"><input type="checkbox" id="cipWzDry" ${dry ? 'checked' : ''}> <b>Test à vide</b> (laser jamais allumé)</label>
     <div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',3)">←</button><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('wzgen')">▶ Générer et simuler le .LST</button></div>
     <div class="cipStat" id="cipWzMsg">${S.wz.msg || ''}</div></div>`;
     box.innerHTML = h;
@@ -9098,9 +10412,19 @@ function cip_build() {
       b.onclick = () => cip_ui('wzback', k + 1);
       h.appendChild(b);
     });
-    box.querySelectorAll('[data-mirror]').forEach(el => {
+    techRefresh();
+    box.querySelectorAll('[data-mirchk]').forEach(el => {
       el.onchange = () => {
+        $(el.dataset.mirchk).checked = el.checked;
+        parSave();
+        lstForget();
+        dlStale();
+      };
+    });
+    box.querySelectorAll('[data-mirror]').forEach(el => {
+      el.onchange = el.oninput = () => {
         $(el.dataset.mirror).value = el.value;
+        if (/^cipL[WC]No$/.test(el.dataset.mirror)) parSave();
       };
       const t = $(el.dataset.mirror);
       const opt = t && t.options ? t.options[t.selectedIndex] : null;
@@ -9117,7 +10441,7 @@ function cip_build() {
     S.c0 = on && cur <= 2;
     if (P && on && cur >= 3) {
       m.g.position.set(...P.f.p);
-      m.g.visible = true;
+      m.g.visible = cur === 3; // v71 : le point jaune seulement pendant l'étape 3 (après : il gêne la simu)
       if (S.wz.posFor !== P.key + cur) {
         const first = cur === 3 && S.wz.posFor.slice(-1) !== '3';
         S.wz.posFor = P.key + cur;
@@ -9153,7 +10477,15 @@ function cip_build() {
   }
   function wzGen() {
     const P = wzP1();
-    if (!P || wzCur() < 4) return;
+    if (!P) return;
+    if (wzCur() < 4) {
+      S.wz.msg = `<span class="cipBad">⚠ Fichier PAS généré : valide d'abord l'étape ${wzCur()} au-dessus.</span>`;
+      S.lastGen = null;
+      S.lastLST = null;
+      wzRender();
+      dlRender();
+      return;
+    }
     const W = $('cipProc').value === 'soudure';
     const nm = $('cipWzName');
     if (nm) $('cipLName').value = nm.value;
@@ -9172,7 +10504,13 @@ function cip_build() {
       S.wz.msg = '';
       S.dlMsg =
         `<span class="cipOk">${r.file} prêt.</span> ` +
-        (dry && !W ? 'À vide, la buse passe 3 mm au-dessus de la pièce (pas de palpage laser éteint). ' : '') +
+        (r.simple
+          ? `<b>Programme simple</b> (${r.simple.ring + r.simple.bis} tour(s), ${r.simple.hole} trou(s) en cycle, ${r.simple.line} ligne(s)${r.simple.trao ? `, <span class="cipWarn">${r.simple.trao} en TRAORI (tête inclinée)</span>` : ''}). `
+          : '') +
+        (r.warn ? `<span class="cipWarn">${r.warn}</span> ` : '') +
+        (dry && !W && !r.simple
+          ? 'À vide, la buse passe 3 mm au-dessus de la pièce (pas de palpage laser éteint). '
+          : '') +
         (dry
           ? "Passe-le d'abord à vide : la pointe doit suivre " +
             (W ? 'la jonction' : 'les contours') +
@@ -9190,12 +10528,58 @@ function cip_build() {
     dlRender();
   }
   // Nom / techno / test à vide modifié après la génération : on retire l'ancien fichier (sinon on téléchargerait l'ancien nom)
+  function parSave() {
+    try {
+      ['cipLWNo', 'cipLCNo', 'cipLVar'].forEach(id => $(id) && localStorage.setItem(id, $(id).value));
+      [
+        'cipLSimple',
+        'cipSmZ',
+        'cipSmRM',
+        'cipSmRP',
+        'cipSmRC',
+        'cipSmLM',
+        'cipSmLP',
+        'cipSmLC',
+        'cipSmHM',
+        'cipSmHP',
+        'cipSmHC',
+        'cipSmHA'
+      ].forEach(
+        id => $(id) && localStorage.setItem(id, $(id).type === 'checkbox' ? ($(id).checked ? '1' : '0') : $(id).value)
+      );
+    } catch (e) {}
+  }
   function dlSig() {
     const v = id => {
       const e = $(id);
       return e ? (e.type === 'checkbox' ? e.checked : e.value) : '';
     };
-    return ['cipLName', 'cipLTW', 'cipLDry', 'cipMtName', 'cipMtTech', 'cipMtDry'].map(v).join('|');
+    return [
+      'cipLName',
+      'cipLTW',
+      'cipLDry',
+      'cipMtName',
+      'cipMtTech',
+      'cipMtDry',
+      'cipLWNo',
+      'cipLCNo',
+      'cipLTCv',
+      'cipLVar',
+      'cipLSimple',
+      'cipSmZ',
+      'cipSmRM',
+      'cipSmRP',
+      'cipSmRC',
+      'cipSmLM',
+      'cipSmLP',
+      'cipSmLC',
+      'cipSmHM',
+      'cipSmHP',
+      'cipSmHC',
+      'cipSmHA'
+    ]
+      .map(v)
+      .join('|');
   }
   function dlStale() {
     if (!S.lastGen && !S.lastLST) return;
@@ -9225,7 +10609,7 @@ function cip_build() {
     box.innerHTML =
       `<h3>⬇ Télécharger le programme</h3>` +
       `<div class="cipNote" style="margin-top:0">Regarde d'abord la simulation au-dessus : elle rejoue <b>ce fichier-là</b>, ligne par ligne (bandeau « Simulation finale »).</div>` +
-      `<button class="cipBtn cipMain" style="width:100%;font-size:17px;padding:13px;margin-top:6px" onclick="cip_ui('dlfile')">⬇ Télécharger ${r.file}</button>` +
+      `<button class="cipBtn cipMain" style="width:100%;font-size:17px;padding:13px;margin-top:6px" onclick="cip_ui('dlfile')">⬇ Télécharger ${r.file}${/TEST A VIDE/.test(r.txt) ? ' (à vide)' : ' (AVEC laser)'}</button>` +
       `<div class="cipStat" style="margin-top:6px">${S.dlDone === r.file ? '<span class="cipOk">✓ ' + r.file + ' téléchargé.</span> ' : ''}${S.dlMsg || ''}</div>`;
   }
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -9233,7 +10617,15 @@ function cip_build() {
   //     on tourne la pièce dans le soft pour que le 1er point soit sous la tête à C1 = 0
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
   function c0Fix() {
-    if (!S.part || !S.prog || S.prog.frames || !F.length || !$('cipC0') || !$('cipC0').checked) {
+    if (
+      !S.part ||
+      !S.prog ||
+      S.prog.frames ||
+      !F.length ||
+      !$('cipC0') ||
+      !$('cipC0').checked ||
+      (S.part.gen && S.part.gen.cut)
+    ) {
       S._c0 = null;
       return;
     }
@@ -9273,8 +10665,8 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v57',
-    CIP_DATE = '19/10/2026';
+  const CIP_VER = 'CIP v92',
+    CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
     if (e) {
@@ -10710,7 +12102,6 @@ function cip_build() {
       .replace(/^-+|-+$/g, '');
     const dry = $('cipMtDry').checked;
     if (!prog && pv) prog = 'ONGLET';
-    if (prog && dry && !/-VIDE$/.test(prog)) prog += '-VIDE';
     if (!prog) return { err: 'Donne un nom au programme.' };
     let tech = ($('cipMtTech').value || '').trim();
     if (!tech && pv) tech = 'TECHNO';
@@ -10721,7 +12112,7 @@ function cip_build() {
     if (g === '') return { err: 'Pointe posée sur le point de départ : tape la valeur lue sur la machine.' };
     if (Math.abs(v.B) > BLIM) return { err: 'B dépasse la butée (±' + BLIM + '°).' };
     // CIP sous TRAORI : la jonction (ellipse) est dans le plan perpendiculaire à l'axe du mandrin ; X (ou Z à plat) = 0 sur ce plan
-    const { o, Dm, fr, tot, st } = mtCore(v);
+    const { o, fr, tot, st } = mtCore(v);
     // points de calcul : chaque morceau (pente / soudure / recouvrement / pente de fin) a ses bornes EXACTES,
     // découpé comme dans la simulation (mtBuild) pour que le programme = ce qu'on voit
     const lims = [0, v.p0, v.p0 + Math.min(v.rot, 360), v.p0 + v.rot, tot];
@@ -10774,7 +12165,8 @@ function cip_build() {
       lstMv(Q[0], 'f5000') + "   ; point d'approche",
       'm0',
       '',
-      A + `TC_WELD_ON(1, "${tech}", ${mode}, ${page}); ROTATIONCW`
+      A +
+        `TC_WELD_ON(${parNo('cipLWNo', 1) === null ? 1 : parNo('cipLWNo', 1)}, "${tech}", ${mode}, ${page}); ROTATIONCW`
     );
     const segs = [
       [cut[0], cut[1], ';pente de debut'],
@@ -10801,6 +12193,7 @@ function cip_build() {
       B.push(
         ';(tete pile sur le point de depart, C1 = 1 tour plus loin = meme position)',
         '',
+        ';----- fin de programme -----',
         'TRAFOOF',
         '',
         'G500',
@@ -10809,20 +12202,22 @@ function cip_build() {
     } else {
       // retour au départ : dégagement 30 mm, le mandrin se déroule tête en l'air (la tête ne bouge pas dans la machine), puis redescente
       const fe = fr(tot);
-      const Pm = rotM(V.sub(fe.p, V.mul(fe.d, 30)), fe.th);
       B.push(
         ';----- retour au point de depart -----',
         lstMv(toLst(V.sub(fe.p, V.mul(fe.d, 30)), fe.d, fe.th, o)) + ' ;degagement 30 mm'
       );
-      const nU = Math.max(2, Math.ceil(tot / 10));
-      for (let k = 1; k <= nU; k++) {
-        const th = tot * (1 - k / nU);
-        B.push(lstMv(toLst(rotM(Pm, -th), rotM(Dm, -th), th, o)));
-      }
+      // v83 : comme les autres programmes : tête en l'air, le mandrin refait ses tours à l'envers EN UNE LIGNE
+      B.push(
+        'TRAFOOF',
+        `G01 G90 C1 = ${n3(Q[0].C)} F10000 ;le mandrin refait ses tours a l envers -> angle de depart`,
+        `TC_SET_TRAFO("${o.trafo}")`,
+        'TRAORI(1)'
+      );
       B.push(
         lstMv(pre) + ' ;au-dessus du depart',
         lstMv(Q[0]) + ' ;tete revenue sur le point de depart',
         '',
+        ';----- fin de programme -----',
         'TRAFOOF',
         '',
         'G500',
@@ -10840,7 +12235,13 @@ function cip_build() {
       '',
       'M30'
     );
-    const L = lstHead(prog, 'soudure', tech).concat(B, ['STOP_TEXT', 'C', 'ENDE_PROGRAMM', 'C', 'ED']);
+    const L = lstHead(prog, 'soudure', tech).concat(airLST([';----- reglages -----'].concat(B)), [
+      'STOP_TEXT',
+      'C',
+      'ENDE_PROGRAMM',
+      'C',
+      'ED'
+    ]);
     const txt = L.join('\r\n').replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '') + '\r\n';
     if (/NaN|Infinity/.test(txt)) return { err: "Calcul invalide (NaN) : le programme n'est pas généré." };
     return { txt, file: prog + '.LST', n: B.length, Q, o };
@@ -10913,6 +12314,37 @@ function cip_build() {
   try {
     const o = JSON.parse(localStorage.getItem('cipMtVals') || 'null');
     if (o) MT_IDS.forEach(id => $(id) && o[id] !== undefined && ($(id).value = o[id]));
+  } catch (e) {}
+  try {
+    ['cipLWNo', 'cipLCNo', 'cipLVar'].forEach(id => {
+      const v = localStorage.getItem(id);
+      if (v !== null && $(id)) $(id).value = v;
+    });
+    [
+      'cipLSimple',
+      'cipSmZ',
+      'cipSmRM',
+      'cipSmRP',
+      'cipSmRC',
+      'cipSmLM',
+      'cipSmLP',
+      'cipSmLC',
+      'cipSmHM',
+      'cipSmHP',
+      'cipSmHC',
+      'cipSmHA'
+    ].forEach(id => {
+      const v = localStorage.getItem(id);
+      if (v === null || !$(id)) return;
+      if ($(id).type === 'checkbox') $(id).checked = v === '1';
+      else $(id).value = v;
+    });
+    ['W', 'C'].forEach(k => {
+      const v = localStorage.getItem('cipTechCur_' + k);
+      const e = techEl(k);
+      if (v !== null && e && !e.value) e.value = v;
+    });
+    techRefresh();
   } catch (e) {}
   try {
     const zt = localStorage.getItem('cipZTop');
@@ -12726,7 +14158,23 @@ function cip_build() {
     let i = 0;
     while (i < hm.length) {
       const f = hm[i];
-      if (f.rev) {
+      if (f.spin) {
+        // v64 : le mandrin refait ses tours en arrière EN TRAORI (la machine ne prenait pas le C1 hors TRAORI) :
+        // tête en l'air, un point tous les 45° -> le mandrin tourne, la tête reste quasi immobile
+        let j = i;
+        while (j < hm.length && hm[j].spin) j++;
+        const seg = hm.slice(i, j);
+        const Cs = seg.map(x => toLst(pf(x), x.d, x.th, o).C);
+        // v78 : UNE ligne, comme à la main : tête en l'air, le mandrin refait ses tours en arrière d'un coup
+        const xl = seg[seg.length - 1];
+        out.push({ t: 'TRAFOOF', s: f.s });
+        out.push({
+          t: `G01 G90 C1 = ${n3(Cs[Cs.length - 1])} F10000 ;le mandrin refait ses tours a l envers (tete en l air)`,
+          s: xl.s
+        });
+        out.push({ t: `TC_SET_TRAFO("${o.trafo}")`, s: xl.s }, { t: 'TRAORI(1)', s: xl.s });
+        i = j;
+      } else if (f.rev) {
         let j = i;
         while (j < hm.length && hm[j].rev) j++;
         const k0 = F.indexOf(f);
@@ -12807,7 +14255,13 @@ function cip_build() {
               [C[ci].mOv, C[ci].mRamp !== undefined ? C[ci].mRamp : Q.length - 1, ';recouvrement'],
               [C[ci].mRamp !== undefined ? C[ci].mRamp : Q.length - 1, Q.length - 1, ';pente de fin']
             ]
-          : [[0, Q.length - 1, null]];
+          : C[ci].leadN || C[ci].overN
+            ? [
+                [0, C[ci].leadN || 0, null],
+                [C[ci].leadN || 0, Q.length - 1 - (C[ci].overN || 0), null],
+                [Q.length - 1 - (C[ci].overN || 0), Q.length - 1, null]
+              ]
+            : [[0, Q.length - 1, null]];
       for (const [a, b, lab] of segs) {
         if (b <= a) continue;
         if (lab) put(lab);
@@ -12956,6 +14410,608 @@ function cip_build() {
       return null;
     }
   }
+  // v77 : nom du tableau techno = une VARIABLE en haut du programme (TM_LTTNAME="…"), choisie dans une liste qu'on complète
+  function techEl(k) {
+    return k === 'W' ? $('cipLTW') : $('cipLTCv');
+  }
+  function techCur(k) {
+    const e = techEl(k);
+    const v = e ? String(e.value || '').trim() : '';
+    if (v || k === 'W') return v;
+    const t = lttTable();
+    return t ? t.name : '';
+  }
+  function techList(k) {
+    let l = null;
+    try {
+      l = JSON.parse(localStorage.getItem('cipTechL_' + k) || 'null');
+    } catch (e) {}
+    if (!Array.isArray(l)) {
+      l = k === 'W' ? ['TUBECOUDE-DORE', 'TUBECOUDE-DORE-GROS', 'MERCKD81-NORBERT'] : ['INOX4MM'];
+      if (k === 'C') {
+        const t = lttTable();
+        if (t && !l.includes(t.name)) l.unshift(t.name);
+      }
+    }
+    const c = techCur(k);
+    if (c && !l.includes(c)) l.unshift(c);
+    return l;
+  }
+  function techSave(k, l) {
+    try {
+      localStorage.setItem('cipTechL_' + k, JSON.stringify(l));
+    } catch (e) {}
+  }
+  function techSet(k, v) {
+    const e = techEl(k);
+    if (!e) return;
+    e.value = v;
+    try {
+      localStorage.setItem('cipTechCur_' + k, v);
+    } catch (er) {}
+    if ($('cipLMsg')) $('cipLMsg').innerHTML = '';
+    lstForget();
+    dlStale();
+    techRefresh();
+    if ($('cipTestPage') && $('cipTestPage').style.display !== 'none') tstRender();
+  }
+  function techRefresh() {
+    const h = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    document.querySelectorAll('[data-techslot]').forEach(sl => {
+      const k = sl.dataset.techslot,
+        cur = techCur(k),
+        L = techList(k);
+      sl.innerHTML =
+        `<span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><select style="width:140px;max-width:100%;font:12px var(--mono)">${cur ? '' : '<option value="">— choisis —</option>'}${L.map(n => `<option value="${h(n)}" ${n === cur ? 'selected' : ''}>${h(n)}</option>`).join('')}</select>` +
+        `<button class="cipBtn" data-tadd style="padding:1px 7px" title="Ajouter un nom de tableau techno à la liste">＋</button><button class="cipBtn" data-tdel style="padding:1px 7px" title="Enlever ce nom de la liste">✕</button></span>`;
+      sl.querySelector('select').onchange = e => techSet(k, e.target.value);
+      sl.querySelector('[data-tadd]').onclick = () => {
+        const v = (prompt('Nom du tableau techno, EXACTEMENT comme sur la machine :', '') || '').trim();
+        if (!v) return;
+        if (/["',;]/.test(v)) {
+          alert('Pas de guillemet, virgule ou point-virgule dans le nom.');
+          return;
+        }
+        const l = techList(k).filter(n => n !== v);
+        l.unshift(v);
+        techSave(k, l);
+        techSet(k, v);
+      };
+      sl.querySelector('[data-tdel]').onclick = () => {
+        const c = techCur(k);
+        if (!c) return;
+        const l = techList(k).filter(n => n !== c);
+        techSave(k, l);
+        techSet(k, l[0] || '');
+      };
+    });
+  }
+  function techVar() {
+    const v = String(($('cipLVar') || {}).value || '').trim() || 'TM_LTTNAME';
+    return /^[A-Za-z_][A-Za-z0-9_]{0,31}$/.test(v) ? v : null;
+  }
+  function parNo(id, def) {
+    const e = $(id);
+    const v = e ? String(e.value).trim() : '';
+    if (v === '') return def;
+    return /^\d{1,4}$/.test(v) ? +v : null;
+  }
+  // v83 : programme AÉRÉ : une ligne vide avant chaque titre (;----- / ;===), jamais deux lignes vides de suite
+  function airLST(B) {
+    const out = [];
+    for (const l of B) {
+      if (l === '' && (!out.length || out[out.length - 1] === '')) continue;
+      if (/^;(-----|===)/.test(l) && out.length && out[out.length - 1] !== '') out.push('');
+      out.push(l);
+    }
+    return out;
+  }
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  // v92 PROGRAMME SIMPLE (découpe, tube rond, BA1) — comme le programme test de Seb qui coupe nickel :
+  //  · tête droite (B 0), TRAFOOF + SET_POS + fgroup/FGREF : X le long du tube, C1 = rotation, Z = hauteur buse
+  //  · tours (bout, séparation) = UNE ligne C1 · trous ronds = cycle TC_CIRC2 · le reste = lignes G01 X / C1
+  //  · biseau (tête inclinée) en 1er contour : TRAORI seulement pour placer la tête, la coupe = une ligne C1 en TRAFOOF
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  function simpleVals() {
+    const g = (id, d) => {
+      const e = $(id);
+      const s = e ? String(e.value).trim() : '';
+      if (s === '') return d;
+      return /^-?\d+(\.\d+)?$/.test(s) ? +s : NaN;
+    };
+    const tri = (k, d) => [g('cipSm' + k + 'M', d[0]), g('cipSm' + k + 'P', d[1]), g('cipSm' + k + 'C', d[2])];
+    const v = {
+      zh: g('cipSmZ', 5),
+      ring: tri('R', [11, 0, 300]),
+      hole: tri('H', [9, 11, 300]),
+      ap: g('cipSmHA', 0.5),
+      line: tri('L', [11, 0, 300]),
+      trao: tri('T', [11, 0, 300])
+    };
+    const all = [v.zh, v.ap].concat(v.ring, v.hole, v.line, v.trao);
+    if (all.some(x => !isFinite(x))) return { err: 'Programme simple : un des réglages n’est pas un nombre.' };
+    if (!(v.zh >= 1 && v.zh <= 20)) return { err: 'Programme simple : hauteur de buse entre 1 et 20 mm.' };
+    return v;
+  }
+  function simpleOn() {
+    return !S._simpleOff && !!($('cipLSimple') && $('cipLSimple').checked);
+  }
+  // cercle par 3+ points (moindres carrés) -> {u, v, r, dev}
+  function fitCircle(P) {
+    let su = 0,
+      sv = 0;
+    P.forEach(p => {
+      su += p[0];
+      sv += p[1];
+    });
+    const mu = su / P.length,
+      mv = sv / P.length;
+    let Suu = 0,
+      Svv = 0,
+      Suv = 0,
+      Suuu = 0,
+      Svvv = 0,
+      Suvv = 0,
+      Svuu = 0;
+    P.forEach(p => {
+      const u = p[0] - mu,
+        v = p[1] - mv;
+      Suu += u * u;
+      Svv += v * v;
+      Suv += u * v;
+      Suuu += u * u * u;
+      Svvv += v * v * v;
+      Suvv += u * v * v;
+      Svuu += v * u * u;
+    });
+    const det = Suu * Svv - Suv * Suv;
+    if (Math.abs(det) < 1e-12) return null;
+    const a = (Suuu + Suvv) / 2,
+      b = (Svvv + Svuu) / 2;
+    const uc = (a * Svv - b * Suv) / det,
+      vc = (b * Suu - a * Suv) / det;
+    const r = Math.sqrt(uc * uc + vc * vc + (Suu + Svv) / P.length);
+    let dev = 0;
+    P.forEach(p => {
+      dev = Math.max(dev, Math.abs(Math.hypot(p[0] - mu - uc, p[1] - mv - vc) - r));
+    });
+    return { u: uc + mu, v: vc + mv, r, dev };
+  }
+  // simplification d'une polyligne (Douglas-Peucker) en coordonnées déroulées (mm)
+  function dpSimplify(P, tol) {
+    if (P.length < 3) return P.map((_, i) => i);
+    const keep = new Array(P.length).fill(false);
+    keep[0] = keep[P.length - 1] = true;
+    const st = [[0, P.length - 1]];
+    const sub = (a, b) => a.map((x, i) => x - b[i]);
+    const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
+    while (st.length) {
+      const [a, b] = st.pop();
+      const d = sub(P[b], P[a]),
+        l2 = dot(d, d);
+      let im = -1,
+        dm = tol;
+      for (let i = a + 1; i < b; i++) {
+        const w = sub(P[i], P[a]);
+        const t = l2 > 1e-12 ? Math.max(0, Math.min(1, dot(w, d) / l2)) : 0;
+        const e = w.map((x, j) => x - t * d[j]);
+        const dd = Math.sqrt(dot(e, e));
+        if (dd > dm) {
+          dm = dd;
+          im = i;
+        }
+      }
+      if (im >= 0) {
+        keep[im] = true;
+        st.push([a, im], [im, b]);
+      }
+    }
+    return keep.map((k, i) => (k ? i : -1)).filter(i => i >= 0);
+  }
+  function simpleBody(x) {
+    const { o, C, posMode, dry, TV, sh, fg } = x;
+    const pr = S.profile;
+    let Rr = pr && pr.type === 'rond' ? pr.R : null;
+    if (pr && !Rr && pr.out && pr.out.length > 8) {
+      // profil « perso » mais rond quand même (tube tourné dans le mandrin)
+      let a = 1e9,
+        b = 0;
+      pr.out.forEach(q => {
+        const r = Math.hypot(q[0], q[1]);
+        a = Math.min(a, r);
+        b = Math.max(b, r);
+      });
+      if (b - a < 0.02) Rr = (a + b) / 2;
+    }
+    if (!Rr)
+      return { err: 'Programme simple : seulement pour un tube ROND. Décoche « Programme simple » pour ce tube.' };
+    if (o.trafo !== 'BA1') return { err: 'Programme simple : seulement mandrin à 90° (BA1).' };
+    if (!posMode)
+      return {
+        err: 'Programme simple : il faut le départ « SET_POS » (pointe posée sur le départ, comme tes rondelles). Choisis-le à l’étape 3 de l’assistant, ou décoche « Programme simple ».'
+      };
+    const v = simpleVals();
+    if (v.err) return v;
+    const R = Rr,
+      zh = v.zh,
+      zt = zh + 5;
+    const A = dry ? ';A VIDE ' : '';
+    const ySg = o.xdir === '-X' ? 1 : -1; // Y machine = ySg * côté (repère du modèle tourné)
+    const cuts = C.map((c, ci) => F.filter(f => f.ci === ci && f.j >= 0));
+    const nm = ci =>
+      C[ci].name
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^\x20-\x7e]/g, '');
+    // un point vu de la MACHINE (sans TRAORI) : X le long du tube, Y sur le côté, C1, faisceau vertical ?
+    const mach = f => {
+      const Pm = rotM(f.p, f.th),
+        Dm = rotM(f.d, f.th);
+      const q = toLst(f.p, f.d, f.th, o);
+      return {
+        X: q.X,
+        Y: ySg * Pm[0],
+        H: Pm[2],
+        C: q.C,
+        B: q.B,
+        vert: Math.abs(Dm[0]) < 0.006 && Math.abs(Dm[1]) < 0.006 && Dm[2] < 0
+      };
+    };
+    // pointe au-dessus de l'axe (Y machine 0), à la hauteur R + z, pour l'angle de mandrin de ce point
+    const topOf = (f, z) => {
+      const Pm = [0, f.p[1], R + z];
+      return toLst(rotM(Pm, -f.th), rotM([0, 0, -1], -f.th), f.th, o);
+    };
+    // 1. classer chaque contour
+    const K = [];
+    for (let ci = 0; ci < C.length; ci++) {
+      const fr = cuts[ci];
+      if (!fr.length) {
+        K.push(null);
+        continue;
+      }
+      const M = fr.map(mach);
+      let flat = true,
+        xmin = 1e9,
+        xmax = -1e9,
+        ymax = 0,
+        bmin = 1e9,
+        bmax = -1e9;
+      M.forEach(q => {
+        if (!q.vert || q.H < R * 0.3 || q.H > R + 0.15) flat = false; // faisceau vertical (sur le dessus ou décalé sur le côté)
+        xmin = Math.min(xmin, q.X);
+        xmax = Math.max(xmax, q.X);
+        ymax = Math.max(ymax, Math.abs(q.Y));
+        bmin = Math.min(bmin, q.B);
+        bmax = Math.max(bmax, q.B);
+      });
+      const cspan = Math.abs(M[M.length - 1].C - M[0].C);
+      const ringX = cspan >= 359 && xmax - xmin < 0.05;
+      if (ci === 0 && ringX && bmax - bmin < 0.3 && Math.abs(M[0].B) >= 0.3) {
+        K.push({ t: 'bis', M, fr });
+        continue;
+      }
+      if (!flat || ymax > R * 0.95) {
+        K.push({ t: 'trao', M, fr }); // tête inclinée : ce contour passe en TRAORI
+        continue;
+      }
+      if (ringX && ymax < 0.02) {
+        K.push({ t: 'ring', M, fr });
+        continue;
+      }
+      // trou rond ? (sans l'entrée / le dépassement du soft : TC_CIRC2 a les siens)
+      const a0 = C[ci].leadN || 0,
+        a1 = M.length - 1 - (C[ci].overN || 0);
+      const core = M.slice(a0, a1 + 1);
+      let hole = null;
+      if (core.length >= 8) {
+        const c0 = core[0].C;
+        const cFix = core.every(q => Math.abs(q.C - c0) < 0.05);
+        // tête fixe (C1 bloqué) : cercle dans le plan X / Y de la machine ; sinon cercle sur le tube déroulé
+        const pts = cFix ? core.map(q => [q.X, q.Y]) : core.map(q => [q.X, R * q.C * DEG]);
+        const fc = fitCircle(pts);
+        const cl = Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]);
+        if (
+          fc &&
+          fc.dev < 0.03 &&
+          cl < Math.max(0.2, 0.15 * fc.r) &&
+          fc.r > 0.2 &&
+          fc.r < R * 0.6 &&
+          (cFix || ymax < 0.02)
+        )
+          hole = cFix ? { X: fc.u, Y: fc.v, C: c0, D: 2 * fc.r } : { X: fc.u, Y: 0, C: fc.v / (R * DEG), D: 2 * fc.r };
+      }
+      if (hole) {
+        K.push({ t: 'hole', M, fr, hole });
+        continue;
+      }
+      // trou oblong ? (tête fixe, C1 bloqué) -> cycle TC_RECT2 (rayon d'angle = largeur / 2)
+      if (core.length >= 8 && core.every(q => Math.abs(q.C - core[0].C) < 0.05)) {
+        const pts = core.map(q => [q.X, q.Y]);
+        const mx = pts.reduce((s, p) => s + p[0], 0) / pts.length,
+          my = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+        let sxx = 0,
+          syy = 0,
+          sxy = 0;
+        pts.forEach(p => {
+          sxx += (p[0] - mx) ** 2;
+          syy += (p[1] - my) ** 2;
+          sxy += (p[0] - mx) * (p[1] - my);
+        });
+        let an = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+        {
+          // angle affiné : celui qui donne la largeur la plus petite
+          const wid = a => {
+            let lo = 1e9,
+              hi = -1e9;
+            pts.forEach(p => {
+              const t = -(p[0] - mx) * Math.sin(a) + (p[1] - my) * Math.cos(a);
+              lo = Math.min(lo, t);
+              hi = Math.max(hi, t);
+            });
+            return hi - lo;
+          };
+          let best = an,
+            bw = wid(an);
+          for (let d = -3; d <= 3; d += 0.02) {
+            const a = an + (d * Math.PI) / 180,
+              w = wid(a);
+            if (w < bw) {
+              bw = w;
+              best = a;
+            }
+          }
+          an = best;
+        }
+        const ca = Math.cos(an),
+          sa = Math.sin(an);
+        const ST = pts.map(p => [(p[0] - mx) * ca + (p[1] - my) * sa, -(p[0] - mx) * sa + (p[1] - my) * ca]);
+        let s0 = 1e9,
+          s1 = -1e9,
+          t0 = 1e9,
+          t1 = -1e9;
+        ST.forEach(p => {
+          s0 = Math.min(s0, p[0]);
+          s1 = Math.max(s1, p[0]);
+          t0 = Math.min(t0, p[1]);
+          t1 = Math.max(t1, p[1]);
+        });
+        const Lo = s1 - s0,
+          Wo = t1 - t0,
+          cs = (s0 + s1) / 2,
+          ct = (t0 + t1) / 2,
+          hl = (Lo - Wo) / 2;
+        let dev = 0;
+        ST.forEach(p => {
+          const s = Math.max(-hl, Math.min(hl, p[0] - cs));
+          dev = Math.max(dev, Math.abs(Math.hypot(p[0] - cs - s, p[1] - ct) - Wo / 2));
+        });
+        const cl = Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]);
+        if (Lo > Wo + 0.2 && Wo > 0.4 && dev < 0.03 && cl < 0.3) {
+          let deg = (an * 180) / Math.PI;
+          if (deg > 90) deg -= 180;
+          if (deg <= -90) deg += 180;
+          K.push({
+            t: 'obl',
+            M,
+            fr,
+            obl: { X: mx + cs * ca - ct * sa, Y: my + cs * sa + ct * ca, C: core[0].C, L: Lo, W: Wo, a: deg }
+          });
+          continue;
+        }
+      }
+      K.push({
+        t: 'line',
+        M,
+        fr,
+        keep: dpSimplify(
+          M.map(q => [q.X, q.Y, R * q.C * DEG]),
+          0.01
+        )
+      });
+    }
+    const first = K.findIndex(k => k && k.t !== 'bis');
+    if (first < 0) return { err: 'Programme simple : aucun contour.' };
+    const hasBis = !!(K[0] && K[0].t === 'bis');
+    const out = [];
+    const f0 = cuts.find(c => c.length)[0];
+    const q0 = toLst(f0.p, f0.d, f0.th, o);
+    const info = { ring: 0, hole: 0, line: 0, bis: 0, trao: 0 };
+    const FG = [
+      'fgroup(X,Y,Z,c1)',
+      `FGREF [c1] = ${(+fg).toFixed(3)} ;rayon du tube : la vitesse est tenue SUR le tube`
+    ];
+    const LON = t => A + `TC_LASER_ON(${t[0]},${TV},${t[1]},${t[2]})`;
+    // 2. biseau (1er contour, tête inclinée) : TRAORI pour se placer, la coupe = 1 ligne C1 sans TRAORI
+    if (hasBis) {
+      const k = K[0];
+      const f = k.fr[0];
+      const a = toLst(V.sub(f.p, V.mul(f.d, 30 + (dry ? 3 : 0))), f.d, f.th, o);
+      out.push(
+        `;----- CONTOUR 1 : ${nm(0)} (tete inclinee B ${n3(k.M[0].B)}) -----`,
+        lstMv(a) + " ;pre-approche 30 mm dans l'axe du faisceau",
+        lstMv(toLst(sh(f), f.d, f.th, o)) + ' ;tete placee sur le biseau',
+        'TRAFOOF ;la coupe : juste la rotation du mandrin',
+        ...FG,
+        LON(v.ring),
+        `G01 C1 = ${n3(k.M[k.M.length - 1].C)}`,
+        A + 'TC_LASER_OFF(2)',
+        'TC_SET_TRAFO("BA1")',
+        'TRAORI(1)'
+      );
+      info.bis++;
+    }
+    // 3. passage en mode simple : buse au-dessus du tube, tête droite, au départ des coupes
+    const fr0 = K[first].fr[0];
+    const Xref = toLst(fr0.p, fr0.d, fr0.th, o).X;
+    if (hasBis) {
+      out.push('', ';----- tete droite, au-dessus du depart des coupes -----');
+      F.filter(f => f.ci === first && f.j < 0).forEach(f => out.push(lstMv(toLst(f.p, f.d, f.th, o))));
+      out.push(lstMv(topOf(fr0, 30)));
+    } else if (!posMode) {
+      out.push(lstMv(topOf(fr0, 30)) + ' ;au-dessus du depart');
+    }
+    out.push(
+      lstMv(topOf(fr0, zh)) + ` ;buse ${n3(zh)} mm au-dessus du tube`,
+      'TRAFOOF',
+      `SET_POS(0.000, 0.000, ${n3(zh)}) ;ici : X = 0, Z = 0 = la surface du tube`,
+      ...FG
+    );
+    // 4. les coupes
+    const c0r = mach(fr0).C;
+    let cx = 0,
+      cy = 0,
+      cc = c0r,
+      lastTh = fr0.th;
+    const xyc = (xx, yy, c) => {
+      const s = [];
+      if (Math.abs(xx - cx) > 5e-4) s.push(`X = ${n3(xx)}`);
+      if (Math.abs(yy - cy) > 5e-4) s.push(`Y = ${n3(yy)}`);
+      if (Math.abs(c - cc) > 5e-4) s.push(`C1 = ${n3(c)}`);
+      cx = xx;
+      cy = yy;
+      cc = c;
+      return s.length ? 'G01 ' + s.join(' ') : null;
+    };
+    const go = (xx, yy, c, lab) => {
+      const L = [];
+      const far = Math.abs(xx - cx) > 5e-4 || Math.abs(yy - cy) > 5e-4 || Math.abs(c - cc) > 5e-4;
+      if (far) {
+        L.push(`G01 Z = ${n3(zt)}`);
+        L.push(xyc(xx, yy, c) + (lab ? ' ;' + lab : ''));
+      }
+      L.push(`G01 Z = ${n3(zh)}`);
+      return L;
+    };
+    for (let ci = first; ci < K.length; ci++) {
+      const k = K[ci];
+      if (!k) continue;
+      out.push('', `;----- CONTOUR ${ci + 1} : ${nm(ci)} -----`);
+      if (k.t === 'ring') {
+        const s = k.M[0],
+          e = k.M[k.M.length - 1];
+        out.push(...go(s.X - Xref, 0, s.C), LON(v.ring), xyc(cx, 0, e.C), A + 'TC_LASER_OFF(2)');
+        lastTh = k.fr[k.fr.length - 1].th;
+        info.ring++;
+      } else if (k.t === 'hole') {
+        const h = k.hole;
+        out.push(
+          ...go(h.X - Xref, h.Y, h.C, 'centre du trou'),
+          `R1 = ${n3(h.X - Xref)} R2 = ${n3(h.Y)} R3 = 0 R4 = 0 R5 = ${n3(h.C)} ;centre du trou : X Y Z B C1`,
+          A + `TC_CIRC2(${n3(h.D)},${n3(v.ap)},0,${v.hole[0]},${v.hole[1]},${v.hole[2]},${TV}) ;trou D${n3(h.D)}`
+        );
+        lastTh = k.fr[0].th;
+        info.hole++;
+      } else if (k.t === 'obl') {
+        const h = k.obl;
+        out.push(
+          ...go(h.X - Xref, h.Y, h.C, 'centre de l oblong'),
+          `R1 = ${n3(h.X - Xref)} R2 = ${n3(h.Y)} R3 = 0 R4 = 0 R5 = ${n3(h.C)} R9 = ${n3(Math.abs(h.a) < 0.05 ? 0 : h.a)} ;centre : X Y Z B C1 + rotation`,
+          A +
+            `TC_RECT2(${n3(h.L)},${n3(h.W)},${n3(h.W / 2)},${n3(v.ap)},0,${v.hole[0]},${v.hole[1]},${v.hole[2]},${TV}) ;oblong ${n3(h.L)} x ${n3(h.W)}`
+        );
+        lastTh = k.fr[0].th;
+        info.hole++;
+      } else if (k.t === 'line') {
+        const P = k.keep.map(i => k.M[i]);
+        out.push(...go(P[0].X - Xref, P[0].Y, P[0].C), LON(v.line));
+        for (let i = 1; i < P.length; i++) {
+          const l = xyc(P[i].X - Xref, P[i].Y, P[i].C);
+          if (l) out.push(l);
+        }
+        out.push(A + 'TC_LASER_OFF(2)');
+        lastTh = k.fr[k.keep[k.keep.length - 1]].th;
+        info.line++;
+      } else {
+        // tête inclinée : ce contour passe en TRAORI ; on dit à la machine où est la pointe, et au retour pareil
+        const f = k.fr[0],
+          fe = k.fr[k.fr.length - 1];
+        const ms = mach(f),
+          me = mach(fe);
+        out.push(`G01 Z = ${n3(zt)}`);
+        const l = xyc(ms.X - Xref, 0, ms.C);
+        if (l) out.push(l + ' ;au-dessus du depart');
+        const ts = topOf(f, zt);
+        out.push(
+          ';(tete inclinee : ce contour se fait en TRAORI)',
+          'TC_SET_TRAFO("BA1")',
+          'TRAORI(1)',
+          `SET_POS(${n3(ts.X)}, ${n3(ts.Y)}, ${n3(ts.Z)}) ;on dit a la machine ou est la pointe (en TRAORI)`,
+          'FGROUP() ;vitesse normale TRAORI (a la pointe)',
+          lstMv(toLst(V.sub(f.p, V.mul(f.d, 30)), f.d, f.th, o)) + " ;pre-approche 30 mm dans l'axe du faisceau",
+          lstMv(toLst(sh(f), f.d, f.th, o)) + ' ;depart du contour',
+          LON(v.trao)
+        );
+        for (const bl of fitBlocks(k.fr.map(ff => toLst(sh(ff), ff.d, ff.th, o)))) out.push(lineOf(bl));
+        out.push(
+          A + 'TC_LASER_OFF(2)',
+          lstMv(toLst(V.sub(fe.p, V.mul(fe.d, 30)), fe.d, fe.th, o)) + ' ;tete levee de 30 mm',
+          lstMv(topOf(fe, zt)) + ' ;tete droite au-dessus du tube',
+          'TRAFOOF',
+          `SET_POS(${n3(me.X - Xref)}, 0.000, ${n3(zt)}) ;retour sans TRAORI (memes reperes qu avant)`,
+          ...FG
+        );
+        cx = me.X - Xref;
+        cy = 0;
+        cc = me.C;
+        lastTh = fe.th;
+        info.trao++;
+      }
+    }
+    // 5. fin : tout revient comme au lancement
+    out.push('', ';----- fin : retour a la position de depart -----', 'G01 Z = 30.000 F10000 ;tete en l air');
+    let inTrao = false;
+    if (posMode) {
+      if (!hasBis) {
+        const m0 = mach(f0);
+        out.push(
+          `G01 G90 C1 = ${n3(q0.C)} ;le mandrin refait ses tours a l envers -> angle de depart`,
+          `G01 X = 0.000 Y = ${n3(m0.Y)}`,
+          `G01 Z = ${n3(m0.H - R)} ;pointe sur le depart : tout est comme au lancement`
+        );
+      } else {
+        // la tête doit revenir inclinée sur le biseau : on repasse en TRAORI (on redit où est la pointe)
+        const Pm = [0, fr0.p[1], R + 30];
+        const qn = toLst(rotM(Pm, -lastTh), rotM([0, 0, -1], -lastTh), lastTh, o);
+        const a0 = toLst(V.sub(f0.p, V.mul(f0.d, 30)), f0.d, f0.th, o);
+        out.push(
+          'G01 X = 0.000 Y = 0.000',
+          'TC_SET_TRAFO("BA1")',
+          'TRAORI(1)',
+          `SET_POS(${n3(qn.X)}, ${n3(qn.Y)}, ${n3(qn.Z)}) ;on redit a la machine ou est la pointe (en TRAORI)`,
+          'TRAFOOF',
+          `G01 G90 C1 = ${n3(q0.C)} F10000 ;le mandrin refait ses tours a l envers -> angle de depart`,
+          'TC_SET_TRAFO("BA1")',
+          'TRAORI(1)',
+          lstMv(a0) + ' ;au-dessus du depart',
+          lstMv(q0) + ' ;pointe sur le depart : tout est comme au lancement'
+        );
+        inTrao = true;
+      }
+    }
+    out.push(
+      '',
+      ';----- fin de programme -----',
+      ...(inTrao ? ['TRAFOOF'] : []),
+      'G500',
+      'G90',
+      ...(posMode
+        ? [';(tout est revenu a la position de depart)']
+        : [
+            'G01 Z = 350 F10000 ;tete en haut',
+            'G01 B = 0 C1 =0',
+            'G01 Y = 200',
+            ';(position de depart du gabarit : prete pour la piece suivante)'
+          ]),
+      '',
+      'TC_LASER_REQUEST(0)',
+      'TC_RESET',
+      'TC_OPEN_DOOR(0,1,0,0)',
+      '',
+      'M30'
+    );
+    return { lines: out, info };
+  }
   function lstMv(q, f) {
     return ` G01 X = ${n3(q.X)} Y = ${n3(q.Y)} Z = ${n3(q.Z)} B = ${n3(q.B)} C1 = ${n3(q.C)}` + (f ? ' ' + f : '');
   }
@@ -12969,17 +15025,18 @@ function cip_build() {
       .toUpperCase()
       .replace(/[^A-Z0-9_-]+/g, '-')
       .replace(/^-+|-+$/g, '');
-    if (prog && $('cipLDry').checked && !/-VIDE$/.test(prog)) prog += '-VIDE';
     if (!prog) return { err: 'Donne un nom au programme.' };
     let tech;
     if (kind === 'soudure') {
-      tech = ($('cipLTW').value || '').trim();
-      if (!tech) return { err: 'Donne le nom de la techno soudure (table WTT), comme dans TC_WELD_ON.' };
+      tech = techCur('W');
+      if (!tech) return { err: 'Choisis le tableau techno soudure (WTT) dans la liste (＋ pour en ajouter un).' };
     } else {
-      const t = lttTable();
-      if (!t) return { err: 'Table techno découpe introuvable.' };
-      tech = t.name;
+      if (!lttTable()) return { err: 'Table techno découpe introuvable.' };
+      tech = techCur('C');
+      if (!tech) return { err: 'Choisis le tableau techno découpe (LTT) dans la liste (＋ pour en ajouter un).' };
     }
+    const TV = techVar();
+    if (!TV) return { err: 'Nom de variable du tableau techno invalide (lettres, chiffres, _ ; ex : TM_LTTNAME).' };
     if (/["',]/.test(tech)) return { err: 'Le nom de techno ne doit pas contenir de guillemet ni de virgule.' };
     const OX = $('cipLOX').value,
       OY = $('cipLOY').value,
@@ -13002,10 +15059,19 @@ function cip_build() {
     const WM = ($('cipLWMode') && $('cipLWMode').value) || '10',
       WP = ($('cipLWPage') && $('cipLWPage').value) || '100',
       WO = ($('cipLWOff') && $('cipLWOff').value) || '10';
+    // v76 : n° de paramètre choisi par toi (1er chiffre de TC_WELD_ON / TC_LASER_ON)
+    const WN = parNo('cipLWNo', 1),
+      CN = parNo('cipLCNo', 11);
+    if (WN === null || CN === null) return { err: 'Le n° de paramètre doit être un nombre entier (ex : 1, 2, 11…).' };
     const ON = W
-      ? rot => `TC_WELD_ON(1, "${tech}", ${WM}, ${WP});` + (rot > 0 ? ' ROTATIONCW' : rot < 0 ? ' ROTATIONCCW' : '')
-      : () => `TC_LASER_ON(11,"${tech}",0,300)`;
+      ? rot => `TC_WELD_ON(${WN}, "${tech}", ${WM}, ${WP});` + (rot > 0 ? ' ROTATIONCW' : rot < 0 ? ' ROTATIONCCW' : '')
+      : () => `TC_LASER_ON(${CN},${TV},0,300)`;
+    const TLINE = `${TV}="${tech}" ;nom du tableau techno : pour en prendre un autre, change juste cette ligne`;
     const OFF = W ? `TC_WELD_OFF(3,${WO}) ;(00 sans pente,10 avec pente)` : 'TC_LASER_OFF(2)';
+    // v65 : FIN SIMPLE (comme à la main) : on lève la tête, TRAFOOF, puis tous les axes reviennent en coordonnées MACHINE
+    // SET_POS : là où ils étaient au lancement (mémorisés au début) ; SET_G54 : position de dégagement du gabarit (Z 350, C1 0)
+    const simpleEnd = !!(S.prog.home && !S.prog.home.noUnw);
+
     // en-tête du corps (gabarits)
     if (W) {
       B.push(
@@ -13031,6 +15097,7 @@ function cip_build() {
     } else {
       B.push(
         'TC_RESET',
+        TLINE,
         'G71',
         'g90',
         'TC_DYNAMIC_LEVEL(0)',
@@ -13039,7 +15106,7 @@ function cip_build() {
         ';TC_DIST(1);distance buse piece en mm',
         g54,
         'G01 F = 2000',
-        'TC_LASER_REQUEST(1)'
+        'TC_LASER_REQUEST(2)'
       );
     }
     B.push(";=== mouvements generes par l'onglet CIP Trumpf (CNC 3018) ===");
@@ -13054,6 +15121,50 @@ function cip_build() {
           DRYOFF +
           ' mm vers la tete (pas de palpage laser eteint) !!!'
       );
+    if (!W && simpleOn()) {
+      const sr = simpleBody({ o, C, posMode, dry, TV, sh, fg });
+      if (sr.err) {
+        // pas possible pour cette pièce : on sort le programme normal (TRAORI) et on le dit
+        S._simpleOff = true;
+        try {
+          const nr = genLST();
+          if (nr && !nr.err)
+            nr.warn = sr.err.replace(/ ?Décoche[^.]*\./, '') + ' → programme normal (TRAORI) généré à la place.';
+          return nr;
+        } finally {
+          S._simpleOff = false;
+        }
+      }
+      B.splice(
+        B.indexOf(";=== mouvements generes par l'onglet CIP Trumpf (CNC 3018) ==="),
+        1,
+        ';=== PROGRAMME SIMPLE : tete droite, sans TRAORI ni CIP (TC_CIRC2 pour les trous) ==='
+      );
+      {
+        const i = B.findIndex(l => /^;!!! A VIDE : toute la trajectoire/.test(l));
+        if (i >= 0) B.splice(i, 1, ';!!! A VIDE : la buse reste au-dessus du tube (pas de palpage laser eteint) !!!');
+      }
+      B.push(...sr.lines);
+      const L = lstHead(prog, kind, tech).concat(airLST([';----- reglages -----'].concat(B)), [
+        'STOP_TEXT',
+        'C',
+        'ENDE_PROGRAMM',
+        'C'
+      ]);
+      L.push(...lttTable().table.split('\n'), 'C', 'ED');
+      const txt = L.join('\r\n').replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '') + '\r\n';
+      if (/NaN|Infinity/.test(txt)) return { err: 'Calcul invalide (NaN) : le programme n’est pas généré.' };
+      // simu : la même trajectoire écrite en TRAORI (le simulateur ne relit que TRAORI)
+      S._simpleOff = true;
+      let simTxt = null;
+      try {
+        const nr = genLST();
+        simTxt = nr && nr.txt;
+      } finally {
+        S._simpleOff = false;
+      }
+      return { txt, sim: simTxt, file: prog + '.LST', kind, tech, n: C.length, o, simple: sr.info };
+    }
     for (let ci = 0; ci < C.length; ci++) {
       const fr = F.filter(f => f.ci === ci);
       const rap = fr.filter(f => f.j < 0),
@@ -13090,7 +15201,13 @@ function cip_build() {
               [C[ci].mOv, C[ci].mRamp !== undefined ? C[ci].mRamp : Q.length - 1, ';recouvrement'],
               [C[ci].mRamp !== undefined ? C[ci].mRamp : Q.length - 1, Q.length - 1, ';pente de fin']
             ]
-          : [[0, Q.length - 1, null]];
+          : C[ci].leadN || C[ci].overN
+            ? [
+                [0, C[ci].leadN || 0, null],
+                [C[ci].leadN || 0, Q.length - 1 - (C[ci].overN || 0), null],
+                [Q.length - 1 - (C[ci].overN || 0), Q.length - 1, null]
+              ]
+            : [[0, Q.length - 1, null]];
       for (const [a, b, lab] of segs) {
         if (b <= a) continue;
         if (lab) B.push(lab);
@@ -13099,16 +15216,50 @@ function cip_build() {
       B.push('', (dry ? ';A VIDE ' : '') + OFF, '');
     }
     {
-      const hm = S.prog.home ? F.filter(f => f.ci === S.prog.home.ci) : [];
-      if (hm.length) {
+      const hm = S.prog.home && !simpleEnd ? F.filter(f => f.ci === S.prog.home.ci) : [];
+      if (simpleEnd) {
+        const fl = F.filter(f => f.ci < S.prog.home.ci).pop() || F[F.length - 1];
+        B.push(
+          ';----- fin : on leve la tete, puis tous les axes reviennent a la position de depart -----',
+          lstMv(toLst(V.sub(sh(fl), V.mul(fl.d, 30)), fl.d, fl.th, o), W ? 'f5000' : '') +
+            " ;tete levee de 30 mm dans l'axe du faisceau"
+        );
+        if (posMode) {
+          // v66 : le mandrin refait ses tours A L'ENVERS jusqu'à l'angle de départ (valeur en clair), tête en l'air,
+          // puis la pointe revient sur le départ : TOUT est comme au lancement
+          const f0 = F.find(x => x.j >= 0);
+          const q0 = toLst(f0.p, f0.d, f0.th, o);
+          const a0 = toLst(V.sub(f0.p, V.mul(f0.d, 30 + DRYOFF)), f0.d, f0.th, o);
+          B.push(
+            'TRAFOOF',
+            `G01 G90 C1 = ${n3(q0.C)} F10000 ;le mandrin refait ses tours a l envers -> angle de depart`,
+            `TC_SET_TRAFO("${o.trafo}")`,
+            'TRAORI(1)',
+            lstMv(a0) + ' ;au-dessus du depart',
+            lstMv(q0) + ' ;pointe sur le depart : tout est comme au lancement, pret pour la piece suivante'
+          );
+        }
+      } else if (hm.length) {
         B.push(';----- retour au point de depart -----');
         let fset = false;
-        homeLines(hm, o, sh).forEach(l => {
+        const HL = homeLines(hm, o, sh);
+        let lastF = -1;
+        HL.forEach((l, k) => {
+          if (l.f) lastF = k;
+        });
+        HL.forEach((l, k) => {
           if (l.t) return B.push(l.t);
+          // v62 : le DERNIER point = le départ EXACT (pas reculé « à vide ») : la pointe est où le SET_POS l'attend
+          // -> la pièce suivante repart pile pareil (sinon à vide on remontait de 3 mm à chaque cycle)
+          if (k === lastF && DRYOFF) {
+            B.push(lstMv(toLst(l.f.p, l.f.d, l.f.th, o)) + ' ;pointe sur le depart : pret pour la piece suivante');
+            return;
+          }
           // 1re ligne de déplacement du retour : f5000 en soudure (sinon : vitesse de soudure, très lent)
           const fx = W && !fset ? 'f5000 ;retour rapide (laser coupe)' : '';
           fset = true;
-          B.push(lstMv(toLst(sh(l.f), l.f.d, l.f.th, o), fx));
+          const ln = lstMv(toLst(sh(l.f), l.f.d, l.f.th, o), fx);
+          if (ln !== B[B.length - 1]) B.push(ln); // pas 2 fois la même ligne
         });
         B.push('');
       } else {
@@ -13118,20 +15269,31 @@ function cip_build() {
         );
       }
     }
-    const park = !S.prog.home;
+    const park = !S.prog.home || (simpleEnd && !posMode);
+    const PARK = [
+      'G01 Z = 350 F10000 ;tete en haut',
+      'G01 B = 0 C1 =0',
+      o.trafo === 'Bc1' ? 'G01 X =50 Y = 200' : 'G01 Y = 200',
+      ';(position de depart du gabarit : prete pour la piece suivante)'
+    ];
+
+    const ENDMV = simpleEnd ? (posMode ? [';(tout est revenu a la position de depart)'] : PARK) : null;
     if (W) {
       B.push(
         '',
+        ';----- fin de programme -----',
         'TRAFOOF',
         '',
         'G500',
         'G90',
-        ...(park
-          ? [
-              o.trafo === 'Bc1' ? 'G01 X =50 Y = 200 F10000' : 'G01 Y = 200 C1 =0 F10000',
-              o.trafo === 'Bc1' ? 'G01 Z = 350 B = 0 C1 =0' : 'G01 Z = 350 B = 0'
-            ]
-          : [';(tete laissee sur le point de depart, prete pour la piece suivante)']),
+        ...(ENDMV
+          ? ENDMV
+          : park
+            ? [
+                o.trafo === 'Bc1' ? 'G01 X =50 Y = 200 F10000' : 'G01 Y = 200 C1 =0 F10000',
+                o.trafo === 'Bc1' ? 'G01 Z = 350 B = 0 C1 =0' : 'G01 Z = 350 B = 0'
+              ]
+            : [';(tete laissee sur le point de depart, prete pour la piece suivante)']),
         '',
         'TC_AUX_LIGHT(5,0)',
         'TC_AUX_LIGHT(6,0)',
@@ -13141,8 +15303,31 @@ function cip_build() {
         '',
         'M30'
       );
-    } else B.push('M30');
-    const L = lstHead(prog, kind, tech).concat(B, ['STOP_TEXT', 'C', 'ENDE_PROGRAMM', 'C']);
+    } else
+      // v62 : découpe aussi : fin propre + PORTES OUVERTES (la tête est déjà sur le départ, prête pour la pièce suivante)
+      B.push(
+        '',
+        ';----- fin de programme -----',
+        'TRAFOOF',
+        '',
+        'G500',
+        'G90',
+        ...(ENDMV
+          ? ENDMV
+          : [park ? ';(tete degagee)' : ';(tete laissee sur le point de depart, prete pour la piece suivante)']),
+        '',
+        'TC_LASER_REQUEST(0)',
+        'TC_RESET',
+        'TC_OPEN_DOOR(0,1,0,0)',
+        '',
+        'M30'
+      );
+    const L = lstHead(prog, kind, tech).concat(airLST([';----- reglages -----'].concat(B)), [
+      'STOP_TEXT',
+      'C',
+      'ENDE_PROGRAMM',
+      'C'
+    ]);
     if (!W) {
       L.push(...lttTable().table.split('\n'), 'C');
     }
@@ -13153,10 +15338,162 @@ function cip_build() {
     return { txt, file: prog + '.LST', kind, tech, n: C.length, o };
   }
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  // §23b. CARTE D'ESSAI « RONDELLES » (v80) : programme à part, ne touche à RIEN d'autre.
+  //     Tube rond, BA1, tête à B = 0 sur le dessus, seul le mandrin tourne (1 tour par coupe, sens alterné).
+  //     Repère pièce TRAORI : X le long du tube, Y = R·sin(C1), Z = R·cos(C1) (comme les .LST validés).
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
+  function tstVals() {
+    const g = id => +(($(id) || {}).value || 0);
+    return {
+      D: g('cipTsD'),
+      w: g('cipTsW'),
+      n: Math.round(g('cipTsN')),
+      k: g('cipTsK'),
+      ov: g('cipTsO'),
+      dir: g('cipTsDir') < 0 ? -1 : 1,
+      sz: ($('cipTsSz') || {}).value || '100',
+      lm: ($('cipTsM') || {}).value,
+      lp: ($('cipTsP') || {}).value,
+      zh: Math.max(0, g('cipTsZ')),
+      dry: !!($('cipTsDry') || {}).checked,
+      name: ($('cipTsName') || {}).value || ''
+    };
+  }
+  // v81 : programme SIMPLE (comme à la main) : pas de TRAORI, pas de CIP. Une coupe = une ligne C1 (le mandrin
+  // tourne, la tête ne bouge pas), décalage en X, coupe, décalage… fin : Z monte, C1 à 0, X à 0, Z redescend.
+  // fgroup + FGREF [c1] = rayon : la vitesse de la table LTT est tenue SUR le tube pendant la rotation.
+  function tstGen() {
+    const v = tstVals();
+    const prog = String(v.name)
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (!prog) return { err: 'Donne un nom au programme.' };
+    if (!(v.D > 0.5)) return { err: 'Ø du tube invalide.' };
+    if (!(v.w > 0)) return { err: 'Largeur de rondelle invalide.' };
+    if (!(v.n >= 0 && v.n <= 200)) return { err: 'Nombre de rondelles : de 0 (juste affranchir) à 200.' };
+    if (!(v.k >= 0) || !(v.ov >= 0)) return { err: 'Saignée / dépassement : valeurs positives.' };
+    if (!(v.zh >= 0 && v.zh <= 20)) return { err: 'Hauteur de départ de la buse : entre 0 et 20 mm.' };
+    if (!lttTable()) return { err: 'Table techno découpe introuvable.' };
+    const tech = techCur('C');
+    if (!tech) return { err: 'Choisis le tableau techno (LTT) dans la liste.' };
+    const TV = techVar();
+    if (!TV) return { err: 'Nom de variable du tableau techno invalide (réglages avancés).' };
+    const CN = /^\d{1,3}$/.test(String(v.lm).trim()) ? +v.lm : null,
+      PC = /^\d{1,3}$/.test(String(v.lp).trim()) ? +v.lp : null;
+    if (CN === null || PC === null) return { err: 'Méthode / perçage : des nombres entiers (ex : 11 et 0).' };
+    const R = v.D / 2,
+      pitch = v.w + v.k,
+      ovDeg = (v.ov / R) * (180 / Math.PI),
+      nCut = v.n + 1,
+      A = v.dry ? ';A VIDE ' : '';
+    // v82 : programme AÉRÉ (blocs séparés par une ligne vide + un titre) : plus lisible sur la machine
+    const B = [
+      v.n
+        ? `;=== RONDELLES : tube D${n3(v.D)} - ${v.n} x ${n3(v.w)} mm - saignee ${n3(v.k)} - pas ${n3(pitch)} mm ===`
+        : `;=== AFFRANCHISSAGE : tube D${n3(v.D)} - une seule coupe ===`,
+      '',
+      ';----- reglages -----',
+      'TC_RESET',
+      `${TV}="${tech}" ;nom du tableau techno : pour en prendre un autre, change juste cette ligne`,
+      'G71',
+      'G90',
+      'TC_DYNAMIC_LEVEL(0)',
+      'TC_TRAFO_OFF ;pas de transformation : comme ton programme tole',
+      '',
+      ';----- depart -----',
+      "SET_POS(0.000, 0.000, 0.000) ;la pointe est sur le dessus du tube, au 1er trait de coupe (B 0, C1 0) : on part d'ici",
+      'G01 F = 2000',
+      'TC_LASER_REQUEST(2)',
+      `fgroup(X,Y,Z,c1)`,
+      `FGREF [c1] = ${n3(R)} ;vitesse de coupe tenue sur le tube (rayon ${n3(R)})`
+    ];
+    if (v.dry) B.push('', ';!!! TEST A VIDE : laser jamais allume (TC_LASER_ON / OFF en commentaire) !!!');
+    let c = 0;
+    for (let k = 0; k < nCut; k++) {
+      const x = v.dir * k * pitch;
+      B.push('', `;----- coupe ${k + 1}/${nCut} -----`);
+      // v91 : la buse part au-dessus du tube, le capteur va chercher la pièce (distance du tableau LTT)
+      B.push(`G01 Z = ${n3(v.zh)}` + (k === 0 ? ' ;buse au-dessus du tube : le capteur va chercher la piece' : ''));
+      if (k > 0) B.push(`G01 X = ${n3(x)} ;decalage`);
+      c = k % 2 === 0 ? -(360 + ovDeg) : 0; // un tour dans un sens, le suivant dans l'autre
+      B.push(A + `TC_LASER_ON(${CN},${TV},${PC},${v.sz})`, `G01 C1 = ${n3(c)}`, A + 'TC_LASER_OFF(2)');
+    }
+    B.push(
+      '',
+      ';----- fin : retour a la position de depart -----',
+      'G01 Z = 30.000 F10000 ;tete en l air',
+      'G01 G90 C1 = 0.000 ;mandrin a 0',
+      'G01 X = 0.000',
+      'G01 Z = 0.000 ;pointe sur le depart',
+      '',
+      ';----- fin de programme -----',
+      'G500',
+      'G90',
+      'TC_LASER_REQUEST(0)',
+      'TC_RESET',
+      'TC_OPEN_DOOR(0,1,0,0)',
+      '',
+      'M30'
+    );
+    const L = lstHead(prog, 'decoupe', tech).concat(B, ['STOP_TEXT', 'C', 'ENDE_PROGRAMM', 'C']);
+    L.push(...lttTable().table.split('\n'), 'C', 'ED');
+    const txt = L.join('\r\n').replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '') + '\r\n';
+    if (/NaN|Infinity/.test(txt)) return { err: 'Calcul invalide (NaN) : programme pas généré.' };
+    // pour la SIMU seulement : les mêmes mouvements écrits en repère pièce (le simulateur ne lit que TRAORI)
+    const Rd = R + (v.dry ? v.zh : 0),
+      Ru = R + 30;
+    const pt = (x, r, cc) => ({ X: x, Y: r * Math.sin(cc * DEG), Z: r * Math.cos(cc * DEG), B: 0, C: cc });
+    const S2 = ['TC_SET_TRAFO("BA1")', 'TRAORI(1)', lstMv(pt(0, Rd, 0))];
+    let cc = 0;
+    for (let k = 0; k < nCut; k++) {
+      const x = v.dir * k * pitch;
+      S2.push(lstMv(pt(v.dir * Math.max(0, k - 1) * pitch, R + v.zh, cc)));
+      if (k > 0) S2.push(lstMv(pt(x, R + v.zh, cc)));
+      S2.push(lstMv(pt(x, Rd, cc)));
+      const ce = k % 2 === 0 ? -(360 + ovDeg) : 0,
+        nA = Math.max(3, Math.ceil(Math.abs(ce - cc) / 120));
+      S2.push('TC_LASER_ON');
+      for (let a = 1; a <= nA; a++) {
+        const c0 = cc + ((ce - cc) * (a - 1)) / nA,
+          c1 = cc + ((ce - cc) * a) / nA;
+        S2.push(lineOf({ t: 'CIP', m: pt(x, Rd, (c0 + c1) / 2), e: pt(x, Rd, c1) }));
+      }
+      cc = ce;
+      S2.push('TC_LASER_OFF');
+    }
+    S2.push(lstMv(pt(v.dir * (nCut - 1) * pitch, Ru, cc)), 'TRAFOOF', 'G01 C1 = 0', 'TRAORI(1)');
+    S2.push(lstMv(pt(v.dir * (nCut - 1) * pitch, Ru, 0)), lstMv(pt(0, Ru, 0)), lstMv(pt(0, R, 0)));
+    return { txt, file: prog + '.LST', n: nCut, lines: B.length, sim: S2.join('\n') };
+  }
+  function tstRender() {
+    const r = tstGen();
+    S.tstLast = r.err ? null : r;
+    $('cipTsMsg').innerHTML = r.err
+      ? '<span class="cipBad">' + r.err + '</span>'
+      : `<span class="cipOk">${r.n > 1 ? `${r.n - 1} rondelle(s) = ${r.n} coupes (le bout + 1 par rondelle)` : '1 seule coupe : affranchir le bout'} · ${r.lines} lignes</span> · fichier <b>${r.file}</b>` +
+        ($('cipTsDry').checked ? ' <b>(à vide)</b>' : ' <b style="color:#ef5350">(AVEC laser)</b>');
+    // on montre le programme lui-même (l'en-tête et la table LTT sont dans le fichier téléchargé)
+    if (r.err) $('cipTsTxt').value = '';
+    else {
+      const t = r.txt.replace(/\r/g, '');
+      const i = t.indexOf('START_TEXT'),
+        j = t.indexOf('STOP_TEXT');
+      $('cipTsTxt').value = i >= 0 && j > i ? t.slice(i + 11, j) : t;
+    }
+  }
+  function tstShow(on) {
+    const p = $('cipTestPage');
+    if (!p) return;
+    p.style.display = on ? '' : 'none';
+  }
+  // ════════════════════════════════════════════════════════════════════════════════════════════════════
   // §24. NAVIGATION ENTRE LES ÉCRANS + RÉGLAGES DU .LST
   //     showProcPage / showPartPage / showWork / setStep, g54Calc, lstSync
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
   function showProcPage() {
+    tstShow(false);
     if ($('cipMiterPage')) $('cipMiterPage').style.display = 'none';
     $('cipStart').style.display = 'none';
     $('cipWork').style.display = 'none';
@@ -13170,6 +15507,7 @@ function cip_build() {
     S.procChosen = true;
   }
   function showPartPage() {
+    tstShow(false);
     if ($('cipMiterPage')) $('cipMiterPage').style.display = 'none';
     $('cipStart').style.display = 'none';
     $('cipProcPage').style.display = 'none';
@@ -13177,6 +15515,8 @@ function cip_build() {
     $('cipPartPage').style.display = '';
     const W = $('cipProc').value === 'soudure';
     if ($('cipCardMiter')) $('cipCardMiter').style.display = W ? '' : 'none';
+    if ($('cipCardCut')) $('cipCardCut').style.display = W ? 'none' : '';
+    if ($('cipCardTest')) $('cipCardTest').style.display = W || S.cfg.chuck !== 'vertical' ? 'none' : '';
     $('cipPartProc').textContent = W ? '🔥 Soudure' : '✂ Découpe laser';
     $('cipPartKeepBtn').textContent = S.part ? 'Garder la pièce actuelle →' : 'Continuer sans pièce →';
     $('cipCardDemoT').textContent = W ? '▶ Exemple : tube en T' : '▶ Exemple : tuiles';
@@ -13185,6 +15525,7 @@ function cip_build() {
       : '3 tuiles à 120° dans un tube Ø54×2 : biseau, trous, lamelles, séparation.';
   }
   function showWork(st) {
+    tstShow(false);
     if ($('cipMiterPage')) $('cipMiterPage').style.display = 'none';
     $('cipStart').style.display = 'none';
     $('cipProcPage').style.display = 'none';
@@ -13309,8 +15650,10 @@ function cip_build() {
     }
     $('cipLWeld').style.display = W ? '' : 'none';
     $('cipLCut').style.display = W ? 'none' : '';
+    if ($('cipLVarRow')) $('cipLVarRow').style.display = W ? 'none' : ''; // la variable du tableau techno : découpe seulement
     const t = lttTable();
     if (t) $('cipLTC').textContent = t.name;
+    techRefresh();
     if ((!S.fgUser || $('cipLFg').value === '') && S.profile) $('cipLFg').value = (S.profile.rmax || 0).toFixed(3); // suit le tube tant que tu ne l'as pas tapé toi-même
     const o = lstOpt();
     const og = { bout: 'du bout libre du tube', mors: 'de la face des mors', p1: 'du 1er point du 1er contour' }[
@@ -13403,7 +15746,7 @@ function cip_build() {
     cipLOY: 'SET_G54 Y (0 = centre du mandrin).',
     cipLOZ: 'SET_G54 Z.',
     cipLDry:
-      "Version test à vide : même trajet, mais TC_WELD_ON / TC_LASER_ON (et OFF) sont mis en commentaire → le laser ne s'allume JAMAIS.\nLe fichier s'appelle <NOM>-VIDE.LST.\nÀ faire tourner en premier sur la machine.",
+      "Version test à vide : même trajet, mais TC_WELD_ON / TC_LASER_ON (et OFF) sont mis en commentaire → le laser ne s'allume JAMAIS.\nMême nom de fichier que le vrai (le soft te dit lequel tu télécharges).\nÀ faire tourner en premier sur la machine.",
     cipVec: 'Affiche des petits traits qui montrent la direction du faisceau le long des passages.',
     cipBw: "Points rouges : là où le faisceau ressort et tape la paroi d'en face (à surveiller en découpe).",
     cipParts: 'Afficher / cacher la pièce 3D.',
@@ -13458,11 +15801,10 @@ function cip_build() {
     '#cipWz .cipWzS:nth-child(3) .cipMain': "Valide le X lu : il devient l'origine (SET_G54) du programme.",
     '#cipWzX':
       "Pose la pointe pile sur le point jaune de la pièce, puis tape ici la valeur X affichée par la machine, avec son signe (ex : -125.40).\nC'est l'origine du programme.",
-    '#cipWzName':
-      "Nom du programme sur la machine (lettres, chiffres, tirets). Le fichier s'appellera ce nom + .LST (+ « -VIDE » en test à vide).",
+    '#cipWzName': "Nom du programme sur la machine (lettres, chiffres, tirets). Le fichier s'appellera ce nom + .LST.",
     '#cipWzTech': 'Nom de ta table techno soudure (WTT), exactement comme dans TC_WELD_ON (ex : TUBECOUDE-DORE).',
     '#cipWzDry':
-      "Test à vide : le laser ne s'allume jamais (allumage en commentaire), fichier « -VIDE ».\nEn découpe, toute la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint).\nToujours passer à vide avant le vrai !",
+      "Test à vide : le laser ne s'allume jamais (allumage en commentaire), même nom de fichier.\nEn découpe, toute la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint).\nToujours passer à vide avant le vrai !",
     '#cipWz [onclick*="cip_ui(\'wzgen\')"]':
       'Créer le .LST et le simuler. Le bouton Télécharger apparaît sous la simulation.',
     '#cipWz [onclick*="cip_ui(\'wzback\'"]': "Revenir à l'étape d'avant.",
@@ -13933,6 +16275,7 @@ function cip_build() {
       const dry = raw.match(/^\s*;\s*A VIDE\s+(TC_(?:LASER|WELD)_(?:ON|OFF)[^;]*)/i);
       let l = dry ? dry[1] : raw.split(';')[0].trim();
       if (!l) continue;
+      if (/^[A-Z_][A-Z0-9_]*\s*=\s*"/i.test(l)) continue; // TM_LTTNAME="…" : nom du tableau techno, pas un mouvement
       // saut de bloc « / », numéro de ligne « N10 », et G90 / G91 en tête de ligne
       const U = l
         .toUpperCase()
@@ -13944,12 +16287,16 @@ function cip_build() {
         trafo = tf[1].toUpperCase() === 'BA1' ? 'BA1' : 'Bc1';
         continue;
       }
-      if (/TRAORI/.test(U)) {
+      if (/TRAORI|TC_TRAFO_ON/.test(U)) {
         inT = true;
         continue;
       }
-      if (/TRAFOOF/.test(U)) {
+      if (/TRAFOOF|TC_TRAFO_OFF/.test(U)) {
         inT = false;
+        continue;
+      }
+      if (/TC_MODULO\(\s*C1\s*\)/.test(U)) {
+        st.C -= 360 * Math.round(st.C / 360); // compteur remis entre -180 et +180, le mandrin ne bouge pas
         continue;
       }
       if (/TC_(LASER|WELD)_ON/.test(U)) {
@@ -13960,7 +16307,16 @@ function cip_build() {
         laser = false;
         continue;
       }
-      if (!inT) continue;
+      if (!inT) {
+        const mc = /^G0?[01]\b/.test(U) && U.match(/(?<![A-Z0-9_])C1\s*=\s*([-+]?[\d.]+)/);
+        if (mc && moves.length) {
+          // TRAFOOF + G01 C1 : le MANDRIN tourne seul, la tête reste immobile -> on le montre dans la simu
+          const nc = /^\s*(\/\s*)?(N\d+\s*)?G91/i.test(l) ? st.C + +mc[1] : +mc[1];
+          moves.push({ t: 'SPIN', s: { ...st }, e: { ...st, C: nc }, m: null, laser: false, ln: li });
+          st.C = nc;
+        }
+        continue;
+      }
       const isCIP = /^CIP\b/.test(U);
       if (!isCIP && !/^G0?[01]\b/.test(U) && !/^[XYZBC]/.test(U)) continue;
       const v = {};
@@ -13987,11 +16343,26 @@ function cip_build() {
     return { trafo, moves, lines };
   }
   // échantillonne chaque bloc G01 / CIP d'un .LST lu (points machine X Y Z B C + laser)
-  function lstSample(r) {
+  function lstSample(r, o) {
     const pts = [];
     for (const mv of r.moves) {
       const a = mv.s,
         e = mv.e;
+      if (mv.t === 'SPIN') {
+        // mandrin seul : la tête ne bouge pas dans la machine -> dans le repère pièce elle tourne à l'envers du mandrin
+        const oo = o || lstOpt(true);
+        const f0 = fromLst(a, oo),
+          f1 = fromLst(e, oo);
+        const Pm = rotM(f0.p, f0.th),
+          Dm = rotM(f0.d, f0.th);
+        const N = Math.max(1, Math.ceil(Math.abs(f1.th - f0.th) / 5));
+        for (let k = 1; k <= N; k++) {
+          const th = f0.th + ((f1.th - f0.th) * k) / N;
+          const q = toLst(rotM(Pm, -th), rotM(Dm, -th), th, oo);
+          pts.push({ X: q.X, Y: q.Y, Z: q.Z, B: q.B, C: q.C, laser: false, ln: k === N ? mv.ln : -1 });
+        }
+        continue;
+      }
       let N = 1,
         ci = null;
       if (mv.t === 'CIP') {
@@ -14079,9 +16450,9 @@ function cip_build() {
   function lstVerify() {
     const L0 = S.lastGen || S.lastLST;
     if (!L0 || !L0.o) return;
-    const r = parseLST(L0.txt);
+    const r = parseLST(L0.sim || L0.txt);
     if (!r.moves.length) return;
-    const pts = lstSample(r);
+    const pts = lstSample(r, L0.o);
     const FB = lstFrames(r, pts, L0.o);
     if (!FB) return;
     if (!(S.prog && S.prog.verify)) S.progCalc = S.prog;
@@ -14236,6 +16607,8 @@ function cip_build() {
       }
     };
     if (S.miter) P.part = { type: 'miter' };
+    else if (S.part && S.part.gen && S.part.gen.cut)
+      P.part = { type: 'cut', def: JSON.parse(JSON.stringify(S.cutDef)) };
     else if (S.part && S.part.gen) P.part = { type: 'gen', def: JSON.parse(JSON.stringify(S.genDef)) };
     else if (S.part && S.srcMesh)
       P.part = {
@@ -14292,7 +16665,14 @@ function cip_build() {
       return;
     }
     mtLeave();
-    if (t === 'gen') {
+    if (t === 'cut') {
+      S.genKind = 'cut';
+      S.cutDef = Object.assign(CUT_DEF(), JSON.parse(JSON.stringify(P.part.def)));
+      showWork('build');
+      uiFlags();
+      cutRender();
+      cutApply(true);
+    } else if (t === 'gen') {
       S.genKind = 'proj'; // un projet ouvert n'écrase pas les cotes gardées
       S.genDef = JSON.parse(JSON.stringify(P.part.def));
       showWork('build');
@@ -14406,7 +16786,74 @@ function cip_build() {
   // choix faits à la main : on ne les écrase plus avec les valeurs automatiques
   try {
     $('cipRetMode').addEventListener('change', () => (S.retUser = true));
-    ['cipMtName', 'cipMtTech', 'cipMtDry', 'cipLName', 'cipLTW', 'cipLDry'].forEach(id => {
+    {
+      const cb = $('cipCutBox');
+      if (cb) {
+        cb.addEventListener('input', e => {
+          if (e.target.dataset && e.target.dataset.ck && e.target.tagName === 'INPUT' && e.target.type !== 'checkbox')
+            cutField(e.target);
+        });
+        cb.addEventListener('change', e => {
+          if (
+            e.target.dataset &&
+            e.target.dataset.ck &&
+            (e.target.tagName === 'SELECT' || e.target.type === 'checkbox')
+          )
+            cutField(e.target);
+        });
+      }
+      const cf = $('cipCutFile');
+      if (cf)
+        cf.onchange = () => {
+          const f = cf.files[0];
+          cf.value = '';
+          if (!f) return;
+          f.text().then(t => {
+            let r;
+            try {
+              r = dxfParse(t);
+            } catch (e) {
+              r = { loops: [] };
+            }
+            const msg = $('cipCutMsg');
+            if (!r.loops.length) {
+              if (msg) msg.innerHTML = '<span class="cipBad">Aucun contour FERMÉ dans ce DXF.</span>';
+              return;
+            }
+            const k = r.units === 1 ? 25.4 : 1;
+            let big = r.loops[0];
+            r.loops.forEach(l => {
+              if (Math.abs(pArea(l)) > Math.abs(pArea(big))) big = l;
+            });
+            let x0 = 1e9,
+              x1 = -1e9,
+              y0 = 1e9,
+              y1 = -1e9;
+            big.forEach(q => {
+              x0 = Math.min(x0, q[0]);
+              x1 = Math.max(x1, q[0]);
+              y0 = Math.min(y0, q[1]);
+              y1 = Math.max(y1, q[1]);
+            });
+            const pts = big.map(q => [(q[0] - (x0 + x1) / 2) * k, (q[1] - (y0 + y1) / 2) * k]);
+            const nm = f.name.replace(/\.dxf$/i, '');
+            const D = S.cutDef;
+            if (S.cutDxfFor === 'prof') {
+              D.dxf = { out: pts, name: nm };
+              D.prof = 'dxf';
+            } else {
+              const F = D.feats[+S.cutDxfFor];
+              if (F) {
+                F.pts = pts;
+                F.name = nm;
+              }
+            }
+            cutRender();
+            cutSoon(true);
+          });
+        };
+    }
+    ['cipMtName', 'cipMtTech', 'cipMtDry', 'cipLName', 'cipLTW', 'cipLDry', 'cipLWNo', 'cipLCNo'].forEach(id => {
       const e = $(id);
       if (e) ['input', 'change'].forEach(t => e.addEventListener(t, ev => ev.isTrusted && dlStale()));
     });
@@ -14503,6 +16950,13 @@ function cip_build() {
           const vis = el => el && el.style.display !== 'none';
           const pp2 = $('cipPartPage');
           const mp = $('cipMiterPage');
+          const tp = $('cipTestPage');
+          if (tp && tp.style.display !== 'none') {
+            e.stopPropagation();
+            e.preventDefault();
+            showPartPage();
+            return;
+          }
           if (mp && mp.style.display !== 'none') {
             e.stopPropagation();
             e.preventDefault();
@@ -15014,6 +17468,47 @@ function cip_build() {
           genApply(true);
         } else genRender();
         return;
+      } else if (a === 'partcut') {
+        // tube à découper : profil au choix + coupes de bout + trous / piquages / formes
+        mtLeave();
+        if (S.genKind !== 'cut' || !(S.part && S.part.gen && S.part.gen.cut)) {
+          S.genKind = 'cut';
+          S.cutDef = cutMemLoad() || CUT_DEF();
+          showWork('build');
+          uiFlags();
+          cutRender();
+          cutApply(true);
+        } else {
+          showWork('build');
+          uiFlags();
+          cutRender();
+        }
+        return;
+      } else if (a === 'cutadd') {
+        const D = S.cutDef;
+        const y = Math.round(+D.L / 2);
+        D.feats.push(
+          {
+            rond: { type: 'rond', d: 6, pos: y, rot: 0 },
+            oblong: { type: 'oblong', l: 12, w: 5, pos: y, rot: 0, ang: 0 },
+            rect: { type: 'rect', l: 12, w: 6, r: 0.5, pos: y, rot: 0, ang: 0 },
+            piq: { type: 'piq', d2: 10, beta: 90, exc: 0, pos: y, rot: 0, trav: false },
+            dxf: { type: 'dxf', pts: null, name: '', sc: 100, pos: y, rot: 0, ang: 0 }
+          }[v]
+        );
+        cutRender();
+        if (v === 'dxf') cip_ui('cutdxf', D.feats.length - 1);
+        else cutSoon(true);
+        return;
+      } else if (a === 'cutdel') {
+        S.cutDef.feats.splice(+v, 1);
+        cutRender();
+        cutSoon(true);
+        return;
+      } else if (a === 'cutdxf') {
+        S.cutDxfFor = v;
+        $('cipCutFile').click();
+        return;
       } else if (a === 'partcreate') {
         mtLeave();
         showWork('build');
@@ -15097,7 +17592,59 @@ function cip_build() {
         S.order = null;
         computeProgram();
         return;
+      } else if (a === 'tstopen') {
+        $('cipPartPage').style.display = 'none';
+        tstShow(true);
+        techRefresh();
+        tstRender();
+        return;
+      } else if (a === 'tst') {
+        tstRender();
+        return;
+      } else if (a === 'tstcirc' || a === 'tstnorm') {
+        const c = a === 'tstcirc' ? ['9', '11', '300'] : ['1', '10', '100'];
+        $('cipTsM').value = c[0];
+        $('cipTsP').value = c[1];
+        $('cipTsSz').value = c[2];
+        tstRender();
+        return;
+      } else if (a === 'tstback') {
+        showPartPage();
+        return;
+      } else if (a === 'tstdl') {
+        tstRender();
+        const r = S.tstLast;
+        if (!r) return;
+        const blob = new Blob([r.txt], { type: 'application/octet-stream' });
+        const u = URL.createObjectURL(blob);
+        const lk = document.createElement('a');
+        lk.href = u;
+        lk.download = r.file;
+        document.body.appendChild(lk);
+        lk.click();
+        lk.remove();
+        setTimeout(() => URL.revokeObjectURL(u), 2000);
+        return;
+      } else if (a === 'tstsim') {
+        tstRender();
+        const r = S.tstLast;
+        if (!r) return;
+        showWork('sim');
+        loadLST(r.sim, r.file);
+        // le vrai Ø du tube (la lecture du fichier l'estime depuis les points : faux à vide, trajet reculé de 3 mm)
+        if (S.prog && S.prog.frames) {
+          const v = tstVals();
+          S.cfg.d = v.D;
+          S.cfg.ep = Math.max(0.5, +(v.D * 0.04).toFixed(1));
+          syncForm();
+          buildStatic();
+          setMapping();
+          rebuildPaths();
+          $('cipPartStat').innerHTML = `<b>${r.file}</b> · carte d'essai rondelles · tube Ø${v.D}`;
+        }
+        return;
       } else if (a === 'lstclr') {
+        parSave();
         $('cipLMsg').innerHTML = '';
         lstForget(); // un réglage du .LST a changé : il faut le regénérer
         return;
@@ -15127,6 +17674,8 @@ function cip_build() {
         $('cipLDl').textContent = 'Télécharger ' + r.file;
         $('cipLMsg').innerHTML =
           `<span class="cipOk">${r.file} prêt (${r.kind}, techno ${r.tech}, ${r.n} contour(s))${$('cipLDry').checked ? ' — VERSION À VIDE, laser jamais allumé' : ''}.</span>` +
+          (r.simple ? ' <b>Programme simple</b>.' : '') +
+          (r.warn ? ` <span class="cipWarn">${r.warn}</span>` : '') +
           (r.n > 1
             ? ` <span class="cipWarn">Plusieurs contours : ${r.kind === 'soudure' ? 'TC_WELD_ON/OFF' : 'TC_LASER_ON/OFF'} répété pour chacun — pas vu dans tes fichiers, à tester à vide.</span>`
             : '') +
@@ -15177,6 +17726,7 @@ function cip_build() {
             return;
           }
           S.lttRef = { name: nm, table: t.slice(i, j + 'ENDE_LTT_STAMM'.length), src: f.name };
+          techSet('C', nm); // la table reprise devient le tableau choisi (et entre dans la liste)
           lstSync();
           $('cipLMsg').innerHTML = '<span class="cipOk">Table ' + nm + ' reprise de ' + f.name + '.</span>';
         });
