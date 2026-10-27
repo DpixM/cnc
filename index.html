@@ -10680,7 +10680,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v93',
+  const CIP_VER = 'CIP v94',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -14685,12 +14685,43 @@ function cip_build() {
     // 1. classer chaque contour
     const K = [];
     for (let ci = 0; ci < C.length; ci++) {
-      const fr = cuts[ci];
+      let fr = cuts[ci];
       if (!fr.length) {
         K.push(null);
         continue;
       }
-      const M = fr.map(mach);
+      let M = fr.map(mach);
+      {
+        // v94 : petit bout où la tête penche (ex. la lamelle qui arrive dans le biseau) : on prolonge le trait tout droit
+        const okP = q => q.vert && q.H >= R * 0.3 && q.H <= R + 0.15;
+        let i0 = 0,
+          i1 = M.length - 1;
+        while (i0 < M.length && !okP(M[i0])) i0++;
+        while (i1 > i0 && !okP(M[i1])) i1--;
+        const mid = M.slice(i0, i1 + 1);
+        const lenOf = (a, b) => {
+          let s = 0;
+          for (let i = a; i < b; i++) s += V.len(V.sub(fr[i + 1].p, fr[i].p));
+          return s;
+        };
+        if (
+          (i0 > 0 || i1 < M.length - 1) &&
+          mid.length >= 2 &&
+          mid.every(okP) &&
+          lenOf(0, i0) + lenOf(i1, M.length - 1) < 3
+        ) {
+          const ext = (a, b, xTo) => {
+            const dx = b.X - a.X;
+            if (Math.abs(dx) < 1e-6) return null;
+            const t = (xTo - b.X) / dx;
+            return { ...b, X: xTo, Y: b.Y + (b.Y - a.Y) * t, C: b.C + (b.C - a.C) * t };
+          };
+          const tail = i1 < M.length - 1 ? ext(mid[mid.length - 2], mid[mid.length - 1], M[M.length - 1].X) : null;
+          const head = i0 > 0 ? ext(mid[1], mid[0], M[0].X) : null;
+          M = (head ? [head] : []).concat(mid, tail ? [tail] : []);
+          fr = (head ? [fr[i0]] : []).concat(fr.slice(i0, i1 + 1), tail ? [fr[i1]] : []);
+        }
+      }
       let flat = true,
         xmin = 1e9,
         xmax = -1e9,
@@ -14837,7 +14868,8 @@ function cip_build() {
     const f0 = cuts.find(c => c.length)[0];
     const q0 = toLst(f0.p, f0.d, f0.th, o);
     const info = { ring: 0, hole: 0, line: 0, bis: 0, trao: 0 };
-    const extraT = [];
+    const extraT = [],
+      defs = [];
     let startQ = null,
       startA = null,
       bisLift = null;
@@ -14859,19 +14891,25 @@ function cip_build() {
       const tbl = v.bisT && v.bisT !== tech;
       out.push(
         `;----- CONTOUR 1 : ${nm(0)} (tete inclinee B ${n3(qs.B)}) -----`,
-        ...(tbl ? [`${TV}="${v.bisT}" ;tableau techno du biseau`] : []),
+
         lstMv(a) + " ;pre-approche 30 mm dans l'axe du faisceau",
         lstMv(ps) + ' ;tete placee sur le biseau',
         'TRAFOOF ;la coupe : juste la rotation du mandrin',
         ...FG,
-        LON(v.ring),
+        A +
+          `TC_LASER_ON(${v.ring[0]},${tbl ? 'LTT_BISEAU' : TV},${v.ring[1]},${v.ring[2]})` +
+          (tbl ? ' ;tableau du biseau' : ''),
         `G01 C1 = ${n3(k.M[k.M.length - 1].C)}`,
         A + 'TC_LASER_OFF(2)',
-        ...(tbl ? [`${TV}="${tech}" ;retour au tableau techno normal`] : []),
         'TC_SET_TRAFO("BA1")',
         'TRAORI(1)'
       );
-      if (tbl) extraT.push(v.bisT);
+      if (tbl) {
+        extraT.push(v.bisT);
+        defs.push(
+          `DEF STRING[31] LTT_BISEAU="${v.bisT}" ;tableau techno du BISEAU : pour en prendre un autre, change juste cette ligne`
+        );
+      }
       startQ = qs;
       bisLift = toLst(V.sub(fb.p, V.mul(fb.d, 30)), fb.d, k.fr[k.fr.length - 1].th, o);
       startA = toLst(V.sub(fb.p, V.mul(fb.d, 30)), fb.d, fb.th, o);
@@ -14883,10 +14921,7 @@ function cip_build() {
     if (hasBis) {
       out.push('', ';----- tete droite, au-dessus du depart des coupes -----');
       if (bisLift) out.push(lstMv(bisLift) + ' ;tete levee de 30 mm');
-      F.filter(f => f.ci === first && f.j < 0)
-        .slice(bisLift ? 1 : 0)
-        .forEach(f => out.push(lstMv(toLst(f.p, f.d, f.th, o))));
-      out.push(lstMv(topOf(fr0, 30)));
+      out.push(lstMv(topOf(fr0, 30)) + ' ;tete droite au-dessus du depart');
     } else if (!posMode) {
       out.push(lstMv(topOf(fr0, 30)) + ' ;au-dessus du depart');
     }
@@ -14902,24 +14937,26 @@ function cip_build() {
       cy = 0,
       cc = c0r,
       lastTh = fr0.th;
-    const xyc = (xx, yy, c) => {
+    let cz = zh;
+    const xyc = (xx, yy, c, zz) => {
       const s = [];
       if (Math.abs(xx - cx) > 5e-4) s.push(`X = ${n3(xx)}`);
       if (Math.abs(yy - cy) > 5e-4) s.push(`Y = ${n3(yy)}`);
+      if (zz !== undefined && Math.abs(zz - cz) > 0.01) {
+        s.push(`Z = ${n3(zz)}`);
+        cz = zz;
+      }
       if (Math.abs(c - cc) > 5e-4) s.push(`C1 = ${n3(c)}`);
       cx = xx;
       cy = yy;
       cc = c;
       return s.length ? 'G01 ' + s.join(' ') : null;
     };
-    const go = (xx, yy, c, lab) => {
+    const go = (xx, yy, c, lab, zz) => {
       const L = [];
       const far = Math.abs(xx - cx) > 5e-4 || Math.abs(yy - cy) > 5e-4 || Math.abs(c - cc) > 5e-4;
-      if (far) {
-        L.push(`G01 Z = ${n3(zt)}`);
-        L.push(xyc(xx, yy, c) + (lab ? ' ;' + lab : ''));
-      }
-      L.push(`G01 Z = ${n3(zh)}`);
+      // v94 : 1 ligne ; la buse se met à sa hauteur au-dessus du tube À CET ENDROIT (trait décalé sur le côté = tube plus bas)
+      if (far) L.push(xyc(xx, yy, c, zz === undefined ? zh : zz) + (lab ? ' ;' + lab : ''));
       return L;
     };
     for (let ci = first; ci < K.length; ci++) {
@@ -14953,7 +14990,7 @@ function cip_build() {
         info.hole++;
       } else if (k.t === 'line') {
         const P = k.keep.map(i => k.M[i]);
-        out.push(...go(P[0].X - Xref, P[0].Y, P[0].C), LON(v.line));
+        out.push(...go(P[0].X - Xref, P[0].Y, P[0].C, null, +(P[0].H - R + zh).toFixed(3)), LON(v.line));
         for (let i = 1; i < P.length; i++) {
           const l = xyc(P[i].X - Xref, P[i].Y, P[i].C);
           if (l) out.push(l);
@@ -14968,6 +15005,7 @@ function cip_build() {
         const ms = mach(f),
           me = mach(fe);
         out.push(`G01 Z = ${n3(zt)}`);
+        cz = zt;
         const l = xyc(ms.X - Xref, 0, ms.C);
         if (l) out.push(l + ' ;au-dessus du depart');
         const ts = topOf(f, zt);
@@ -14988,8 +15026,10 @@ function cip_build() {
           lstMv(topOf(fe, zt)) + ' ;tete droite au-dessus du tube',
           'TRAFOOF',
           `SET_POS(${n3(me.X - Xref)}, 0.000, ${n3(zt)}) ;retour sans TRAORI (memes reperes qu avant)`,
-          ...FG
+          ...FG,
+          `G01 Z = ${n3(zh)}`
         );
+        cz = zh;
         cx = me.X - Xref;
         cy = 0;
         cc = me.C;
@@ -15010,18 +15050,18 @@ function cip_build() {
         );
       } else {
         // la tête doit revenir inclinée sur le biseau : on repasse en TRAORI (on redit où est la pointe)
+        // v94 : le mandrin se déroule SANS TRAORI, puis on repasse en TRAORI une seule fois
+        const th0 = o.xdir === '-X' ? q0.C : -q0.C;
         const Pm = [0, fr0.p[1], R + 30];
-        const qn = toLst(rotM(Pm, -lastTh), rotM([0, 0, -1], -lastTh), lastTh, o);
+        const qn = toLst(rotM(Pm, -th0), rotM([0, 0, -1], -th0), th0, o);
         const a0 = startA || toLst(V.sub(f0.p, V.mul(f0.d, 30)), f0.d, f0.th, o);
+        void lastTh;
         out.push(
+          `G01 G90 C1 = ${n3(q0.C)} ;le mandrin refait ses tours a l envers -> angle de depart`,
           'G01 X = 0.000 Y = 0.000',
           'TC_SET_TRAFO("BA1")',
           'TRAORI(1)',
           `SET_POS(${n3(qn.X)}, ${n3(qn.Y)}, ${n3(qn.Z)}) ;on redit a la machine ou est la pointe (en TRAORI)`,
-          'TRAFOOF',
-          `G01 G90 C1 = ${n3(q0.C)} F10000 ;le mandrin refait ses tours a l envers -> angle de depart`,
-          'TC_SET_TRAFO("BA1")',
-          'TRAORI(1)',
           lstMv(a0) + ' ;au-dessus du depart',
           lstMv(startQ || q0) + ' ;pointe sur le depart : tout est comme au lancement'
         );
@@ -15049,7 +15089,7 @@ function cip_build() {
       '',
       'M30'
     );
-    return { lines: out, info, extraT, startB: startQ ? startQ.B : null };
+    return { lines: out, info, extraT, defs, startB: startQ ? startQ.B : null };
   }
   function lstMv(q, f) {
     return ` G01 X = ${n3(q.X)} Y = ${n3(q.Y)} Z = ${n3(q.Z)} B = ${n3(q.B)} C1 = ${n3(q.C)}` + (f ? ' ' + f : '');
@@ -15187,6 +15227,7 @@ function cip_build() {
         const i = B.findIndex(l => /^SET_POS\(/.test(l));
         if (i >= 0) B[i] = B[i].replace(/\(B -?[\d.]+/, `(B ${n3(sr.startB)}`);
       }
+      if (sr.defs.length) B.unshift(...sr.defs);
       B.push(...sr.lines);
       const L = lstHead(prog, kind, tech, sr.extraT).concat(airLST([';----- reglages -----'].concat(B)), [
         'STOP_TEXT',
