@@ -164,6 +164,10 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-10-27 — JS : IMPORT — le SVG (et l'image vectorisée) arrive AU CENTRE de la feuille (demande Seb)
+ [UI] Avant : coin haut-gauche collé à l'origine -> avec l'origine au centre, le dessin partait en bas à droite.
+   Maintenant le dessin est centré sur la feuille. Le DXF était déjà centré (inchangé). Taille inchangée.
+
 -- 2026-10-26 — JR : DÉCOUPE LASER — les entrées en arc des SVG sont revenues (cassé depuis IN, le 14/10)
  [FIX] Un SVG (ex. xTool) dont un chemin revient à quelques millièmes de mm de son départ (0,004 mm) était pris
    pour un trait OUVERT. Depuis IN, un trait ouvert ne compte plus pour savoir ce qui est chute ou pièce -> tout le
@@ -2398,7 +2402,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-26-JR ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-10-27-JS ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -27590,7 +27594,7 @@ function importSVG(input){
       paintObjects.push({id,type:'svg',x:org.x,y:org.y,w:svgW*scale,h:svgH*scale,svgW,svgH,paths:good,name:file.name,strokeW:(currentStrokeW||0.2)});
       // Resserrer la boîte sur le dessin réel (sinon elle reste carrée avec du vide autour)
       refitSvgBBox(paintObjects[paintObjects.length-1]);
-      {const _o=paintObjects[paintObjects.length-1],_og=getOriginMm();_o.x=_og.x;_o.y=_og.y;} // import collé à 0,0
+      {const _o=paintObjects[paintObjects.length-1];_o.x=wMm()/2-_o.w/2;_o.y=hMm()/2-_o.h/2;} // JS : import posé AU CENTRE de la feuille (demande Seb)
       pushHistory();
       selObjId=id;redrawCanvas();renderInspector();centerViewOnObj(getObj(id));
       // Toast au lieu d'alert (qui bloque et perd le focus)
@@ -27912,7 +27916,7 @@ function _doVectorize(img,file,mode,killLoader){
         paintObjects.push({id,type:'svg',x:org.x,y:org.y,w:svgW*scale,h:svgH*scale,svgW,svgH,paths:good,name:file.name,strokeW:(currentStrokeW||0.2)});
       // Resserrer la boîte sur le dessin réel (sinon elle reste carrée avec du vide autour)
       refitSvgBBox(paintObjects[paintObjects.length-1]);
-      {const _o=paintObjects[paintObjects.length-1],_og=getOriginMm();_o.x=_og.x;_o.y=_og.y;} // import collé à 0,0
+      {const _o=paintObjects[paintObjects.length-1];_o.x=wMm()/2-_o.w/2;_o.y=hMm()/2-_o.h/2;} // JS : import posé AU CENTRE de la feuille (demande Seb)
       pushHistory();
         selObjId=id;redrawCanvas();renderInspector();centerViewOnObj(getObj(id));
         killLoader();
