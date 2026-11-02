@@ -164,6 +164,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-11-02 — JU : DESSIN — bouton 🧲 accroche ON/OFF toujours visible + tests avec le VRAI SVG « little wich »
+ [AJOUT] Bouton « 🧲 ON / OFF » dans la barre du haut (+ touche F9) : visible avec TOUS les outils. Avant il était
+   caché dans la barre de style, qui disparaît avec l'outil Cercle / Sélection -> impossible de remettre l'accroche.
+ [FIX] L'accroche grille suit la grille AFFICHÉE : zoom avant = pas plus fin (5 -> 2 -> 1 mm).
+ [FIX] Un tracé libre / spline ne sert plus de « guides » partout (la grille ne marchait plus autour).
+ [FIX] Gros dessin (SVG 320 tracés) : le champ de valeur (échelle, décalage, congé, cote…) perdait le focus,
+   les chiffres tapés partaient dans le vide. Un SVG plus grand que l'écran est affiché en entier à l'import.
+ [FIX] Échap ferme TOUT (outils, fenêtres Engrenage / Nettoyer…). Le menu Créer passait SOUS le panneau de taille.
+   Les messages d'import ne cachent plus (et ne bloquent plus) la barre d'outils. Polygone : [ ] marchent dans le champ.
+
 -- 2026-11-02 — JT : DESSIN — gros nettoyage : chaque outil testé forme par forme (~1 400 tests en vrais clics)
  [FIX] IMPORT : un DXF ou un SVG arrive à sa VRAIE TAILLE (rectangle 100×50 dans le fichier = découpe 100×50).
    SVG : unités mm / cm / in / pt / px lues dans width/height. DXF : unité $INSUNITS, polylignes avec arrondis
@@ -2027,12 +2037,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 .tcat{gap:1px}
 .tcar{font-size:9px;opacity:.55;margin-left:1px}
 /* Menu déroulant d'une famille d'outils : gros boutons, faciles à viser */
-.tmenu{position:fixed;z-index:9998;background:var(--surf);border:1.5px solid var(--brd2);border-radius:14px;padding:9px;box-shadow:0 10px 34px rgba(0,0,0,.55);display:grid;grid-template-columns:repeat(3,1fr);gap:7px;min-width:230px}
+.tmenu{position:fixed;z-index:100021;background:var(--surf);border:1.5px solid var(--brd2);border-radius:14px;padding:9px;box-shadow:0 10px 34px rgba(0,0,0,.55);display:grid;grid-template-columns:repeat(3,1fr);gap:7px;min-width:230px}
 .tmi{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:11px 5px;border-radius:11px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--txt);cursor:pointer;font-size:21px;min-height:62px}
 .tmi span{font-size:9px;font-weight:600;color:var(--txt2);line-height:1.1;text-align:center}
 .tmi.on{border-color:var(--acc);background:rgba(245,166,35,.13);color:var(--acc)}
 .tmi:active{transform:scale(.94)}
-.tmbk{position:fixed;inset:0;z-index:9997;background:rgba(0,0,0,.35)}
+.tmbk{position:fixed;inset:0;z-index:100020;background:rgba(0,0,0,.35)}
 .ptool.active{border-color:var(--acc);color:var(--acc);background:rgba(245,166,35,.1)}
 .ptool:active{transform:scale(.94)}
 .tsep{width:1px;background:var(--brd2);height:22px;margin:0 2px;align-self:center}
@@ -2418,7 +2428,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-02-JT ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-02-JU ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3813,6 +3823,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 
       <div class="tsep"></div>
 
+      <button class="ptool" id="snapMainBtn" onclick="toggleSnap()" title="Accrochage (grille + points des formes) : ON / OFF — touche F9" style="font-size:11px;gap:3px;min-width:64px;font-weight:800">🧲<span id="snapMainLbl" style="font-size:10px">ON</span></button>
       <button class="ptool" id="btnCenterView" onclick="(function(){var o=getObj(selObjId);o?centerViewOnObj(o):fitView();})()" title="Centrer / ajuster la vue"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none"><circle cx="12" cy="12" r="6.5"/><line x1="12" y1="1.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.5" y2="12"/></svg></button>
       <button class="ptool tcat" id="cat-more" onclick="openToolMenu('more',this)" title="Plus d'actions">
         ⋯<span class="tcar">▾</span>
@@ -3851,7 +3862,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
         <div id="strokePicker" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"></div>
         <input type="number" id="strokeManual" min="0.01" max="20" step="0.01" value="0.5" style="width:54px;padding:3px 5px;font-family:var(--mono);font-size:10px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:4px;color:var(--acc);outline:none" title="Épaisseur personnalisée (mm)" onchange="setStrokeW(parseFloat(this.value)||0.5)">
         <span style="font-size:8px;color:var(--txt3);font-family:var(--mono)">mm</span></span>
-      <button class="ptool" id="snapBtn" title="Accrochage" onclick="snapEnabled=!snapEnabled;renderSnapBtn()" style="gap:3px;cursor:pointer;flex-shrink:0"><span style="font-size:9px">🧲 Snap</span></button>
+      <button class="ptool" id="snapBtn" title="Accrochage" onclick="toggleSnap()" style="gap:3px;cursor:pointer;flex-shrink:0"><span style="font-size:9px">🧲 Snap</span></button>
       <button class="ptool" id="pt-bucket" onclick="startBucket()" title="Seau : remplir une zone fermée → poche" style="display:none;background:rgba(59,130,246,.22);color:#60a5fa"><svg viewBox="0 0 24 24" width="17" height="17" style="pointer-events:none"><path d="M4 7.5h16l-1.5 11.6a1.2 1.2 0 0 1-1.2 1H6.7a1.2 1.2 0 0 1-1.2-1L4 7.5z" fill="currentColor"/><rect x="2.7" y="4.3" width="18.6" height="2.6" rx="1.3" fill="currentColor"/></svg></button>
       <span style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span style="font-size:8px;color:var(--txt3);font-family:var(--mono);white-space:nowrap;letter-spacing:.5px">REMPLI :</span>
         <button class="fill-btn active" id="fb-none"   onclick="setFill('none')"   title="Contour seul">◻ Aucun</button>
@@ -22877,6 +22888,8 @@ function centerViewOnObj(o){
   const cx=bb.x+bb.w/2, cy=bb.y+bb.h/2;
   const cssW=parseFloat(pCanvas.style.width)||pCanvas.width;
   const cssH=parseFloat(pCanvas.style.height)||pCanvas.height;
+  // JT : un dessin plus GRAND que la vue (ex. SVG xTool 292×250 mm) -> on dézoome pour le voir en entier (jamais de zoom avant)
+  { const need=Math.max(bb.w*BASE_PX*vZoom/(cssW*0.88), bb.h*BASE_PX*vZoom/(cssH*0.88)); if(need>1){ vZoom=Math.max(0.02, vZoom/need); const _zd=document.getElementById('zoomDisp'); if(_zd)_zd.textContent=Math.round(vZoom*100)+'%'; } }
   vPanX=cssW/2 - cx*BASE_PX*vZoom;
   vPanY=cssH/2 - cy*BASE_PX*vZoom;
   redrawCanvas();
@@ -23495,7 +23508,7 @@ function redrawCanvasNow(){
 
   // ── Sheet content ──
   // Grid lines
-  const gStep=pickStep(wMm(),sx1-sx0);
+  const gStep=pickStep(wMm(),sx1-sx0); window._gridStepNow=gStep; // JT : l'accroche grille suit la grille AFFICHÉE (zoom avant = pas plus fin)
   pCtx.strokeStyle='rgba(160,160,140,.3)';pCtx.lineWidth=.5;
   for(let xmm=0;xmm<=wMm();xmm+=gStep){const[px]=mmToPx(xmm,0);pCtx.beginPath();pCtx.moveTo(px,sy0);pCtx.lineTo(px,sy1);pCtx.stroke();}
   const gStepY=pickStep(hMm(),sy1-sy0);
@@ -24067,7 +24080,7 @@ function _pickEdgeAt(xm,ym){
 }
 function _edgeSeg(pick){ // renvoie [ax,ay,bx,by] de l'arête choisie
   try{ const strokes=objToStrokesRaw(pick.obj); const CLOSEDT=['rect','ellipse','tri','star','oblong','gear','text','polygon']; const isClosed=CLOSEDT.includes(pick.obj.type)||pick.obj._poly; for(const poly of strokes){ let pts=poly; if(isClosed){ const a=poly[0],b=poly[poly.length-1]; if(Math.hypot(a[0]-b[0],a[1]-b[1])>1e-6){ pts=poly.slice(); pts.push([a[0],a[1]]); } } if(pick.edge<pts.length-1){ const A=pts[pick.edge],B=pts[pick.edge+1]; return [A[0],A[1],B[0],B[1]]; } } }catch(e){} return null; }
-function _valInputRemove(){ const e=document.getElementById('valInput'); if(e)e.remove(); window._valActiveCommit=null; window._valActiveLive=null; }
+function _valInputRemove(){ const e=document.getElementById('valInput'); if(e)e.remove(); window._valActiveCommit=null; window._valActiveLive=null; window._valActiveCancel=null; }
 function _valInput(label, def, onLive, onCommit){
   _valInputRemove();
   const d=document.createElement('div'); d.id='valInput';
@@ -24083,10 +24096,18 @@ function _valInput(label, def, onLive, onCommit){
   inp.addEventListener('input',()=>{ const v=parseFloat(inp.value); if(isFinite(v))onLive(v); });
   inp.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); commit(); } else if(e.key==='Escape'){ e.preventDefault(); _valInputRemove(); onCommit(null); } });
   ok.addEventListener('click',commit);
+  window._valActiveCancel=()=>{ _valInputRemove(); onCommit(null); };
   window._valActiveCommit=(vv)=>{ inp.value=String(vv); commit(); }; window._valActiveLive=(vv)=>{ inp.value=String(vv); const pv=parseFloat(vv); if(isFinite(pv))onLive(pv); };
   d.addEventListener('mousedown',ev=>{ if(ev.target&&(ev.target.tagName==='INPUT'||ev.target.tagName==='BUTTON'))return; ev.preventDefault(); const r=d.getBoundingClientRect(); const ox=ev.clientX-r.left, oy=ev.clientY-r.top; const mv=(e)=>{ d.style.left=Math.max(0,e.clientX-ox)+'px'; d.style.top=Math.max(0,e.clientY-oy)+'px'; }; const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); const r2=d.getBoundingClientRect(); window._valPanelPos={left:Math.round(r2.left),top:Math.round(r2.top)}; try{localStorage.setItem('cncValPanelPos',JSON.stringify(window._valPanelPos));}catch(e){} }; document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); });
-  setTimeout(()=>{ try{inp.focus();inp.select();}catch(e){} },10);
+  _kerfFocus(inp);
 }
+// JT : donner le focus à un champ ouvert PAR UN CLIC sur le canvas. Avec un gros dessin (SVG de 320 tracés)
+// le calcul est long : le navigateur traitait le « mousedown » APRÈS notre focus et le lui reprenait ->
+// les chiffres tapés partaient dans le vide. On le redonne au relâché du clic et un peu après.
+function _kerfFocus(el0){ if(!el0)return; const E=()=>(typeof el0==='function')?el0():el0; const f=()=>{ try{ const el=E(); const a=document.activeElement; if(el&&document.body.contains(el)&&(!a||a===document.body||a===pCanvas)){ el.focus(); if(el.select)el.select(); } }catch(e){} };
+  setTimeout(()=>{ try{ const el=E(); if(el){ el.focus(); if(el.select)el.select(); } }catch(e){} },(typeof el0==='function')?0:10);
+  const once=()=>setTimeout(f,0); document.addEventListener('mouseup',once,{once:true,capture:true}); document.addEventListener('pointerup',once,{once:true,capture:true});
+  setTimeout(f,150); setTimeout(f,400); }
 function _cornerOp(kind, picks){
   const A=picks[0], B=picks[1]; if(!A||!B){ return; }
   if(A.obj&&A.obj.type==='text'||B.obj&&B.obj.type==='text'){ if(typeof toastHist==='function')toastHist('⚠️ Pas de congé/chanfrein sur un texte'); return; }
@@ -24767,11 +24788,11 @@ function _shpShowInputs(){
   if(_shp.tool==='ppoly'){ div.appendChild(lab('Côtés')); sidesI=inp(46,_shp.sides,true,'sides'); div.appendChild(sidesI); }
   div.appendChild(lab('Ø')); dI=inp(64,_shp.typed||curD,false,'diam'); div.appendChild(dI);
   document.body.appendChild(div); if(typeof _makePanelDraggable==='function')_makePanelDraggable(div);
-  const finish=(e)=>{ if(e.key==='Enter'){ if(_shp){ if(_shp.cx==null){ let c=_shp.cursor; if(!c){ try{ c=pxToMm(pCanvas.width/2, pCanvas.height/2); }catch(_){ c=[0,0]; } } _shp.cx=c[0]; _shp.cy=c[1]; } if(_shp.cx!=null && (_shp.typed||_shpRadius()>0)) _shpFinalize(); } e.preventDefault(); } else if(e.key==='Escape'){ _shp=null; _shpInputsRemove(); if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); } };
+  const finish=(e)=>{ if(e.key==='Enter'){ if(_shp){ if(_shp.cx==null){ let c=_shp.cursor; if(!c){ try{ c=pxToMm(pCanvas.width/2, pCanvas.height/2); }catch(_){ c=[0,0]; } } _shp.cx=c[0]; _shp.cy=c[1]; } if(_shp.cx!=null && (_shp.typed||_shpRadius()>0)) _shpFinalize(); } e.preventDefault(); } else if(_shp&&_shp.tool==='ppoly'&&(e.key==='['||e.key===']')){ e.preventDefault(); _shp.sides=e.key===']'?Math.min(64,_shp.sides+1):Math.max(3,_shp.sides-1); if(sidesI)sidesI.value=_shp.sides; redrawCanvasNow(); } else if(e.key==='Escape'){ _shp=null; _shpInputsRemove(); if(typeof setPTool==='function')setPTool('select'); redrawCanvasNow(); } };
   if(sidesI){ sidesI.oninput=()=>{ const n=parseInt(sidesI.value); if(n>=3&&_shp)_shp.sides=Math.min(64,n); redrawCanvasNow(); }; sidesI.onkeydown=finish; }
   dI.oninput=()=>{ dI.dataset.typed='1'; if(_shp)_shp.typed=dI.value; redrawCanvasNow(); }; dI.onkeydown=finish;
   // focus : le champ pertinent, TEXTE SÉLECTIONNÉ (JT : avant, « 20 » tapé s'ajoutait derrière « 0.0 » -> Ø 0,02)
-  setTimeout(()=>{ try{ const f=(_shp&&_shp.cx==null&&sidesI)?sidesI:dI; f.focus(); f.select(); }catch(e){} },0);
+  try{ _kerfFocus(()=>(_shp&&_shp.cx==null&&sidesI)?sidesI:dI); }catch(e){}
 }
 function _shpOverlay(){
   if(!pCtx||!_shp)return; pCtx.save(); pCtx.setLineDash([]);
@@ -25269,7 +25290,7 @@ function _shapeParamsPanel(o){ _shapeParamsRemove(); if(typeof _selPanelRemove==
   // Entrée (valide) / Échap (ferme) même quand le focus n'est pas dans un champ du panneau.
   _shpPanelKey=(ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); commit(); } else if(ev.key==='Escape'){ ev.preventDefault(); _shapeParamsRemove(); redrawCanvasNow(); } };
   document.addEventListener('keydown',_shpPanelKey,true);
-  setTimeout(()=>{ try{ const i0=d.querySelector('input'); if(i0){i0.focus();i0.select();} }catch(e){} },20);
+  _kerfFocus(d.querySelector('input'));
 }
 function cadDimClick(xm,ym){
   const _ps=window._dimPanelSrc; window._dimPanelSrc=null;
@@ -25572,7 +25593,7 @@ function openDimInput(dim){
   document.addEventListener('keydown',gkey,true);
   setTimeout(()=>{ document.addEventListener('pointerdown',gaway,true); }, 60);
   window._dimInputApply=apply; window._dimInputCancel=cancel;
-  setTimeout(()=>{ try{inp.focus();inp.select();}catch(e){} },20);
+  _kerfFocus(inp);
 }
 function _dimArrow(x,y,ang){ const s=6; pCtx.beginPath(); pCtx.moveTo(x,y); pCtx.lineTo(x+Math.cos(ang+0.38)*s, y+Math.sin(ang+0.38)*s); pCtx.lineTo(x+Math.cos(ang-0.38)*s, y+Math.sin(ang-0.38)*s); pCtx.closePath(); pCtx.fill(); }
 function _dimLabel(px,py,txt){ pCtx.save(); pCtx.font='11px sans-serif'; pCtx.textAlign='center'; pCtx.textBaseline='middle'; const w=pCtx.measureText(txt).width+8; pCtx.fillStyle='rgba(247,244,240,.95)'; pCtx.fillRect(px-w/2,py-8,w,16); pCtx.fillStyle='#4b5563'; pCtx.fillText(txt,px,py); pCtx.restore(); }
@@ -26033,6 +26054,17 @@ function handlePointerDown(cpx,cpy){
   if(paintTool==='eraser'){/* erasing handled in move */}
 }
 
+// JT : points d'ALIGNEMENT (lignes guides) : seulement les points REMARQUABLES.
+// Un tracé libre / spline a des dizaines de points serrés : s'ils servaient tous de guides, la grille ne
+// marchait plus du tout dans toute cette bande (cercle posé à 30,52 au lieu de 30). On garde : les bouts,
+// et les vrais coins (changement de direction > 25°).
+function _alignPointsOf(o){
+  if(o&&o.type==='free'&&o.pts&&o.pts.length>4&&!o._poly&&!o._arc){ const P=o.pts, out=[[P[0][0],P[0][1]],[P[P.length-1][0],P[P.length-1][1]]];
+    for(let i=1;i<P.length-1&&out.length<40;i++){ const ax=P[i][0]-P[i-1][0],ay=P[i][1]-P[i-1][1],bx=P[i+1][0]-P[i][0],by=P[i+1][1]-P[i][1]; const la=Math.hypot(ax,ay),lb=Math.hypot(bx,by); if(la<1e-9||lb<1e-9)continue; const c=(ax*bx+ay*by)/(la*lb); if(c<Math.cos(25*Math.PI/180)) out.push([P[i][0],P[i][1]]); }
+    return out; }
+  return snapPointsOf(o);
+}
+function _gridSnapStep(){ if(!(gridSnapMM>0)) return 0; try{ const st=pickStep(wMm(), wMm()*BASE_PX*vZoom); return Math.min(gridSnapMM, st>0?st:gridSnapMM); }catch(e){ return gridSnapMM; } }
 function snapPoint(xm,ym,excludeId){
   if(!snapEnabled)return{x:xm,y:ym,snapped:false};
   const SNAP_MM=SNAP_DIST/(BASE_PX*vZoom);
@@ -26098,17 +26130,39 @@ function snapPoint(xm,ym,excludeId){
     if(Math.abs(xm-org.x)<AX){ bx=org.x; snapped=true; snapKind='axisX'; window._alignX=org.x; }
     if(Math.abs(ym-org.y)<AX){ by=org.y; snapped=true; if(snapKind!=='axisX')snapKind='axisY'; window._alignY=org.y; }
     const AL=SNAP_MM*0.5; let bestX=(snapKind==='axisX')?bx:null,bxd=AL, bestY=(snapKind==='axisY')?by:null,byd=AL;
-    if(paintObjects.length<=250){ for(const o of paintObjects){ if(o.id===excludeId||o.type==='dim')continue; let pts; try{pts=snapPointsOf(o);}catch(e){continue;} for(const p of pts){ const dx=Math.abs(xm-p[0]); if(dx<bxd){bxd=dx;bestX=p[0];} const dy=Math.abs(ym-p[1]); if(dy<byd){byd=dy;bestY=p[1];} } } }
+    if(paintObjects.length<=250){ for(const o of paintObjects){ if(o.id===excludeId||o.type==='dim')continue; let pts; try{pts=_alignPointsOf(o);}catch(e){continue;} for(const p of pts){ const dx=Math.abs(xm-p[0]); if(dx<bxd){bxd=dx;bestX=p[0];} const dy=Math.abs(ym-p[1]); if(dy<byd){byd=dy;bestY=p[1];} } } }
     if(bestX!=null){ bx=bestX; snapped=true; if(snapKind!=='axisX')snapKind=snapKind||'alignX'; window._alignX=bestX; }
     if(bestY!=null){ by=bestY; snapped=true; if(snapKind!=='axisY')snapKind=snapKind||'alignY'; window._alignY=bestY; }
     // JT : grille AXE PAR AXE : un axe aligné garde son alignement, l'AUTRE est quand même arrondi à la grille
     // (avant : aligné sur un axe -> l'autre restait au pixel près : cercle r 9,96 au lieu de 10, rect à 29,96…)
-    if(gridSnapMM>0){ const g=gridSnapMM; if(window._alignX==null) bx=org.x+Math.round((xm-org.x)/g)*g; if(window._alignY==null) by=org.y+Math.round((ym-org.y)/g)*g; if(!snapped){ snapped=true; snapKind='grid'; } }
+    if(gridSnapMM>0){ const g=_gridSnapStep(); if(window._alignX==null) bx=org.x+Math.round((xm-org.x)/g)*g; if(window._alignY==null) by=org.y+Math.round((ym-org.y)/g)*g; if(!snapped){ snapped=true; snapKind='grid'; } }
   }
   return{x:bx,y:by,snapped,kind:snapKind};
 }
 
+// JT : accrochage ON/OFF accessible PARTOUT (barre du haut + touche F9), plus seulement dans la barre de style
+// JT : Échap = on sort de TOUT ce qui est en cours (outil, panneau, fenêtre), sans rien valider
+function _escapeAll(){
+  try{ if(typeof _rot2!=='undefined'&&_rot2&&typeof _rotCancel==='function')_rotCancel(); }catch(e){}
+  try{ if(typeof _mirror!=='undefined'&&_mirror){ _mirror=null; _mirrorPanelRemove(); } }catch(e){}
+  try{ if(typeof _ext!=='undefined'&&_ext&&typeof _extCancel==='function')_extCancel(); }catch(e){}
+  try{ if(typeof _align2!=='undefined'&&_align2) _align2=null; }catch(e){}
+  try{ if(typeof _arrayPick!=='undefined'&&_arrayPick){ _arrayPick=null; _arrayCursor=null; } }catch(e){}
+  try{ if(typeof _rectPat!=='undefined'&&_rectPat&&typeof _rectPatCancel==='function')_rectPatCancel(); }catch(e){}
+  try{ if(window._valActiveCancel) window._valActiveCancel(); else if(typeof _valInputRemove==='function') _valInputRemove(); }catch(e){}
+  try{ if(typeof _shp!=='undefined'&&_shp){ _shp=null; if(typeof _shpInputsRemove==='function')_shpInputsRemove(); } }catch(e){}
+  try{ document.querySelectorAll('.modal-bg.open').forEach(m=>m.classList.remove('open')); }catch(e){}
+  try{ document.querySelectorAll('.kerfOv').forEach(m=>m.remove()); ['arrPopBk','arrPop'].forEach(id=>{ const e=document.getElementById(id); if(e)e.remove(); }); }catch(e){}
+  try{ if(typeof closeToolMenu==='function')closeToolMenu(); }catch(e){}
+  try{ if(typeof _conHintHide==='function')_conHintHide(); }catch(e){}
+  try{ window._selCon=null; if(typeof _conDelBtnRemove==='function')_conDelBtnRemove(); }catch(e){}
+  try{ if(typeof _cadMode!=='undefined') _cadMode=false; }catch(e){}
+}
+function toggleSnap(force){ snapEnabled=(typeof force==='boolean')?force:!snapEnabled; renderSnapBtn(); if(typeof toastHist==='function')toastHist(snapEnabled?'🧲 Accrochage ON':'🧲 Accrochage OFF (libre)'); try{ if(typeof redrawCanvasNow==='function')redrawCanvasNow(); }catch(e){} }
 function renderSnapBtn(){
+  const mb=document.getElementById('snapMainBtn'), ml=document.getElementById('snapMainLbl');
+  if(mb){ mb.style.background=snapEnabled?'rgba(66,165,245,.22)':'rgba(239,83,80,.12)'; mb.style.borderColor=snapEnabled?'var(--blu)':'var(--red)'; mb.style.color=snapEnabled?'var(--blu)':'var(--red)'; }
+  if(ml) ml.textContent=snapEnabled?'ON':'OFF';
   const btn=document.getElementById('snapBtn');
   if(btn)btn.style.background=snapEnabled?'rgba(66,165,245,.15)':'';
   if(btn)btn.style.borderColor=snapEnabled?'var(--blu)':'var(--brd2)';
@@ -26988,7 +27042,7 @@ function explodeSvg(o,mode){
   redrawCanvas();renderInspector();updateObjCount();pushHistory();
 
   const t=document.createElement('div');
-  t.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--grn);color:#000;padding:9px 16px;border-radius:9px;font-size:12px;font-weight:700;z-index:9999';
+  t.style.cssText='position:fixed;top:118px;left:50%;transform:translateX(-50%);background:var(--grn);color:#000;padding:9px 16px;border-radius:9px;font-size:12px;font-weight:700;pointer-events:none;z-index:9999';
   t.textContent='✅ Séparé en '+created.length+' objet(s) — sélectionnés';
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),2800);
@@ -27084,7 +27138,7 @@ function openPatternRect(){
   const bb = selBBox(objs);
   const dw = Math.max(1, Math.round(bb.w+2)), dh = Math.max(1, Math.round(bb.h+2));
   const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center'; ov.classList.add('kerfOv');
   const row = 'display:flex;justify-content:space-between;align-items:center;gap:12px;margin:9px 0;font-size:13px';
   const inp = 'width:92px;padding:5px;border-radius:6px;border:1px solid #333;background:#0d0f12;color:#fff';
   ov.innerHTML =
@@ -27186,7 +27240,7 @@ function countSmallContours(thr){
 
 function openMinFeature(){
   const ov=document.createElement('div');
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center'; ov.classList.add('kerfOv');
   const inp='width:100px;padding:5px;border-radius:6px;border:1px solid #333;background:#0d0f12;color:#fff';
   ov.innerHTML='<div style="background:#1a1d22;border:1px solid #2a2d35;border-radius:14px;padding:18px;min-width:290px;color:#fff;font-family:system-ui">'
     +'<div style="font-size:16px;font-weight:700;color:#f5a623;margin-bottom:10px">◦ Détails minimum</div>'
@@ -27259,7 +27313,7 @@ function cleanSmallContours(thr){
 
 function openCleanSmall(){
   const ov=document.createElement('div');
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;display:flex;align-items:center;justify-content:center'; ov.classList.add('kerfOv');
   const inp='width:100px;padding:5px;border-radius:6px;border:1px solid #333;background:#0d0f12;color:#fff';
   ov.innerHTML='<div style="background:#1a1d22;border:1px solid #2a2d35;border-radius:14px;padding:18px;min-width:300px;color:#fff;font-family:system-ui">'
     +'<div style="font-size:16px;font-weight:700;color:#f5a623;margin-bottom:10px">🧹 Nettoyer les petits contours</div>'
@@ -27553,7 +27607,7 @@ function importFontFile(inp){
         if(o){ o.fontFamily=name; redrawCanvas(); setTimeout(()=>iEditText(_fontImportOid),200); }
       }
       const t=document.createElement('div');
-      t.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--grn);color:#000;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;z-index:9999;pointer-events:none';
+      t.style.cssText='position:fixed;top:118px;left:50%;transform:translateX(-50%);background:var(--grn);color:#000;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;z-index:9999;pointer-events:none';
       t.textContent='✅ Police "'+name+'" chargée';
       document.body.appendChild(t);
       setTimeout(()=>t.remove(),2500);
@@ -27661,7 +27715,7 @@ function importDXF(file){
       // entité -> on voyait un coin, d'où l'impression de "n'importe quoi").
       if(typeof fitView==='function')fitView(); else { const b=getObj(selObjId); if(b&&typeof centerViewOnObj==='function')centerViewOnObj(b); }
       const toast=document.createElement('div');
-      toast.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--grn);color:#000;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+      toast.style.cssText='position:fixed;top:118px;left:50%;transform:translateX(-50%);background:var(--grn);color:#000;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;pointer-events:none;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.4)';
       toast.textContent='✅ '+file.name+' — '+made.length+' entité(s) DXF éditables (vraie taille)';
       document.body.appendChild(toast); setTimeout(()=>toast.remove(),3500);
     }catch(err){alert('❌ Erreur lecture DXF : '+err.message);}
@@ -27913,10 +27967,10 @@ function importSVG(input){
       selObjId=id;redrawCanvas();renderInspector();centerViewOnObj(getObj(id));
       // Toast au lieu d'alert (qui bloque et perd le focus)
 const toast=document.createElement('div');
-toast.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--grn);color:#000;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+toast.style.cssText='position:fixed;top:118px;left:50%;transform:translateX(-50%);background:var(--grn);color:#000;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;pointer-events:none;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.4)';
 const closed=good.filter(p=>Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<0.1).length;
 const closedCount=good.filter(p=>Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1).length;
-toast.textContent='✅ '+file.name+' — '+good.length+' tracé(s) ('+(good.length-closedCount)+' ouverts, '+closedCount+' fermés) ('+(good.length-closed)+' ouverts)';
+toast.textContent='✅ '+file.name+' — '+good.length+' tracé(s) : '+closedCount+' fermé(s), '+(good.length-closedCount)+' ouvert(s)';
 document.body.appendChild(toast);
 setTimeout(()=>toast.remove(),3000);
     }catch(err){alert('❌ Erreur SVG : '+err.message+'\n'+err.stack?.split('\n')[1]);}
@@ -28236,7 +28290,7 @@ function _doVectorize(img,file,mode,killLoader){
         killLoader();
 
         const toast=document.createElement('div');
-        toast.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--grn);color:#000;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.4)';
+        toast.style.cssText='position:fixed;top:118px;left:50%;transform:translateX(-50%);background:var(--grn);color:#000;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;pointer-events:none;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.4)';
         toast.textContent='✅ '+file.name+' — '+good.length+(mode==='centerline'?' ligne(s) centrale(s)':' contour(s)');
         document.body.appendChild(toast);
         setTimeout(()=>toast.remove(),3000);
@@ -33863,6 +33917,7 @@ function initCanvas(){
       if(isDrawing){ isDrawing=false; _clickRubber=false; try{ freePts=[]; }catch(_){} }
       try{ if(typeof _conPick!=='undefined' && _conPick){ _conPick=null; if(typeof _conHintHide==='function')_conHintHide(); if(typeof _tangentPanelRemove==='function')_tangentPanelRemove(); } }catch(_){}
       try{ if(typeof _dimPlace!=='undefined') _dimPlace=null; if(typeof _dimEdgeA!=='undefined') _dimEdgeA=null; if(typeof _dimA!=='undefined') _dimA=null; }catch(_){}
+      _escapeAll();
       selObjIds.clear();selObjId=null;redrawCanvas();renderInspector();}
     // JT : COPIER / COUPER / COLLER / DUPLIQUER / FLÈCHES (comme dans tout logiciel de dessin)
     { const ae=document.activeElement, typing=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.isContentEditable);
@@ -33888,6 +33943,7 @@ function initCanvas(){
       e.preventDefault(); redoAction(); return;
     }
     // Tout sélectionner
+    if(e.key==='F9'){ e.preventDefault(); if(typeof toggleSnap==='function')toggleSnap(); return; }
     if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='a'){
       e.preventDefault(); selectAllObjs(); return;
     }
@@ -34804,7 +34860,7 @@ function hitHandle(o,cpx,cpy){
 function showSvgExplodeDialog(o){
   const n=o.paths.length;
   const ov=document.createElement('div');
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px'; ov.classList.add('kerfOv');
   ov.innerHTML=`<div style="background:var(--surf);border:1px solid var(--brd2);border-radius:14px;padding:20px;max-width:350px;width:100%">
     <div style="font-size:15px;font-weight:700;color:var(--txt);margin-bottom:6px">✂️ Séparer le SVG</div>
     <div style="font-size:12px;color:var(--txt2);margin-bottom:16px">Ce dessin contient <b>${n} contours</b>.</div>
