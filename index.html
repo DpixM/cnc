@@ -2930,6 +2930,8 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
             <div class="cipGB" id="cipSmBox" style="margin:6px 0">
             <label class="cipChk" data-tip="Comme ton programme test qui coupe nickel : tête droite, SANS TRAORI ni CIP.\nTours (bout, séparation) = une ligne C1 · trous ronds = TC_CIRC2 · lignes (lamelles…) = G01 X / C1.\nfgroup + FGREF = rayon du tube : la vitesse est tenue sur le tube.\nBiseau du bout (tête inclinée) : TRAORI sert juste à placer la tête, la coupe = une ligne C1.\nLes coupes où la tête doit pencher en avançant (lamelle en biais…) passent en TRAORI, avec leurs propres chiffres.\nTube rond, mandrin à 90° seulement."><input type="checkbox" id="cipLSimple" checked onchange="cip_ui('lstclr')"> <b>Programme simple</b> (sans TRAORI ni CIP, comme mon test)</label>
             <div class="cipNum" data-tip="Hauteur de la buse au-dessus du tube avant chaque coupe : au TC_LASER_ON le capteur va chercher la pièce (distance de ton tableau). Entre deux coupes elle monte de 5 mm de plus."><span>Buse au-dessus du tube (mm)</span><input type="number" id="cipSmZ" value="5" step="0.5" style="width:70px" onchange="cip_ui('lstclr')"></div>
+            <div class="cipNum" data-tip="Angle de la tête pour le biseau du bout (1er contour). Le soft le force à cette valeur."><span>Angle du biseau (°)</span><input type="number" id="cipSmBA" value="45" step="0.5" style="width:70px" onchange="cip_ui('lstclr')"></div>
+            <div class="cipNum" data-tip="Tableau techno utilisé SEULEMENT pour le biseau : le programme met TM_LTTNAME sur ce tableau juste avant le biseau, puis remet le tableau normal juste après.\nVide = même tableau que le reste."><span>Tableau techno du biseau</span><input id="cipSmBT" value="BISEAU-SS010MDN2S-0" style="width:190px;font:12px var(--mono)" onchange="cip_ui('lstclr')"></div>
             <div class="cipSub">TC_LASER_ON( méthode, tableau, perçage, contour )</div>
 <div class="cipNum" data-tip="Les 3 chiffres de TC_LASER_ON pour les coupes qui font le tour (une ligne C1)."><span>Tours (bout, séparation)</span><span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><input type="number" id="cipSmRM" value="11" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmRP" value="0" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmRC" value="300" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></span></div>
 <div class="cipNum" data-tip="Les 3 chiffres de TC_LASER_ON pour les autres coupes (lignes G01 X / C1)."><span>Lignes et formes (lamelles…)</span><span class="cipRow" style="margin:0;gap:4px;flex-wrap:nowrap;display:inline-flex"><input type="number" id="cipSmLM" value="11" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmLP" value="0" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"><input type="number" id="cipSmLC" value="300" step="1" style="width:52px;font:13px var(--mono)" onchange="cip_ui('lstclr')"></span></div>
@@ -10698,7 +10700,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v92',
+  const CIP_VER = 'CIP v94',
     CIP_DATE = '23/10/2026';
   {
     const e = $('cipVer');
@@ -14348,7 +14350,7 @@ function cip_build() {
   //     gabarits copiés des vrais fichiers de Seb
   // ════════════════════════════════════════════════════════════════════════════════════════════════════
   // Soudure : PTUBE-COUDE-*.LST / PMERCKD81-CIPNORBERT.LST.  Découpe : PDECOUPE_TABS_ALPCN_*.LST (+ sa table LTT_STAMM verbatim).
-  function lstHead(prog, kind, tech) {
+  function lstHead(prog, kind, tech, extra) {
     const H = [
       'BD',
       'SET_METRIC',
@@ -14387,8 +14389,9 @@ function cip_build() {
         'ZA,MM,1',
         "MM,AT,1,10,1,1,,'DataSetName',,'',T",
         'C',
-        'ZA,DA,1',
+        `ZA,DA,${1 + (extra || []).length}`,
         `DA,'${tech}'`,
+        ...(extra || []).map(t => `DA,'${t}'`),
         'C',
         'ENDE_LTT_CALLS',
         'C'
@@ -14559,11 +14562,15 @@ function cip_build() {
       hole: tri('H', [9, 11, 300]),
       ap: g('cipSmHA', 0.5),
       line: tri('L', [11, 0, 300]),
+      bisA: g('cipSmBA', 45),
+      bisT: String(($('cipSmBT') || {}).value || '').trim(),
       trao: tri('T', [11, 0, 300])
     };
     const all = [v.zh, v.ap].concat(v.ring, v.hole, v.line, v.trao);
     if (all.some(x => !isFinite(x))) return { err: 'Programme simple : un des réglages n’est pas un nombre.' };
     if (!(v.zh >= 1 && v.zh <= 20)) return { err: 'Programme simple : hauteur de buse entre 1 et 20 mm.' };
+    if (!(v.bisA > 0 && v.bisA < 80)) return { err: 'Programme simple : angle du biseau entre 0 et 80°.' };
+    if (/["',;]/.test(v.bisT)) return { err: 'Tableau du biseau : pas de guillemet, virgule ou point-virgule.' };
     return v;
   }
   function simpleOn() {
@@ -14642,7 +14649,7 @@ function cip_build() {
     return keep.map((k, i) => (k ? i : -1)).filter(i => i >= 0);
   }
   function simpleBody(x) {
-    const { o, C, posMode, dry, TV, sh, fg } = x;
+    const { o, C, posMode, dry, TV, sh, fg, tech } = x;
     const pr = S.profile;
     let Rr = pr && pr.type === 'rond' ? pr.R : null;
     if (pr && !Rr && pr.out && pr.out.length > 8) {
@@ -14698,12 +14705,43 @@ function cip_build() {
     // 1. classer chaque contour
     const K = [];
     for (let ci = 0; ci < C.length; ci++) {
-      const fr = cuts[ci];
+      let fr = cuts[ci];
       if (!fr.length) {
         K.push(null);
         continue;
       }
-      const M = fr.map(mach);
+      let M = fr.map(mach);
+      {
+        // v94 : petit bout où la tête penche (ex. la lamelle qui arrive dans le biseau) : on prolonge le trait tout droit
+        const okP = q => q.vert && q.H >= R * 0.3 && q.H <= R + 0.15;
+        let i0 = 0,
+          i1 = M.length - 1;
+        while (i0 < M.length && !okP(M[i0])) i0++;
+        while (i1 > i0 && !okP(M[i1])) i1--;
+        const mid = M.slice(i0, i1 + 1);
+        const lenOf = (a, b) => {
+          let s = 0;
+          for (let i = a; i < b; i++) s += V.len(V.sub(fr[i + 1].p, fr[i].p));
+          return s;
+        };
+        if (
+          (i0 > 0 || i1 < M.length - 1) &&
+          mid.length >= 2 &&
+          mid.every(okP) &&
+          lenOf(0, i0) + lenOf(i1, M.length - 1) < 3
+        ) {
+          const ext = (a, b, xTo) => {
+            const dx = b.X - a.X;
+            if (Math.abs(dx) < 1e-6) return null;
+            const t = (xTo - b.X) / dx;
+            return { ...b, X: xTo, Y: b.Y + (b.Y - a.Y) * t, C: b.C + (b.C - a.C) * t };
+          };
+          const tail = i1 < M.length - 1 ? ext(mid[mid.length - 2], mid[mid.length - 1], M[M.length - 1].X) : null;
+          const head = i0 > 0 ? ext(mid[1], mid[0], M[0].X) : null;
+          M = (head ? [head] : []).concat(mid, tail ? [tail] : []);
+          fr = (head ? [fr[i0]] : []).concat(fr.slice(i0, i1 + 1), tail ? [fr[i1]] : []);
+        }
+      }
       let flat = true,
         xmin = 1e9,
         xmax = -1e9,
@@ -14850,6 +14888,11 @@ function cip_build() {
     const f0 = cuts.find(c => c.length)[0];
     const q0 = toLst(f0.p, f0.d, f0.th, o);
     const info = { ring: 0, hole: 0, line: 0, bis: 0, trao: 0 };
+    const extraT = [],
+      defs = [];
+    let startQ = null,
+      startA = null,
+      bisLift = null;
     const FG = [
       'fgroup(X,Y,Z,c1)',
       `FGREF [c1] = ${(+fg).toFixed(3)} ;rayon du tube : la vitesse est tenue SUR le tube`
@@ -14859,19 +14902,37 @@ function cip_build() {
     if (hasBis) {
       const k = K[0];
       const f = k.fr[0];
-      const a = toLst(V.sub(f.p, V.mul(f.d, 30 + (dry ? 3 : 0))), f.d, f.th, o);
+      // v93 : biseau à l'angle demandé (45° par défaut), même point de départ sur le tube
+      const qs = toLst(f.p, f.d, f.th, o);
+      qs.B = Math.sign(qs.B || 1) * v.bisA;
+      const fb = fromLst(qs, o);
+      const ps = toLst(V.sub(fb.p, V.mul(fb.d, dry ? 3 : 0)), fb.d, fb.th, o);
+      const a = toLst(V.sub(fb.p, V.mul(fb.d, 30 + (dry ? 3 : 0))), fb.d, fb.th, o);
+      const tbl = v.bisT && v.bisT !== tech;
       out.push(
-        `;----- CONTOUR 1 : ${nm(0)} (tete inclinee B ${n3(k.M[0].B)}) -----`,
+        `;----- CONTOUR 1 : ${nm(0)} (tete inclinee B ${n3(qs.B)}) -----`,
+
         lstMv(a) + " ;pre-approche 30 mm dans l'axe du faisceau",
-        lstMv(toLst(sh(f), f.d, f.th, o)) + ' ;tete placee sur le biseau',
+        lstMv(ps) + ' ;tete placee sur le biseau',
         'TRAFOOF ;la coupe : juste la rotation du mandrin',
         ...FG,
-        LON(v.ring),
+        A +
+          `TC_LASER_ON(${v.ring[0]},${tbl ? 'LTT_BISEAU' : TV},${v.ring[1]},${v.ring[2]})` +
+          (tbl ? ' ;tableau du biseau' : ''),
         `G01 C1 = ${n3(k.M[k.M.length - 1].C)}`,
         A + 'TC_LASER_OFF(2)',
         'TC_SET_TRAFO("BA1")',
         'TRAORI(1)'
       );
+      if (tbl) {
+        extraT.push(v.bisT);
+        defs.push(
+          `DEF STRING[31] LTT_BISEAU="${v.bisT}" ;tableau techno du BISEAU : pour en prendre un autre, change juste cette ligne`
+        );
+      }
+      startQ = qs;
+      bisLift = toLst(V.sub(fb.p, V.mul(fb.d, 30)), fb.d, k.fr[k.fr.length - 1].th, o);
+      startA = toLst(V.sub(fb.p, V.mul(fb.d, 30)), fb.d, fb.th, o);
       info.bis++;
     }
     // 3. passage en mode simple : buse au-dessus du tube, tête droite, au départ des coupes
@@ -14879,8 +14940,8 @@ function cip_build() {
     const Xref = toLst(fr0.p, fr0.d, fr0.th, o).X;
     if (hasBis) {
       out.push('', ';----- tete droite, au-dessus du depart des coupes -----');
-      F.filter(f => f.ci === first && f.j < 0).forEach(f => out.push(lstMv(toLst(f.p, f.d, f.th, o))));
-      out.push(lstMv(topOf(fr0, 30)));
+      if (bisLift) out.push(lstMv(bisLift) + ' ;tete levee de 30 mm');
+      out.push(lstMv(topOf(fr0, 30)) + ' ;tete droite au-dessus du depart');
     } else if (!posMode) {
       out.push(lstMv(topOf(fr0, 30)) + ' ;au-dessus du depart');
     }
@@ -14896,24 +14957,26 @@ function cip_build() {
       cy = 0,
       cc = c0r,
       lastTh = fr0.th;
-    const xyc = (xx, yy, c) => {
+    let cz = zh;
+    const xyc = (xx, yy, c, zz) => {
       const s = [];
       if (Math.abs(xx - cx) > 5e-4) s.push(`X = ${n3(xx)}`);
       if (Math.abs(yy - cy) > 5e-4) s.push(`Y = ${n3(yy)}`);
+      if (zz !== undefined && Math.abs(zz - cz) > 0.01) {
+        s.push(`Z = ${n3(zz)}`);
+        cz = zz;
+      }
       if (Math.abs(c - cc) > 5e-4) s.push(`C1 = ${n3(c)}`);
       cx = xx;
       cy = yy;
       cc = c;
       return s.length ? 'G01 ' + s.join(' ') : null;
     };
-    const go = (xx, yy, c, lab) => {
+    const go = (xx, yy, c, lab, zz) => {
       const L = [];
       const far = Math.abs(xx - cx) > 5e-4 || Math.abs(yy - cy) > 5e-4 || Math.abs(c - cc) > 5e-4;
-      if (far) {
-        L.push(`G01 Z = ${n3(zt)}`);
-        L.push(xyc(xx, yy, c) + (lab ? ' ;' + lab : ''));
-      }
-      L.push(`G01 Z = ${n3(zh)}`);
+      // v94 : 1 ligne ; la buse se met à sa hauteur au-dessus du tube À CET ENDROIT (trait décalé sur le côté = tube plus bas)
+      if (far) L.push(xyc(xx, yy, c, zz === undefined ? zh : zz) + (lab ? ' ;' + lab : ''));
       return L;
     };
     for (let ci = first; ci < K.length; ci++) {
@@ -14947,7 +15010,7 @@ function cip_build() {
         info.hole++;
       } else if (k.t === 'line') {
         const P = k.keep.map(i => k.M[i]);
-        out.push(...go(P[0].X - Xref, P[0].Y, P[0].C), LON(v.line));
+        out.push(...go(P[0].X - Xref, P[0].Y, P[0].C, null, +(P[0].H - R + zh).toFixed(3)), LON(v.line));
         for (let i = 1; i < P.length; i++) {
           const l = xyc(P[i].X - Xref, P[i].Y, P[i].C);
           if (l) out.push(l);
@@ -14962,6 +15025,7 @@ function cip_build() {
         const ms = mach(f),
           me = mach(fe);
         out.push(`G01 Z = ${n3(zt)}`);
+        cz = zt;
         const l = xyc(ms.X - Xref, 0, ms.C);
         if (l) out.push(l + ' ;au-dessus du depart');
         const ts = topOf(f, zt);
@@ -14982,8 +15046,10 @@ function cip_build() {
           lstMv(topOf(fe, zt)) + ' ;tete droite au-dessus du tube',
           'TRAFOOF',
           `SET_POS(${n3(me.X - Xref)}, 0.000, ${n3(zt)}) ;retour sans TRAORI (memes reperes qu avant)`,
-          ...FG
+          ...FG,
+          `G01 Z = ${n3(zh)}`
         );
+        cz = zh;
         cx = me.X - Xref;
         cy = 0;
         cc = me.C;
@@ -15004,20 +15070,20 @@ function cip_build() {
         );
       } else {
         // la tête doit revenir inclinée sur le biseau : on repasse en TRAORI (on redit où est la pointe)
+        // v94 : le mandrin se déroule SANS TRAORI, puis on repasse en TRAORI une seule fois
+        const th0 = o.xdir === '-X' ? q0.C : -q0.C;
         const Pm = [0, fr0.p[1], R + 30];
-        const qn = toLst(rotM(Pm, -lastTh), rotM([0, 0, -1], -lastTh), lastTh, o);
-        const a0 = toLst(V.sub(f0.p, V.mul(f0.d, 30)), f0.d, f0.th, o);
+        const qn = toLst(rotM(Pm, -th0), rotM([0, 0, -1], -th0), th0, o);
+        const a0 = startA || toLst(V.sub(f0.p, V.mul(f0.d, 30)), f0.d, f0.th, o);
+        void lastTh;
         out.push(
+          `G01 G90 C1 = ${n3(q0.C)} ;le mandrin refait ses tours a l envers -> angle de depart`,
           'G01 X = 0.000 Y = 0.000',
           'TC_SET_TRAFO("BA1")',
           'TRAORI(1)',
           `SET_POS(${n3(qn.X)}, ${n3(qn.Y)}, ${n3(qn.Z)}) ;on redit a la machine ou est la pointe (en TRAORI)`,
-          'TRAFOOF',
-          `G01 G90 C1 = ${n3(q0.C)} F10000 ;le mandrin refait ses tours a l envers -> angle de depart`,
-          'TC_SET_TRAFO("BA1")',
-          'TRAORI(1)',
           lstMv(a0) + ' ;au-dessus du depart',
-          lstMv(q0) + ' ;pointe sur le depart : tout est comme au lancement'
+          lstMv(startQ || q0) + ' ;pointe sur le depart : tout est comme au lancement'
         );
         inTrao = true;
       }
@@ -15043,7 +15109,7 @@ function cip_build() {
       '',
       'M30'
     );
-    return { lines: out, info };
+    return { lines: out, info, extraT, defs, startB: startQ ? startQ.B : null };
   }
   function lstMv(q, f) {
     return ` G01 X = ${n3(q.X)} Y = ${n3(q.Y)} Z = ${n3(q.Z)} B = ${n3(q.B)} C1 = ${n3(q.C)}` + (f ? ' ' + f : '');
@@ -15155,7 +15221,7 @@ function cip_build() {
           ' mm vers la tete (pas de palpage laser eteint) !!!'
       );
     if (!W && simpleOn()) {
-      const sr = simpleBody({ o, C, posMode, dry, TV, sh, fg });
+      const sr = simpleBody({ o, C, posMode, dry, TV, sh, fg, tech });
       if (sr.err) {
         // pas possible pour cette pièce : on sort le programme normal (TRAORI) et on le dit
         S._simpleOff = true;
@@ -15177,8 +15243,13 @@ function cip_build() {
         const i = B.findIndex(l => /^;!!! A VIDE : toute la trajectoire/.test(l));
         if (i >= 0) B.splice(i, 1, ';!!! A VIDE : la buse reste au-dessus du tube (pas de palpage laser eteint) !!!');
       }
+      if (sr.startB !== null) {
+        const i = B.findIndex(l => /^SET_POS\(/.test(l));
+        if (i >= 0) B[i] = B[i].replace(/\(B -?[\d.]+/, `(B ${n3(sr.startB)}`);
+      }
+      if (sr.defs.length) B.unshift(...sr.defs);
       B.push(...sr.lines);
-      const L = lstHead(prog, kind, tech).concat(airLST([';----- reglages -----'].concat(B)), [
+      const L = lstHead(prog, kind, tech, sr.extraT).concat(airLST([';----- reglages -----'].concat(B)), [
         'STOP_TEXT',
         'C',
         'ENDE_PROGRAMM',
