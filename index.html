@@ -164,6 +164,19 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-11-03 — JW : SURFAÇAGE — 4 façons d'usiner, 5 zéros, fraises dans la bibliothèque commune
+ [AJOUT] Façon d'usiner : Zigzag · Sens unique · Croisé (90° à chaque passe) · Concentrique (de l'extérieur au centre,
+   en opposition ou en avalant). Zéro X/Y : 4 coins du brut ou centre (croix verte sur l'aperçu).
+ [AJOUT] Bibliothèque d'outils : nouveau type « Fraise à surfacer » (+ 2 au catalogue). Bouton « ＋ Nouvelle fraise »
+   dans le Surfaçage (préremplie) ; c'est la MÊME bibliothèque pour usinage normal, incrustation et surfaçage.
+
+-- 2026-11-03 — JV : CNC 3018 — nouveau mode 🪚 SURFAÇAGE (demande Seb)
+ [AJOUT] 4e carte « Surfaçage » sur l'accueil (écran à part, fonctions surf_*). Tu rentres la taille du brut, le Ø de
+   la fraise et l'épaisseur à enlever : zigzag automatique, plusieurs passes, passe de finition, montée de broche.
+   2 préréglages : Planche brute / Martyr (MDF). Avancé : pas, profondeur/passe, avances, broche, débord, sens.
+   La fraise descend TOUJOURS hors du brut (débord > rayon) ; aperçu vue de dessus avec la zone interdite aux brides ;
+   temps estimé ; alertes (course du 3018 300×180, passe trop profonde…). Rien d'autre ne change.
+
 -- 2026-11-02 — JU : DESSIN — bouton 🧲 accroche ON/OFF toujours visible + tests avec le VRAI SVG « little wich »
  [AJOUT] Bouton « 🧲 ON / OFF » dans la barre du haut (+ touche F9) : visible avec TOUS les outils. Avant il était
    caché dans la barre de style, qui disparaît avec l'outil Cercle / Sélection -> impossible de remettre l'accroche.
@@ -1945,6 +1958,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--acc)}
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%23f5a623' d='M5 6L0 0h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:28px}
 textarea{resize:vertical;min-height:50px}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+#wzpSURF .surf-pre{background:var(--surf2);border:1.5px solid var(--brd2);color:var(--txt2)}
+#wzpSURF .surf-pre.on{background:rgba(245,166,35,.15);border-color:var(--acc);color:var(--acc)}
+#wzpSURF details summary{list-style:none}
+#wzpSURF .surf-sts{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+#wzpSURF .surf-st{background:var(--surf);border:1.5px solid var(--brd2);border-radius:10px;padding:8px 6px;cursor:pointer;color:var(--txt2);display:flex;flex-direction:column;align-items:center;gap:3px;font-family:var(--sans)}
+#wzpSURF .surf-st b{font-size:12.5px;color:var(--txt)}
+#wzpSURF .surf-st small{font-size:10.5px;text-align:center;line-height:1.25}
+#wzpSURF .surf-st.on{border-color:var(--acc);background:rgba(245,166,35,.12);color:var(--acc)}
+@media (max-width:640px){ #wzpSURF .surf-sts{grid-template-columns:repeat(2,1fr)} }
 .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
 .g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px}
 .rng{display:flex;align-items:center;gap:8px}
@@ -2428,7 +2450,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-02-JU ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-03-JW ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2513,10 +2535,85 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
       Incrustation bois (V-Carve Inlay)
       <span class="bc-desc">Mâle ♂ + Femelle ♀ — noyer &amp; érable — 4 fichiers G-code</span>
     </button>
+    <button class="bc-btn" id="modeSURF" onclick="surf_open()">
+      <span class="bc-icon"><svg viewBox="0 0 24 24" width="30" height="30" style="vertical-align:middle"><rect x="9.5" y="2" width="5" height="8" rx="1" fill="#3b82f6"/><rect x="7" y="10" width="10" height="3" rx="1" fill="#60a5fa"/><path d="M2 18h20" stroke="#c8a16a" stroke-width="3"/><path d="M3 15.5h4M10 15.5h4M17 15.5h4" stroke="#93c5fd" stroke-width="1.5"/></svg></span>
+      Surfaçage
+      <span class="bc-desc">Mettre une planche ou le martyr à plat — taille du brut + Ø fraise = G-code</span>
+    </button>
     </div>
   </div>
 <div id="modeHint" class="al al-w" style="display:none"></div>
 </div>
+
+<!-- ╔══════════ SURFAÇAGE CNC 3018 — écran à part (surf_*) ══════════╗ -->
+<div class="wz-wrap" id="wzpSURF">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+    <button class="btn btn-dim" onclick="surf_back()">← Retour</button>
+    <div class="wz-h1" style="margin:0">🪚 Surfaçage — CNC 3018</div>
+  </div>
+  <div class="wz-sub">Tu rentres la taille du brut et le Ø de ta fraise, tu choisis la façon d'usiner : le parcours se fait tout seul.</div>
+  <div id="surfPre" data-v="planche" style="display:flex;gap:8px;margin:6px 0 10px">
+    <button class="btn surf-pre on" data-v="planche" onclick="surf_preset('planche')">🪵 Planche brute</button>
+    <button class="btn surf-pre" data-v="martyr" onclick="surf_preset('martyr')">🟫 Martyr (MDF)</button>
+  </div>
+  <div class="g2">
+    <div class="fld"><label>Largeur X du brut (mm)</label><input type="number" id="surfW" value="200" min="1" step="0.1" inputmode="decimal"></div>
+    <div class="fld"><label>Longueur Y du brut (mm)</label><input type="number" id="surfL" value="120" min="1" step="0.1" inputmode="decimal"></div>
+    <div class="fld"><label>Ø de la fraise (mm)</label><input type="number" id="surfD" value="6" min="0.5" step="0.1" inputmode="decimal"></div>
+    <div class="fld"><label>Épaisseur à enlever (mm)</label><input type="number" id="surfZ" value="1" min="0.05" step="0.05" inputmode="decimal"></div>
+  </div>
+  <div class="fld" style="margin-top:7px"><label>Fraise (même bibliothèque que l'usinage normal et l'incrustation)</label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><select id="surfTool" onchange="surf_tool()" style="flex:1;min-width:180px"></select>
+      <button class="btn btn-sec" onclick="surf_newTool()" title="Ajouter une fraise à la bibliothèque (préremplie avec le Ø et les réglages d'ici)">＋ Nouvelle fraise</button>
+      <button class="btn btn-dim" onclick="surf_lib()" title="Ouvrir la bibliothèque d'outils">🔧 Bibliothèque</button></div></div>
+  <div class="fld" style="margin-top:7px"><label>Où est ton zéro X/Y sur le brut ?</label>
+    <select id="surfOrg"><option value="FL">↙ Coin avant-gauche (près de toi, à gauche)</option><option value="FR">↘ Coin avant-droit (près de toi, à droite)</option><option value="BL">↖ Coin arrière-gauche (fond, à gauche)</option><option value="BR">↗ Coin arrière-droit (fond, à droite)</option><option value="C">✛ Centre du brut</option></select></div>
+  <div class="fld" style="margin-top:9px"><label>Façon d'usiner</label>
+    <div id="surfStrat" data-v="zigzag" class="surf-sts">
+      <button class="surf-st on" data-v="zigzag" onclick="surf_strat('zigzag')"><svg viewBox="0 0 40 28" width="40" height="28"><path d="M3 4H37V11H3V18H37V25H3" fill="none" stroke="currentColor" stroke-width="2"/></svg><b>Zigzag</b><small>aller-retour · le plus rapide</small></button>
+      <button class="surf-st" data-v="oneway" onclick="surf_strat('oneway')"><svg viewBox="0 0 40 28" width="40" height="28"><path d="M3 4H35M3 11H35M3 18H35M3 25H35" fill="none" stroke="currentColor" stroke-width="2"/><path d="M31 1l5 3-5 3M31 8l5 3-5 3M31 15l5 3-5 3M31 22l5 3-5 3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><b>Sens unique</b><small>plus propre · plus long</small></button>
+      <button class="surf-st" data-v="cross" onclick="surf_strat('cross')"><svg viewBox="0 0 40 28" width="40" height="28"><path d="M3 5H37M3 14H37M3 23H37" stroke="currentColor" stroke-width="2"/><path d="M8 2V26M20 2V26M32 2V26" stroke="currentColor" stroke-width="2" opacity=".55"/></svg><b>Croisé</b><small>90° à chaque passe · planche voilée</small></button>
+      <button class="surf-st" data-v="concentric" onclick="surf_strat('concentric')"><svg viewBox="0 0 40 28" width="40" height="28"><rect x="3" y="3" width="34" height="22" fill="none" stroke="currentColor" stroke-width="2"/><rect x="9" y="8" width="22" height="12" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 14H25" stroke="currentColor" stroke-width="2"/></svg><b>Concentrique</b><small>de l'extérieur au centre · bords nets</small></button>
+    </div></div>
+  <div class="g2" style="margin-top:7px">
+    <div class="fld" id="surfDirRow"><label>Sens des lignes</label><select id="surfDir"><option value="auto">Auto (le long du côté long)</option><option value="x">Le long de X</option><option value="y">Le long de Y</option></select></div>
+    <div class="fld" id="surfClimbRow" style="display:none"><label>Sens de coupe (tours)</label><select id="surfClimb"><option value="0">En opposition (conseillé sur 3018)</option><option value="1">En avalant (plus lisse si machine rigide)</option></select></div>
+  </div>
+  <div id="surfStat" class="al al-ok" style="margin-top:10px"></div>
+  <div class="card" style="margin-top:8px;padding:6px"><canvas id="surfCv" style="width:100%;height:340px;display:block;background:#11151b;border-radius:8px"></canvas>
+    <div style="font-size:11.5px;color:var(--txt2);margin-top:5px;line-height:1.45">🟫 brut · <span style="color:#60a5fa">bleu</span> = parcours de la dernière passe · <span style="color:#22c55e">✛ vert</span> = ton zéro X0 Y0 · <span style="color:#f87171">zone rouge pointillée</span> = là où passe la fraise : <b>aucune bride dedans</b></div></div>
+  <div id="surfWarn"></div>
+  <details class="card" style="margin-top:8px"><summary style="cursor:pointer;font-weight:700;color:var(--acc)">⚙️ Réglages avancés (calculés tout seuls)</summary>
+    <div class="g2" style="margin-top:8px">
+      <div class="fld"><label>Recouvrement / pas (% du Ø)</label><input type="number" id="surfStep" min="5" max="90" step="1" inputmode="decimal"></div>
+      <div class="fld"><label>Profondeur par passe (mm)</label><input type="number" id="surfDoc" min="0.01" step="0.05" inputmode="decimal"></div>
+      <div class="fld"><label>Avance (mm/min)</label><input type="number" id="surfF" min="10" step="10" inputmode="decimal"></div>
+      <div class="fld"><label>Plongée (mm/min)</label><input type="number" id="surfFz" min="10" step="10" inputmode="decimal"></div>
+      <div class="fld"><label>Broche (tr/min)</label><input type="number" id="surfS" min="100" step="500" inputmode="decimal"></div>
+      <div class="fld"><label>Z de sécurité (mm)</label><input type="number" id="surfSafe" value="5" min="1" step="0.5" inputmode="decimal"></div>
+      <div class="fld"><label>Débord autour du brut (mm)</label><input type="number" id="surfOv" min="0" step="0.5" inputmode="decimal"></div>
+      <div class="fld"><label><input type="checkbox" id="surfFin"> Passe de finition fine</label><input type="number" id="surfFinD" min="0.05" step="0.05" value="0.2" inputmode="decimal"></div>
+    </div>
+  </details>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    <button class="btn btn-p" onclick="surf_dl()">💾 Télécharger le G-code (.nc)</button>
+    <button class="btn btn-sec" onclick="surf_copy()">📋 Copier</button>
+    <button class="btn btn-dim" onclick="surf_show()">👁 Voir le G-code</button>
+  </div>
+  <textarea id="surfGc" readonly style="display:none;width:100%;height:220px;margin-top:8px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:6px"></textarea>
+  <details class="card" style="margin-top:10px"><summary style="cursor:pointer;font-weight:700;color:var(--acc)">📘 Mode d'emploi rapide</summary>
+    <ol style="font-size:12.5px;line-height:1.55;margin:8px 0 0 18px;padding:0">
+      <li><b>Bride</b> le brut en dehors de la zone rouge (la fraise déborde pour faire des bords nets).</li>
+      <li><b>Zéro X/Y</b> sur le coin (ou le centre) que tu as choisi : la croix verte de l'aperçu.</li>
+      <li><b>Zéro Z</b> sur le point le <b>plus haut</b> du brut : sinon la 1re passe ne touche pas partout (normal sur une planche voilée, refais une passe).</li>
+      <li>La fraise descend <b>toujours en dehors du brut</b> : pas de plongée dans le bois.</li>
+      <li><b>Zigzag</b> = rapide. <b>Sens unique</b> = même sens de coupe partout, fond plus régulier. <b>Croisé</b> = une passe en X, la suivante en Y : efface les marches d'une planche voilée. <b>Concentrique</b> = bords bien nets, finit au centre.</li>
+      <li>1re fois : garde la main sur l'<b>arrêt</b> et joue avec l'override de vitesse (Feed %) si ça force ou si ça brûle.</li>
+      <li>Fraise à surfacer 25 mm (queue 6,35) : il faut une <b>pince ER11 de 6,35 mm</b> sur la broche 775.</li>
+    </ol>
+  </details>
+</div>
+<!-- ╚══════════ FIN SURFAÇAGE ══════════╝ -->
 
 <!-- ╔══════════════════ ZONE CIP TRUMPF — ÉCRAN ISOLÉ ══════════════════╗
      Écran 100% indépendant du reste du soft : AUCUN canvas, AUCUN paintObjects,
@@ -20527,6 +20624,157 @@ function kerfSpinUp(S){ S=Math.round(+S||12000); const st=[];
   for(const base of [1000,10000]) for(const f of [0.25,0.5,0.75]){ const v=Math.round(base*f); if(v<S*0.9 && !st.includes(v)) st.push(v); }
   const L=['; montée progressive de la broche (paliers de 1 s)']; for(const v of st) L.push('M3 S'+v,'G4 P1');
   L.push('M3 S'+S+' ; broche ON','G4 P2'); return L; }
+// ╔══════════ SURFAÇAGE CNC 3018 (JU+) — écran isolé, fonctions surf_* ══════════╗
+// Tu rentres la taille du brut + le Ø de la fraise -> parcours automatique (zigzag, sens unique, croisé, concentrique).
+// Zéro X/Y = un des 4 coins du brut ou son centre ; zéro Z = DESSUS du brut (point le plus haut).
+// La fraise descend TOUJOURS en dehors du brut (débord > rayon) : jamais de plongée dans la matière.
+// Les fraises viennent de la MÊME bibliothèque que l'usinage normal et l'incrustation (tableau `tools`).
+const SURF_KEY='kerf_surf_v1';
+const SURF_STRATS={
+  zigzag:{n:'Zigzag', s:'Aller-retour en lignes — le plus rapide'},
+  oneway:{n:'Sens unique', s:'Toujours dans le même sens — plus propre, plus long'},
+  cross:{n:'Croisé', s:'Chaque passe tourne de 90° — idéal planche voilée'},
+  concentric:{n:'Concentrique', s:'Tours de l\'extérieur vers le centre — bords très nets'},
+};
+const SURF_ORIG={FL:'Coin avant-gauche',FR:'Coin avant-droit',BL:'Coin arrière-gauche',BR:'Coin arrière-droit',C:'Centre du brut'};
+function surf_auto(D, preset){ D=+D||6; const big=D>=15, mid=D>=5;
+  const pl=(preset!=='martyr');
+  return { stepPct: big?45:40,
+    doc: pl ? (big?0.5:(mid?1.0:0.8)) : (big?0.3:(mid?0.5:0.4)),
+    F: big?900:(mid?900:700), Fz:200, S: big?12000:(mid?16000:18000),
+    zcut: pl?1.0:0.5, finish: pl, fin:0.2, ov: Math.round((D/2+1)*10)/10 }; }
+function surf_compute(p){
+  const W=+p.W, L=+p.L, D=+p.D, r=D/2; const warn=[];
+  if(!(W>0&&L>0)) return {err:'Rentre la taille du brut (X et Y).'};
+  if(!(D>0)) return {err:'Rentre le Ø de la fraise.'};
+  const zcut=Math.max(0,+p.zcut||0); if(!(zcut>0)) return {err:'Rentre l\'épaisseur à enlever (> 0).'};
+  const stepPct=Math.min(90,Math.max(5,+p.stepPct||40)), doc=Math.max(0.01,+p.doc||0.5), F=Math.max(10,+p.F||800), Fz=Math.max(10,+p.Fz||200), S=Math.round(+p.S||12000);
+  const safeZ=Math.max(1,+p.safeZ||5), ov=Math.max(r+0.5, +p.ov||(r+1)), ZR=1; // ZR : 1 mm au-dessus du brut pour les retours
+  let strat=SURF_STRATS[p.strat]?p.strat:(p.oneWay?'oneway':'zigzag');
+  const s=stepPct/100*D;
+  const fin=(p.finish&&+p.fin>0&&+p.fin<zcut)?+p.fin:0; const rough=zcut-fin;
+  const lv=[]; if(rough>1e-9){ const n=Math.ceil(rough/doc-1e-9); for(let k=1;k<=n;k++) lv.push(-rough*k/n); } if(fin>0) lv.push(-zcut);
+  const org=SURF_ORIG[p.origin]?p.origin:(p.origin==='center'?'C':'FL');
+  const ox=org==='C'?-W/2:((org==='FR'||org==='BR')?-W:0), oy=org==='C'?-L/2:((org==='BL'||org==='BR')?-L:0);
+  const f3=v=>{ const t=(Math.round(v*1000)/1000).toFixed(3).replace(/0+$/,'').replace(/\.$/,''); return t==='-0'?'0':t; };
+  const out=[]; const path=[]; let len=0, plen=0, rlen=0, cur=null; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  const mv=(g,x,y,z,feed)=>{ const parts=[g]; if(x!=null)parts.push('X'+f3(x)); if(y!=null)parts.push('Y'+f3(y)); if(z!=null)parts.push('Z'+f3(z)); if(feed)parts.push('F'+Math.round(feed)); out.push(parts.join(' '));
+    const nx=x!=null?x:(cur?cur[0]:0), ny=y!=null?y:(cur?cur[1]:0), nz=z!=null?z:(cur?cur[2]:safeZ);
+    if(cur){ const d=Math.hypot(nx-cur[0],ny-cur[1],nz-cur[2]); if(g==='G0') rlen+=d; else if(Math.abs(nz-cur[2])>1e-9&&Math.hypot(nx-cur[0],ny-cur[1])<1e-9) plen+=d; else len+=d; }
+    if(g==='G1'&&nz<0){ x0=Math.min(x0,nx);x1=Math.max(x1,nx);y0=Math.min(y0,ny);y1=Math.max(y1,ny); }
+    cur=[nx,ny,nz]; path.push({x:nx,y:ny,z:nz,g}); };
+  // aller à (x,y) puis descendre à z : sans retour si on y est déjà (on est toujours hors du brut à ce moment-là)
+  const goPlunge=(x,y,z)=>{ const at=cur&&Math.abs(cur[0]-x)<1e-9&&Math.abs(cur[1]-y)<1e-9;
+    if(!at){ if(cur&&cur[2]<ZR) mv('G0',null,null,ZR); mv('G0',x,y,null); } if(cur&&cur[2]>ZR) mv('G0',null,null,ZR); mv('G1',null,null,z,Fz); };
+  // ── zigzag / sens unique d'une passe, le long de 'ax' ──
+  const raster=(z,ax,oneway,flipV,startU)=>{ const U=ax==='x'?W:L, V=ax==='x'?L:W; const nR=Math.max(2,Math.ceil(V/s)+1), sv=V/(nR-1);
+    const XY=(u,v)=> ax==='x'?[ox+u, oy+v]:[ox+v, oy+u]; const uA=-ov, uB=U+ov;
+    let side=startU; // 0 : départ côté uA
+    for(let j=0;j<nR;j++){ const i=flipV?(nR-1-j):j, v=i*sv;
+      if(oneway){ const a=XY(uA,v), b=XY(uB,v); if(j>0){ mv('G0',null,null,ZR); mv('G0',a[0],a[1],null); mv('G1',null,null,z,Fz); } else goPlunge(a[0],a[1],z); mv('G1',b[0],b[1],null,F); side=1; }
+      else { const a=XY(side?uB:uA, v); if(j===0) goPlunge(a[0],a[1],z); else mv('G1',a[0],a[1],null,F); side=1-side; const b=XY(side?uB:uA, v); mv('G1',b[0],b[1],null,F); } }
+    return {nR, sv, endSide:side, endFlip:flipV}; };
+  // ── concentrique : rectangles de l'extérieur vers le centre ──
+  const concentric=(z,climb)=>{ const cx=ox+W/2, cy=oy+L/2; const A=W/2+ov, B=L/2+ov; let n=0;
+    const loop=(a,b)=>{ const P=climb?[[cx-a,cy-b],[cx-a,cy+b],[cx+a,cy+b],[cx+a,cy-b],[cx-a,cy-b]]:[[cx-a,cy-b],[cx+a,cy-b],[cx+a,cy+b],[cx-a,cy+b],[cx-a,cy-b]]; for(let i=1;i<P.length;i++) mv('G1',P[i][0],P[i][1],null,F); };
+    goPlunge(cx-A,cy-B,z);
+    for(let i=0;;i++){ const a=A-i*s, b=B-i*s; if(a<=1e-6||b<=1e-6) break; if(i>0) mv('G1',cx-a,cy-b,null,F); loop(a,b); n++; }
+    const m=Math.min(A,B), last=m-(n-1)*s; const ea=A-(n-1)*s-last, eb=B-(n-1)*s-last; // reste au centre : un trait le long du côté long
+    if(ea>1e-6){ mv('G1',cx-ea,cy,null,F); mv('G1',cx+ea,cy,null,F); } else if(eb>1e-6){ mv('G1',cx,cy-eb,null,F); mv('G1',cx,cy+eb,null,F); } else mv('G1',cx,cy,null,F);
+    return {nR:n, sv:s}; };
+  const date=new Date().toLocaleString('fr-FR');
+  const longAx=W>=L?'x':'y'; const axSel=(p.dir==='x'||p.dir==='y')?p.dir:longAx;
+  out.push('; KERF — SURFAÇAGE CNC 3018 — '+date);
+  out.push('; Brut '+f3(W)+' x '+f3(L)+' mm — fraise Ø'+f3(D)+' mm — on enlève '+f3(zcut)+' mm — '+SURF_STRATS[strat].n+(strat==='concentric'?(p.climb?' (en avalant)':' (en opposition)'):''));
+  out.push('; '+lv.length+' passe(s) : '+lv.map(z=>f3(-z)).join(' / ')+' mm');
+  out.push('; ZÉRO : X0 Y0 = '+SURF_ORIG[org].toUpperCase()+' du brut ; Z0 = DESSUS du brut (point le plus haut)');
+  out.push('; La fraise déborde de '+f3(ov)+' mm autour du brut : AUCUNE bride dans cette zone !');
+  out.push('G21','G90','G17','G0 Z'+f3(safeZ)+' ; sécurité');
+  (typeof kerfSpinUp==='function'?kerfSpinUp(S):['M3 S'+S,'G4 P2']).forEach(l=>out.push(l));
+  cur=[0,0,safeZ];
+  let info=null, flip=false, side=0; const axes=[];
+  for(let k=0;k<lv.length;k++){ const z=lv[k];
+    let ax=axSel; if(strat==='cross'){ ax=((lv.length-1-k)%2===0)?longAx:(longAx==='x'?'y':'x'); } axes.push(strat==='concentric'?'○':ax.toUpperCase());
+    out.push('; ── passe '+(k+1)+'/'+lv.length+' : Z'+f3(z)+(fin>0&&k===lv.length-1?' (finition)':'')+(strat==='concentric'?'':' — lignes le long de '+ax.toUpperCase()));
+    if(strat==='concentric'){ info=concentric(z,!!p.climb); }
+    else if(strat==='zigzag'){ const r0=raster(z,ax,false,flip,side); info=r0; flip=!flip; side=r0.endSide; }   // on repart d'où on s'est arrêté (hors du brut)
+    else if(strat==='oneway'){ info=raster(z,ax,true,false,0); }
+    else { info=raster(z,ax,false,false,0); }
+  }
+  out.push('G0 Z'+f3(safeZ)); out.push('G0 X0 Y0'); out.push('M5 ; broche OFF'); out.push('M30');
+  const min=len/F + plen/Fz + rlen/1500 + 8/60;
+  const spanX=x1-x0+D, spanY=y1-y0+D;
+  if(spanX>300||spanY>180) warn.push('Parcours de '+Math.round(spanX)+' × '+Math.round(spanY)+' mm (fraise comprise) : le 3018 fait environ 300 × 180 mm de course. Vérifie que ça rentre (débord plus petit dans les réglages avancés, ou fais-le en 2 fois).');
+  if(doc>D*0.5) warn.push('Profondeur par passe ('+doc+' mm) grande pour une fraise Ø'+D+' : le 3018 risque de forcer.');
+  if(D>=15&&doc>0.6) warn.push('Avec une grosse fraise à surfacer, reste vers 0,3–0,5 mm par passe sur un 3018 (châssis léger).');
+  if(stepPct>60) warn.push('Pas de '+stepPct+' % : des stries risquent de rester entre les lignes (40–50 % conseillé).');
+  if(F>1500) warn.push('Avance '+F+' mm/min : beaucoup de 3018 sont limités vers 1000–2000 mm/min ($110/$111).');
+  if(zcut>5) warn.push('Plus de 5 mm à enlever : c\'est long, vérifie la longueur de coupe de ta fraise.');
+  if(strat==='concentric'&&p.climb) warn.push('En avalant sur un 3018 : la fraise peut « tirer » dans le jeu des axes. Si ça broute, repasse en opposition.');
+  return { gcode:out.join('\n')+'\n', levels:lv, nRows:info?info.nR:0, sv:info?info.sv:0, ov, strat, axes, minutes:min, lenCut:len, path, warn, W, L, D, ox, oy, org, spanX, spanY };
+}
+function surf_read(){ const g=id=>{ const e=document.getElementById(id); return e?e.value:''; }, c=id=>{ const e=document.getElementById(id); return !!(e&&e.checked); };
+  const n=id=>parseFloat(String(g(id)).replace(',','.'));
+  return { W:n('surfW'), L:n('surfL'), D:n('surfD'), zcut:n('surfZ'), preset:(document.getElementById('surfPre')||{}).dataset?.v||'planche',
+    origin:g('surfOrg')||'FL', strat:(document.getElementById('surfStrat')||{}).dataset?.v||'zigzag', climb:g('surfClimb')==='1', tool:g('surfTool'),
+    stepPct:n('surfStep'), doc:n('surfDoc'), F:n('surfF'), Fz:n('surfFz'), S:n('surfS'), safeZ:n('surfSafe'), ov:n('surfOv'),
+    dir:g('surfDir')||'auto', finish:c('surfFin'), fin:n('surfFinD') }; }
+function surf_set(id,v){ const e=document.getElementById(id); if(!e)return; if(e.type==='checkbox') e.checked=!!v; else e.value=v; }
+function surf_applyAuto(keepZ){ const p=surf_read(); const a=surf_auto(p.D,p.preset);
+  surf_set('surfStep',a.stepPct); surf_set('surfDoc',a.doc); surf_set('surfF',a.F); surf_set('surfFz',a.Fz); surf_set('surfS',a.S); surf_set('surfOv',a.ov); surf_set('surfFin',a.finish); surf_set('surfFinD',a.fin);
+  const t=surf_curTool(); if(t){ if(t.fxy) surf_set('surfF',t.fxy); if(t.fz) surf_set('surfFz',t.fz); if(t.spin) surf_set('surfS',t.spin); if(t.maxD>0) surf_set('surfDoc',Math.min(a.doc,+t.maxD)); }
+  if(!keepZ) surf_set('surfZ',a.zcut); surf_update(); }
+function surf_preset(v){ const b=document.getElementById('surfPre'); if(b) b.dataset.v=v; document.querySelectorAll('#wzpSURF .surf-pre').forEach(x=>x.classList.toggle('on',x.dataset.v===v)); surf_applyAuto(false); }
+function surf_strat(v){ const b=document.getElementById('surfStrat'); if(b) b.dataset.v=v; document.querySelectorAll('#wzpSURF .surf-st').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
+  const cl=document.getElementById('surfClimbRow'); if(cl) cl.style.display=v==='concentric'?'':'none'; const dr=document.getElementById('surfDirRow'); if(dr) dr.style.display=(v==='concentric'||v==='cross')?'none':''; surf_update(); }
+function surf_tools(){ const L=(typeof tools!=='undefined'&&Array.isArray(tools))?tools:[]; return L.filter(t=>t&&(t.type==='surface'||t.type==='flat')&&+t.dia>0).sort((a,b)=>(a.type==='surface'?0:1)-(b.type==='surface'?0:1)||(+b.dia)-(+a.dia)); }
+function surf_curTool(){ const sel=document.getElementById('surfTool'); if(!sel||!sel.value) return null; return surf_tools().find(x=>String(x.id)===sel.value)||null; }
+function surf_refreshTools(selId){ const sel=document.getElementById('surfTool'); if(!sel) return; const keep=selId!=null?String(selId):sel.value; const L=surf_tools();
+  const opt=t=>{ const nm=String(t.name||'Fraise'), dz='Ø'+String(t.dia).replace('.',','); return '<option value="'+t.id+'">'+(t.type==='surface'?'🪚 ':'🔷 ')+nm.replace(/</g,'&lt;')+(nm.replace('.',',').indexOf(dz)>=0?'':' — '+dz)+'</option>'; };
+  sel.innerHTML='<option value="">✏️ Ø tapé à la main</option>'+(L.some(t=>t.type==='surface')?'<optgroup label="Fraises à surfacer">'+L.filter(t=>t.type==='surface').map(opt).join('')+'</optgroup>':'')+(L.some(t=>t.type==='flat')?'<optgroup label="Fraises plates">'+L.filter(t=>t.type==='flat').map(opt).join('')+'</optgroup>':'');
+  if(keep&&L.some(t=>String(t.id)===keep)){ sel.value=keep; if(selId!=null) surf_tool(); } }
+function surf_tool(){ const t=surf_curTool(); if(!t){ surf_update(); return; } surf_set('surfD',t.dia); surf_applyAuto(true); }
+function surf_newTool(){ const p=surf_read(); if(typeof tlxOpen!=='function'){ if(typeof toastHist==='function')toastHist('Bibliothèque indisponible'); return; } window._surfWantTool=true; tlxOpen();
+  const D=+p.D||25, big=D>=12; try{ tlxNew({type:big?'surface':'flat', name:(big?'Surfaçage Ø':'Plate Ø')+String(D).replace('.',','), dia:D, shank:big?6.35:(D<=3.2?3.175:6), cutH:big?7:Math.max(8,D*2), totalH:40, flutes:big?3:2, fxy:+p.F||900, fz:+p.Fz||200, spin:+p.S||12000, maxD:+p.doc||0.5}); tlxRender(); }catch(e){} }
+function surf_lib(){ if(typeof tlxOpen==='function') tlxOpen(); }
+let _surfLast=null;
+function surf_update(){ const p=surf_read(); try{ localStorage.setItem(SURF_KEY,JSON.stringify(p)); }catch(e){}
+  const R=surf_compute(p); _surfLast=R; const st=document.getElementById('surfStat'), wn=document.getElementById('surfWarn');
+  if(R.err){ if(st){ st.className='al al-err'; st.textContent='⚠️ '+R.err; } if(wn) wn.innerHTML=''; surf_draw(null); return; }
+  const mm=Math.max(1,Math.round(R.minutes)); const tm=mm>=60?(Math.floor(mm/60)+' h '+String(mm%60).padStart(2,'0')):mm+' min';
+  const how=R.strat==='concentric'?(R.nRows+' tours tous les '+R.sv.toFixed(2)+' mm'):(R.nRows+' lignes tous les '+R.sv.toFixed(2)+' mm · '+(R.strat==='cross'?'sens : '+R.axes.join(' → '):'le long de '+R.axes[0]));
+  if(st){ st.className='al al-ok'; st.innerHTML='<span>✅ <b>'+R.levels.length+' passe(s)</b> ('+R.levels.map(z=>(-z).toFixed(2).replace(/\.?0+$/,'')).join(' / ')+' mm) · <b>'+SURF_STRATS[R.strat].n+'</b> · '+how+' · <b>≈ '+tm+'</b></span>'; }
+  if(wn) wn.innerHTML=R.warn.map(w=>'<div class="al al-w" style="margin-top:6px"><span>⚠️ '+w+'</span></div>').join('');
+  surf_draw(R); }
+function surf_draw(R){ const cv=document.getElementById('surfCv'); if(!cv) return; const dpr=window.devicePixelRatio||1; const cw=cv.clientWidth||600, ch=cv.clientHeight||340; cv.width=cw*dpr; cv.height=ch*dpr; const c=cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,cw,ch);
+  if(!R) return; const r=R.D/2; let X0=R.ox,Y0=R.oy,X1=R.ox+R.W,Y1=R.oy+R.L; for(const q of R.path){ if(q.z<0){ X0=Math.min(X0,q.x);X1=Math.max(X1,q.x);Y0=Math.min(Y0,q.y);Y1=Math.max(Y1,q.y);} } X0-=r+2;Y0-=r+2;X1+=r+2;Y1+=r+2; X0=Math.min(X0,-3);Y0=Math.min(Y0,-3);X1=Math.max(X1,3);Y1=Math.max(Y1,3);
+  const k=Math.min((cw-30)/(X1-X0),(ch-36)/(Y1-Y0)); const offX=Math.max(15,(cw-(X1-X0)*k)/2), offY=Math.max(15,(ch-(Y1-Y0)*k)/2)+6; const T=(x,y)=>[offX+(x-X0)*k, ch-offY-(y-Y0)*k]; // Y vers le HAUT (fond de la machine)
+  // zone balayée par la fraise (débord) : pas de bride ici
+  { let a=1e9,b=1e9,e=-1e9,f=-1e9; for(const q of R.path){ if(q.z<0&&q.g==='G1'){ a=Math.min(a,q.x);b=Math.min(b,q.y);e=Math.max(e,q.x);f=Math.max(f,q.y);} } const A=T(a-r,b-r), B=T(e+r,f+r);
+    c.fillStyle='rgba(239,68,68,.10)'; c.strokeStyle='rgba(239,68,68,.6)'; c.setLineDash([5,4]); c.fillRect(A[0],B[1],B[0]-A[0],A[1]-B[1]); c.strokeRect(A[0],B[1],B[0]-A[0],A[1]-B[1]); c.setLineDash([]); }
+  { const a=T(R.ox,R.oy), b=T(R.ox+R.W,R.oy+R.L); c.fillStyle='#c8a16a'; c.fillRect(a[0],b[1],b[0]-a[0],a[1]-b[1]); c.strokeStyle='#7c5a2e'; c.lineWidth=1.5; c.strokeRect(a[0],b[1],b[0]-a[0],a[1]-b[1]); }
+  // parcours de la DERNIÈRE passe (celle qui fait la surface finale)
+  const zl=R.levels[R.levels.length-1]; c.strokeStyle='rgba(37,99,235,.9)'; c.lineWidth=1.2; c.beginPath(); let st=false, prev=null;
+  for(const q of R.path){ if(Math.abs(q.z-zl)<1e-6){ const P=T(q.x,q.y); if(!st||(prev&&prev.z>zl+1e-6)){ c.moveTo(P[0],P[1]); st=true; } else c.lineTo(P[0],P[1]); } else if(st&&q.z>zl+1e-6&&q.g==='G0'&&q.z>0){ c.stroke(); c.beginPath(); c.strokeStyle='rgba(37,99,235,.9)'; } prev=q; } c.stroke();
+  const s0=R.path.find(q=>Math.abs(q.z-zl)<1e-6); if(s0){ const P=T(s0.x,s0.y); c.fillStyle='rgba(37,99,235,.25)'; c.strokeStyle='#1d4ed8'; c.beginPath(); c.arc(P[0],P[1],Math.max(3,r*k),0,Math.PI*2); c.fill(); c.stroke(); c.fillStyle='#93c5fd'; c.font='bold 11px sans-serif'; c.fillText('départ',P[0]-14,P[1]+Math.max(3,r*k)+13); }
+  { const P=T(0,0); c.strokeStyle='#22c55e'; c.lineWidth=2.2; c.beginPath(); c.moveTo(P[0]-9,P[1]); c.lineTo(P[0]+9,P[1]); c.moveTo(P[0],P[1]-9); c.lineTo(P[0],P[1]+9); c.stroke(); c.beginPath(); c.arc(P[0],P[1],4,0,Math.PI*2); c.stroke(); c.fillStyle='#22c55e'; c.font='bold 11px sans-serif'; c.fillText('X0 Y0',P[0]+6,P[1]-7); }
+  c.fillStyle='#9aa6b3'; c.font='11px sans-serif'; c.fillText('vue de dessus — fond de la machine en haut ↑ · tracé = dernière passe',12,13); c.fillText('toi (avant de la machine) ↓',12,ch-5); }
+function surf_dl(){ if(!_surfLast||_surfLast.err){ surf_update(); if(!_surfLast||_surfLast.err) return; } const R=_surfLast; const nm='surfacage_'+Math.round(R.W)+'x'+Math.round(R.L)+'_D'+String(R.D).replace('.',',')+'_'+R.strat+'.nc'; _dlBlob(nm,R.gcode,'text/plain'); if(typeof toastHist==='function') toastHist('💾 '+nm); }
+function surf_copy(){ if(!_surfLast||_surfLast.err) return; const t=_surfLast.gcode; try{ navigator.clipboard.writeText(t).then(()=>{ if(typeof toastHist==='function')toastHist('📋 G-code copié'); }); }catch(e){} }
+function surf_show(){ const w=document.getElementById('surfGc'); if(!w||!_surfLast||_surfLast.err) return; w.style.display=w.style.display==='none'?'block':'none'; w.value=_surfLast.gcode; }
+function surf_init(){ surf_refreshTools(); if(window._surfInited){ surf_update(); return; } window._surfInited=true;
+  let p=null; try{ p=JSON.parse(localStorage.getItem(SURF_KEY)||'null'); }catch(e){}
+  if(p&&p.origin==='corner') p.origin='FL'; if(p&&p.origin==='center') p.origin='C'; if(p&&!p.strat) p.strat=p.oneWay?'oneway':'zigzag';
+  if(p){ for(const [k,id] of [['W','surfW'],['L','surfL'],['D','surfD'],['zcut','surfZ'],['origin','surfOrg'],['stepPct','surfStep'],['doc','surfDoc'],['F','surfF'],['Fz','surfFz'],['S','surfS'],['safeZ','surfSafe'],['ov','surfOv'],['dir','surfDir'],['finish','surfFin'],['fin','surfFinD']]) if(p[k]!=null&&p[k]===p[k]) surf_set(id,p[k]);
+    surf_set('surfClimb',p.climb?'1':'0'); if(p.tool) surf_set('surfTool',p.tool);
+    const b=document.getElementById('surfPre'); if(b) b.dataset.v=p.preset||'planche'; document.querySelectorAll('#wzpSURF .surf-pre').forEach(x=>x.classList.toggle('on',x.dataset.v===(p.preset||'planche'))); surf_strat(p.strat||'zigzag'); }
+  else { surf_strat('zigzag'); surf_preset('planche'); }
+  document.querySelectorAll('#wzpSURF input, #wzpSURF select').forEach(e=>{ if(e.id==='surfTool') return; e.addEventListener('input',()=>{ if(e.id==='surfD'){ const sel=document.getElementById('surfTool'); const t=surf_curTool(); if(t&&Math.abs(+t.dia-parseFloat(String(e.value).replace(',','.')))>1e-9&&sel) sel.value=''; surf_applyAuto(true); } else surf_update(); }); e.addEventListener('change',()=>surf_update()); });
+  window.addEventListener('resize',()=>{ if(document.getElementById('wzpSURF')?.classList.contains('wz-on')) surf_draw(_surfLast); }); }
+function surf_open(){ try{ document.querySelectorAll('.wz-wrap').forEach(p=>p.classList.remove('wz-on')); const el=document.getElementById('wzpSURF'); if(el) el.classList.add('wz-on'); const nav=document.getElementById('wzNav'); if(nav){ nav.dataset.surfPrev=nav.style.display; nav.style.display='none'; } surf_init(); requestAnimationFrame(()=>surf_draw(_surfLast)); }catch(e){ console.error('[SURF] open',e); } }
+function surf_back(){ try{ document.querySelectorAll('.wz-wrap').forEach(p=>p.classList.remove('wz-on')); const el=document.getElementById('wzp1'); if(el) el.classList.add('wz-on'); const nav=document.getElementById('wzNav'); if(nav&&nav.dataset.surfPrev!=null){ nav.style.display=nav.dataset.surfPrev; delete nav.dataset.surfPrev; } }catch(e){ console.error('[SURF] back',e); } }
+// ╚══════════ FIN SURFAÇAGE ══════════╝
+
 function wzGenNormal(){
   const safeZ=parseFloat(document.getElementById('safeZ2')?.value||5);
   const date=new Date().toLocaleString('fr-FR');
@@ -36923,7 +37171,7 @@ function _s3dCubeRender(){ if(!_s3dCube||!_s3d) return; const {r,sc,cam}=_s3dCub
 #tlx .tlx-name{flex:1;font-size:17px;font-weight:700}
 #tlx .tlx-dirty{color:var(--acc);font-size:12px;font-weight:700;white-space:nowrap}
 #tlx .tlx-back{display:none}
-#tlx .tlx-types{display:grid;grid-template-columns:repeat(6,1fr);gap:7px}
+#tlx .tlx-types{display:grid;grid-template-columns:repeat(7,1fr);gap:7px}
 #tlx .tlx-type{background:var(--surf);border:1.5px solid var(--brd2);border-radius:10px;padding:6px 4px 7px;cursor:pointer;color:var(--txt);display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--sans)}
 #tlx .tlx-type.on{border-color:var(--acc);background:rgba(245,166,35,.1)}
 #tlx .tlx-type b{font-size:12px}
@@ -36998,6 +37246,7 @@ const TLX_TYPES=[
   {k:'tapered',   n:'Conique (TBN)', s:'Relief 3D détaillé'},
   {k:'drill',     n:'Foret',         s:'Perçage'},
   {k:'engraving', n:'Gravure fine',  s:'Tracé · marquage'},
+  {k:'surface',   n:'Fraise à surfacer', s:'Surfaçage · martyr · planche'},
 ];
 const TLX_HELP={
   flat:{use:'Vider des poches, découper des contours, ébauche de l\'incrustation.',
@@ -37024,6 +37273,10 @@ const TLX_HELP={
         plus:'Trait très fin et précis.',
         trap:'Ultra fragile : 0,1–0,3 mm de profondeur max, avance lente. Le plateau doit être bien à plat sinon le trait change de largeur.',
         set:'15–30°, pointe 0,1 mm : 200–400 mm/min.'},
+  surface:{use:'Mettre à plat une planche ou le martyr (mode 🪚 Surfaçage), en passes larges et fines.',
+        plus:'Très large (souvent 22–25 mm) : peu de lignes, fond bien plat et lisse.',
+        trap:'Grosse charge pour un 3018 : passes fines (0,3–0,5 mm) et pas de 40–50 % du Ø. Queue 6,35 mm → il faut une pince ER11 de 6,35. Jamais de plongée dans la matière : elle descend en dehors du brut.',
+        set:'Ø25 : ~900 mm/min · 0,3–0,5 mm/passe · ~12 000 tr/min (valeurs de départ, à ajuster).'},
 };
 const TLX_HELIX={
   up:      {n:'Up-cut ↑',      t:'Remonte les copeaux → bonne évacuation, idéale pour les poches profondes. Mais arrache un peu le bord du dessus (peluches). C\'est la plus courante.'},
@@ -37054,6 +37307,10 @@ const TLX_CATALOG=[
     {name:'Boule Ø3,175 (R1,6)', type:'ball', helix:'up', dia:3.175, shank:3.175, cutH:12, totalH:38, flutes:2, fxy:900,  fz:200, spin:12000, maxD:1},
     {name:'Conique pointe 0,5 · 10°', type:'tapered', helix:'up', tipD:0.5, angle:10, shank:3.175, cutH:15, totalH:38, flutes:2, fxy:600, fz:120, spin:12000, maxD:0.5},
     {name:'Conique pointe 1 · 15°',   type:'tapered', helix:'up', tipD:1,   angle:15, shank:3.175, cutH:12, totalH:38, flutes:2, fxy:700, fz:150, spin:12000, maxD:0.8},
+  ]},
+  {g:'Fraises à surfacer', items:[
+    {name:'Surfaçage Ø25,4 · 3 dents', type:'surface', dia:25.4, shank:6.35, cutH:7, totalH:40, flutes:3, fxy:900, fz:200, spin:12000, maxD:0.5},
+    {name:'Surfaçage Ø22 · 2 dents',   type:'surface', dia:22,   shank:6.35, cutH:6, totalH:40, flutes:2, fxy:900, fz:200, spin:12000, maxD:0.5},
   ]},
   {g:'Forets', items:[
     {name:'Foret Ø1', type:'drill', dia:1, shank:1, cutH:12, totalH:34, flutes:2, fxy:300, fz:60,  spin:10000, maxD:1},
@@ -37091,7 +37348,7 @@ function tlxSvg(t, mini){
   const cx=mini?W/2:205, yb=mini?H-4:H-52; const X=r=>cx+r*s, Y=y=>yb-y*s;
   const poly=pts=>{ const r=pts.map(p=>X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)), l=pts.slice().reverse().map(p=>(cx-p[0]*s).toFixed(1)+','+Y(p[1]).toFixed(1)); return r.concat(l).join(' '); };
   const [cut,rest]=_tlxSplit(G.P,G.cz);
-  const ccol=({vbit:'#f5a623',engraving:'#f5a623',flat:'#42a5f5',ball:'#4caf50',tapered:'#ab47bc',drill:'#ef5350'})[G.ty]||'#42a5f5';
+  const ccol=({vbit:'#f5a623',engraving:'#f5a623',flat:'#42a5f5',ball:'#4caf50',tapered:'#ab47bc',drill:'#ef5350',surface:'#c8a16a'})[G.ty]||'#42a5f5';
   let o='';
   if(rest.length>1) o+=`<polygon points="${poly(rest)}" fill="#59636f" stroke="#8a96a3" stroke-width="${mini?0.6:1.2}"/>`;
   if(cut.length>1) o+=`<polygon points="${poly(cut)}" fill="${ccol}" fill-opacity="${mini?0.75:0.28}" stroke="${ccol}" stroke-width="${mini?0.8:2}"/>`;
@@ -37208,7 +37465,7 @@ function tlxRenderEdit(){ const el=document.getElementById('tlxRight'); if(!el) 
     <div class="tlx-foot"><button class="tlx-b tlx-bp" onclick="tlxSave()">💾 Enregistrer</button>${TLX.isNew?'':`<button class="tlx-b" onclick="tlxDup()">⧉ Dupliquer</button>`}<button class="tlx-b" onclick="tlxRevert()">↩ Annuler les modifs</button>${TLX.isNew?'':`<button class="tlx-b tlx-del" onclick="tlxDel()">🗑 Supprimer</button>`}</div></div>`;
   el.querySelectorAll('.tlx-cote[data-k]').forEach(g=>g.addEventListener('click',ev=>{ ev.stopPropagation(); tlxPopShow(g.dataset.k, g); })); }
 const TLX_CATALOG_DEF={ flat:{type:'flat',dia:3,shank:3.175,cutH:12,totalH:30}, vbit:{type:'vbit',angle:40,tipD:0.2,dia:3.175,shank:3.175,cutH:4,totalH:30}, ball:{type:'ball',dia:3,shank:3.175,cutH:12,totalH:30},
-  tapered:{type:'tapered',angle:14,tipD:0.6,shank:3.175,cutH:12,totalH:30}, drill:{type:'drill',dia:2.4,shank:2.4,cutH:18,totalH:30}, engraving:{type:'engraving',angle:15,tipD:0.1,dia:3.175,shank:3.175,cutH:6,totalH:30} };
+  tapered:{type:'tapered',angle:14,tipD:0.6,shank:3.175,cutH:12,totalH:30}, drill:{type:'drill',dia:2.4,shank:2.4,cutH:18,totalH:30}, engraving:{type:'engraving',angle:15,tipD:0.1,dia:3.175,shank:3.175,cutH:6,totalH:30}, surface:{type:'surface',dia:25.4,shank:6.35,cutH:7,totalH:40,flutes:3,fxy:900,fz:200,spin:12000,maxD:0.5} };
 function tlxF(k,l,u,v){ return `<label class="tlx-fl"><span>${l}${u?` <i>${u}</i>`:''}</span><input type="number" step="any" inputmode="decimal" value="${v}" onchange="tlxSet('${k}',this.value)"></label>`; }
 function tlxWarn(d){ const w=[]; const fl=+d.flutes||2, cl=(+d.fxy)/((+d.spin||1)*fl);
   if(d.type!=='drill' && d.fxy && d.spin){ if(cl<0.008) w.push('Charge par dent très faible ('+cl.toFixed(3)+' mm) : la fraise frotte au lieu de couper → risque de brûler le bois. Monte l\'avance ou baisse la broche.'); else if(cl>0.08) w.push('Charge par dent forte ('+cl.toFixed(3)+' mm) : beaucoup pour une 3018, risque de casse.'); }
@@ -37230,6 +37487,7 @@ function tlxSetType(k){ const d=TLX.draft; if(!d) return; d.type=k; const D=TLX_
 function tlxFav(id){ const t=tools.find(x=>x.id===id); if(!t) return; t.fav=!t.fav; if(TLX.draft&&TLX.draft.id===id) TLX.draft.fav=t.fav; try{ saveTools(); }catch(e){} tlxRenderList(); }
 function _tlxRefreshApp(savedId){ const keep=[window._ilAuto_r, window._ilAuto_v]; window._ilAuto_r=window._ilAuto_v=1;   // juste rafraîchir les listes, sans choisir d'outil à ta place
   ['renderToolPanel','renderToolDrop','renderInspector','ilToolsLibInit'].forEach(f=>{ try{ if(typeof window[f]==='function') window[f](); }catch(e){} });
+  try{ if(typeof surf_refreshTools==='function') surf_refreshTools(savedId); }catch(e){}   // la même bibliothèque sert aussi au Surfaçage
   window._ilAuto_r=keep[0]; window._ilAuto_v=keep[1];
   // si c'est l'outil choisi dans l'incrustation, on remet ses nouvelles cotes dans les réglages
   if(savedId!=null && typeof ilToolPick==='function') for(const k of ['r','v']){ let cur=null; try{ cur=localStorage.getItem('kerf_ilTool_'+k); }catch(e){} if(cur===String(savedId)){ try{ ilToolPick(k, savedId, true); }catch(e){} } } }
