@@ -167,7 +167,7 @@
 -- 2026-11-04 — JY : DÉCOUPE LASER — TC_LASER_ON réglable en 1 clic (demande Seb)
  [AJOUT] Carte « Programme » : TC_LASER_ON(1, TM_LTTNAME, 10, 100) affiché ; clic sur un chiffre = menu.
    Perçage : 10 normal · 20 doux · 0 sans perçage. Contour : 100 grand · 200 moyen · 300 petit. « autre valeur » partout.
-   Mémorisé dans le navigateur. Par défaut 1 / 10 / 100 : programme .LST IDENTIQUE à avant.
+   Mémorisé dans le navigateur. Par défaut 1 / 10 / 100 : programme .LST IDENTIQUE à avant. (JZ : plus d'alerte « sans perçage ».)
 
 -- 2026-11-04 — JX : SURFAÇAGE — nouvelle façon d'usiner « Spirale » (part du centre)
  [AJOUT] Spirale rectangulaire continue qui part du CENTRE et s'élargit jusqu'à sortir du brut (bords nets).
@@ -2461,7 +2461,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-04-JY ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-04-JZ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3734,7 +3734,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
       </div>
       <div class="lon-box"><div class="lon-lbl">🔦 Allumage laser — clique un chiffre</div>
         <div class="lon-code">TC_LASER_ON(<span class="lon-v" id="lonA" onclick="_lonMenu(this,'a')">1</span>, TM_LTTNAME, <span class="lon-v" id="lonP" onclick="_lonMenu(this,'p')">10</span>, <span class="lon-v" id="lonC" onclick="_lonMenu(this,'c')">100</span>)</div>
-        <div class="lon-w" id="lonWarn"></div></div>
+      </div>
       <input type="hidden" id="laserReq" value="2"><!-- priorité laser : TOUJOURS 2 (machine n°2 sur la source) -->
       <div style="font-size:9.5px;color:var(--txt3);margin-top:7px">Le nom du tableau techno doit correspondre EXACTEMENT à celui de la machine (ex : INOX3MM_S).</div>
     </div>
@@ -20655,7 +20655,7 @@ let _lon={a:1,p:10,c:100}; try{ const v=JSON.parse(localStorage.getItem('kerf_la
 function _laserOnStr(){ return 'TC_LASER_ON('+_lon.a+', TM_LTTNAME, '+_lon.p+', '+_lon.c+')'; }
 function _lonRender(){ const A=document.getElementById('lonA'),P=document.getElementById('lonP'),C=document.getElementById('lonC'),W=document.getElementById('lonWarn');
   if(A)A.textContent=_lon.a; if(P)P.textContent=_lon.p; if(C)C.textContent=_lon.c;
-  if(W) W.textContent=_lon.p===0?'⚠️ Sans perçage : seulement si la coupe démarre hors de la tôle.':''; }
+  if(W) W.textContent=''; }
 function _lonSet(k,v){ v=Math.round(+v); if(!Number.isFinite(v)||v<0) return; _lon[k]=v; try{ localStorage.setItem('kerf_laserOn',JSON.stringify(_lon)); }catch(e){} _lonRender(); _lonMenuClose(); if(typeof wzGenLaser==='function') wzGenLaser(); }
 function _lonMenuClose(){ const m=document.getElementById('lonMenu'); if(m) m.remove(); document.removeEventListener('pointerdown',_lonAway,true); document.removeEventListener('keydown',_lonKey,true); }
 function _lonAway(e){ const m=document.getElementById('lonMenu'); if(m&&!m.contains(e.target)&&!(e.target.classList&&e.target.classList.contains('lon-v'))) _lonMenuClose(); }
