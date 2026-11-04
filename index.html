@@ -164,6 +164,11 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-11-04 — JY : DÉCOUPE LASER — TC_LASER_ON réglable en 1 clic (demande Seb)
+ [AJOUT] Carte « Programme » : TC_LASER_ON(1, TM_LTTNAME, 10, 100) affiché ; clic sur un chiffre = menu.
+   Perçage : 10 normal · 20 doux · 0 sans perçage. Contour : 100 grand · 200 moyen · 300 petit. « autre valeur » partout.
+   Mémorisé dans le navigateur. Par défaut 1 / 10 / 100 : programme .LST IDENTIQUE à avant.
+
 -- 2026-11-04 — JX : SURFAÇAGE — nouvelle façon d'usiner « Spirale » (part du centre)
  [AJOUT] Spirale rectangulaire continue qui part du CENTRE et s'élargit jusqu'à sortir du brut (bords nets).
    Au centre on est dans le bois : entrée en RAMPE douce (≤ 3°, allers-retours sur la ligne du centre), jamais
@@ -2456,7 +2461,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-04-JX ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-04-JY ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3657,6 +3662,18 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <style>
   .p10card{background:var(--surf2);border:1.5px solid var(--brd2);border-radius:10px;padding:11px 12px;margin-bottom:10px}
   .p10t{font-size:13px;font-weight:800;color:var(--txt);margin-bottom:9px}
+  .lon-box{margin-top:10px}
+  .lon-lbl{font-size:10px;color:var(--txt2);margin-bottom:4px}
+  .lon-code{font-family:var(--mono);font-size:13px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;padding:9px 10px;color:var(--txt2);white-space:nowrap;overflow-x:auto}
+  .lon-v{color:var(--acc);font-weight:800;border-bottom:2px dashed var(--acc);cursor:pointer;padding:0 4px;border-radius:3px}
+  .lon-v:hover{background:rgba(245,166,35,.15)}
+  .lon-w{font-size:11px;color:#ffcc80;margin-top:5px}
+  .lon-w:empty{display:none}
+  .lon-menu{position:fixed;z-index:100030;background:#1f2430;border:1.5px solid var(--acc);border-radius:10px;padding:5px;box-shadow:0 10px 28px rgba(0,0,0,.6);display:flex;flex-direction:column;min-width:190px}
+  .lon-menu button{display:flex;gap:8px;align-items:baseline;text-align:left;padding:9px 11px;background:none;border:none;color:var(--txt);font:13px var(--sans);border-radius:7px;cursor:pointer}
+  .lon-menu button:hover{background:var(--surf2)}
+  .lon-menu button.on{background:rgba(245,166,35,.15);color:var(--acc)}
+  .lon-menu b{font-family:var(--mono);color:var(--acc);min-width:34px}
   details.p10card>summary{cursor:pointer;font-size:13px;font-weight:800;color:var(--txt)}
   .p10f{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
   .p10f label{font-size:10px;color:var(--txt2)}
@@ -3715,6 +3732,9 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
         <label style="flex:2;min-width:150px">Tableau techno — TM_LTTNAME
           <input id="laserTechno" type="text" value="INOX2MM" oninput="wzGenLaser()"></label>
       </div>
+      <div class="lon-box"><div class="lon-lbl">🔦 Allumage laser — clique un chiffre</div>
+        <div class="lon-code">TC_LASER_ON(<span class="lon-v" id="lonA" onclick="_lonMenu(this,'a')">1</span>, TM_LTTNAME, <span class="lon-v" id="lonP" onclick="_lonMenu(this,'p')">10</span>, <span class="lon-v" id="lonC" onclick="_lonMenu(this,'c')">100</span>)</div>
+        <div class="lon-w" id="lonWarn"></div></div>
       <input type="hidden" id="laserReq" value="2"><!-- priorité laser : TOUJOURS 2 (machine n°2 sur la source) -->
       <div style="font-size:9.5px;color:var(--txt3);margin-top:7px">Le nom du tableau techno doit correspondre EXACTEMENT à celui de la machine (ex : INOX3MM_S).</div>
     </div>
@@ -20517,19 +20537,19 @@ function buildLaserBody(){
     if(chosen && chosen.line){
       head='G1 X'+_lc(chosen.A[0])+' Y'+_lc(chosen.A[1])+Fstr+'   ;percage (rentree choisie a la main)\n'
           +'G1 Z0   ;redescendre sur la tole avant de percer\n'
-          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+          +_laserOnStr()+'\n'
           +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;LEAD droit (rentree manuelle)\n';
     }
     else if(chosen && chosen._man){
       head='G1 X'+_lc(chosen.A[0])+' Y'+_lc(chosen.A[1])+Fstr+'   ;percage (rentree choisie a la main)\n'
           +'G1 Z0   ;redescendre sur la tole avant de percer\n'
-          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+          +_laserOnStr()+'\n'
           +chosen.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(chosen.O[0]-chosen.A[0])+' J'+_lc(chosen.O[1]-chosen.A[1])+'   ;LEAD arc tangent (rentree manuelle)\n';
     }
     else if(chosen){
       head='G1 X'+_lc(chosen.A[0])+' Y'+_lc(chosen.A[1])+Fstr+'   ;percage au coeur de la zone (loin du bord)\n'
           +'G1 Z0   ;redescendre sur la tole avant de percer\n'
-          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n'
+          +_laserOnStr()+'\n'
           +chosen.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(chosen.O[0]-chosen.A[0])+' J'+_lc(chosen.O[1]-chosen.A[1])+'   ;LEAD arc lisse, tangent au contour\n';
     }
     // Pas de fallback ligne droite : si la forme est trop petite pour un arc propre,
@@ -20537,7 +20557,7 @@ function buildLaserBody(){
     if(head===null){
       head='G1 X'+_lc(S[0])+' Y'+_lc(S[1])+Fstr+'\n'
           +'G1 Z0   ;redescendre sur la tole avant de percer\n'
-          +'TC_LASER_ON(1, TM_LTTNAME, 10, 100)\n';
+          +_laserOnStr()+'\n';
     }
     // Parcours réel (ordre de passage) pour l'affichage des flèches mauves — n'influence PAS le code.
     try{ let pts=(c.poly||[]).map(q=>[q[0],q[1]]); if(c._closed && _polyVsArc(c)) pts=pts.slice().reverse();
@@ -20627,6 +20647,28 @@ function wzGenLaser(){
 // JQ : MONTÉE PROGRESSIVE DE LA BROCHE avant l'usinage (paliers de 1 s) — ménage la carte et l'alim (broche 775).
 // Marche quel que soit le réglage $30 de la carte (1000 ou 10000+) : paliers à 25/50/75 % de 1000 PUIS de 10000,
 // en gardant seulement ceux sous la vitesse demandée, puis la vitesse demandée.
+// JY : TC_LASER_ON réglable (clic sur un chiffre -> menu). Par défaut 1 / 10 / 100 = programme IDENTIQUE à avant.
+const LON_OPT={ a:[[1,'valeur habituelle']],
+  p:[[10,'perçage normal'],[20,'perçage doux'],[0,'sans perçage']],
+  c:[[100,'grand contour'],[200,'contour moyen'],[300,'petit contour']] };
+let _lon={a:1,p:10,c:100}; try{ const v=JSON.parse(localStorage.getItem('kerf_laserOn')||'null'); if(v&&['a','p','c'].every(k=>Number.isFinite(+v[k]))) _lon={a:+v.a,p:+v.p,c:+v.c}; }catch(e){}
+function _laserOnStr(){ return 'TC_LASER_ON('+_lon.a+', TM_LTTNAME, '+_lon.p+', '+_lon.c+')'; }
+function _lonRender(){ const A=document.getElementById('lonA'),P=document.getElementById('lonP'),C=document.getElementById('lonC'),W=document.getElementById('lonWarn');
+  if(A)A.textContent=_lon.a; if(P)P.textContent=_lon.p; if(C)C.textContent=_lon.c;
+  if(W) W.textContent=_lon.p===0?'⚠️ Sans perçage : seulement si la coupe démarre hors de la tôle.':''; }
+function _lonSet(k,v){ v=Math.round(+v); if(!Number.isFinite(v)||v<0) return; _lon[k]=v; try{ localStorage.setItem('kerf_laserOn',JSON.stringify(_lon)); }catch(e){} _lonRender(); _lonMenuClose(); if(typeof wzGenLaser==='function') wzGenLaser(); }
+function _lonMenuClose(){ const m=document.getElementById('lonMenu'); if(m) m.remove(); document.removeEventListener('pointerdown',_lonAway,true); document.removeEventListener('keydown',_lonKey,true); }
+function _lonAway(e){ const m=document.getElementById('lonMenu'); if(m&&!m.contains(e.target)&&!(e.target.classList&&e.target.classList.contains('lon-v'))) _lonMenuClose(); }
+function _lonKey(e){ if(e.key==='Escape'){ e.preventDefault(); _lonMenuClose(); } }
+function _lonMenu(el,k){ const open=document.getElementById('lonMenu'); const same=open&&open.dataset.k===k; _lonMenuClose(); if(same) return;
+  const m=document.createElement('div'); m.id='lonMenu'; m.className='lon-menu'; m.dataset.k=k;
+  const opts=LON_OPT[k].slice(); if(!opts.some(o=>o[0]===_lon[k])) opts.push([_lon[k],'valeur perso']);
+  for(const [v,l] of opts){ const b=document.createElement('button'); if(v===_lon[k]) b.className='on'; b.innerHTML='<b>'+v+'</b>'+l; b.onclick=()=>_lonSet(k,v); m.appendChild(b); }
+  const o=document.createElement('button'); o.innerHTML='<b>…</b>autre valeur'; o.onclick=()=>{ const r=prompt('Valeur ?',String(_lon[k])); if(r!==null&&r.trim()!=='') _lonSet(k,parseFloat(String(r).replace(',','.'))); }; m.appendChild(o);
+  document.body.appendChild(m); const r=el.getBoundingClientRect(); const mw=m.offsetWidth, mh=m.offsetHeight;
+  m.style.left=Math.max(6,Math.min(r.left,window.innerWidth-mw-6))+'px'; m.style.top=((r.bottom+6+mh<window.innerHeight)?r.bottom+6:Math.max(6,r.top-mh-6))+'px';
+  setTimeout(()=>{ document.addEventListener('pointerdown',_lonAway,true); document.addEventListener('keydown',_lonKey,true); },0); }
+document.addEventListener('DOMContentLoaded',_lonRender); setTimeout(_lonRender,300);
 function kerfSpinUp(S){ S=Math.round(+S||12000); const st=[];
   for(const base of [1000,10000]) for(const f of [0.25,0.5,0.75]){ const v=Math.round(base*f); if(v<S*0.9 && !st.includes(v)) st.push(v); }
   const L=['; montée progressive de la broche (paliers de 1 s)']; for(const v of st) L.push('M3 S'+v,'G4 P1');
