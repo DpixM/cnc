@@ -164,6 +164,10 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-11-04 — KA : DÉCOUPE LASER — TC_LASER_ON sans perçage PAR DÉFAUT
+ [CHANGE] Par défaut : TC_LASER_ON(1, TM_LTTNAME, 0, 100) (avant : 10 = perçage normal). Demande Seb : à la découpe
+   ce perçage gêne, ils l'enlevaient à la main. 10 / 20 restent dans le menu (clic sur le chiffre). Rien d'autre ne change.
+
 -- 2026-11-04 — JY : DÉCOUPE LASER — TC_LASER_ON réglable en 1 clic (demande Seb)
  [AJOUT] Carte « Programme » : TC_LASER_ON(1, TM_LTTNAME, 10, 100) affiché ; clic sur un chiffre = menu.
    Perçage : 10 normal · 20 doux · 0 sans perçage. Contour : 100 grand · 200 moyen · 300 petit. « autre valeur » partout.
@@ -2461,7 +2465,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-04-JZ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-04-KA ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3733,7 +3737,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <input id="laserTechno" type="text" value="INOX2MM" oninput="wzGenLaser()"></label>
       </div>
       <div class="lon-box"><div class="lon-lbl">🔦 Allumage laser — clique un chiffre</div>
-        <div class="lon-code">TC_LASER_ON(<span class="lon-v" id="lonA" onclick="_lonMenu(this,'a')">1</span>, TM_LTTNAME, <span class="lon-v" id="lonP" onclick="_lonMenu(this,'p')">10</span>, <span class="lon-v" id="lonC" onclick="_lonMenu(this,'c')">100</span>)</div>
+        <div class="lon-code">TC_LASER_ON(<span class="lon-v" id="lonA" onclick="_lonMenu(this,'a')">1</span>, TM_LTTNAME, <span class="lon-v" id="lonP" onclick="_lonMenu(this,'p')">0</span>, <span class="lon-v" id="lonC" onclick="_lonMenu(this,'c')">100</span>)</div>
       </div>
       <input type="hidden" id="laserReq" value="2"><!-- priorité laser : TOUJOURS 2 (machine n°2 sur la source) -->
       <div style="font-size:9.5px;color:var(--txt3);margin-top:7px">Le nom du tableau techno doit correspondre EXACTEMENT à celui de la machine (ex : INOX3MM_S).</div>
@@ -20649,9 +20653,9 @@ function wzGenLaser(){
 // en gardant seulement ceux sous la vitesse demandée, puis la vitesse demandée.
 // JY : TC_LASER_ON réglable (clic sur un chiffre -> menu). Par défaut 1 / 10 / 100 = programme IDENTIQUE à avant.
 const LON_OPT={ a:[[1,'valeur habituelle']],
-  p:[[10,'perçage normal'],[20,'perçage doux'],[0,'sans perçage']],
+  p:[[0,'sans perçage (défaut)'],[10,'perçage normal'],[20,'perçage doux']],
   c:[[100,'grand contour'],[200,'contour moyen'],[300,'petit contour']] };
-let _lon={a:1,p:10,c:100}; try{ const v=JSON.parse(localStorage.getItem('kerf_laserOn')||'null'); if(v&&['a','p','c'].every(k=>Number.isFinite(+v[k]))) _lon={a:+v.a,p:+v.p,c:+v.c}; }catch(e){}
+let _lon={a:1,p:0,c:100}; // KA : sans perçage PAR DÉFAUT (demande Seb) try{ const v=JSON.parse(localStorage.getItem('kerf_laserOn')||'null'); if(v&&['a','p','c'].every(k=>Number.isFinite(+v[k]))) _lon={a:+v.a,p:+v.p,c:+v.c}; }catch(e){}
 function _laserOnStr(){ return 'TC_LASER_ON('+_lon.a+', TM_LTTNAME, '+_lon.p+', '+_lon.c+')'; }
 function _lonRender(){ const A=document.getElementById('lonA'),P=document.getElementById('lonP'),C=document.getElementById('lonC'),W=document.getElementById('lonWarn');
   if(A)A.textContent=_lon.a; if(P)P.textContent=_lon.p; if(C)C.textContent=_lon.c;
