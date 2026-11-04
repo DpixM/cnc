@@ -164,6 +164,11 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-11-04 — JX : SURFAÇAGE — nouvelle façon d'usiner « Spirale » (part du centre)
+ [AJOUT] Spirale rectangulaire continue qui part du CENTRE et s'élargit jusqu'à sortir du brut (bords nets).
+   Au centre on est dans le bois : entrée en RAMPE douce (≤ 3°, allers-retours sur la ligne du centre), jamais
+   de plongée droite. En opposition ou en avalant. Testé : 155 combinaisons (façons × zéros × fraises × sens).
+
 -- 2026-11-03 — JW : SURFAÇAGE — 4 façons d'usiner, 5 zéros, fraises dans la bibliothèque commune
  [AJOUT] Façon d'usiner : Zigzag · Sens unique · Croisé (90° à chaque passe) · Concentrique (de l'extérieur au centre,
    en opposition ou en avalant). Zéro X/Y : 4 coins du brut ou centre (croix verte sur l'aperçu).
@@ -1961,12 +1966,13 @@ textarea{resize:vertical;min-height:50px}
 #wzpSURF .surf-pre{background:var(--surf2);border:1.5px solid var(--brd2);color:var(--txt2)}
 #wzpSURF .surf-pre.on{background:rgba(245,166,35,.15);border-color:var(--acc);color:var(--acc)}
 #wzpSURF details summary{list-style:none}
-#wzpSURF .surf-sts{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+#wzpSURF .surf-sts{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
 #wzpSURF .surf-st{background:var(--surf);border:1.5px solid var(--brd2);border-radius:10px;padding:8px 6px;cursor:pointer;color:var(--txt2);display:flex;flex-direction:column;align-items:center;gap:3px;font-family:var(--sans)}
 #wzpSURF .surf-st b{font-size:12.5px;color:var(--txt)}
 #wzpSURF .surf-st small{font-size:10.5px;text-align:center;line-height:1.25}
 #wzpSURF .surf-st.on{border-color:var(--acc);background:rgba(245,166,35,.12);color:var(--acc)}
 @media (max-width:640px){ #wzpSURF .surf-sts{grid-template-columns:repeat(2,1fr)} }
+@media (min-width:641px) and (max-width:900px){ #wzpSURF .surf-sts{grid-template-columns:repeat(3,1fr)} }
 .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
 .g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px}
 .rng{display:flex;align-items:center;gap:8px}
@@ -2450,7 +2456,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-03-JW ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-04-JX ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -2574,6 +2580,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
       <button class="surf-st" data-v="oneway" onclick="surf_strat('oneway')"><svg viewBox="0 0 40 28" width="40" height="28"><path d="M3 4H35M3 11H35M3 18H35M3 25H35" fill="none" stroke="currentColor" stroke-width="2"/><path d="M31 1l5 3-5 3M31 8l5 3-5 3M31 15l5 3-5 3M31 22l5 3-5 3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><b>Sens unique</b><small>plus propre · plus long</small></button>
       <button class="surf-st" data-v="cross" onclick="surf_strat('cross')"><svg viewBox="0 0 40 28" width="40" height="28"><path d="M3 5H37M3 14H37M3 23H37" stroke="currentColor" stroke-width="2"/><path d="M8 2V26M20 2V26M32 2V26" stroke="currentColor" stroke-width="2" opacity=".55"/></svg><b>Croisé</b><small>90° à chaque passe · planche voilée</small></button>
       <button class="surf-st" data-v="concentric" onclick="surf_strat('concentric')"><svg viewBox="0 0 40 28" width="40" height="28"><rect x="3" y="3" width="34" height="22" fill="none" stroke="currentColor" stroke-width="2"/><rect x="9" y="8" width="22" height="12" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 14H25" stroke="currentColor" stroke-width="2"/></svg><b>Concentrique</b><small>de l'extérieur au centre · bords nets</small></button>
+      <button class="surf-st" data-v="spiral" onclick="surf_strat('spiral')"><svg viewBox="0 0 40 28" width="40" height="28"><path d="M17 14H23L24 17H15L14 10H26L28 21H11L9 6H31L34 25H6" fill="none" stroke="currentColor" stroke-width="2"/></svg><b>Spirale</b><small>part du centre · entrée en rampe</small></button>
     </div></div>
   <div class="g2" style="margin-top:7px">
     <div class="fld" id="surfDirRow"><label>Sens des lignes</label><select id="surfDir"><option value="auto">Auto (le long du côté long)</option><option value="x">Le long de X</option><option value="y">Le long de Y</option></select></div>
@@ -2607,7 +2614,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
       <li><b>Zéro X/Y</b> sur le coin (ou le centre) que tu as choisi : la croix verte de l'aperçu.</li>
       <li><b>Zéro Z</b> sur le point le <b>plus haut</b> du brut : sinon la 1re passe ne touche pas partout (normal sur une planche voilée, refais une passe).</li>
       <li>La fraise descend <b>toujours en dehors du brut</b> : pas de plongée dans le bois.</li>
-      <li><b>Zigzag</b> = rapide. <b>Sens unique</b> = même sens de coupe partout, fond plus régulier. <b>Croisé</b> = une passe en X, la suivante en Y : efface les marches d'une planche voilée. <b>Concentrique</b> = bords bien nets, finit au centre.</li>
+      <li><b>Zigzag</b> = rapide. <b>Sens unique</b> = même sens de coupe partout, fond plus régulier. <b>Croisé</b> = une passe en X, la suivante en Y : efface les marches d'une planche voilée. <b>Concentrique</b> = bords bien nets, finit au centre. <b>Spirale</b> = part du centre et s'élargit sans s'arrêter (la fraise entre dans le bois en rampe douce, pas en plongée).</li>
       <li>1re fois : garde la main sur l'<b>arrêt</b> et joue avec l'override de vitesse (Feed %) si ça force ou si ça brûle.</li>
       <li>Fraise à surfacer 25 mm (queue 6,35) : il faut une <b>pince ER11 de 6,35 mm</b> sur la broche 775.</li>
     </ol>
@@ -20635,6 +20642,7 @@ const SURF_STRATS={
   oneway:{n:'Sens unique', s:'Toujours dans le même sens — plus propre, plus long'},
   cross:{n:'Croisé', s:'Chaque passe tourne de 90° — idéal planche voilée'},
   concentric:{n:'Concentrique', s:'Tours de l\'extérieur vers le centre — bords très nets'},
+  spiral:{n:'Spirale', s:'Part du centre et s\'élargit — entrée en rampe douce'},
 };
 const SURF_ORIG={FL:'Coin avant-gauche',FR:'Coin avant-droit',BL:'Coin arrière-gauche',BR:'Coin arrière-droit',C:'Centre du brut'};
 function surf_auto(D, preset){ D=+D||6; const big=D>=15, mid=D>=5;
@@ -20682,10 +20690,29 @@ function surf_compute(p){
     const m=Math.min(A,B), last=m-(n-1)*s; const ea=A-(n-1)*s-last, eb=B-(n-1)*s-last; // reste au centre : un trait le long du côté long
     if(ea>1e-6){ mv('G1',cx-ea,cy,null,F); mv('G1',cx+ea,cy,null,F); } else if(eb>1e-6){ mv('G1',cx,cy-eb,null,F); mv('G1',cx,cy+eb,null,F); } else mv('G1',cx,cy,null,F);
     return {nR:n, sv:s}; };
+  // ── spirale : part du CENTRE et s'élargit jusqu'à sortir du brut ──
+  // Au centre on est DANS la matière : pas de plongée droite, on descend en RAMPE douce (3°) en faisant
+  // des allers-retours sur la ligne du centre. Puis vraie spirale rectangulaire continue (chaque tour = +1 pas).
+  const RAMP=Math.tan(3*Math.PI/180);
+  const spiral=(z,zTop,climb)=>{ const cx=ox+W/2, cy=oy+L/2; const A=W/2+ov, B=L/2+ov, Dm=Math.min(A,B); const ex=Math.max(0,A-B), ey=Math.max(0,B-A);
+    const hor=ex>=ey; const Lh=Math.max(hor?ex:ey, D); // demi-longueur de la ligne de rampe
+    const R0=hor?[cx-Lh,cy]:[cx,cy+Lh], R1=hor?[cx+Lh,cy]:[cx,cy-Lh];
+    // approche : au-dessus du départ de rampe, descente À VIDE jusqu'au dessus de la matière restante
+    if(cur&&cur[2]<ZR) mv('G0',null,null,ZR); mv('G0',R0[0],R0[1],null); if(cur[2]>ZR) mv('G0',null,null,ZR); mv('G1',null,null,zTop,Fz);
+    const dz=zTop-z, legs=Math.max(1,Math.ceil(dz/RAMP/(2*Lh))); let zc=zTop;
+    for(let i=1;i<=legs;i++){ const P=(i%2)?R1:R0; zc=zTop-dz*i/legs; mv('G1',P[0],P[1],zc,F); }
+    const end=(legs%2)?R1:R0, other=(legs%2)?R0:R1; mv('G1',other[0],other[1],null,F); // repasse à fond sur toute la ligne
+    // départ de la spirale : bout de la ligne centrale du côté du 1er coin
+    const C0=hor?[cx+ex,cy]:[cx,cy-ey]; const Cs=hor?[cx-ex,cy]:[cx,cy+ey]; mv('G1',Cs[0],Cs[1],null,F); mv('G1',C0[0],C0[1],null,F);
+    const SG=climb?[[1,-1],[1,1],[-1,1],[-1,-1]]:[[1,-1],[-1,-1],[-1,1],[1,1]]; // en avalant : sens anti-horaire (matière DEHORS)
+    let clamp=0, turns=0;
+    for(let j=0; clamp<5 && j<100000; j++){ let d=(j+1)*s/4; if(d>=Dm){ d=Dm; clamp++; } const g=SG[j%4]; mv('G1',cx+g[0]*(ex+d),cy+g[1]*(ey+d),null,F); if(j%4===3) turns++; }
+    return {nR:turns, sv:s}; };
   const date=new Date().toLocaleString('fr-FR');
   const longAx=W>=L?'x':'y'; const axSel=(p.dir==='x'||p.dir==='y')?p.dir:longAx;
   out.push('; KERF — SURFAÇAGE CNC 3018 — '+date);
-  out.push('; Brut '+f3(W)+' x '+f3(L)+' mm — fraise Ø'+f3(D)+' mm — on enlève '+f3(zcut)+' mm — '+SURF_STRATS[strat].n+(strat==='concentric'?(p.climb?' (en avalant)':' (en opposition)'):''));
+  out.push('; Brut '+f3(W)+' x '+f3(L)+' mm — fraise Ø'+f3(D)+' mm — on enlève '+f3(zcut)+' mm — '+SURF_STRATS[strat].n+((strat==='concentric'||strat==='spiral')?(p.climb?' (en avalant)':' (en opposition)'):''));
+  if(strat==='spiral') out.push('; Spirale : départ AU CENTRE, entrée en rampe 3° (pas de plongée droite dans le bois)');
   out.push('; '+lv.length+' passe(s) : '+lv.map(z=>f3(-z)).join(' / ')+' mm');
   out.push('; ZÉRO : X0 Y0 = '+SURF_ORIG[org].toUpperCase()+' du brut ; Z0 = DESSUS du brut (point le plus haut)');
   out.push('; La fraise déborde de '+f3(ov)+' mm autour du brut : AUCUNE bride dans cette zone !');
@@ -20694,9 +20721,10 @@ function surf_compute(p){
   cur=[0,0,safeZ];
   let info=null, flip=false, side=0; const axes=[];
   for(let k=0;k<lv.length;k++){ const z=lv[k];
-    let ax=axSel; if(strat==='cross'){ ax=((lv.length-1-k)%2===0)?longAx:(longAx==='x'?'y':'x'); } axes.push(strat==='concentric'?'○':ax.toUpperCase());
-    out.push('; ── passe '+(k+1)+'/'+lv.length+' : Z'+f3(z)+(fin>0&&k===lv.length-1?' (finition)':'')+(strat==='concentric'?'':' — lignes le long de '+ax.toUpperCase()));
+    let ax=axSel; if(strat==='cross'){ ax=((lv.length-1-k)%2===0)?longAx:(longAx==='x'?'y':'x'); } axes.push((strat==='concentric'||strat==='spiral')?'○':ax.toUpperCase());
+    out.push('; ── passe '+(k+1)+'/'+lv.length+' : Z'+f3(z)+(fin>0&&k===lv.length-1?' (finition)':'')+((strat==='concentric'||strat==='spiral')?'':' — lignes le long de '+ax.toUpperCase()));
     if(strat==='concentric'){ info=concentric(z,!!p.climb); }
+    else if(strat==='spiral'){ info=spiral(z,k===0?0:lv[k-1],!!p.climb); }
     else if(strat==='zigzag'){ const r0=raster(z,ax,false,flip,side); info=r0; flip=!flip; side=r0.endSide; }   // on repart d'où on s'est arrêté (hors du brut)
     else if(strat==='oneway'){ info=raster(z,ax,true,false,0); }
     else { info=raster(z,ax,false,false,0); }
@@ -20710,7 +20738,8 @@ function surf_compute(p){
   if(stepPct>60) warn.push('Pas de '+stepPct+' % : des stries risquent de rester entre les lignes (40–50 % conseillé).');
   if(F>1500) warn.push('Avance '+F+' mm/min : beaucoup de 3018 sont limités vers 1000–2000 mm/min ($110/$111).');
   if(zcut>5) warn.push('Plus de 5 mm à enlever : c\'est long, vérifie la longueur de coupe de ta fraise.');
-  if(strat==='concentric'&&p.climb) warn.push('En avalant sur un 3018 : la fraise peut « tirer » dans le jeu des axes. Si ça broute, repasse en opposition.');
+  if(strat==='spiral') warn.push('Spirale : la fraise entre AU CENTRE, dans le bois, en rampe douce. Une fraise à surfacer à plaquettes n\'aime pas trop ça : si elle peine, prends Concentrique (entrée hors du brut).');
+  if((strat==='concentric'||strat==='spiral')&&p.climb) warn.push('En avalant sur un 3018 : la fraise peut « tirer » dans le jeu des axes. Si ça broute, repasse en opposition.');
   return { gcode:out.join('\n')+'\n', levels:lv, nRows:info?info.nR:0, sv:info?info.sv:0, ov, strat, axes, minutes:min, lenCut:len, path, warn, W, L, D, ox, oy, org, spanX, spanY };
 }
 function surf_read(){ const g=id=>{ const e=document.getElementById(id); return e?e.value:''; }, c=id=>{ const e=document.getElementById(id); return !!(e&&e.checked); };
@@ -20726,7 +20755,7 @@ function surf_applyAuto(keepZ){ const p=surf_read(); const a=surf_auto(p.D,p.pre
   if(!keepZ) surf_set('surfZ',a.zcut); surf_update(); }
 function surf_preset(v){ const b=document.getElementById('surfPre'); if(b) b.dataset.v=v; document.querySelectorAll('#wzpSURF .surf-pre').forEach(x=>x.classList.toggle('on',x.dataset.v===v)); surf_applyAuto(false); }
 function surf_strat(v){ const b=document.getElementById('surfStrat'); if(b) b.dataset.v=v; document.querySelectorAll('#wzpSURF .surf-st').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
-  const cl=document.getElementById('surfClimbRow'); if(cl) cl.style.display=v==='concentric'?'':'none'; const dr=document.getElementById('surfDirRow'); if(dr) dr.style.display=(v==='concentric'||v==='cross')?'none':''; surf_update(); }
+  const cl=document.getElementById('surfClimbRow'); if(cl) cl.style.display=(v==='concentric'||v==='spiral')?'':'none'; const dr=document.getElementById('surfDirRow'); if(dr) dr.style.display=(v==='concentric'||v==='cross'||v==='spiral')?'none':''; surf_update(); }
 function surf_tools(){ const L=(typeof tools!=='undefined'&&Array.isArray(tools))?tools:[]; return L.filter(t=>t&&(t.type==='surface'||t.type==='flat')&&+t.dia>0).sort((a,b)=>(a.type==='surface'?0:1)-(b.type==='surface'?0:1)||(+b.dia)-(+a.dia)); }
 function surf_curTool(){ const sel=document.getElementById('surfTool'); if(!sel||!sel.value) return null; return surf_tools().find(x=>String(x.id)===sel.value)||null; }
 function surf_refreshTools(selId){ const sel=document.getElementById('surfTool'); if(!sel) return; const keep=selId!=null?String(selId):sel.value; const L=surf_tools();
@@ -20742,7 +20771,7 @@ function surf_update(){ const p=surf_read(); try{ localStorage.setItem(SURF_KEY,
   const R=surf_compute(p); _surfLast=R; const st=document.getElementById('surfStat'), wn=document.getElementById('surfWarn');
   if(R.err){ if(st){ st.className='al al-err'; st.textContent='⚠️ '+R.err; } if(wn) wn.innerHTML=''; surf_draw(null); return; }
   const mm=Math.max(1,Math.round(R.minutes)); const tm=mm>=60?(Math.floor(mm/60)+' h '+String(mm%60).padStart(2,'0')):mm+' min';
-  const how=R.strat==='concentric'?(R.nRows+' tours tous les '+R.sv.toFixed(2)+' mm'):(R.nRows+' lignes tous les '+R.sv.toFixed(2)+' mm · '+(R.strat==='cross'?'sens : '+R.axes.join(' → '):'le long de '+R.axes[0]));
+  const how=(R.strat==='concentric'||R.strat==='spiral')?(R.nRows+' tours tous les '+R.sv.toFixed(2)+' mm'+(R.strat==='spiral'?' · départ au centre (rampe)':'')):(R.nRows+' lignes tous les '+R.sv.toFixed(2)+' mm · '+(R.strat==='cross'?'sens : '+R.axes.join(' → '):'le long de '+R.axes[0]));
   if(st){ st.className='al al-ok'; st.innerHTML='<span>✅ <b>'+R.levels.length+' passe(s)</b> ('+R.levels.map(z=>(-z).toFixed(2).replace(/\.?0+$/,'')).join(' / ')+' mm) · <b>'+SURF_STRATS[R.strat].n+'</b> · '+how+' · <b>≈ '+tm+'</b></span>'; }
   if(wn) wn.innerHTML=R.warn.map(w=>'<div class="al al-w" style="margin-top:6px"><span>⚠️ '+w+'</span></div>').join('');
   surf_draw(R); }
