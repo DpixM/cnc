@@ -164,6 +164,9 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-11-12 — KD : ESQUISSE — BUG : lignes « égales » qui rapetissaient quand on ajoutait perpendiculaire / parallèle
+   (le solveur annulait l'erreur d'angle en écrasant les lignes). Contraintes d'angle (parallèle, perpendiculaire,
+   colinéaire, tangent à un bout, cote d'angle) indépendantes de la longueur ; horizontal / vertical tourne d'abord la ligne.
 -- 2026-11-11 — KC : ESQUISSE — fond sombre « infini » (plus de feuille blanche : grille + axes X/Y, brut en pointillé),
    GOMME (E) ronde/carrée à taille réglable qui n'efface que ce qui passe dessous, AJUSTER en glissant à travers les
    traits, clic droit sur un élément = menu (Supprimer…), cote à 2 points : symbole ↔ ↕ ⤢ pour savoir ce qu'on pose.
@@ -2518,7 +2521,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-11-KC ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-12-KD ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -37710,31 +37713,39 @@ function skLen(e){ const a=SK.pts[e.a],b=SK.pts[e.b]; return Math.hypot(b.x-a.x,
 // ── résidus d'une contrainte (0 = satisfaite) ──
 function skPair(c){ if(c.e!=null){ const e=SK.ents[c.e]; return [SK.pts[e.a],SK.pts[e.b]]; } return [SK.pts[c.p],SK.pts[c.q]]; }
 function skDir(e){ const a=SK.pts[e.a],b=SK.pts[e.b]; return [b.x-a.x,b.y-a.y,a]; }
+// longueur de référence figée pour les contraintes d'angle (sinon le solveur « triche » en rapetissant les lignes :
+// avec |g|·sin(angle), mettre la ligne à 0 annule aussi l'erreur -> toutes les lignes égales rétrécissaient)
+const SK_REF=new Map();
+function skRefL(c,a,b){ let L=SK_REF.get(c); if(L==null){ L=Math.max(1,(a+b)/2); } return L; }
+function skFreezeRefs(){ SK_REF.clear(); for(const id in SK.cons){ const c=SK.cons[id]; let L=null; try{
+      if(c.t==='PAR'||c.t==='PRP'||c.t==='COL'||c.t==='DA'){ const d=skDir(SK.ents[c.e]),g=skDir(SK.ents[c.f]); L=(Math.hypot(d[0],d[1])+Math.hypot(g[0],g[1]))/2; }
+      else if(c.t==='TAN'){ const e=SK.ents[c.e],f=SK.ents[c.f]; if(skShared(e,f)!=null){ L=(e.t==='L'?skLen(e):skR(e))/2+(f.t==='L'?skLen(f):skR(f))/2; } } }catch(_){ }
+    if(L!=null&&isFinite(L)) SK_REF.set(c,Math.max(1,L)); } }
 function skResid(c){ const P=SK.pts,E=SK.ents;
   switch(c.t){
     case 'ARC': { const e=E[c.e],o=P[e.c],a=P[e.a],b=P[e.b]; return [Math.hypot(a.x-o.x,a.y-o.y)-Math.hypot(b.x-o.x,b.y-o.y)]; }
     case 'H': { const [p,q]=skPair(c); return [p.y-q.y]; }
     case 'V': { const [p,q]=skPair(c); return [p.x-q.x]; }
-    case 'PAR': { const d=skDir(E[c.e]),g=skDir(E[c.f]); const l=Math.hypot(d[0],d[1])||1e-9; return [(d[0]*g[1]-d[1]*g[0])/l]; }
-    case 'PRP': { const d=skDir(E[c.e]),g=skDir(E[c.f]); const l=Math.hypot(d[0],d[1])||1e-9; return [(d[0]*g[0]+d[1]*g[1])/l]; }
-    case 'COL': { const d=skDir(E[c.e]),g=skDir(E[c.f]); const l=Math.hypot(d[0],d[1])||1e-9, a=d[2], q=g[2]; return [(d[0]*g[1]-d[1]*g[0])/l, (d[0]*(q.y-a.y)-d[1]*(q.x-a.x))/l]; }
+    case 'PAR': { const d=skDir(E[c.e]),g=skDir(E[c.f]); const l=Math.hypot(d[0],d[1])||1e-9, m=Math.hypot(g[0],g[1])||1e-9; return [(d[0]*g[1]-d[1]*g[0])/(l*m)*skRefL(c,l,m)]; }
+    case 'PRP': { const d=skDir(E[c.e]),g=skDir(E[c.f]); const l=Math.hypot(d[0],d[1])||1e-9, m=Math.hypot(g[0],g[1])||1e-9; return [(d[0]*g[0]+d[1]*g[1])/(l*m)*skRefL(c,l,m)]; }
+    case 'COL': { const d=skDir(E[c.e]),g=skDir(E[c.f]); const l=Math.hypot(d[0],d[1])||1e-9, m=Math.hypot(g[0],g[1])||1e-9, a=d[2], q=g[2]; return [(d[0]*g[1]-d[1]*g[0])/(l*m)*skRefL(c,l,m), (d[0]*(q.y-a.y)-d[1]*(q.x-a.x))/l]; }
     case 'PON': { const p=P[c.p],e=E[c.e]; if(e.t==='L'){ const d=skDir(e),l=Math.hypot(d[0],d[1])||1e-9,a=d[2]; return [(d[0]*(p.y-a.y)-d[1]*(p.x-a.x))/l]; } const o=P[e.c]; return [Math.hypot(p.x-o.x,p.y-o.y)-skR(e)]; }
     case 'MID': { const p=P[c.p],e=E[c.e],a=P[e.a],b=P[e.b]; return [p.x-(a.x+b.x)/2, p.y-(a.y+b.y)/2]; }
     case 'TAN': { const e=E[c.e],f=E[c.f]; const sh=skShared(e,f);
       if(e.t==='L'||f.t==='L'){ const L=e.t==='L'?e:f, K=e.t==='L'?f:e; const d=skDir(L),l=Math.hypot(d[0],d[1])||1e-9,a=d[2],o=P[K.c];
         // ligne et arc qui PARTAGENT un bout (congé, oblong) : tangent = rayon perpendiculaire à la ligne en ce point
         // (la formule « distance = rayon » a une dérivée nulle dans ce cas -> le solveur ne la « sentait » pas)
-        if(sh!=null){ const s0=P[sh]; return [(d[0]*(o.x-s0.x)+d[1]*(o.y-s0.y))/l]; }
+        if(sh!=null){ const s0=P[sh]; const r=Math.hypot(o.x-s0.x,o.y-s0.y)||1e-9; return [(d[0]*(o.x-s0.x)+d[1]*(o.y-s0.y))/(l*r)*skRefL(c,l,r)]; }
         return [c.s*(d[0]*(o.y-a.y)-d[1]*(o.x-a.x))/l-skR(K)]; }
       const o1=P[e.c],o2=P[f.c],r1=skR(e),r2=skR(f);
-      if(sh!=null){ const s0=P[sh]; const ax=o1.x-s0.x,ay=o1.y-s0.y,bx=o2.x-s0.x,by=o2.y-s0.y; return [(ax*by-ay*bx)/(Math.hypot(ax,ay)||1e-9)]; }
+      if(sh!=null){ const s0=P[sh]; const ax=o1.x-s0.x,ay=o1.y-s0.y,bx=o2.x-s0.x,by=o2.y-s0.y, ra=Math.hypot(ax,ay)||1e-9, rb=Math.hypot(bx,by)||1e-9; return [(ax*by-ay*bx)/(ra*rb)*skRefL(c,ra,rb)]; }
       return [Math.hypot(o1.x-o2.x,o1.y-o2.y)-(c.s>0?r1+r2:Math.abs(r1-r2))]; }
     case 'EQ': { const e=E[c.e],f=E[c.f]; if(e.t==='L') return [skLen(e)-skLen(f)]; return [skR(e)-skR(f)]; }
     case 'SYM': { const p=P[c.p],q=P[c.q],d=skDir(E[c.e]),l=Math.hypot(d[0],d[1])||1e-9,a=d[2]; const mx=(p.x+q.x)/2-a.x,my=(p.y+q.y)/2-a.y; return [(d[0]*my-d[1]*mx)/l, (d[0]*(q.x-p.x)+d[1]*(q.y-p.y))/l]; }
     case 'DD': { const p=P[c.p],q=P[c.q]; if(c.m==='h') return [c.s*(q.x-p.x)-c.v]; if(c.m==='v') return [c.s*(q.y-p.y)-c.v]; return [Math.hypot(q.x-p.x,q.y-p.y)-c.v]; }
     case 'DL': { const p=P[c.p],d=skDir(E[c.e]),l=Math.hypot(d[0],d[1])||1e-9,a=d[2]; return [c.s*(d[0]*(p.y-a.y)-d[1]*(p.x-a.x))/l-c.v]; }
     case 'DR': { const e=E[c.e]; return [skR(e)*(c.dia?2:1)-c.v]; }
-    case 'DA': { const d=skDir(E[c.e]),g=skDir(E[c.f]); const ux=d[0]*c.s1,uy=d[1]*c.s1,vx=g[0]*c.s2,vy=g[1]*c.s2; const ang=Math.atan2(Math.abs(ux*vy-uy*vx),ux*vx+uy*vy); const L=(Math.hypot(ux,uy)+Math.hypot(vx,vy))/2||1; return [(ang-c.v*Math.PI/180)*L]; }
+    case 'DA': { const d=skDir(E[c.e]),g=skDir(E[c.f]); const ux=d[0]*c.s1,uy=d[1]*c.s1,vx=g[0]*c.s2,vy=g[1]*c.s2; const ang=Math.atan2(Math.abs(ux*vy-uy*vx),ux*vx+uy*vy); const L=skRefL(c,Math.hypot(ux,uy),Math.hypot(vx,vy)); return [(ang-c.v*Math.PI/180)*L]; }
   }
   return [];
 }
@@ -37743,7 +37754,7 @@ function skShared(e,f){ const A=e.t==='L'||e.t==='A'?[e.a,e.b]:[], B=f.t==='L'||
 function skConNEq(c){ return (c.t==='COL'||c.t==='MID'||c.t==='SYM')?2:1; }
 const SK_DIMS={DD:1,DL:1,DR:1,DA:1};
 // valeur MESURÉE d'une cote (ce qu'elle vaut sur le dessin maintenant)
-function skMeasure(c){ const v=c.v; c.v=0; let r; try{ r=skResid(c)[0]; }finally{ c.v=v; } if(c.t==='DA'){ const d=skDir(SK.ents[c.e]),g=skDir(SK.ents[c.f]); const L=(Math.hypot(d[0],d[1])+Math.hypot(g[0],g[1]))/2||1; return r/L*180/Math.PI; } return r; }
+function skMeasure(c){ const v=c.v; c.v=0; let r; try{ r=skResid(c)[0]; }finally{ c.v=v; } if(c.t==='DA'){ const d=skDir(SK.ents[c.e]),g=skDir(SK.ents[c.f]); const L=skRefL(c,Math.hypot(d[0],d[1]),Math.hypot(g[0],g[1])); return r/L*180/Math.PI; } return r; }
 // points / rayons touchés par une contrainte
 function skConRefs(c){ const ps=[],rs=[]; const addE=id=>{ const e=SK.ents[id]; if(!e) return false; for(const p of skEntPts(e)) ps.push(p); if(e.t==='C') rs.push(id); return true; };
   let ok=true; for(const k of ['e','f']) if(c[k]!=null) ok=addE(c[k])&&ok; for(const k of ['p','q']) if(c[k]!=null){ if(!SK.pts[c[k]]) ok=false; ps.push(c[k]); }
@@ -37764,7 +37775,7 @@ function skSys(opt){ const drag=(opt&&opt.drag)||null; skO();
   for(let i=0;i<n;i++){ const g=G[find(i)]; if(g){ g.loc[i]=g.cols.length; g.cols.push(i); } }
   let m=0; for(const q of eqs) m+=q.n;
   return {prm,eqs,m,n,ix,groups}; }
-function skSolve(opt){ opt=opt||{}; const S=skSys(opt); SK._last=S; const all=S.prm.map(p=>p.o[p.k]); let ok=true,it=0,res=0;
+function skSolve(opt){ opt=opt||{}; skFreezeRefs(); const S=skSys(opt); SK._last=S; const all=S.prm.map(p=>p.o[p.k]); let ok=true,it=0,res=0;
   for(const g of S.groups){ const r=skSolveG(S.prm,g); if(!r.ok) ok=false; if(r.it>it) it=r.it; if(r.res>res) res=r.res; }
   // équations dont tout est déjà fixe : il faut juste qu'elles soient vraies
   for(const q of S.eqs){ if(q.cols.length) continue; for(const v of skResid(q.c)){ const a=Math.abs(v||0); if(a>1e-6) ok=false; if(a>res) res=a; } }
@@ -37833,10 +37844,15 @@ function skEntFree(e){ const F=SK.free; if(e.t==='C') return !!(F[e.c]||F['r'+e.
 // ── ajout sûr d'une contrainte : si elle est impossible -> on annule ; cote redondante -> « pilotée » (entre parenthèses) ──
 function skSnap(){ return JSON.stringify({pts:SK.pts,ents:SK.ents,cons:SK.cons,nid:SK.nid}); }
 function skUnsnap(s){ const o=JSON.parse(s); SK.pts=o.pts; SK.ents=o.ents; SK.cons=o.cons; SK.nid=o.nid; }
+function skPreRot(c){ const e=SK.ents[c.e]; if(!e||e.t!=='L') return; const a=SK.pts[e.a], b=SK.pts[e.b]; const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy); if(L<1e-9) return;
+  let ux,uy; if(c.t==='H'){ ux=dx>=0?1:-1; uy=0; } else { ux=0; uy=dy>=0?1:-1; } if(Math.abs(dx*uy-dy*ux)/L<1e-9) return;
+  if(a.fx&&b.fx) return; if(a.fx){ b.x=a.x+ux*L; b.y=a.y+uy*L; } else if(b.fx){ a.x=b.x-ux*L; a.y=b.y-uy*L; }
+  else { const mx=(a.x+b.x)/2, my=(a.y+b.y)/2; a.x=mx-ux*L/2; a.y=my-uy*L/2; b.x=mx+ux*L/2; b.y=my+uy*L/2; } }
 function skAddCon(c,opt){ opt=opt||{}; const R=skConRefs(c); if(!R.ok) return null;
   // doublon exact ?
   for(const id in SK.cons){ const d=SK.cons[id]; if(d.t===c.t&&!SK_DIMS[c.t]){ const same=(d.e==c.e&&d.f==c.f&&d.p==c.p&&d.q==c.q)||(d.e==c.f&&d.f==c.e&&d.p==c.p&&d.q==c.q&&c.t!=='TAN'&&c.t!=='PON'&&c.t!=='MID'); if(same) return d; } }
   const before=skSnap(); let rank0=null; if(SK_DIMS[c.t]){ skAnalyze(); rank0=SK.rank; }
+  if((c.t==='H'||c.t==='V')&&c.e!=null) skPreRot(c);
   c.id=SK.nid++; SK.cons[c.id]=c;
   let ok=true;
   if(SK_DIMS[c.t]&&opt.ramp){ // grosse variation de cote : on y va par étapes (évite les retournements)
