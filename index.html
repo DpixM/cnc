@@ -11072,7 +11072,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v98',
+  const CIP_VER = 'CIP v99',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -15469,6 +15469,10 @@ function cip_build() {
       ...(posMode
         ? [';(tout est revenu a la position de depart)']
         : [
+            'TC_RESET ;comme au debut : plus aucun decalage (trafo, frames)',
+            'G71',
+            'G500',
+            'G90',
             'G01 Z = 350 F10000 ;1. on ecarte la tete',
             'G01 C1 = 0 ;2. C1 a 0 (le mandrin revient tout seul, tete loin)',
             'G01 B = 0 Y = 200 ;3. tete en position de depart',
@@ -15748,6 +15752,11 @@ function cip_build() {
     const park = !S.prog.home || (simpleEnd && !posMode);
     // v98 : fin propre, dans l'ordre : 1. on écarte la tête  2. C1 à 0 (tout seul)  3. tête en position de départ
     const PARK = [
+      // v99 : mêmes lignes qu'au début du programme (là où le C1 = 0 marche) : TC_RESET efface les décalages laissés par la trafo
+      'TC_RESET ;comme au debut : plus aucun decalage (trafo, frames)',
+      'G71',
+      'G500',
+      'G90',
       'G01 Z = 350 F10000 ;1. on ecarte la tete',
       'G01 C1 = 0 ;2. C1 a 0 (le mandrin revient tout seul, tete loin)',
       (o.trafo === 'Bc1' ? 'G01 B = 0 X =50 Y = 200' : 'G01 B = 0 Y = 200') + ' ;3. tete en position de depart',
