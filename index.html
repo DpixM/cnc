@@ -2944,9 +2944,9 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="10" y="74" width="180" height="28" rx="4" fill="#9aa5ae"/><rect x="10" y="83" width="180" height="10" fill="#7d8890"/><rect x="88" y="16" width="26" height="62" rx="2" fill="#b9c3cb" transform="rotate(20 101 76)"/><rect x="140" y="40" width="10" height="36" fill="#b9c3cb"/><path d="M78 76q22-8 44 0" stroke="#ffb74d" stroke-width="4" fill="none"/><circle cx="40" cy="40" r="16" fill="none" stroke="#f5a623" stroke-width="4"/><path d="M40 28v24M28 40h24" stroke="#f5a623" stroke-width="4"/></svg>
           <b>🛠 Créer ma pièce</b><span>Un tube + des piquages, ronds, plats, une bride ou un plot déporté, en tapant juste les cotes. Ligne de soudure exacte.</span>
         </button>
-        <button class="cipCard" id="cipCardTee" onclick="cip_ui('parttee')" data-tip="Poignée en T : un tube (ou un rond) qui TRAVERSE une barre, le bout dépasse un peu au-dessus. Tu tapes les cotes, le soft calcule les 2 soudures (dessus et dessous de la barre).">
+        <button class="cipCard" id="cipCardTee" onclick="cip_ui('parttee')" data-tip="Poignée en T : un tube (ou un rond) qui TRAVERSE une barre, le bout dépasse un peu au-dessus. Tu tapes les cotes, une soudure par mise en place : 1 = autour du bout qui dépasse, 2 = pièce retournée, autour de la tige.">
           <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="88" y="44" width="24" height="84" rx="2" fill="#9aa5ae"/><path d="M22 30 L48 22 H152 L178 30 V46 L152 54 H48 L22 46 Z" fill="#b9c3cb"/><rect x="92" y="12" width="16" height="12" fill="#c9d1d8"/><path d="M90 24q10 5 20 0" stroke="#f5a623" stroke-width="4" fill="none"/><path d="M88 55q12 5 24 0" stroke="#f5a623" stroke-width="4" fill="none"/></svg>
-          <b>⊤ Poignée en T</b><span>Un tube qui traverse une barre, le bout dépasse. Soudure dessus et dessous calculée exacte.</span>
+          <b>⊤ Poignée en T</b><span>Un tube qui traverse une barre, le bout dépasse. Soudure du bout, puis pièce retournée pour la tige.</span>
         </button>
         <button class="cipCard" id="cipCardDep" onclick="cip_ui('partdeport')" data-tip="Un cylindre (ou un tube) avec un petit cylindre posé sur sa face du bout, axe parallèle mais DÉCALÉ du centre. Tu tapes les cotes (Ø, hauteur, déport), le soft fait le CIP : le mandrin tourne, X/Y/Z suivent le cercle décalé. Soudure ou découpe, mandrin à plat ou à 90°.">
           <svg viewBox="0 0 200 130" aria-hidden="true"><ellipse cx="100" cy="112" rx="58" ry="12" fill="#7d8890"/><rect x="42" y="62" width="116" height="50" fill="#9aa5ae"/><ellipse cx="100" cy="62" rx="58" ry="12" fill="#b9c3cb"/><line x1="100" y1="20" x2="100" y2="124" stroke="#66bb6a" stroke-width="2" stroke-dasharray="5 4"/><rect x="118" y="24" width="22" height="38" fill="#c9d1d8"/><ellipse cx="129" cy="24" rx="11" ry="4" fill="#dde3e8"/><ellipse cx="129" cy="62" rx="11" ry="4" fill="none" stroke="#f5a623" stroke-width="3"/><line x1="100" y1="16" x2="129" y2="16" stroke="#f5a623" stroke-width="2"/></svg>
@@ -8573,8 +8573,11 @@ function cip_build() {
           err = 'Barre ' + (bi + 1) + ' : elle est plus courte que le Ø du tube.';
           return;
         }
-        const yc = L - dep - Rb;
-        if (yc - Rb < 1) {
+        // v96 : 2 mises en place, 1 soudure chacune. Op 1 = le bout qui dépasse côté bout libre ;
+        // op 2 = pièce retournée : la barre côté mandrin, la longue tige vers le bout libre -> on soude le côté tige
+        const flip = b.op === 'bot';
+        const yc = flip ? dep + Rb : L - dep - Rb;
+        if (yc - Rb < (flip ? -1e-6 : 1) || yc + Rb > L + 1e-6) {
           err = 'Barre ' + (bi + 1) + ' : la pièce est trop courte pour la barre (augmente la longueur).';
           return;
         }
@@ -8629,10 +8632,8 @@ function cip_build() {
           }
           return { P, NB, ax: e1, c: C0, r: Rb, t0: -Lb / 2, t1: Lb / 2, noCut: true, keepIdeal: true };
         };
-        info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot };
-        if (b.wTop !== false) seams.push(mk(1)); // dessus : là où le bout ressort
-        if (b.wBot !== false) seams.push(mk(-1)); // dessous : côté mandrin
-        if (b.wTop === false && b.wBot === false) err = 'Barre ' + (bi + 1) + ' : coche au moins une soudure (dessus ou dessous).';
+        info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot, flip };
+        seams.push(mk(1)); // la soudure est toujours côté bout libre (op 1 : autour du bout ; op 2 : autour de la tige)
         return;
       }
       if (b.type === 'deport') {
@@ -9015,8 +9016,7 @@ function cip_build() {
               f('dp', 'Ø au bout des pointes', b.dp, 'Ø aux 2 bouts de la barre (= Ø de la barre : pas de pointe).', 0.1) +
               f('lp', 'Longueur des pointes', b.lp, 'Longueur du cône à chaque bout (0 = pas de pointe).', 0.5) +
               f('rot', 'Tour autour (°)', b.rot, 'Sens de la barre vu au départ : 0 = en travers devant la tête, 90 = tournée.') +
-              `<label class="cipChk cipGK" data-hk="${i}:wTop"><input type="checkbox" data-k="wTop" ${b.wTop !== false ? 'checked' : ''}> Souder le dessus (autour du bout qui dépasse)</label>` +
-              `<label class="cipChk cipGK" data-hk="${i}:wBot"><input type="checkbox" data-k="wBot" ${b.wBot !== false ? 'checked' : ''}> Souder le dessous (côté mandrin)</label>`;
+              `<div class="cipNum" data-tip="Une soudure par mise en place (un programme chacune).\n1 : la longue tige dans le mandrin, on soude autour du petit bout qui dépasse.\n2 : pièce retournée (la barre côté mandrin, la longue tige vers toi), on soude autour de la tige."><span>Soudure à faire</span><select data-k="op" style="width:190px;max-width:60%"><option value="top" ${b.op !== 'bot' ? 'selected' : ''}>1 · le bout qui dépasse</option><option value="bot" ${b.op === 'bot' ? 'selected' : ''}>2 · côté tige (pièce retournée)</option></select></div>`;
           else if (b.type === 'deport')
             h +=
               f('d', 'Ø', b.d, 'Diamètre du cylindre déporté (mm).', 0.1) +
@@ -9092,6 +9092,13 @@ function cip_build() {
           return h + '</div>';
         })
         .join('') || '<div class="cipNote">Ajoute au moins un corps à souder.</div>';
+    box.querySelectorAll('select[data-k]').forEach(sl => {
+      const i = +sl.closest('.cipGB').dataset.i;
+      sl.addEventListener('change', () => {
+        S.genDef.bodies[i][sl.dataset.k] = sl.value;
+        genSoon();
+      });
+    });
     box.querySelectorAll('input[data-k]').forEach(inp => {
       const i = +inp.closest('.cipGB').dataset.i;
       const k = inp.dataset.k;
@@ -11038,7 +11045,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v95',
+  const CIP_VER = 'CIP v96',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -17903,7 +17910,7 @@ function cip_build() {
             d: 8,
             ep: 4,
             L: 100,
-            bodies: [{ type: 'barre', d: 14, lb: 70, dep: 2, dp: 8, lp: 18, rot: 0, wTop: true, wBot: true }]
+            bodies: [{ type: 'barre', d: 14, lb: 70, dep: 2, dp: 8, lp: 18, rot: 0, op: 'top' }]
           };
           genRender();
           genApply(true);
@@ -17992,7 +17999,7 @@ function cip_build() {
           rond: { type: 'rond', d: 20, h: 50, ang: 90, pos: 30 + 25 * n, exc: 0, rot: 0, trav: false },
           plat: { type: 'plat', w: 40, t: 5, h: 40, ang: 90, pos: 40, exc: 0, rot: 90, trav: false },
           bride: { type: 'bride', d: +S.genDef.d + 30, t: 4, pos: 15 },
-          barre: { type: 'barre', d: Math.round(+S.genDef.d * 1.6 + 2), lb: 60, dep: 2, dp: Math.round(+S.genDef.d), lp: 15, rot: 0, wTop: true, wBot: true },
+          barre: { type: 'barre', d: Math.round(+S.genDef.d * 1.6 + 2), lb: 60, dep: 2, dp: Math.round(+S.genDef.d), lp: 15, rot: 0, op: 'top' },
           deport: {
             type: 'deport',
             d: Math.max(2, Math.round(+S.genDef.d / 4)),
