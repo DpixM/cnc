@@ -11072,7 +11072,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v99',
+  const CIP_VER = 'CIP v100',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -15474,8 +15474,8 @@ function cip_build() {
             'G500',
             'G90',
             'G01 Z = 350 F10000 ;1. on ecarte la tete',
-            'G01 C1 = 0 ;2. C1 a 0 (le mandrin revient tout seul, tete loin)',
-            'G01 B = 0 Y = 200 ;3. tete en position de depart',
+            'G01 G90 C1 = 0 F5000 ;2. mandrin a 0 (tete degagee)',
+            'G01 B = 0 Y = 200 F10000 ;3. tete en position de depart',
             ';(prete pour la piece suivante)'
           ]),
       '',
@@ -15712,7 +15712,8 @@ function cip_build() {
           const a0 = toLst(V.sub(f0.p, V.mul(f0.d, 30 + DRYOFF)), f0.d, f0.th, o);
           B.push(
             'TRAFOOF',
-            `G01 G90 C1 = ${n3(q0.C)} F10000 ;le mandrin refait ses tours a l envers -> angle de depart`,
+            'G01 G90 C1 = 0 F5000 ;mandrin a 0 (tete degagee)',
+            ...(Math.abs(q0.C) > 1e-3 ? [`G01 G90 C1 = ${n3(q0.C)} F5000 ;angle de depart`] : []),
             `TC_SET_TRAFO("${o.trafo}")`,
             'TRAORI(1)',
             lstMv(a0) + ' ;au-dessus du depart',
@@ -15741,6 +15742,11 @@ function cip_build() {
           const ln = lstMv(toLst(sh(l.f), l.f.d, l.f.th, o), fx);
           if (ln !== B[B.length - 1]) B.push(ln); // pas 2 fois la même ligne
         });
+        // v100 : puis on dégage la tête -> le PARK met le mandrin à 0 et la tête en position de départ
+        if (W && !posMode) {
+          const fh = hm[hm.length - 1];
+          B.push(lstMv(toLst(V.sub(sh(fh), V.mul(fh.d, 30)), fh.d, fh.th, o), 'f5000') + " ;tete degagee de 30 mm dans l'axe du faisceau");
+        }
         B.push('');
       } else {
         const fl = F[F.length - 1];
@@ -15749,7 +15755,7 @@ function cip_build() {
         );
       }
     }
-    const park = !S.prog.home || (simpleEnd && !posMode);
+    const park = !S.prog.home || (simpleEnd && !posMode) || (W && !posMode); // v100 soudure : TOUJOURS mandrin à 0 à la fin
     // v98 : fin propre, dans l'ordre : 1. on écarte la tête  2. C1 à 0 (tout seul)  3. tête en position de départ
     const PARK = [
       // v99 : mêmes lignes qu'au début du programme (là où le C1 = 0 marche) : TC_RESET efface les décalages laissés par la trafo
@@ -15758,12 +15764,12 @@ function cip_build() {
       'G500',
       'G90',
       'G01 Z = 350 F10000 ;1. on ecarte la tete',
-      'G01 C1 = 0 ;2. C1 a 0 (le mandrin revient tout seul, tete loin)',
-      (o.trafo === 'Bc1' ? 'G01 B = 0 X =50 Y = 200' : 'G01 B = 0 Y = 200') + ' ;3. tete en position de depart',
+      'G01 G90 C1 = 0 F5000 ;2. mandrin a 0 (tete degagee)',
+      (o.trafo === 'Bc1' ? 'G01 B = 0 X =50 Y = 200 F10000' : 'G01 B = 0 Y = 200 F10000') + ' ;3. tete en position de depart',
       ';(prete pour la piece suivante)'
     ];
 
-    const ENDMV = simpleEnd ? (posMode ? [';(tout est revenu a la position de depart)'] : PARK) : null;
+    const ENDMV = posMode && simpleEnd ? [';(tout est revenu a la position de depart)'] : park && W ? PARK : simpleEnd ? PARK : null;
     if (W) {
       B.push(
         '',
