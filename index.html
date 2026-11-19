@@ -8447,10 +8447,23 @@ function cip_build() {
       if (nOut && V.dot(n, nOut) < 0) idx.push(a, c, b);
       else idx.push(a, b, c);
     };
+    // v97 barre en T : la tige (Ø pièce) et le petit bout qui dépasse (Ø ds) n'ont pas le même Ø -> tube en 2 tronçons
+    const TB = (def.bodies || []).find(b => b.type === 'barre');
+    let SEG = [[0, L, R]],
+      Rw = R;
+    if (TB) {
+      const rb = Math.max(0.5, +TB.d || 0) / 2,
+        dp0 = Math.max(0, +TB.dep || 0),
+        rs = +TB.ds > 0 ? +TB.ds / 2 : R,
+        fl = TB.op === 'bot',
+        y0 = fl ? dp0 + rb : L - dp0 - rb;
+      if (y0 > 0 && y0 < L) SEG = fl ? [[0, y0, rs], [y0, L, R]] : [[0, y0, R], [y0, L, rs]];
+      Rw = fl ? R : rs; // Ø du côté soudé (vers le bout libre)
+      if (Ri > Math.min(R, rs) - 0.05) Ri = 0;
+    }
     // tube de la pièce (peau ext., alésage, 2 bouts)
     {
-      const NA = 96,
-        NY = Math.max(2, Math.ceil(L / 6));
+      const NA = 96;
       const ring = (r, y) => {
         const o = [];
         for (let k = 0; k < NA; k++) {
@@ -8459,15 +8472,17 @@ function cip_build() {
         }
         return o;
       };
-      for (const [r, sgn] of solid
-        ? [[R, 1]]
+      for (const [ya, yb2, rs0] of SEG)
+      for (const [r, sgn] of Ri < 0.05
+        ? [[rs0, 1]]
         : [
-            [R, 1],
+            [rs0, 1],
             [Ri, -1]
           ]) {
-        let prev = ring(r, 0);
+        const NY = Math.max(2, Math.ceil((yb2 - ya) / 6));
+        let prev = ring(r, ya);
         for (let j = 1; j <= NY; j++) {
-          const cur = ring(r, (L * j) / NY);
+          const cur = ring(r, ya + ((yb2 - ya) * j) / NY);
           for (let k = 0; k < NA; k++) {
             const k2 = (k + 1) % NA;
             const t = (2 * Math.PI * (k + 0.5)) / NA;
@@ -8482,8 +8497,8 @@ function cip_build() {
         [0, -1],
         [L, 1]
       ]) {
-        const o = ring(R, y);
-        if (solid) {
+        const o = ring(y < L / 2 ? SEG[0][2] : SEG[SEG.length - 1][2], y);
+        if (Ri < 0.05) {
           // face pleine : éventail autour du centre
           const c = vtx([0, y, 0]);
           for (let k = 0; k < NA; k++) tri(c, o[k], o[(k + 1) % NA], [0, sg, 0]);
@@ -8565,11 +8580,12 @@ function cip_build() {
           dep = Math.max(0, +b.dep || 0),
           rp = Math.min(Rb, Math.max(0.2, (+b.dp || 2 * Rb) / 2)),
           lp = Math.max(0, Math.min(Lb / 2 - R - 0.5, +b.lp || 0));
-        if (!(Rb > R + 0.3)) {
-          err = 'Barre ' + (bi + 1) + ' : son Ø doit être plus grand que le Ø du tube qui la traverse.';
+        const Rs = +b.ds > 0 ? +b.ds / 2 : R;
+        if (!(Rb > Math.max(R, Rs) + 0.3)) {
+          err = 'Barre ' + (bi + 1) + ' : son Ø doit être plus grand que le Ø de la tige et du bout qui dépasse.';
           return;
         }
-        if (!(Lb > 2 * R + 1)) {
+        if (!(Lb > 2 * Math.max(R, Rs) + 1)) {
           err = 'Barre ' + (bi + 1) + ' : elle est plus courte que le Ø du tube.';
           return;
         }
@@ -8618,21 +8634,21 @@ function cip_build() {
           const c = vtx(V.add(C0, V.mul(e1, prof[j][0])));
           for (let k = 0; k < NA; k++) tri(c, rings[j][k], rings[j][(k + 1) % NA], V.mul(e1, sg));
         }
-        const n = Math.max(144, Math.ceil((2 * Math.PI * R) / 0.3));
+        const n = Math.max(144, Math.ceil((2 * Math.PI * Rw) / 0.3));
         const mk = s => {
           const P = [],
             NB = [];
           for (let k = 0; k < n; k++) {
             const t = (2 * Math.PI * k) / n;
-            const x = R * Math.cos(t),
-              z = R * Math.sin(t);
+            const x = Rw * Math.cos(t),
+              z = Rw * Math.sin(t); // v97 : rayon du côté soudé (bout qui dépasse en op 1, tige en op 2)
             const dy = s * Math.sqrt(Math.max(0, Rb * Rb - z * z));
             P.push(RT([x, yc + dy, z]));
             NB.push(V.nrm(RT([0, dy, z]))); // normale de la barre, vers l'extérieur
           }
           return { P, NB, ax: e1, c: C0, r: Rb, t0: -Lb / 2, t1: Lb / 2, noCut: true, keepIdeal: true };
         };
-        info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot, flip };
+        info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot, flip, Rs, Rw };
         seams.push(mk(1)); // la soudure est toujours côté bout libre (op 1 : autour du bout ; op 2 : autour de la tige)
         return;
       }
@@ -8837,7 +8853,7 @@ function cip_build() {
         });
     });
     if (err) return { err };
-    return { pos: new Float32Array(pos), idx: new Uint32Array(idx), seams, info, R, Ri, L };
+    return { pos: new Float32Array(pos), idx: new Uint32Array(idx), seams, info, R, Ri, L, Rw };
   }
   // coutures -> même format que la lecture STEP (cip_geo.program), après placement de la pièce sur le tube
   function genSeams(isWeld) {
@@ -8973,7 +8989,7 @@ function cip_build() {
     }
     S.geoC = null;
     S.cfg.prof = 'rond';
-    S.cfg.d = def.d;
+    S.cfg.d = r.Rw && Math.abs(r.Rw - r.R) > 1e-6 ? +(2 * r.Rw).toFixed(3) : def.d; // v97 T : collisions sur le Ø du côté soudé
     S.cfg.ep = def.ep;
     syncForm();
     $('cipFitBtn').disabled = false;
@@ -9004,7 +9020,8 @@ function cip_build() {
           let h = `<div class="cipGB" data-i="${i}"><div class="cipRow" style="justify-content:space-between;margin:0 0 4px"><b style="font-size:13px">${i + 1}. ${T}</b><button class="cipBtn" style="padding:1px 7px" data-del="${i}" data-tip="Enlever ce corps.">✕</button></div>`;
           if (b.type === 'barre')
             h +=
-              f('d', 'Ø de la barre', b.d, 'Diamètre de la barre (mm). Plus gros que le tube qui la traverse.', 0.1) +
+              f('d', 'Ø de la barre', b.d, 'Diamètre de la barre (mm). Plus gros que la tige et que le bout qui dépasse.', 0.1) +
+              f('ds', 'Ø du bout qui dépasse', b.ds > 0 ? b.ds : D.d, 'Ø du petit bout qui ressort de la barre (mm). Le Ø du tube de la pièce = Ø de la longue tige.', 0.01) +
               f('lb', 'Longueur de la barre', b.lb, 'Longueur totale de la barre, pointes comprises (mm).', 0.5) +
               f(
                 'dep',
@@ -11045,7 +11062,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v96',
+  const CIP_VER = 'CIP v97',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -17910,7 +17927,7 @@ function cip_build() {
             d: 8,
             ep: 4,
             L: 100,
-            bodies: [{ type: 'barre', d: 14, lb: 70, dep: 2, dp: 8, lp: 18, rot: 0, op: 'top' }]
+            bodies: [{ type: 'barre', d: 14, lb: 70, dep: 2, ds: 8, dp: 8, lp: 18, rot: 0, op: 'top' }]
           };
           genRender();
           genApply(true);
@@ -17999,7 +18016,7 @@ function cip_build() {
           rond: { type: 'rond', d: 20, h: 50, ang: 90, pos: 30 + 25 * n, exc: 0, rot: 0, trav: false },
           plat: { type: 'plat', w: 40, t: 5, h: 40, ang: 90, pos: 40, exc: 0, rot: 90, trav: false },
           bride: { type: 'bride', d: +S.genDef.d + 30, t: 4, pos: 15 },
-          barre: { type: 'barre', d: Math.round(+S.genDef.d * 1.6 + 2), lb: 60, dep: 2, dp: Math.round(+S.genDef.d), lp: 15, rot: 0, op: 'top' },
+          barre: { type: 'barre', d: Math.round(+S.genDef.d * 1.6 + 2), lb: 60, dep: 2, ds: +S.genDef.d, dp: Math.round(+S.genDef.d), lp: 15, rot: 0, op: 'top' },
           deport: {
             type: 'deport',
             d: Math.max(2, Math.round(+S.genDef.d / 4)),
