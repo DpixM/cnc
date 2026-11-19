@@ -2944,6 +2944,10 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="10" y="74" width="180" height="28" rx="4" fill="#9aa5ae"/><rect x="10" y="83" width="180" height="10" fill="#7d8890"/><rect x="88" y="16" width="26" height="62" rx="2" fill="#b9c3cb" transform="rotate(20 101 76)"/><rect x="140" y="40" width="10" height="36" fill="#b9c3cb"/><path d="M78 76q22-8 44 0" stroke="#ffb74d" stroke-width="4" fill="none"/><circle cx="40" cy="40" r="16" fill="none" stroke="#f5a623" stroke-width="4"/><path d="M40 28v24M28 40h24" stroke="#f5a623" stroke-width="4"/></svg>
           <b>🛠 Créer ma pièce</b><span>Un tube + des piquages, ronds, plats, une bride ou un plot déporté, en tapant juste les cotes. Ligne de soudure exacte.</span>
         </button>
+        <button class="cipCard" id="cipCardTee" onclick="cip_ui('parttee')" data-tip="Poignée en T : un tube (ou un rond) qui TRAVERSE une barre, le bout dépasse un peu au-dessus. Tu tapes les cotes, le soft calcule les 2 soudures (dessus et dessous de la barre).">
+          <svg viewBox="0 0 200 130" aria-hidden="true"><rect x="88" y="44" width="24" height="84" rx="2" fill="#9aa5ae"/><path d="M22 30 L48 22 H152 L178 30 V46 L152 54 H48 L22 46 Z" fill="#b9c3cb"/><rect x="92" y="12" width="16" height="12" fill="#c9d1d8"/><path d="M90 24q10 5 20 0" stroke="#f5a623" stroke-width="4" fill="none"/><path d="M88 55q12 5 24 0" stroke="#f5a623" stroke-width="4" fill="none"/></svg>
+          <b>⊤ Poignée en T</b><span>Un tube qui traverse une barre, le bout dépasse. Soudure dessus et dessous calculée exacte.</span>
+        </button>
         <button class="cipCard" id="cipCardDep" onclick="cip_ui('partdeport')" data-tip="Un cylindre (ou un tube) avec un petit cylindre posé sur sa face du bout, axe parallèle mais DÉCALÉ du centre. Tu tapes les cotes (Ø, hauteur, déport), le soft fait le CIP : le mandrin tourne, X/Y/Z suivent le cercle décalé. Soudure ou découpe, mandrin à plat ou à 90°.">
           <svg viewBox="0 0 200 130" aria-hidden="true"><ellipse cx="100" cy="112" rx="58" ry="12" fill="#7d8890"/><rect x="42" y="62" width="116" height="50" fill="#9aa5ae"/><ellipse cx="100" cy="62" rx="58" ry="12" fill="#b9c3cb"/><line x1="100" y1="20" x2="100" y2="124" stroke="#66bb6a" stroke-width="2" stroke-dasharray="5 4"/><rect x="118" y="24" width="22" height="38" fill="#c9d1d8"/><ellipse cx="129" cy="24" rx="11" ry="4" fill="#dde3e8"/><ellipse cx="129" cy="62" rx="11" ry="4" fill="none" stroke="#f5a623" stroke-width="3"/><line x1="100" y1="16" x2="129" y2="16" stroke="#f5a623" stroke-width="2"/></svg>
           <b>⊙ Pièce déportée</b><span>Un cylindre + un plot posé sur sa face, décalé du centre. Tu tapes les cotes, le CIP se fait tout seul.</span>
@@ -3017,7 +3021,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNum cipGK" data-hk="T:L"><span>Longueur de la pièce (mm)</span><input type="number" id="cipGTL" value="120" min="10" step="1" oninput="cip_ui('gen')"></div>
           <div class="cipSub">CE QU'ON SOUDE DESSUS</div>
           <div id="cipGBodies"></div>
-          <div class="cipRow"><button class="cipBtn" onclick="cip_ui('genadd','rond')">+ Tube / rond</button><button class="cipBtn" onclick="cip_ui('genadd','plat')">+ Plat</button><button class="cipBtn" onclick="cip_ui('genadd','bride')">+ Bride</button><button class="cipBtn" onclick="cip_ui('genadd','deport')">+ Déporté</button></div>
+          <div class="cipRow"><button class="cipBtn" onclick="cip_ui('genadd','rond')">+ Tube / rond</button><button class="cipBtn" onclick="cip_ui('genadd','plat')">+ Plat</button><button class="cipBtn" onclick="cip_ui('genadd','bride')">+ Bride</button><button class="cipBtn" onclick="cip_ui('genadd','deport')">+ Déporté</button><button class="cipBtn" onclick="cip_ui('genadd','barre')">+ Barre en T</button></div>
           <div class="cipStat" id="cipGMsg"></div>
           <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : réglages →</button></div>
         </div>
@@ -8553,6 +8557,84 @@ function cip_build() {
         info[bi] = { type: 'bride', yb, Rb, y1, y2 };
         return;
       }
+      if (b.type === 'barre') {
+        // v95 BARRE EN T : barre transversale traversée par le tube (poignée en T). Le bout du tube dépasse au-dessus de la barre.
+        // Jonctions = intersection du tube (rayon R, axe y) et de la barre (rayon Rb, axe perpendiculaire) : 2 courbes « selle ».
+        const Rb = Math.max(0.5, +b.d || 0) / 2,
+          Lb = Math.max(1, +b.lb || 0),
+          dep = Math.max(0, +b.dep || 0),
+          rp = Math.min(Rb, Math.max(0.2, (+b.dp || 2 * Rb) / 2)),
+          lp = Math.max(0, Math.min(Lb / 2 - R - 0.5, +b.lp || 0));
+        if (!(Rb > R + 0.3)) {
+          err = 'Barre ' + (bi + 1) + ' : son Ø doit être plus grand que le Ø du tube qui la traverse.';
+          return;
+        }
+        if (!(Lb > 2 * R + 1)) {
+          err = 'Barre ' + (bi + 1) + ' : elle est plus courte que le Ø du tube.';
+          return;
+        }
+        const yc = L - dep - Rb;
+        if (yc - Rb < 1) {
+          err = 'Barre ' + (bi + 1) + ' : la pièce est trop courte pour la barre (augmente la longueur).';
+          return;
+        }
+        const e1 = RT([1, 0, 0]),
+          e2 = [0, 1, 0],
+          e3 = RT([0, 0, 1]);
+        const C0 = RT([0, yc, 0]);
+        const NA = 96;
+        // profil le long de la barre : cylindre + pointes (cône jusqu'au Ø des pointes), bouts plats
+        const prof = [
+          [-Lb / 2, rp],
+          [-Lb / 2 + lp, Rb],
+          [Lb / 2 - lp, Rb],
+          [Lb / 2, rp]
+        ];
+        const rings = prof.map(([s, r]) => {
+          const o = [];
+          for (let k = 0; k < NA; k++) {
+            const t = (2 * Math.PI * k) / NA;
+            o.push(vtx(V.add(C0, V.add(V.mul(e1, s), V.add(V.mul(e2, r * Math.cos(t)), V.mul(e3, r * Math.sin(t)))))));
+          }
+          return o;
+        });
+        for (let j = 0; j + 1 < rings.length; j++) {
+          if (Math.abs(prof[j + 1][0] - prof[j][0]) < 1e-6) continue;
+          for (let k = 0; k < NA; k++) {
+            const k2 = (k + 1) % NA;
+            const t = (2 * Math.PI * (k + 0.5)) / NA;
+            const nn = V.add(V.mul(e2, Math.cos(t)), V.mul(e3, Math.sin(t)));
+            tri(rings[j][k], rings[j][k2], rings[j + 1][k], nn);
+            tri(rings[j][k2], rings[j + 1][k2], rings[j + 1][k], nn);
+          }
+        }
+        for (const [j, sg] of [
+          [0, -1],
+          [rings.length - 1, 1]
+        ]) {
+          const c = vtx(V.add(C0, V.mul(e1, prof[j][0])));
+          for (let k = 0; k < NA; k++) tri(c, rings[j][k], rings[j][(k + 1) % NA], V.mul(e1, sg));
+        }
+        const n = Math.max(144, Math.ceil((2 * Math.PI * R) / 0.3));
+        const mk = s => {
+          const P = [],
+            NB = [];
+          for (let k = 0; k < n; k++) {
+            const t = (2 * Math.PI * k) / n;
+            const x = R * Math.cos(t),
+              z = R * Math.sin(t);
+            const dy = s * Math.sqrt(Math.max(0, Rb * Rb - z * z));
+            P.push(RT([x, yc + dy, z]));
+            NB.push(V.nrm(RT([0, dy, z]))); // normale de la barre, vers l'extérieur
+          }
+          return { P, NB, ax: e1, c: C0, r: Rb, t0: -Lb / 2, t1: Lb / 2, noCut: true, keepIdeal: true };
+        };
+        info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot };
+        if (b.wTop !== false) seams.push(mk(1)); // dessus : là où le bout ressort
+        if (b.wBot !== false) seams.push(mk(-1)); // dessous : côté mandrin
+        if (b.wTop === false && b.wBot === false) err = 'Barre ' + (bi + 1) + ' : coche au moins une soudure (dessus ou dessous).';
+        return;
+      }
       if (b.type === 'deport') {
         // CORPS DÉPORTÉ : cylindre posé sur la face du bout libre, axe PARALLÈLE à l'axe du mandrin mais décalé du centre.
         // La jonction = un cercle sur la face (pas centré sur l'axe) -> le mandrin tourne, X/Y/Z suivent (TRAORI).
@@ -8814,6 +8896,7 @@ function cip_build() {
         NB,
         W: P.map(() => true),
         body: { c: XP(s.c), ax, r: s.r, t0: s.t0 !== undefined ? s.t0 : -500, t1: s.t1 !== undefined ? s.t1 : 500 },
+        keepIdeal: !!s.keepIdeal, // v95 barre en T : on garde l'angle idéal s'il passe (1 seule passe)
         NS: s.NS ? P.map(() => XV(s.NS)) : null, // corps déporté : la surface de base est la FACE du bout (pas le tube)
         mode: 'fixe',
         A: 0,
@@ -8836,7 +8919,7 @@ function cip_build() {
   }
   function genMemSave() {
     const k = S.genKind;
-    if (k !== 'create' && k !== 'deport') return;
+    if (k !== 'create' && k !== 'deport' && k !== 'tee') return;
     S.genMem = S.genMem || {};
     S.genMem[k] = JSON.parse(JSON.stringify(S.genDef));
     try {
@@ -8914,10 +8997,27 @@ function cip_build() {
             rond: 'Tube / rond piqué',
             plat: 'Plat / gousset',
             bride: 'Bride / collerette',
-            deport: 'Déporté sur la face du bout'
+            deport: 'Déporté sur la face du bout',
+            barre: 'Barre en T (traversée par le tube)'
           }[b.type];
           let h = `<div class="cipGB" data-i="${i}"><div class="cipRow" style="justify-content:space-between;margin:0 0 4px"><b style="font-size:13px">${i + 1}. ${T}</b><button class="cipBtn" style="padding:1px 7px" data-del="${i}" data-tip="Enlever ce corps.">✕</button></div>`;
-          if (b.type === 'deport')
+          if (b.type === 'barre')
+            h +=
+              f('d', 'Ø de la barre', b.d, 'Diamètre de la barre (mm). Plus gros que le tube qui la traverse.', 0.1) +
+              f('lb', 'Longueur de la barre', b.lb, 'Longueur totale de la barre, pointes comprises (mm).', 0.5) +
+              f(
+                'dep',
+                'Le bout dépasse de',
+                b.dep,
+                'De combien le bout du tube ressort au-dessus de la barre (mm). 0 = au ras.',
+                0.1
+              ) +
+              f('dp', 'Ø au bout des pointes', b.dp, 'Ø aux 2 bouts de la barre (= Ø de la barre : pas de pointe).', 0.1) +
+              f('lp', 'Longueur des pointes', b.lp, 'Longueur du cône à chaque bout (0 = pas de pointe).', 0.5) +
+              f('rot', 'Tour autour (°)', b.rot, 'Sens de la barre vu au départ : 0 = en travers devant la tête, 90 = tournée.') +
+              `<label class="cipChk cipGK" data-hk="${i}:wTop"><input type="checkbox" data-k="wTop" ${b.wTop !== false ? 'checked' : ''}> Souder le dessus (autour du bout qui dépasse)</label>` +
+              `<label class="cipChk cipGK" data-hk="${i}:wBot"><input type="checkbox" data-k="wBot" ${b.wBot !== false ? 'checked' : ''}> Souder le dessous (côté mandrin)</label>`;
+          else if (b.type === 'deport')
             h +=
               f('d', 'Ø', b.d, 'Diamètre du cylindre déporté (mm).', 0.1) +
               f('h', 'Hauteur', b.h, 'Hauteur du cylindre déporté au-dessus de la face (mm).') +
@@ -10390,6 +10490,7 @@ function cip_build() {
       I = Gn.info && Gn.info[bi],
       b = D.bodies[bi];
     if (!I || !b) return;
+    if (I.type === 'barre') return;
     if (I.type === 'bride') {
       if (k === 'd') {
         line(ring([0, I.yb, 0], Z, X, I.Rb, 0, 360, 128), true);
@@ -10937,8 +11038,8 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v94',
-    CIP_DATE = '23/10/2026';
+  const CIP_VER = 'CIP v95',
+    CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
     if (e) {
@@ -14073,7 +14174,7 @@ function cip_build() {
           let opt = null;
           // corps déporté (cercle sur une face plate) : l'angle idéal passe ? on le garde tel quel (l'optimiseur, fait
           // pour les piquages sur tube, couchait la tête pour freiner le mandrin, alors que rien ne touche)
-          const faceOk = fIn && !DD.some((d, i) => i % 3 === 0 && clearance(PP[i], d, true) < 0.5);
+          const faceOk = (fIn || c.keepIdeal) && !DD.some((d, i) => i % 3 === 0 && clearance(PP[i], d, true) < 0.5);
           if (optOn && !faceOk) {
             const h = hp();
             const ph = p => Math.atan2(p[2], p[0]) / DEG;
@@ -17792,6 +17893,22 @@ function cip_build() {
         showWork('prep');
         cip_ui('demo');
         return;
+      } else if (a === 'parttee') {
+        // v95 : « Créer ma pièce » réglé pour une poignée en T (tube + barre traversée, le bout dépasse)
+        mtLeave();
+        showWork('build');
+        if (S.genKind !== 'tee' || !(S.part && S.part.gen)) {
+          S.genKind = 'tee';
+          S.genDef = genMemLoad('tee') || {
+            d: 8,
+            ep: 4,
+            L: 100,
+            bodies: [{ type: 'barre', d: 14, lb: 70, dep: 2, dp: 8, lp: 18, rot: 0, wTop: true, wBot: true }]
+          };
+          genRender();
+          genApply(true);
+        } else genRender();
+        return;
       } else if (a === 'partdeport') {
         // raccourci : « Créer ma pièce » déjà réglé pour une pièce déportée (rond plein + plot décalé sur la face du bout)
         mtLeave();
@@ -17875,6 +17992,7 @@ function cip_build() {
           rond: { type: 'rond', d: 20, h: 50, ang: 90, pos: 30 + 25 * n, exc: 0, rot: 0, trav: false },
           plat: { type: 'plat', w: 40, t: 5, h: 40, ang: 90, pos: 40, exc: 0, rot: 90, trav: false },
           bride: { type: 'bride', d: +S.genDef.d + 30, t: 4, pos: 15 },
+          barre: { type: 'barre', d: Math.round(+S.genDef.d * 1.6 + 2), lb: 60, dep: 2, dp: Math.round(+S.genDef.d), lp: 15, rot: 0, wTop: true, wBot: true },
           deport: {
             type: 'deport',
             d: Math.max(2, Math.round(+S.genDef.d / 4)),
