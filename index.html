@@ -8634,21 +8634,30 @@ function cip_build() {
           const c = vtx(V.add(C0, V.mul(e1, prof[j][0])));
           for (let k = 0; k < NA; k++) tri(c, rings[j][k], rings[j][(k + 1) % NA], V.mul(e1, sg));
         }
-        const n = Math.max(144, Math.ceil((2 * Math.PI * Rw) / 0.3));
+        // v98 : élargir le parcours. + = le tour grossit (posé sur la barre, plus loin du petit tube) ;
+        // − = le parcours remonte sur le tube soudé (vers le bout libre). 0 = pile dans l'angle.
+        const ofs = +b.ofs || 0,
+          Ro = Rw + Math.max(0, ofs),
+          up = Math.max(0, -ofs);
+        if (!(Ro < Rb - 0.2)) {
+          err = 'Barre ' + (bi + 1) + ' : « élargir » trop grand, le parcours sort de la barre (max ' + (Rb - Rw - 0.2).toFixed(2) + ' mm).';
+          return;
+        }
+        const n = Math.max(144, Math.ceil((2 * Math.PI * Ro) / 0.3));
         const mk = s => {
           const P = [],
             NB = [];
           for (let k = 0; k < n; k++) {
             const t = (2 * Math.PI * k) / n;
-            const x = Rw * Math.cos(t),
-              z = Rw * Math.sin(t); // v97 : rayon du côté soudé (bout qui dépasse en op 1, tige en op 2)
+            const x = Ro * Math.cos(t),
+              z = Ro * Math.sin(t); // v97 : rayon du côté soudé (bout qui dépasse en op 1, tige en op 2) ; v98 : + élargir
             const dy = s * Math.sqrt(Math.max(0, Rb * Rb - z * z));
-            P.push(RT([x, yc + dy, z]));
+            P.push(RT([x, yc + dy + s * up, z]));
             NB.push(V.nrm(RT([0, dy, z]))); // normale de la barre, vers l'extérieur
           }
           return { P, NB, ax: e1, c: C0, r: Rb, t0: -Lb / 2, t1: Lb / 2, noCut: true, keepIdeal: true };
         };
-        info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot, flip, Rs, Rw };
+        info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot, flip, Rs, Rw, ofs };
         seams.push(mk(1)); // la soudure est toujours côté bout libre (op 1 : autour du bout ; op 2 : autour de la tige)
         return;
       }
@@ -9030,6 +9039,7 @@ function cip_build() {
                 'De combien le bout du tube ressort au-dessus de la barre (mm). 0 = au ras.',
                 0.1
               ) +
+              f('ofs', 'Élargir le parcours', b.ofs || 0, 'Décale le tour de soudure (mm).\n+ = le tour grossit : il se pose sur la barre, plus loin du tube soudé.\n− = il remonte sur le tube soudé (vers le bout libre).\n0 = pile dans l\'angle.', 0.05) +
               f('dp', 'Ø au bout des pointes', b.dp, 'Ø aux 2 bouts de la barre (= Ø de la barre : pas de pointe).', 0.1) +
               f('lp', 'Longueur des pointes', b.lp, 'Longueur du cône à chaque bout (0 = pas de pointe).', 0.5) +
               f('rot', 'Tour autour (°)', b.rot, 'Sens de la barre vu au départ : 0 = en travers devant la tête, 90 = tournée.') +
@@ -11062,7 +11072,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v97',
+  const CIP_VER = 'CIP v98',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -15459,10 +15469,10 @@ function cip_build() {
       ...(posMode
         ? [';(tout est revenu a la position de depart)']
         : [
-            'G01 Z = 350 F10000 ;tete en haut',
-            'G01 B = 0 C1 =0',
-            'G01 Y = 200',
-            ';(position de depart du gabarit : prete pour la piece suivante)'
+            'G01 Z = 350 F10000 ;1. on ecarte la tete',
+            'G01 C1 = 0 ;2. C1 a 0 (le mandrin revient tout seul, tete loin)',
+            'G01 B = 0 Y = 200 ;3. tete en position de depart',
+            ';(prete pour la piece suivante)'
           ]),
       '',
       'TC_LASER_REQUEST(0)',
@@ -15736,11 +15746,12 @@ function cip_build() {
       }
     }
     const park = !S.prog.home || (simpleEnd && !posMode);
+    // v98 : fin propre, dans l'ordre : 1. on écarte la tête  2. C1 à 0 (tout seul)  3. tête en position de départ
     const PARK = [
-      'G01 Z = 350 F10000 ;tete en haut',
-      'G01 B = 0 C1 =0',
-      o.trafo === 'Bc1' ? 'G01 X =50 Y = 200' : 'G01 Y = 200',
-      ';(position de depart du gabarit : prete pour la piece suivante)'
+      'G01 Z = 350 F10000 ;1. on ecarte la tete',
+      'G01 C1 = 0 ;2. C1 a 0 (le mandrin revient tout seul, tete loin)',
+      (o.trafo === 'Bc1' ? 'G01 B = 0 X =50 Y = 200' : 'G01 B = 0 Y = 200') + ' ;3. tete en position de depart',
+      ';(prete pour la piece suivante)'
     ];
 
     const ENDMV = simpleEnd ? (posMode ? [';(tout est revenu a la position de depart)'] : PARK) : null;
@@ -15755,10 +15766,7 @@ function cip_build() {
         ...(ENDMV
           ? ENDMV
           : park
-            ? [
-                o.trafo === 'Bc1' ? 'G01 X =50 Y = 200 F10000' : 'G01 Y = 200 C1 =0 F10000',
-                o.trafo === 'Bc1' ? 'G01 Z = 350 B = 0 C1 =0' : 'G01 Z = 350 B = 0'
-              ]
+            ? PARK
             : [';(tete laissee sur le point de depart, prete pour la piece suivante)']),
         '',
         'TC_AUX_LIGHT(5,0)',
