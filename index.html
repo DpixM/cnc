@@ -11080,7 +11080,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v104',
+  const CIP_VER = 'CIP v105',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -14586,7 +14586,7 @@ function cip_build() {
         // v103 : tête en zone sûre AVANT de tourner le mandrin (une barre en T balaie large)
         out.push({ t: 'G01 SUPA Z = 350 F10000 ;tete en zone sure avant de tourner le mandrin', s: f.s });
         out.push({
-          t: `G01 G90 C1 = ${n3(Cs[Cs.length - 1])} F5000 ;le mandrin refait ses tours a l envers (tete en zone sure)`,
+          t: `G01 G90 C1 = ${n3(Cs[Cs.length - 1])} F10000 ;2. mandrin a 0 (tete en zone sure)`,
           s: xl.s
         });
         out.push({ t: `TC_SET_TRAFO("${o.trafo}")`, s: xl.s }, { t: 'TRAORI(1)', s: xl.s });
@@ -15511,7 +15511,7 @@ function cip_build() {
             'G500',
             'G90',
             'G01 Z = 350 F10000 ;1. on ecarte la tete',
-            'G01 G90 C1 = 0 F5000 ;2. mandrin a 0 (tete degagee)',
+            'G01 G90 C1 = 0 F10000 ;2. mandrin a 0 (tete degagee)',
             'G01 B = 0 Y = 200 F10000 ;3. tete en position de depart',
             ';(prete pour la piece suivante)'
           ]),
@@ -15744,7 +15744,7 @@ function cip_build() {
     };
     const unwind = arr => {
       const c = lastC(arr);
-      return ['G01 G90 C1 = 0 F5000 ;mandrin a 0 (tete degagee)']; // v103 : le déroulé relatif est ajouté par relUnwind
+      return ['G01 G90 C1 = 0 F10000 ;2. mandrin a 0 (tete degagee)']; // v103 : le déroulé relatif est ajouté par relUnwind
     };
     // v103 SET_POS : fin = tête en zone sûre (Z 350 machine), mandrin à 0, puis la pointe revient sur le départ
     const posTail = () => {
@@ -15801,7 +15801,7 @@ function cip_build() {
         });
         // v100 : puis on dégage la tête -> le PARK met le mandrin à 0 et la tête en position de départ
         // v103 : si le retour a déjà remis le mandrin (tête en zone sûre) et posé la pointe sur le départ, on ne refait pas tout
-        const hadSpin = HL.some(l => l.t && /C1\s*=/.test(l.t));
+        const hadSpin = HL.some(l => l.t === 'TRAFOOF'); // v105 : vrai seulement si le retour a fait TRAFOOF + C1
         if (W && !(posMode && hadSpin)) {
           const fh = hm[hm.length - 1];
           B.push(lstMv(toLst(V.sub(sh(fh), V.mul(fh.d, 30)), fh.d, fh.th, o), 'f5000') + " ;tete degagee de 30 mm dans l'axe du faisceau");
@@ -15835,6 +15835,7 @@ function cip_build() {
         '',
         ';----- fin de programme -----',
         'TRAFOOF',
+        ...(posMode ? ['G01 G90 C1 = 0 F10000 ;mandrin a 0 (securite : deja a 0, ne bouge pas)'] : []), // v105
         '',
         'G500',
         'G90',
