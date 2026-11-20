@@ -3096,6 +3096,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div id="cipWeldOpts" style="display:none">
           <div class="cipNum"><span>Soudure : recouvrement (°)</span><input type="number" id="cipWOv" value="10" min="0" step="1" onchange="cip_ui('proc')"></div>
           <div class="cipNum"><span>Soudure : pente de fin (°)</span><input type="number" id="cipWRamp" value="20" min="0" step="1" onchange="cip_ui('proc')"></div>
+          <div class="cipNum" id="cipWOfsRow" style="display:none" data-tip="Poignée en T : décale le tour de soudure (mm).\n+ = le tour grossit : il se pose sur la barre, plus loin du tube soudé.\n− = il remonte sur le tube soudé (vers le bout libre).\n0 = pile dans l'angle."><span>Soudure : élargir le parcours (mm)</span><input type="number" id="cipWOfs" value="0" step="0.05" onchange="cip_ui('wofs')"></div>
           <label class="cipChk"><input type="checkbox" id="cipWOpt" checked onchange="cip_ui('proc')"> Incliner la tête tout seul pour ne rien toucher</label>
           <div class="cipNum"><span>Écart max à l'angle idéal (°)</span><input type="number" id="cipWMaxDev" value="60" min="0" max="75" step="5" onchange="cip_ui('proc')"></div>
           </div>
@@ -8100,6 +8101,13 @@ function cip_build() {
     w.classList.toggle('cipHasGen', !!(S.part && S.part.gen));
     w.classList.toggle('cipCutMode', S.genKind === 'cut');
     w.classList.toggle('cipHasDet', !!(S.part && S.part.det));
+    // v101 : « élargir le parcours » aussi dans Passages (poignée en T)
+    const tb = S.part && S.part.gen && S.genDef && (S.genDef.bodies || []).find(b => b.type === 'barre');
+    const row = $('cipWOfsRow');
+    if (row) {
+      row.style.display = W && tb ? '' : 'none';
+      if (tb && document.activeElement !== $('cipWOfs')) $('cipWOfs').value = +tb.ofs || 0;
+    }
   }
   function syncProc() {
     try {
@@ -11072,7 +11080,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v100',
+  const CIP_VER = 'CIP v101',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -17940,6 +17948,14 @@ function cip_build() {
         showWork('prep');
         cip_ui('demo');
         return;
+      } else if (a === 'wofs') {
+        const tb = S.genDef && (S.genDef.bodies || []).find(b => b.type === 'barre');
+        if (tb) {
+          tb.ofs = +$('cipWOfs').value || 0;
+          const inp = document.querySelector('#cipGBodies input[data-k="ofs"]');
+          if (inp) inp.value = tb.ofs;
+          genSoon();
+        }
       } else if (a === 'parttee') {
         // v95 : « Créer ma pièce » réglé pour une poignée en T (tube + barre traversée, le bout dépasse)
         mtLeave();
