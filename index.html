@@ -8661,6 +8661,7 @@ function cip_build() {
           err = 'Barre ' + (bi + 1) + ' : « élargir » trop grand, le parcours sort de la barre (max ' + (Rb - Rw - 0.2).toFixed(2) + ' mm).';
           return;
         }
+        const PLAT = b.ofm !== 'barre';
         const n = Math.max(144, Math.ceil((2 * Math.PI * Ro) / 0.3));
         const mk = s => {
           const P = [],
@@ -8669,9 +8670,12 @@ function cip_build() {
             const t = (2 * Math.PI * k) / n;
             const x = Ro * Math.cos(t),
               z = Ro * Math.sin(t); // v97 : rayon du côté soudé (bout qui dépasse en op 1, tige en op 2) ; v98 : + élargir
-            const dy = s * Math.sqrt(Math.max(0, Rb * Rb - z * z));
+            // v111 : élargir « à plat » (par défaut) = on s'écarte du tube À LA HAUTEUR DU JOINT
+            // (sur les côtés de la barre, la surface plonge : « sur la barre » faisait descendre trop bas à C1 ±90°)
+            const zj = PLAT ? Rw * Math.sin(t) : z;
+            const dy = s * Math.sqrt(Math.max(0, Rb * Rb - zj * zj));
             P.push(RT([x, yc + dy + s * up, z]));
-            NB.push(V.nrm(RT([0, dy, z]))); // normale de la barre, vers l'extérieur
+            NB.push(V.nrm(RT([0, dy, zj]))); // normale de la barre, vers l'extérieur
           }
           return {
             P,
@@ -8683,7 +8687,7 @@ function cip_build() {
             t1: Lb / 2,
             noCut: true,
             keepIdeal: true,
-            bar: { c: C0, e1, e3, Rw, Ro, Rb, s, up, ofs: Math.max(-Rw + 0.3, ofs) } // v107 : pour retrouver le point « pile dans l'angle » (SET_POS)
+            bar: { c: C0, e1, e3, Rw, Ro, Rb, s, up, ofs: Math.max(-Rw + 0.3, ofs), plat: PLAT } // v107 / v111 plat : pour retrouver le point « pile dans l'angle » (SET_POS)
           };
         };
         info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot, flip, Rs, Rw, ofs, rp, lp, e1, e3 };
@@ -9081,7 +9085,8 @@ function cip_build() {
               f('dp', 'Ø au bout des pointes', b.dp, 'Ø aux 2 bouts de la barre (= Ø de la barre : pas de pointe).', 0.1) +
               f('lp', 'Longueur des pointes', b.lp, 'Longueur du cône à chaque bout (0 = pas de pointe).', 0.5) +
               f('rot', 'Tour autour (°)', b.rot, 'Sens de la barre vu au départ : 0 = en travers devant la tête, 90 = tournée.') +
-              `<div class="cipNum" data-tip="Une soudure par mise en place (un programme chacune).\n1 : la longue tige dans le mandrin, on soude autour du petit bout qui dépasse.\n2 : pièce retournée (la barre côté mandrin, la longue tige vers toi), on soude autour de la tige."><span>Soudure à faire</span><select data-k="op" style="width:190px;max-width:60%"><option value="top" ${b.op !== 'bot' ? 'selected' : ''}>1 · le bout qui dépasse</option><option value="bot" ${b.op === 'bot' ? 'selected' : ''}>2 · côté tige (pièce retournée)</option></select></div>`;
+              `<div class="cipNum" data-tip="Une soudure par mise en place (un programme chacune).\n1 : la longue tige dans le mandrin, on soude autour du petit bout qui dépasse.\n2 : pièce retournée (la barre côté mandrin, la longue tige vers toi), on soude autour de la tige."><span>Soudure à faire</span><select data-k="op" style="width:190px;max-width:60%"><option value="top" ${b.op !== 'bot' ? 'selected' : ''}>1 · le bout qui dépasse</option><option value="bot" ${b.op === 'bot' ? 'selected' : ''}>2 · côté tige (pièce retournée)</option></select></div>` +
+              `<div class="cipNum" data-tip="Comment « Élargir » écarte le tour :\nÀ plat = il s'écarte du tube en gardant la hauteur du joint (conseillé : ne plonge pas sur les côtés de la barre).\nSur la barre = il suit la surface de la barre (sur les côtés il descend)."><span>Élargir</span><select data-k="ofm" style="width:190px;max-width:60%"><option value="plat" ${b.ofm !== 'barre' ? 'selected' : ''}>à plat (hauteur du joint)</option><option value="barre" ${b.ofm === 'barre' ? 'selected' : ''}>sur la barre</option></select></div>`;
           else if (b.type === 'deport')
             h +=
               f('d', 'Ø', b.d, 'Diamètre du cylindre déporté (mm).', 0.1) +
@@ -11209,7 +11214,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v110',
+  const CIP_VER = 'CIP v111',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -13716,7 +13721,8 @@ function cip_build() {
         up = Math.max(0, -ot);
       const nx = (jx * Ro) / b.Rw,
         nz = (jz * Ro) / b.Rw;
-      const dy = b.s * (Math.sqrt(Math.max(0, b.Rb * b.Rb - nz * nz)) + up);
+      const zz = b.plat ? jz : nz; // v111 : à plat = hauteur du joint
+      const dy = b.s * (Math.sqrt(Math.max(0, b.Rb * b.Rb - zz * zz)) + up);
       return V.add(b.c, V.add(V.mul(b.e1, nx), V.add(V.mul(b.e2, dy), V.mul(b.e3, nz))));
     });
     return o;
