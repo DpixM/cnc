@@ -11080,7 +11080,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v101',
+  const CIP_VER = 'CIP v102',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -15703,6 +15703,23 @@ function cip_build() {
       }
       B.push('', (dry ? ';A VIDE ' : '') + OFF, '');
     }
+    // v102 : le C1 de la machine se comporte en modulo : « G90 C1 = 0 » depuis -381° s'arrête à -360 (même angle).
+    // -> on DÉROULE en relatif (G91) de la valeur exacte du dernier C1 programmé : il revient au VRAI 0.
+    const lastC = arr => {
+      for (let i = arr.length - 1; i >= 0; i--) {
+        const l = String(arr[i]).split(';')[0];
+        const m = /C1\s*=\s*(-?\d+(?:\.\d+)?)/.exec(l);
+        if (m) return +m[1];
+      }
+      return 0;
+    };
+    const unwind = arr => {
+      const c = lastC(arr);
+      return [
+        ...(Math.abs(c) > 1e-3 ? [`G91 G01 C1 = ${n3(-c)} F5000 ;mandrin a 0 : on deroule les ${n3(c)} deg (relatif)`, 'G90'] : []),
+        'G01 G90 C1 = 0 F5000 ;mandrin a 0 (tete degagee)'
+      ];
+    };
     {
       const hm = S.prog.home && !simpleEnd ? F.filter(f => f.ci === S.prog.home.ci) : [];
       if (simpleEnd) {
@@ -15720,7 +15737,7 @@ function cip_build() {
           const a0 = toLst(V.sub(f0.p, V.mul(f0.d, 30 + DRYOFF)), f0.d, f0.th, o);
           B.push(
             'TRAFOOF',
-            'G01 G90 C1 = 0 F5000 ;mandrin a 0 (tete degagee)',
+            ...unwind(B),
             ...(Math.abs(q0.C) > 1e-3 ? [`G01 G90 C1 = ${n3(q0.C)} F5000 ;angle de depart`] : []),
             `TC_SET_TRAFO("${o.trafo}")`,
             'TRAORI(1)',
@@ -15772,7 +15789,7 @@ function cip_build() {
       'G500',
       'G90',
       'G01 Z = 350 F10000 ;1. on ecarte la tete',
-      'G01 G90 C1 = 0 F5000 ;2. mandrin a 0 (tete degagee)',
+      ...unwind(B),
       (o.trafo === 'Bc1' ? 'G01 B = 0 X =50 Y = 200 F10000' : 'G01 B = 0 Y = 200 F10000') + ' ;3. tete en position de depart',
       ';(prete pour la piece suivante)'
     ];
