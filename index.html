@@ -3097,6 +3097,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNum"><span>Soudure : recouvrement (°)</span><input type="number" id="cipWOv" value="10" min="0" step="1" onchange="cip_ui('proc')"></div>
           <div class="cipNum"><span>Soudure : pente de fin (°)</span><input type="number" id="cipWRamp" value="20" min="0" step="1" onchange="cip_ui('proc')"></div>
           <div class="cipNum" id="cipWOfsRow" style="display:none" data-tip="Poignée en T : décale le tour de soudure (mm).\n+ = le tour grossit : il se pose sur la barre, plus loin du tube soudé.\n− = il remonte sur le tube soudé (vers le bout libre).\n0 = pile dans l'angle."><span>Soudure : élargir le parcours (mm)</span><input type="number" id="cipWOfs" value="0" step="0.05" onchange="cip_ui('wofs')"></div>
+          <div id="cipWCorRow" style="display:none;margin:4px 0 6px" data-tip="Poignée en T : corrige la trajectoire là où elle ne suit pas ta soudure.\nLance à vide, regarde à la caméra à chaque quart de tour et tape l'écart (mm) :\n+ = il faut aller vers la barre, − = il faut remonter vers le bout du tube.\nLes angles = de combien le mandrin a tourné depuis le départ (C1 0, -45, -90 …).\nEntre les points le soft fait une courbe douce."><div style="font-size:13px;margin-bottom:3px">Soudure : correction aux 8 points (mm)</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px"><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 0°<input type="number" step="0.05" value="0" class="cipWCor" data-i="0" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -45°<input type="number" step="0.05" value="0" class="cipWCor" data-i="1" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -90°<input type="number" step="0.05" value="0" class="cipWCor" data-i="2" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -135°<input type="number" step="0.05" value="0" class="cipWCor" data-i="3" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -180°<input type="number" step="0.05" value="0" class="cipWCor" data-i="4" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -225°<input type="number" step="0.05" value="0" class="cipWCor" data-i="5" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -270°<input type="number" step="0.05" value="0" class="cipWCor" data-i="6" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -315°<input type="number" step="0.05" value="0" class="cipWCor" data-i="7" onchange="cip_ui('wcor')" style="width:100%"></label></div></div>
           <label class="cipChk"><input type="checkbox" id="cipWOpt" checked onchange="cip_ui('proc')"> Incliner la tête tout seul pour ne rien toucher</label>
           <div class="cipNum"><span>Écart max à l'angle idéal (°)</span><input type="number" id="cipWMaxDev" value="60" min="0" max="75" step="5" onchange="cip_ui('proc')"></div>
           </div>
@@ -8108,6 +8109,14 @@ function cip_build() {
       row.style.display = W && tb ? '' : 'none';
       if (tb && document.activeElement !== $('cipWOfs')) $('cipWOfs').value = +tb.ofs || 0;
     }
+    const crow = $('cipWCorRow');
+    if (crow) {
+      crow.style.display = W && tb ? '' : 'none';
+      if (tb)
+        crow.querySelectorAll('.cipWCor').forEach(inp => {
+          if (document.activeElement !== inp) inp.value = (tb.cor && +tb.cor[+inp.dataset.i]) || 0;
+        });
+    }
   }
   function syncProc() {
     try {
@@ -8673,7 +8682,7 @@ function cip_build() {
             t1: Lb / 2,
             noCut: true,
             keepIdeal: true,
-            bar: { c: C0, e1, e3, Rw, Ro, Rb, s, up } // v107 : pour retrouver le point « pile dans l'angle » (SET_POS)
+            bar: { c: C0, e1, e3, Rw, Ro, Rb, s, up, ofs: Math.max(-Rw + 0.3, ofs) } // v107 : pour retrouver le point « pile dans l'angle » (SET_POS)
           };
         };
         info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot, flip, Rs, Rw, ofs, rp, lp, e1, e3 };
@@ -11164,7 +11173,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v107',
+  const CIP_VER = 'CIP v108',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -13621,6 +13630,61 @@ function cip_build() {
     if (closed && P.length > 2) L += V.len(V.sub(P[0], P[P.length - 1]));
     return L;
   }
+  // v108 POIGNÉE EN T : correction de la trajectoire aux 8 points (0°, 45° … 315° du tour, depuis le départ).
+  // Chaque valeur = un « élargir » local (mm) : + = vers la barre, − = remonte sur le tube. Entre les points : courbe douce.
+  function barCorVals() {
+    const tb = S.genDef && (S.genDef.bodies || []).find(b => b.type === 'barre');
+    const c = tb && Array.isArray(tb.cor) ? tb.cor.map(v => +v || 0) : [];
+    while (c.length < 8) c.push(0);
+    return c.slice(0, 8);
+  }
+  function barCorr(o, b) {
+    const cv = barCorVals();
+    if (!b || cv.every(v => !v)) return o;
+    const ang = p => {
+      const v = V.sub(p, b.c);
+      return Math.atan2(V.dot(v, b.e3), V.dot(v, b.e1));
+    };
+    const a0 = ang(o.P[0]);
+    let prev = a0,
+      acc = 0;
+    // sens du tour : celui du 2e point
+    const cr = u => {
+      // Catmull-Rom périodique sur 8 nœuds (tous les 45°)
+      const x = (((u % 360) + 360) % 360) / 45,
+        i = Math.floor(x),
+        t = x - i;
+      const P0 = cv[(i + 7) % 8],
+        P1 = cv[i % 8],
+        P2 = cv[(i + 1) % 8],
+        P3 = cv[(i + 2) % 8];
+      return 0.5 * (2 * P1 + (-P0 + P2) * t + (2 * P0 - 5 * P1 + 4 * P2 - P3) * t * t + (-P0 + 3 * P1 - 3 * P2 + P3) * t * t * t);
+    };
+    o.P = o.P.map(p => {
+      const a = ang(p);
+      let d = a - prev;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      acc += d;
+      prev = a;
+      const u = (Math.abs(acc) * 180) / Math.PI;
+      const v = V.sub(p, b.c);
+      const x = V.dot(v, b.e1),
+        z = V.dot(v, b.e3),
+        r = Math.hypot(x, z) || 1;
+      const k = b.Rw / r,
+        jx = x * k,
+        jz = z * k;
+      const ot = Math.min(b.Rb - b.Rw - 0.2, (b.ofs || 0) + cr(u)),
+        Ro = b.Rw + Math.max(0, ot),
+        up = Math.max(0, -ot);
+      const nx = (jx * Ro) / b.Rw,
+        nz = (jz * Ro) / b.Rw;
+      const dy = b.s * (Math.sqrt(Math.max(0, b.Rb * b.Rb - nz * nz)) + up);
+      return V.add(b.c, V.add(V.mul(b.e1, nx), V.add(V.mul(b.e2, dy), V.mul(b.e3, nz))));
+    });
+    return o;
+  }
   function addOverlap(o, ov, ramp) {
     if (!isClosed(o)) return o;
     const P = o.P,
@@ -14389,6 +14453,12 @@ function cip_build() {
           } else if (sg.closed) {
             let o = { name: nm, step: 2, P: PP, D: DD, weld: true, opt, faceIn: fIn };
             o = applyStart(o);
+            if (c.bar) {
+              // v108 : correction aux 8 points (poignée en T)
+              const bc = rotM(c.bar.c, ins.a);
+              bc[1] += ins.dy;
+              o = barCorr(o, Object.assign({}, c.bar, { c: bc, e1: rotM(c.bar.e1, ins.a), e2: rotM(c.bar.e2, ins.a), e3: rotM(c.bar.e3, ins.a) }));
+            }
             {
               const Lp = plen(PP, true);
               o = addOverlap(o, (ov / 360) * Lp, (ramp / 360) * Lp);
@@ -15655,9 +15725,9 @@ function cip_build() {
     const jointOf = f => {
       const c = S.prog && S.prog.C[f.ci],
         b = c && c.bar;
-      if (!b || (Math.abs(b.Ro - b.Rw) < 1e-9 && !b.up)) return f.p;
+      if (!b) return f.p;
       const v = V.sub(f.p, b.c);
-      const kk = b.Rw / b.Ro,
+      const kk = b.Rw / (Math.hypot(V.dot(v, b.e1), V.dot(v, b.e3)) || b.Rw),
         x = V.dot(v, b.e1) * kk,
         z = V.dot(v, b.e3) * kk;
       const dy = b.s * Math.sqrt(Math.max(0, b.Rb * b.Rb - z * z));
@@ -18112,6 +18182,12 @@ function cip_build() {
         showWork('prep');
         cip_ui('demo');
         return;
+      } else if (a === 'wcor') {
+        const tb = S.genDef && (S.genDef.bodies || []).find(b => b.type === 'barre');
+        if (tb) {
+          tb.cor = [...document.querySelectorAll('#cipWCorRow .cipWCor')].map(i => +i.value || 0);
+          genSoon();
+        }
       } else if (a === 'wofs') {
         const tb = S.genDef && (S.genDef.bodies || []).find(b => b.type === 'barre');
         if (tb) {
