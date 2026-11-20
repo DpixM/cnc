@@ -11080,7 +11080,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v102',
+  const CIP_VER = 'CIP v103',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -14583,11 +14583,16 @@ function cip_build() {
         // v78 : UNE ligne, comme à la main : tête en l'air, le mandrin refait ses tours en arrière d'un coup
         const xl = seg[seg.length - 1];
         out.push({ t: 'TRAFOOF', s: f.s });
+        // v103 : tête en zone sûre AVANT de tourner le mandrin (une barre en T balaie large)
+        out.push({ t: 'G01 SUPA Z = 350 F10000 ;tete en zone sure avant de tourner le mandrin', s: f.s });
         out.push({
-          t: `G01 G90 C1 = ${n3(Cs[Cs.length - 1])} F10000 ;le mandrin refait ses tours a l envers (tete en l air)`,
+          t: `G01 G90 C1 = ${n3(Cs[Cs.length - 1])} F5000 ;le mandrin refait ses tours a l envers (tete en zone sure)`,
           s: xl.s
         });
         out.push({ t: `TC_SET_TRAFO("${o.trafo}")`, s: xl.s }, { t: 'TRAORI(1)', s: xl.s });
+        // on redescend d'abord 30 mm au-dessus du point suivant, dans l'axe du faisceau
+        const nx = hm[j];
+        if (nx) out.push({ f: { p: V.sub(nx.p, V.mul(nx.d, 30)), d: nx.d, th: nx.th, s: nx.s, ci: nx.ci, j: -1 }, s: xl.s });
         i = j;
       } else if (f.rev) {
         let j = i;
@@ -14913,7 +14918,31 @@ function cip_build() {
     return /^\d{1,4}$/.test(v) ? +v : null;
   }
   // v83 : programme AÉRÉ : une ligne vide avant chaque titre (;----- / ;===), jamais deux lignes vides de suite
+  // v103 : le C1 de la machine prend -360 et 0 pour le même angle : « G90 C1 = 0 » depuis -360 NE BOUGE PAS
+  // (et depuis -382 il s'arrête à -360). Avant chaque retour du mandrin en G90, on déroule en RELATIF (G91)
+  // de l'écart exact depuis le dernier C1 programmé -> le compteur machine revient au vrai chiffre.
+  function relUnwind(B) {
+    const out = [];
+    let last = null;
+    for (const raw of B) {
+      const l = String(raw);
+      const code = l.split(';')[0];
+      const m = /C1\s*=\s*(-?\d+(?:\.\d+)?)/i.exec(code);
+      if (m && /^\s*G0?1\s+G90\s+C1\s*=/i.test(code) && last !== null) {
+        const tgt = +m[1],
+          d = tgt - last;
+        if (Math.abs(d) > 1e-3) out.push(`G91 G01 C1 = ${(+d.toFixed(3)).toFixed(3)} F5000 ;le mandrin se deroule (relatif) : ${(+last.toFixed(3)).toFixed(3)} -> ${(+tgt.toFixed(3)).toFixed(3)}`, 'G90');
+        out.push(l);
+        last = tgt;
+        continue;
+      }
+      if (m && !/G91/i.test(code)) last = +m[1];
+      out.push(l);
+    }
+    return out;
+  }
   function airLST(B) {
+    B = relUnwind(B);
     const out = [];
     for (const l of B) {
       if (l === '' && (!out.length || out[out.length - 1] === '')) continue;
@@ -15715,13 +15744,27 @@ function cip_build() {
     };
     const unwind = arr => {
       const c = lastC(arr);
+      return ['G01 G90 C1 = 0 F5000 ;mandrin a 0 (tete degagee)']; // v103 : le déroulé relatif est ajouté par relUnwind
+    };
+    // v103 SET_POS : fin = tête en zone sûre (Z 350 machine), mandrin à 0, puis la pointe revient sur le départ
+    const posTail = () => {
+      const f0 = F.find(x => x.j >= 0);
+      const q0 = toLst(f0.p, f0.d, f0.th, o);
+      const a0 = toLst(V.sub(f0.p, V.mul(f0.d, 30 + DRYOFF)), f0.d, f0.th, o);
       return [
-        ...(Math.abs(c) > 1e-3 ? [`G91 G01 C1 = ${n3(-c)} F5000 ;mandrin a 0 : on deroule les ${n3(c)} deg (relatif)`, 'G90'] : []),
-        'G01 G90 C1 = 0 F5000 ;mandrin a 0 (tete degagee)'
+        'TRAFOOF',
+        'G01 SUPA Z = 350 F10000 ;1. tete en zone sure (en haut, coordonnees machine)',
+        ...unwind(B).map(l => l.replace(';mandrin a 0', ';2. mandrin a 0')),
+        ...(Math.abs(q0.C) > 1e-3 ? [`G01 G90 C1 = ${n3(q0.C)} F5000 ;angle de depart`] : []),
+        `TC_SET_TRAFO("${o.trafo}")`,
+        'TRAORI(1)',
+        lstMv(a0) + ' ;3. au-dessus du depart',
+        lstMv(q0) + ' ;pointe sur le depart : pret pour la piece suivante'
       ];
     };
     {
-      const hm = S.prog.home && !simpleEnd ? F.filter(f => f.ci === S.prog.home.ci) : [];
+      // v103 soudure en SET_G54 : pas de « retour au départ » (inutile, le PARK remonte la tête) -> pas de trajet parasite
+      const hm = S.prog.home && !simpleEnd && !(W && !posMode) ? F.filter(f => f.ci === S.prog.home.ci) : [];
       if (simpleEnd) {
         const fl = F.filter(f => f.ci < S.prog.home.ci).pop() || F[F.length - 1];
         B.push(
@@ -15732,18 +15775,7 @@ function cip_build() {
         if (posMode) {
           // v66 : le mandrin refait ses tours A L'ENVERS jusqu'à l'angle de départ (valeur en clair), tête en l'air,
           // puis la pointe revient sur le départ : TOUT est comme au lancement
-          const f0 = F.find(x => x.j >= 0);
-          const q0 = toLst(f0.p, f0.d, f0.th, o);
-          const a0 = toLst(V.sub(f0.p, V.mul(f0.d, 30 + DRYOFF)), f0.d, f0.th, o);
-          B.push(
-            'TRAFOOF',
-            ...unwind(B),
-            ...(Math.abs(q0.C) > 1e-3 ? [`G01 G90 C1 = ${n3(q0.C)} F5000 ;angle de depart`] : []),
-            `TC_SET_TRAFO("${o.trafo}")`,
-            'TRAORI(1)',
-            lstMv(a0) + ' ;au-dessus du depart',
-            lstMv(q0) + ' ;pointe sur le depart : tout est comme au lancement, pret pour la piece suivante'
-          );
+          B.push(...posTail());
         }
       } else if (hm.length) {
         B.push(';----- retour au point de depart -----');
@@ -15768,13 +15800,16 @@ function cip_build() {
           if (ln !== B[B.length - 1]) B.push(ln); // pas 2 fois la même ligne
         });
         // v100 : puis on dégage la tête -> le PARK met le mandrin à 0 et la tête en position de départ
-        if (W && !posMode) {
+        // v103 : si le retour a déjà remis le mandrin (tête en zone sûre) et posé la pointe sur le départ, on ne refait pas tout
+        const hadSpin = HL.some(l => l.t && /C1\s*=/.test(l.t));
+        if (W && !(posMode && hadSpin)) {
           const fh = hm[hm.length - 1];
           B.push(lstMv(toLst(V.sub(sh(fh), V.mul(fh.d, 30)), fh.d, fh.th, o), 'f5000') + " ;tete degagee de 30 mm dans l'axe du faisceau");
+          if (posMode) B.push(...posTail()); // v103 : SET_POS aussi -> mandrin à 0
         }
         B.push('');
       } else {
-        const fl = F[F.length - 1];
+        const fl = (S.prog.home && F.filter(f => f.ci < S.prog.home.ci).pop()) || F[F.length - 1];
         B.push(
           lstMv(toLst(V.sub(fl.p, V.mul(fl.d, 30)), fl.d, fl.th, o)) + " ;degagement 30 mm dans l'axe du faisceau"
         );
@@ -15807,7 +15842,7 @@ function cip_build() {
           ? ENDMV
           : park
             ? PARK
-            : [';(tete laissee sur le point de depart, prete pour la piece suivante)']),
+            : [posMode ? ';(mandrin a 0, pointe sur le depart, pret pour la piece suivante)' : ';(tete laissee sur le point de depart, prete pour la piece suivante)']),
         '',
         'TC_AUX_LIGHT(5,0)',
         'TC_AUX_LIGHT(6,0)',
