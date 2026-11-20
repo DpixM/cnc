@@ -8665,7 +8665,7 @@ function cip_build() {
           }
           return { P, NB, ax: e1, c: C0, r: Rb, t0: -Lb / 2, t1: Lb / 2, noCut: true, keepIdeal: true };
         };
-        info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot, flip, Rs, Rw, ofs };
+        info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot, flip, Rs, Rw, ofs, rp, lp, e1, e3 };
         seams.push(mk(1)); // la soudure est toujours côté bout libre (op 1 : autour du bout ; op 2 : autour de la tige)
         return;
       }
@@ -10338,7 +10338,14 @@ function cip_build() {
     L: '#66d36e',
     rot: '#ffd740',
     exc: '#ff5fa2',
-    trav: '#ff5252'
+    trav: '#ff5252',
+    // v106 barre en T
+    ds: '#7c8cff',
+    lb: '#66d36e',
+    dep: '#ff9800',
+    ofs: '#ff5252',
+    dp: '#26e0c0',
+    lp: '#c387ff'
   };
   const hlG = new THREE.Group();
   hlG.renderOrder = 999;
@@ -10532,7 +10539,70 @@ function cip_build() {
       I = Gn.info && Gn.info[bi],
       b = D.bodies[bi];
     if (!I || !b) return;
-    if (I.type === 'barre') return;
+    if (I.type === 'barre') {
+      // v106 : code couleur de la barre en T (la 3D montre ce que chaque cote change)
+      const C = [0, I.yc, 0],
+        e1 = I.e1,
+        e3 = I.e3,
+        e2 = [0, 1, 0],
+        yS = I.flip ? 0 : L, // bout du petit tube qui dépasse
+        sg = I.flip ? -1 : 1,
+        yCr = I.yc + sg * I.Rb; // dessus de la barre côté bout
+      if (k === 'd') {
+        const c = V.add(C, V.mul(e1, Math.max(I.Rs, R) + I.Rb * 0.6));
+        line(ring(c, e2, e3, I.Rb, 0, 360, 96), true);
+        line([V.add(c, V.mul(e2, -I.Rb)), V.add(c, V.mul(e2, I.Rb))]);
+        label(V.add(c, V.mul(e3, I.Rb + R)), 'Ø' + mm(b.d));
+      } else if (k === 'ds') {
+        line(ring([0, yS, 0], Z, X, I.Rs, 0, 360, 96), true);
+        line([
+          [-I.Rs, yS, 0],
+          [I.Rs, yS, 0]
+        ]);
+        label([0, yS + sg * R * 0.6, I.Rs * 1.5], 'Ø' + mm(I.Rs * 2));
+      } else if (k === 'lb') {
+        const o = V.mul(e3, I.Rb + rl * 4);
+        const A = V.add(C, V.add(o, V.mul(e1, -I.Lb / 2))),
+          B2 = V.add(C, V.add(o, V.mul(e1, I.Lb / 2)));
+        line([A, B2]);
+        line([V.add(A, V.mul(e3, -rl * 6)), V.add(A, V.mul(e3, rl * 4))]);
+        line([V.add(B2, V.mul(e3, -rl * 6)), V.add(B2, V.mul(e3, rl * 4))]);
+        label(V.add(C, V.mul(e3, I.Rb + R * 1.2)), mm(b.lb) + ' mm');
+      } else if (k === 'dep') {
+        const x = I.Rs + rl * 4;
+        line([
+          [x, yCr, 0],
+          [x, yS, 0]
+        ]);
+        line(ring([0, yS, 0], Z, X, I.Rs, 0, 360, 96), true);
+        line([
+          [0, yCr, 0],
+          [x + rl * 4, yCr, 0]
+        ]);
+        label([x + R, (yCr + yS) / 2, 0], mm(b.dep) + ' mm');
+      } else if (k === 'ofs') {
+        const sm = Gn.seams && Gn.seams.find(q => q.keepIdeal);
+        if (sm) line(sm.P, true);
+        label([0, yCr + sg * R * 0.8, I.Rb], (+(b.ofs || 0) > 0 ? '+' : '') + mm(b.ofs || 0) + ' mm');
+      } else if (k === 'dp' || k === 'lp') {
+        for (const s2 of [-1, 1]) {
+          const cE = V.add(C, V.mul(e1, (s2 * I.Lb) / 2));
+          if (k === 'dp') line(ring(cE, e2, e3, I.rp, 0, 360, 72), true);
+          else {
+            const o = V.mul(e3, I.Rb + rl * 4);
+            line([V.add(cE, o), V.add(V.add(C, V.mul(e1, s2 * (I.Lb / 2 - I.lp))), o)]);
+            line(ring(V.add(C, V.mul(e1, s2 * (I.Lb / 2 - I.lp))), e2, e3, I.Rb, 0, 360, 72), true);
+          }
+        }
+        const cE = V.add(C, V.mul(e1, I.Lb / 2));
+        label(V.add(cE, V.mul(e3, I.Rb + R)), k === 'dp' ? 'Ø' + mm(b.dp) : mm(b.lp) + ' mm');
+      } else if (k === 'rot') {
+        line([V.add(C, V.mul(e1, -I.Lb / 2 - R)), V.add(C, V.mul(e1, I.Lb / 2 + R))]);
+        line(ring(C, X, Z, I.Rb + R, 0, 360, 96), true);
+        label(V.add(C, V.mul(e1, I.Lb / 2 + R * 2)), mm(b.rot || 0) + '°');
+      }
+      return;
+    }
     if (I.type === 'bride') {
       if (k === 'd') {
         line(ring([0, I.yb, 0], Z, X, I.Rb, 0, 360, 128), true);
@@ -11080,7 +11150,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v105',
+  const CIP_VER = 'CIP v106',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
