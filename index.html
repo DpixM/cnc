@@ -9086,6 +9086,7 @@ function cip_build() {
               f('lp', 'Longueur des pointes', b.lp, 'Longueur du cône à chaque bout (0 = pas de pointe).', 0.5) +
               f('rot', 'Tour autour (°)', b.rot, 'Sens de la barre vu au départ : 0 = en travers devant la tête, 90 = tournée.') +
               `<div class="cipNum" data-tip="Une soudure par mise en place (un programme chacune).\n1 : la longue tige dans le mandrin, on soude autour du petit bout qui dépasse.\n2 : pièce retournée (la barre côté mandrin, la longue tige vers toi), on soude autour de la tige."><span>Soudure à faire</span><select data-k="op" style="width:190px;max-width:60%"><option value="top" ${b.op !== 'bot' ? 'selected' : ''}>1 · le bout qui dépasse</option><option value="bot" ${b.op === 'bot' ? 'selected' : ''}>2 · côté tige (pièce retournée)</option></select></div>` +
+              `<label class="cipChk" data-tip="Coché (conseillé) : la tête garde le MÊME B sur tout le tour (celui du départ).\nDécoché : la tête suit l'angle idéal du joint (B bouge de ~20° sur les côtés de la barre, et la moindre erreur de hauteur de focale décale le tour à C1 ±90°)."><input type="checkbox" data-k="bfix" ${b.bfix !== false ? 'checked' : ''}> Tête à B constant (même B tout le tour)</label>` +
               `<div class="cipNum" data-tip="Comment « Élargir » écarte le tour :\nÀ plat = il s'écarte du tube en gardant la hauteur du joint (conseillé : ne plonge pas sur les côtés de la barre).\nSur la barre = il suit la surface de la barre (sur les côtés il descend)."><span>Élargir</span><select data-k="ofm" style="width:190px;max-width:60%"><option value="plat" ${b.ofm !== 'barre' ? 'selected' : ''}>à plat (hauteur du joint)</option><option value="barre" ${b.ofm === 'barre' ? 'selected' : ''}>sur la barre</option></select></div>`;
           else if (b.type === 'deport')
             h +=
@@ -11214,7 +11215,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v111',
+  const CIP_VER = 'CIP v112',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -14500,6 +14501,13 @@ function cip_build() {
               const bc = rotM(c.bar.c, ins.a);
               bc[1] += ins.dy;
               o = barCorr(o, Object.assign({}, c.bar, { c: bc, e1: rotM(c.bar.e1, ins.a), e2: rotM(c.bar.e2, ins.a), e3: rotM(c.bar.e3, ins.a) }));
+              // v112 : tête à B CONSTANT sur tout le tour (= le B du départ). Avant, B passait de -45 à -66 sur les côtés
+              // de la barre : la moindre erreur de hauteur de focale se transformait en décalage à C1 ±90°.
+              const tb = S.genDef && (S.genDef.bodies || []).find(q => q.type === 'barre');
+              if (!tb || tb.bfix !== false) {
+                const B0 = merid(o.P[0], o.D[0]);
+                o.D = o.P.map(p => dirFromB(p, B0));
+              }
             }
             {
               const Lp = plen(PP, true);
