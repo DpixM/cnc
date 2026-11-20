@@ -10899,6 +10899,11 @@ function cip_build() {
           `<label class="cipChk" data-tip="Tête droite, sans TRAORI ni CIP : tours = 1 ligne C1, trous ronds = TC_CIRC2, lignes = G01 X / C1. Réglages dans les réglages avancés (Fichier .LST)."><input type="checkbox" data-mirchk="cipLSimple" ${($('cipLSimple') || {}).checked ? 'checked' : ''}> <b>Programme simple</b> (sans TRAORI ni CIP)</label>`
     }
     <label class="cipChk" data-tip="Test à vide : le laser ne s'allume jamais (allumage en commentaire), même nom de fichier. En découpe, la trajectoire est aussi reculée de 3 mm (pas de palpage laser éteint). Toujours passer à vide avant le vrai !"><input type="checkbox" id="cipWzDry" ${dry ? 'checked' : ''}> <b>Test à vide</b> (laser jamais allumé)</label>
+    ${
+      $('cipProc').value === 'soudure'
+        ? `<label class="cipChk" data-tip="Fichier de CALAGE : laser jamais allumé, la tête fait le tour et s'arrête (M0) à C1 -45, -90, -135 … -315.\nÀ chaque arrêt : regarde l'écart à la caméra et tape-le dans « Correction aux 8 angles » (carte Barre en T).\nFichier « …-CALAGE.LST »."><input type="checkbox" id="cipWzCal" ${S.wz.cal ? 'checked' : ''} onchange="cipState.wz.cal=this.checked"> <b>📍 Fichier de calage</b> (sans soudure, M0 tous les 45°)</label>`
+        : ''
+    }
     <div class="cipRow"><button class="cipBtn" onclick="cip_ui('wzback',3)">←</button><button class="cipBtn cipMain" style="flex:1" onclick="cip_ui('wzgen')">▶ Générer et simuler le .LST</button></div>
     <div class="cipStat" id="cipWzMsg">${S.wz.msg || ''}</div></div>`;
     box.innerHTML = h;
@@ -11020,7 +11025,17 @@ function cip_build() {
     S.wz.dry = dry;
     $('cipLDry').checked = dry;
     wzApplyG54();
-    const r = genLST();
+    // v110 : case « Fichier de calage » de l'assistant
+    const CALW = W && !!($('cipWzCal') && $('cipWzCal').checked);
+    S.wz.cal = CALW;
+    S._calage = CALW;
+    let r;
+    try {
+      r = genLST();
+    } finally {
+      S._calage = false;
+    }
+    if (CALW && r && !r.err) r.file = r.file.replace(/(-VIDE)?\.LST$/i, '') + '-CALAGE.LST';
     if (r.err) {
       S.wz.msg = '<span class="cipBad">' + r.err + '</span>';
     } else {
@@ -11030,6 +11045,9 @@ function cip_build() {
       S.wz.msg = '';
       S.dlMsg =
         `<span class="cipOk">${r.file} prêt.</span> ` +
+        (CALW
+          ? "<b>FICHIER DE CALAGE</b> : laser jamais allumé, M0 à C1 -45, -90 … -315. À chaque arrêt, tape l'écart vu à la caméra dans « Correction aux 8 angles » (carte Barre en T), puis décoche la case et regénère. "
+          : '') +
         (r.simple
           ? `<b>Programme simple</b> (${r.simple.ring + r.simple.bis} tour(s), ${r.simple.hole} trou(s) en cycle, ${r.simple.line} ligne(s)${r.simple.trao ? `, <span class="cipWarn">${r.simple.trao} en TRAORI (tête inclinée)</span>` : ''}). `
           : '') +
@@ -11191,7 +11209,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v109',
+  const CIP_VER = 'CIP v110',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
