@@ -3173,6 +3173,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNote" id="cipLG54Hint"></div>
           <label class="cipChk" data-wz4><input type="checkbox" id="cipLDry" onchange="cip_ui('lstclr')"> Version <b>test à vide</b> (laser jamais allumé, fichier « -VIDE »)</label>
           <div class="cipRow"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('lstgen')">⬇ Générer le .LST</button></div>
+          <div class="cipRow" data-only="soudure"><button class="cipBtn" style="width:100%" onclick="cip_ui('lstcal')" data-tip="Un .LST SANS soudure (laser jamais allumé) : la tête fait le tour et s'arrête (M0) tous les 45°.\nÀ chaque arrêt tu regardes à la caméra l'écart avec ta soudure, et tu le tapes dans « Correction aux 8 angles ».">📍 Fichier de calage (sans soudure, arrêt tous les 45°)</button></div>
           <div class="cipStat" id="cipLMsg"></div>
           <div class="cipRow" id="cipLBtns" style="display:none"><button class="cipBtn" onclick="cip_ui('lstcopy')">Copier</button><button class="cipBtn" id="cipLDl" onclick="cip_ui('lstdl')">Télécharger</button></div>
           <textarea id="cipLTxt" readonly spellcheck="false" style="display:none;width:100%;height:180px;font:11px var(--mono);background:var(--bg);color:var(--txt);border:1px solid var(--brd2);border-radius:4px;margin-top:4px;white-space:pre"></textarea>
@@ -9071,6 +9072,12 @@ function cip_build() {
                 0.1
               ) +
               f('ofs', 'Élargir le parcours', b.ofs || 0, 'Décale le tour de soudure (mm).\n+ = le tour grossit : il se pose sur la barre, plus loin du tube soudé.\n− = il remonte sur le tube soudé (vers le bout libre).\n0 = pile dans l\'angle.', 0.05) +
+              `<div style="margin:4px 0 6px" data-tip="Correction de la trajectoire (mm) à chaque angle du mandrin.\nFais le « fichier de calage » (étape Mise en machine) : il s'arrête à chaque angle, tu lis l'écart à la caméra et tu le tapes ici.\n+ = il faut aller vers la barre · − = il faut remonter vers le bout du tube."><div style="font-size:13px;margin-bottom:3px">Correction aux 8 angles (mm)</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">${[0, 45, 90, 135, 180, 225, 270, 315]
+                .map(
+                  (a, k) =>
+                    `<label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 ${a ? '-' + a : '0'}°<input type="number" step="0.05" value="${(b.cor && +b.cor[k]) || 0}" data-cor="${k}" style="width:100%"></label>`
+                )
+                .join('')}</div></div>` +
               f('dp', 'Ø au bout des pointes', b.dp, 'Ø aux 2 bouts de la barre (= Ø de la barre : pas de pointe).', 0.1) +
               f('lp', 'Longueur des pointes', b.lp, 'Longueur du cône à chaque bout (0 = pas de pointe).', 0.5) +
               f('rot', 'Tour autour (°)', b.rot, 'Sens de la barre vu au départ : 0 = en travers devant la tête, 90 = tournée.') +
@@ -9154,6 +9161,17 @@ function cip_build() {
       const i = +sl.closest('.cipGB').dataset.i;
       sl.addEventListener('change', () => {
         S.genDef.bodies[i][sl.dataset.k] = sl.value;
+        genSoon();
+      });
+    });
+    box.querySelectorAll('input[data-cor]').forEach(inp => {
+      const i = +inp.closest('.cipGB').dataset.i;
+      inp.addEventListener('change', () => {
+        const b = S.genDef.bodies[i];
+        const c = Array.isArray(b.cor) ? b.cor.slice(0, 8) : [];
+        while (c.length < 8) c.push(0);
+        c[+inp.dataset.cor] = +inp.value || 0;
+        b.cor = c;
         genSoon();
       });
     });
@@ -11173,7 +11191,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v108',
+  const CIP_VER = 'CIP v109',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -15739,7 +15757,8 @@ function cip_build() {
       const q0 = toLst(jointOf(f0), f0.d, f0.th, o);
       g54 = `SET_POS(${n3(q0.X)}, ${n3(q0.Y)}, ${n3(q0.Z)}) ;la pointe est sur le point de depart (B ${n3(q0.B)} C1 ${n3(q0.C)}) : on part d'ici`;
     }
-    const dry = $('cipLDry').checked;
+    const dry = $('cipLDry').checked || !!S._calage; // v109 : le fichier de calage n'allume JAMAIS le laser
+    const CAL = !!S._calage && kind === 'soudure';
     const B = [];
     const W = kind === 'soudure';
     const WM = ($('cipLWMode') && $('cipLWMode').value) || '10',
@@ -15899,11 +15918,32 @@ function cip_build() {
                 [Q.length - 1 - (C[ci].overN || 0), Q.length - 1, null]
               ]
             : [[0, Q.length - 1, null]];
-      for (const [a, b, lab] of segs) {
-        if (b <= a) continue;
-        if (lab) B.push(lab);
-        for (const bl of fitBlocks(Q.slice(a, b + 1))) B.push(lineOf(bl));
-      }
+      if (CAL) {
+        // v109 FICHIER DE CALAGE : pas de soudure, la tête suit le tour point par point et s'arrête (M0) tous les 45°
+        const cv = typeof barCorVals === 'function' ? barCorVals() : [];
+        B.push(';!!! FICHIER DE CALAGE : laser jamais allume, arret M0 tous les 45 deg !!!');
+        B.push(';a chaque arret : regarde a la camera de combien la croix est a cote du cordon (mm)');
+        B.push(';et tape-le dans la case du meme angle (+ = vers la barre, - = vers le bout du tube)');
+        let nx = 1;
+        for (let i = 1; i < Q.length && nx < 8; i++) {
+          B.push(lstMv(Q[i], i === 1 ? 'F1000' : ''));
+          const u = Math.abs(Q[i].C - Q[0].C);
+          const un = i + 1 < Q.length ? Math.abs(Q[i + 1].C - Q[0].C) : 1e9;
+          if (Math.abs(u - nx * 45) <= Math.abs(un - nx * 45) && u >= nx * 45 - 25) {
+            B.push(
+              `M0 ;CALAGE ${nx + 1}/8 : C1 -${nx * 45} -> ecart a la camera -> case C1 -${nx * 45} (deja mis : ${(+(cv[nx] || 0)).toFixed(2)})`
+            );
+            nx++;
+          }
+        }
+        B.push(';fin du calage : on finit le tour sans arret');
+        for (const bl of fitBlocks(Q.slice(Math.max(0, Q.findIndex(q => Math.abs(q.C - Q[0].C) >= 315)), Q.length))) B.push(lineOf(bl));
+      } else
+        for (const [a, b, lab] of segs) {
+          if (b <= a) continue;
+          if (lab) B.push(lab);
+          for (const bl of fitBlocks(Q.slice(a, b + 1))) B.push(lineOf(bl));
+        }
       B.push('', (dry ? ';A VIDE ' : '') + OFF, '');
     }
     // v102 : le C1 de la machine se comporte en modulo : « G90 C1 = 0 » depuis -381° s'arrête à -360 (même angle).
@@ -18458,6 +18498,21 @@ function cip_build() {
         } catch (e) {
           ta.focus();
           ta.select();
+        }
+        return;
+      } else if (a === 'lstcal') {
+        // v109 : fichier de calage = le même programme, laser jamais allumé, M0 tous les 45°
+        S._calage = true;
+        try {
+          cip_ui('lstgen');
+        } finally {
+          S._calage = false;
+        }
+        const r = S.lastLST;
+        if (r && r.txt && /FICHIER DE CALAGE/.test(r.txt)) {
+          r.file = r.file.replace(/(-VIDE)?\.LST$/i, '') + '-CALAGE.LST';
+          $('cipLDl').textContent = 'Télécharger ' + r.file;
+          $('cipLMsg').innerHTML = `<span class="cipOk">${r.file} prêt : SANS soudure, arrêt M0 tous les 45°. À chaque arrêt, lis l'écart à la caméra et tape-le dans « Correction aux 8 angles ».</span>`;
         }
         return;
       } else if (a === 'lstdl') {
