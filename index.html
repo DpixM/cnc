@@ -8663,7 +8663,18 @@ function cip_build() {
             P.push(RT([x, yc + dy + s * up, z]));
             NB.push(V.nrm(RT([0, dy, z]))); // normale de la barre, vers l'extérieur
           }
-          return { P, NB, ax: e1, c: C0, r: Rb, t0: -Lb / 2, t1: Lb / 2, noCut: true, keepIdeal: true };
+          return {
+            P,
+            NB,
+            ax: e1,
+            c: C0,
+            r: Rb,
+            t0: -Lb / 2,
+            t1: Lb / 2,
+            noCut: true,
+            keepIdeal: true,
+            bar: { c: C0, e1, e3, Rw, Ro, Rb, s, up } // v107 : pour retrouver le point « pile dans l'angle » (SET_POS)
+          };
         };
         info[bi] = { type: 'barre', yc, Rb, Lb, dep, rot, flip, Rs, Rw, ofs, rp, lp, e1, e3 };
         seams.push(mk(1)); // la soudure est toujours côté bout libre (op 1 : autour du bout ; op 2 : autour de la tige)
@@ -8930,6 +8941,9 @@ function cip_build() {
         NB,
         W: P.map(() => true),
         body: { c: XP(s.c), ax, r: s.r, t0: s.t0 !== undefined ? s.t0 : -500, t1: s.t1 !== undefined ? s.t1 : 500 },
+        bar: s.bar
+          ? Object.assign({}, s.bar, { c: XP(s.bar.c), e1: XV(s.bar.e1), e2: XV([0, 1, 0]), e3: XV(s.bar.e3) })
+          : null,
         keepIdeal: !!s.keepIdeal, // v95 barre en T : on garde l'angle idéal s'il passe (1 seule passe)
         NS: s.NS ? P.map(() => XV(s.NS)) : null, // corps déporté : la surface de base est la FACE du bout (pas le tube)
         mode: 'fixe',
@@ -11150,7 +11164,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v106',
+  const CIP_VER = 'CIP v107',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -14396,6 +14410,12 @@ function cip_build() {
           }
         });
         for (let q = nOps0; q < ops.length; q++) ops[q].seam = seamObj;
+        if (c.bar) {
+          const bc = rotM(c.bar.c, ins.a);
+          bc[1] += ins.dy;
+          const bar = Object.assign({}, c.bar, { c: bc, e1: rotM(c.bar.e1, ins.a), e2: rotM(c.bar.e2, ins.a), e3: rotM(c.bar.e3, ins.a) });
+          for (let q = nOps0; q < ops.length; q++) ops[q].bar = bar;
+        }
       })
     );
     splitNotes.forEach(s => notes.push(s));
@@ -15629,10 +15649,24 @@ function cip_build() {
     const fg = +$('cipLFg').value;
     if (kind !== 'soudure' && !(fg > 0)) return { err: 'Donne le rayon pièce pour FGREF.' };
     let g54 = `SET_G54(${OX}, ${OY}, ${OZ})`;
+    // v107 : poignée en T + « élargir » : en SET_POS tu poses la pointe PILE DANS L'ANGLE (comme d'hab).
+    // Le SET_POS déclare ce point-là ; le programme va ensuite tout seul sur le tour élargi.
+    // (avant : le SET_POS déclarait le point élargi -> en posant la pointe dans l'angle, l'élargissement s'annulait)
+    const jointOf = f => {
+      const c = S.prog && S.prog.C[f.ci],
+        b = c && c.bar;
+      if (!b || (Math.abs(b.Ro - b.Rw) < 1e-9 && !b.up)) return f.p;
+      const v = V.sub(f.p, b.c);
+      const kk = b.Rw / b.Ro,
+        x = V.dot(v, b.e1) * kk,
+        z = V.dot(v, b.e3) * kk;
+      const dy = b.s * Math.sqrt(Math.max(0, b.Rb * b.Rb - z * z));
+      return V.add(b.c, V.add(V.mul(b.e1, x), V.add(V.mul(b.e2, dy), V.mul(b.e3, z))));
+    };
     if (posMode) {
       // SET_POS : la pointe est SUR le point de départ quand on lance -> on déclare sa position (sur l'axe du mandrin)
       const f0 = F.find(x => x.j >= 0);
-      const q0 = toLst(f0.p, f0.d, f0.th, o);
+      const q0 = toLst(jointOf(f0), f0.d, f0.th, o);
       g54 = `SET_POS(${n3(q0.X)}, ${n3(q0.Y)}, ${n3(q0.Z)}) ;la pointe est sur le point de depart (B ${n3(q0.B)} C1 ${n3(q0.C)}) : on part d'ici`;
     }
     const dry = $('cipLDry').checked;
@@ -15819,8 +15853,9 @@ function cip_build() {
     // v103 SET_POS : fin = tête en zone sûre (Z 350 machine), mandrin à 0, puis la pointe revient sur le départ
     const posTail = () => {
       const f0 = F.find(x => x.j >= 0);
-      const q0 = toLst(f0.p, f0.d, f0.th, o);
-      const a0 = toLst(V.sub(f0.p, V.mul(f0.d, 30 + DRYOFF)), f0.d, f0.th, o);
+      const pj = jointOf(f0); // v107 : on revient PILE DANS L'ANGLE (là où le SET_POS de la pièce suivante l'attend)
+      const q0 = toLst(pj, f0.d, f0.th, o);
+      const a0 = toLst(V.sub(pj, V.mul(f0.d, 30 + DRYOFF)), f0.d, f0.th, o);
       return [
         'TRAFOOF',
         'G01 SUPA Z = 350 F10000 ;1. tete en zone sure (en haut, coordonnees machine)',
@@ -15861,6 +15896,12 @@ function cip_build() {
           // -> la pièce suivante repart pile pareil (sinon à vide on remontait de 3 mm à chaque cycle)
           if (k === lastF && DRYOFF) {
             B.push(lstMv(toLst(l.f.p, l.f.d, l.f.th, o)) + ' ;pointe sur le depart : pret pour la piece suivante');
+            return;
+          }
+          if (k === lastF && posMode) {
+            // v107 : la pointe revient pile dans l'angle (point du SET_POS)
+            const f0 = F.find(x => x.j >= 0);
+            B.push(lstMv(toLst(jointOf(f0), l.f.d, l.f.th, o)) + ' ;pointe sur le depart (dans l angle) : pret pour la piece suivante');
             return;
           }
           // 1re ligne de déplacement du retour : f5000 en soudure (sinon : vitesse de soudure, très lent)
