@@ -11080,7 +11080,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v103',
+  const CIP_VER = 'CIP v104',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -14942,7 +14942,7 @@ function cip_build() {
     return out;
   }
   function airLST(B) {
-    B = relUnwind(B);
+    // v104 : PAS de déroulé relatif : sur la machine de Seb « G01 G90 C1 = 0 F5000 » remet bien le mandrin à 0
     const out = [];
     for (const l of B) {
       if (l === '' && (!out.length || out[out.length - 1] === '')) continue;
