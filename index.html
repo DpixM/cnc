@@ -3099,6 +3099,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNum" id="cipWOfsRow" style="display:none" data-tip="Poignée en T : décale le tour de soudure (mm).\n+ = le tour grossit : il se pose sur la barre, plus loin du tube soudé.\n− = il remonte sur le tube soudé (vers le bout libre).\n0 = pile dans l'angle."><span>Soudure : élargir le parcours (mm)</span><input type="number" id="cipWOfs" value="0" step="0.05" onchange="cip_ui('wofs')"></div>
           <div id="cipWCorRow" style="display:none;margin:4px 0 6px" data-tip="Poignée en T : corrige la trajectoire là où elle ne suit pas ta soudure.\nLance à vide, regarde à la caméra à chaque quart de tour et tape l'écart (mm) :\n+ = il faut aller vers la barre, − = il faut remonter vers le bout du tube.\nLes angles = de combien le mandrin a tourné depuis le départ (C1 0, -45, -90 …).\nEntre les points le soft fait une courbe douce."><div style="font-size:13px;margin-bottom:3px">Soudure : correction aux 8 points (mm)</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px"><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 0°<input type="number" step="0.05" value="0" class="cipWCor" data-i="0" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -45°<input type="number" step="0.05" value="0" class="cipWCor" data-i="1" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -90°<input type="number" step="0.05" value="0" class="cipWCor" data-i="2" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -135°<input type="number" step="0.05" value="0" class="cipWCor" data-i="3" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -180°<input type="number" step="0.05" value="0" class="cipWCor" data-i="4" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -225°<input type="number" step="0.05" value="0" class="cipWCor" data-i="5" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -270°<input type="number" step="0.05" value="0" class="cipWCor" data-i="6" onchange="cip_ui('wcor')" style="width:100%"></label><label style="font-size:11px;color:var(--txt2);display:flex;flex-direction:column">C1 -315°<input type="number" step="0.05" value="0" class="cipWCor" data-i="7" onchange="cip_ui('wcor')" style="width:100%"></label></div></div>
           <label class="cipChk" data-tip="Coché (conseillé) : mouvement fluide à vitesse élevée.\n• la tête est lissée le long du cordon (fini les crans de B / C1 venant des triangles du STEP)\n• en tête de programme : SOFT (accélérations progressives) + G642 (enchaînement lissé des blocs).\nDécoche si ta machine refuse SOFT / G642 (alarme au lancement)."><input type="checkbox" id="cipWSmooth" checked onchange="cip_ui('proc')"> <b>Mouvement fluide</b> (lissage tête + SOFT G642)</label>
+          <div class="cipNum" data-tip="Sur combien de mm on lisse l'inclinaison de la tête (B / C1).\nPetites courbes qui saccadent = la tête doit pivoter trop vite : augmente (15, 20, 30).\nPlus c'est grand, plus c'est fluide, mais plus la tête s'écarte de l'angle idéal (l'écart max est affiché sous la liste des passages).\nJamais de collision : un point qui toucherait garde son angle d'origine."><span>Lissage de la tête (mm)</span><input type="number" id="cipWSmW" value="8" min="1" max="60" step="1" onchange="cip_ui('proc')"></div>
           <div class="cipNum" data-tip="Comment le parcours de soudure est écrit :\n• G01 + COMPCAD (conseillé) : des points serrés, la commande Siemens en refait une courbe LISSE (pas d'à-coup entre les blocs, même à vitesse haute). C'est ce que font les logiciels FAO pour les formes libres.\n• G01 + COMPCURV : pareil, autre compresseur (essaie-le si COMPCAD donne une alarme).\n• CIP : des arcs bout à bout (petit à-coup à chaque raccord à vitesse haute).\nLes vitesses ne changent pas."><span>Format du parcours</span><select id="cipWPath" onchange="cip_ui('proc')" style="width:170px"><option value="compcad" selected>G01 + COMPCAD (lisse)</option><option value="compcurv">G01 + COMPCURV (lisse)</option><option value="cip">CIP (arcs)</option></select></div>
           <label class="cipChk"><input type="checkbox" id="cipWOpt" checked onchange="cip_ui('proc')"> Incliner la tête tout seul pour ne rien toucher</label>
           <div class="cipNum"><span>Écart max à l'angle idéal (°)</span><input type="number" id="cipWMaxDev" value="60" min="0" max="75" step="5" onchange="cip_ui('proc')"></div>
@@ -11236,7 +11237,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v118',
+  const CIP_VER = 'CIP v119',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -13528,36 +13529,45 @@ function cip_build() {
   // v116 : lissage de l'orientation de la tête le long du cordon (fenêtre ~4 mm).
   // Les normales d'un STEP viennent de triangles : elles « crantent » -> B / C1 en escalier -> à-coups à vitesse élevée.
   // Un point lissé qui toucherait la pièce garde sa direction d'origine.
+  const smW = () => Math.max(1, Math.min(60, +(($('cipWSmW') || {}).value || 8) || 8));
   function smoothDirs(P, D, closed, win) {
+    // v119 : lissage « par diffusion » sous contrainte de collision. On moyenne chaque direction avec ses voisines,
+    // par paquets de 8 passes ; après chaque paquet, un point qui toucherait reprend sa valeur d'avant le paquet.
+    // Les sauts de tête (le soft bascule la tête pour éviter la pièce) sont ainsi étalés sur la plus grande longueur possible.
     const n = P.length;
     if (n < 5 || !(win > 0)) return D;
-    const s = [0];
-    for (let i = 1; i < n; i++) s.push(s[i - 1] + V.len(V.sub(P[i], P[i - 1])));
-    const Ltot = s[n - 1] + (closed ? V.len(V.sub(P[0], P[n - 1])) : 0);
-    const sig = win / 2;
-    const out = D.map((d, i) => {
-      let acc = [0, 0, 0];
-      for (let k = -n; k <= n; k++) {
-        let j = i + k;
-        if (closed) j = ((j % n) + n) % n;
-        else if (j < 0 || j >= n) continue;
-        let ds = Math.abs(s[j] - s[i]);
-        if (closed) ds = Math.min(ds, Ltot - ds);
-        if (ds > 2 * win) {
-          if (k > 0) break;
-          continue;
-        }
-        const w = Math.exp(-(ds * ds) / (2 * sig * sig));
-        acc = V.add(acc, V.mul(D[j], w));
-      }
-      const m = V.nrm(acc);
-      if (!(V.len(acc) > 1e-9)) return d;
+    let L = 0;
+    for (let i = 1; i < n; i++) L += V.len(V.sub(P[i], P[i - 1]));
+    const st = L / (n - 1) || 0.5;
+    const iters = Math.min(600, Math.ceil(0.5 * Math.pow(win / st, 2)));
+    const ok = (i, d) => {
       try {
-        if (clearance(P[i], m, true) < 0.4 && clearance(P[i], d, true) >= 0.4) return d;
-      } catch (e) {}
-      return m;
-    });
-    return out;
+        return clearance(P[i], d, 'mid') >= 0.5;
+      } catch (e) {
+        return true;
+      }
+    };
+    const okOrig = D.map((d, i) => ok(i, d));
+    let cur = D.map(d => d.slice());
+    const nb = (i, k) => {
+      let j = i + k;
+      if (closed) return cur[((j % n) + n) % n];
+      return cur[Math.max(0, Math.min(n - 1, j))];
+    };
+    for (let done = 0; done < iters; ) {
+      const start = cur.map(d => d.slice());
+      const m = Math.min(8, iters - done);
+      for (let it = 0; it < m; it++) {
+        const nx = cur.map((d, i) => {
+          if (!closed && (i === 0 || i === n - 1)) return d;
+          return V.nrm(V.add(V.add(nb(i, -1), nb(i, 1)), V.mul(d, 2)));
+        });
+        cur = nx;
+      }
+      done += m;
+      for (let i = 0; i < n; i++) if (okOrig[i] && !ok(i, cur[i])) cur[i] = start[i];
+    }
+    return cur;
   }
   function applyStart(o) {
     // point de départ choisi + angle de tête au départ (l'écart est gardé sur tout le tour)
@@ -14549,7 +14559,7 @@ function cip_build() {
               ops.push(o);
             });
           } else if (sg.closed) {
-            let o = { name: nm, step: 2, P: PP, D: !c.bar && $('cipWSmooth') && $('cipWSmooth').checked ? smoothDirs(PP, DD, true, 8) : DD, weld: true, opt, faceIn: fIn };
+            let o = { name: nm, step: 2, P: PP, D: !c.bar && $('cipWSmooth') && $('cipWSmooth').checked ? smoothDirs(PP, DD, true, smW()) : DD, weld: true, opt, faceIn: fIn };
             o = applyStart(o);
             if (c.bar) {
               // v108 : correction aux 8 points (poignée en T)
@@ -14570,7 +14580,7 @@ function cip_build() {
             }
             ops.push(o);
           } else {
-            let o = { name: nm, step: 2, P: PP, D: $('cipWSmooth') && $('cipWSmooth').checked ? smoothDirs(PP, DD, false, 8) : DD, weld: true, opt, piece: true, faceIn: fIn };
+            let o = { name: nm, step: 2, P: PP, D: $('cipWSmooth') && $('cipWSmooth').checked ? smoothDirs(PP, DD, false, smW()) : DD, weld: true, opt, piece: true, faceIn: fIn };
             o = applyStart(o);
             const rampMm = (ramp / 360) * plen(PP, false); // cordon OUVERT : 360° = toute sa longueur
             let acc = 0,
