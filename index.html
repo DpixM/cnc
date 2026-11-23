@@ -11236,7 +11236,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v117',
+  const CIP_VER = 'CIP v118',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -16042,9 +16042,39 @@ function cip_build() {
           }
         else {
           B.push(PM === 'compcurv' ? 'COMPCURV ;parcours lisse : compresseur (courbure continue)' : 'COMPCAD ;parcours lisse : compresseur (courbure continue)');
+          // v118 : points serrés seulement là où la forme tourne : un point tous les 0,5 mm partout = trop de blocs par seconde
+          // à vitesse haute (la commande n'arrive plus à les préparer -> elle freine/relance = saccades). On garde un point dès que
+          // la corde s'écarte de plus de 0,01 mm ou que B / C1 s'écartent de plus de 0,3°, et au plus tous les 6 mm.
+          const P3 = k => [Q[k].X, Q[k].Y, Q[k].Z];
+          const okSpan = (i, j) => {
+            const A = P3(i),
+              Bq = P3(j),
+              ab = V.sub(Bq, A),
+              L = V.len(ab);
+            if (L > 6) return false;
+            let cum = 0;
+            const sl = [0];
+            for (let k = i + 1; k <= j; k++) sl.push((cum += V.len(V.sub(P3(k), P3(k - 1)))));
+            for (let k = i + 1; k < j; k++) {
+              const ap = V.sub(P3(k), A);
+              if (L > 1e-9 && V.len(V.cross(ap, ab)) / L > 0.01) return false;
+              const t = sl[k - i] / (cum || 1);
+              if (Math.abs(Q[i].B + (Q[j].B - Q[i].B) * t - Q[k].B) > 0.3) return false;
+              if (Math.abs(Q[i].C + (Q[j].C - Q[i].C) * t - Q[k].C) > 0.3) return false;
+            }
+            return true;
+          };
           for (const [a, b, lab] of segs) {
             if (b <= a) continue;
-            for (let k = a + 1; k <= b; k++) B.push(lineOf({ t: 'G01', e: Q[k] }) + (k === a + 1 && lab ? ' ' + lab : ''));
+            let i = a,
+              first = true;
+            while (i < b) {
+              let j = i + 1;
+              while (j + 1 <= b && okSpan(i, j + 1)) j++;
+              B.push(lineOf({ t: 'G01', e: Q[j] }) + (first && lab ? ' ' + lab : ''));
+              first = false;
+              i = j;
+            }
           }
           B.push('COMPOF ;fin du compresseur');
         }
