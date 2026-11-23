@@ -5129,8 +5129,10 @@ function cip_geo() {
     }
     // affinage final du centre : cercle aux moindres carrés (géométrique) sur les SOMMETS de la peau du tube
     if (round) {
-      for (let pass = 0; pass < 2; pass++) {
+      const rrKeep = {};
+      for (let pass = 0; pass < 3; pass++) {
         const rr = [];
+        rr.Rf = rrKeep.R;
         g.T.forEach((t, i) => {
           if (!sel[i]) return;
           for (const vi of t) {
@@ -5155,29 +5157,41 @@ function cip_geo() {
           }
         });
         const R0 = pk / 4;
-        const pts = rr.filter(q => Math.abs(q[2] - R0) < 1.0);
+        // v115 : fenêtre étroite (la peau ext. seule, pas l'alésage d'un tube mince) + poids égal par secteur d'angle
+        // (un maillage STEP est bien plus dense autour d'un piquage : sans ça le centre glissait de ~0,2 mm)
+        const win = pass === 0 ? 1.0 : 0.35;
+        const pts = rr.filter(q => Math.abs(q[2] - (pass === 0 ? R0 : rr.Rf || R0)) < win);
         if (pts.length < 8) break;
+        const NB = 72,
+          cnt = new Array(NB).fill(0);
+        const bin = q => {
+          const a = Math.atan2(q[1] - cy, q[0] - cx);
+          return Math.min(NB - 1, Math.floor(((a + Math.PI) / (2 * Math.PI)) * NB));
+        };
+        pts.forEach(q => cnt[bin(q)]++);
+        const wts = pts.map(q => 1 / cnt[bin(q)]);
         let ax_ = cx,
           ay_ = cy,
           R = R0;
-        for (let it = 0; it < 15; it++) {
+        for (let it = 0; it < 25; it++) {
           let JTJ = [
               [0, 0, 0],
               [0, 0, 0],
               [0, 0, 0]
             ],
             JTr = [0, 0, 0];
-          for (const [x, y] of pts) {
+          pts.forEach(([x, y], pi) => {
+            const w = wts[pi];
             const dx = x - ax_,
               dy = y - ay_;
             const d = Math.hypot(dx, dy) || 1e-9;
             const res = d - R;
             const J = [-dx / d, -dy / d, -1];
             for (let a = 0; a < 3; a++) {
-              JTr[a] += J[a] * res;
-              for (let b = 0; b < 3; b++) JTJ[a][b] += J[a] * J[b];
+              JTr[a] += w * J[a] * res;
+              for (let b = 0; b < 3; b++) JTJ[a][b] += w * J[a] * J[b];
             }
-          }
+          });
           const D = det(JTJ);
           if (Math.abs(D) < 1e-12) break;
           const s = [0, 1, 2].map(j => det(JTJ.map((r, i) => r.map((x, c) => (c === j ? JTr[i] : x)))) / D);
@@ -5189,6 +5203,8 @@ function cip_geo() {
         if (Math.hypot(ax_ - cx, ay_ - cy) < 5) {
           cx = ax_;
           cy = ay_;
+          rr.Rf = R;
+          rrKeep.R = R;
         }
       }
     }
@@ -11218,7 +11234,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v114',
+  const CIP_VER = 'CIP v115',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
