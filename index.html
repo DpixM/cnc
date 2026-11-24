@@ -3002,7 +3002,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div class="cipNote" id="cipMtInfo"></div>
           <div class="cipRow"><button class="cipBtn" style="flex:1" onclick="cip_ui('miter')">📐 Voir l'ellipse et l'écart de rayon</button></div>
           <div class="cipStat" id="cipMtMsg"></div>
-          <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','mach')">Suivant : mise en machine + simulation →</button></div>
+          <div class="cipRow" style="display:none"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','mach')">Suivant : mise en machine + simulation →</button></div>
         </div>
         <div style="--bc:#f5a623" class="cipBox" data-st="build" id="cipCutBox" data-mtno>
           <h3>✂ Tube à découper</h3>
@@ -3010,7 +3010,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div id="cipCutBody"></div>
           <input type="file" id="cipCutFile" accept=".dxf,.DXF" style="display:none">
           <div class="cipStat" id="cipCutMsg"></div>
-          <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : réglages →</button></div>
+          <div class="cipRow" style="display:none"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : réglages →</button></div>
         </div>
         <div style="--bc:#f5a623" class="cipBox" data-st="build" id="cipGenBox" data-mtno>
           <h3>🛠 Créer ma pièce</h3>
@@ -3023,7 +3023,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <div id="cipGBodies"></div>
           <div class="cipRow"><button class="cipBtn" onclick="cip_ui('genadd','rond')">+ Tube / rond</button><button class="cipBtn" onclick="cip_ui('genadd','plat')">+ Plat</button><button class="cipBtn" onclick="cip_ui('genadd','bride')">+ Bride</button><button class="cipBtn" onclick="cip_ui('genadd','deport')">+ Déporté</button><button class="cipBtn" onclick="cip_ui('genadd','barre')">+ Barre en T</button></div>
           <div class="cipStat" id="cipGMsg"></div>
-          <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : réglages →</button></div>
+          <div class="cipRow" style="display:none"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','sim')">Suivant : réglages →</button></div>
         </div>
         <div style="--bc:#4fc3f7" class="cipBox" data-st="sim mach" id="cipSimBox">
           <h3><span class="cipInSim">✔ Contrôle des collisions</span><span class="cipInMach">▶ Simulation (avec tes vraies valeurs)</span></h3>
@@ -3115,7 +3115,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <label class="cipChk" data-tip="À la fin du programme, la tête revient pile sur le point de départ, tous les axes comme au début (X Y Z B C1), par un chemin calculé sans collision : prête pour la pièce suivante."><input type="checkbox" id="cipRetDep" checked onchange="cip_ui('rapmode')"> Revenir au point de départ à la fin</label>
           <div class="cipNum" id="cipRetRow" data-only="soudure" data-tip="Comment la tête revient au point de départ à la fin :\n• Chemin dégagé : elle se dégage et revient par un chemin sans collision (C1 revient à sa valeur du début).\n• Trajet inverse : laser coupé, elle refait à l'envers la pente de fin + le recouvrement, et se retrouve pile sur le point de départ (C1 finit 1 tour plus loin = même position ; le G01 C1=0 du début du programme suivant le remet à 0, tête en haut)."><span>Retour</span><select id="cipRetMode" onchange="cip_ui('rapmode')" style="width:170px"><option value="std">Chemin dégagé (comme avant)</option><option value="inv">Trajet inverse (pente fin + recouvrement)</option></select></div>
           <div class="cipSt" id="cipSteps"></div>
-          <div class="cipRow" style="margin-top:10px"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','mach')">Suivant : mise en machine →</button></div>
+          <div class="cipRow" style="display:none"><button class="cipBtn cipMain" style="width:100%;font-size:15px;padding:10px" onclick="cip_ui('gostep','mach')">Suivant : mise en machine →</button></div>
         </div>
         <div style="--bc:#5fcf8f" class="cipBox" data-st="mach" id="cipMachBox">
           <h3>🔧 Mise en machine</h3>
@@ -11238,7 +11238,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v122',
+  const CIP_VER = 'CIP v123',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -15782,10 +15782,6 @@ function cip_build() {
       ...(posMode
         ? [';(tout est revenu a la position de depart)']
         : [
-            'TC_RESET ;comme au debut : plus aucun decalage (trafo, frames)',
-            'G71',
-            'G500',
-            'G90',
             'G01 Z = 350 F10000 ;1. on ecarte la tete',
             'G01 G90 C1 = 0 F10000 ;2. mandrin a 0 (tete degagee)',
             'G01 B = 0 Y = 200 F10000 ;3. tete en position de depart',
@@ -16196,10 +16192,6 @@ function cip_build() {
     // v98 : fin propre, dans l'ordre : 1. on écarte la tête  2. C1 à 0 (tout seul)  3. tête en position de départ
     const PARK = [
       // v99 : mêmes lignes qu'au début du programme (là où le C1 = 0 marche) : TC_RESET efface les décalages laissés par la trafo
-      'TC_RESET ;comme au debut : plus aucun decalage (trafo, frames)',
-      'G71',
-      'G500',
-      'G90',
       'G01 Z = 350 F10000 ;1. on ecarte la tete',
       ...unwind(B),
       (o.trafo === 'Bc1' ? 'G01 B = 0 X =50 Y = 200 F10000' : 'G01 B = 0 Y = 200 F10000') + ' ;3. tete en position de depart',
@@ -16212,7 +16204,6 @@ function cip_build() {
         '',
         ';----- fin de programme -----',
         'TRAFOOF',
-        ...(posMode ? ['G01 G90 C1 = 0 F10000 ;mandrin a 0 (securite : deja a 0, ne bouge pas)'] : []), // v105
         '',
         'G500',
         'G90',
