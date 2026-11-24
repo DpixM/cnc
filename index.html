@@ -11238,7 +11238,7 @@ function cip_build() {
       row.title = on ? "Avec « Départ à C1 = 0 », c'est le soft qui tourne la pièce." : '';
     }
   }
-  const CIP_VER = 'CIP v120',
+  const CIP_VER = 'CIP v121',
     CIP_DATE = '19/11/2026';
   {
     const e = $('cipVer');
@@ -16131,7 +16131,9 @@ function cip_build() {
     };
     {
       // v103 soudure en SET_G54 : pas de « retour au départ » (inutile, le PARK remonte la tête) -> pas de trajet parasite
-      const hm = S.prog.home && !simpleEnd && !(W && !posMode) ? F.filter(f => f.ci === S.prog.home.ci) : [];
+      // v120 : en soudure plus de « trajet inverse » (le laser est coupé : refaire le tour à l'envers en plein de petits blocs
+      // à F5000 = saccades et segments partout). On lève de 30 mm dans l'axe du faisceau, puis zone sûre, mandrin à 0, départ.
+      const hm = S.prog.home && !simpleEnd && !W ? F.filter(f => f.ci === S.prog.home.ci) : [];
       if (simpleEnd) {
         const fl = F.filter(f => f.ci < S.prog.home.ci).pop() || F[F.length - 1];
         B.push(
@@ -16184,8 +16186,10 @@ function cip_build() {
       } else {
         const fl = (S.prog.home && F.filter(f => f.ci < S.prog.home.ci).pop()) || F[F.length - 1];
         B.push(
-          lstMv(toLst(V.sub(fl.p, V.mul(fl.d, 30)), fl.d, fl.th, o)) + " ;degagement 30 mm dans l'axe du faisceau"
+          ';----- fin : on leve la tete, puis tout revient a la position de depart -----',
+          lstMv(toLst(V.sub(fl.p, V.mul(fl.d, 30)), fl.d, fl.th, o), W ? 'f5000' : '') + " ;degagement 30 mm dans l'axe du faisceau"
         );
+        if (W && posMode) B.push(...posTail());
       }
     }
     const park = !S.prog.home || (simpleEnd && !posMode) || (W && !posMode); // v100 soudure : TOUJOURS mandrin à 0 à la fin
