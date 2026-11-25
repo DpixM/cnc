@@ -164,6 +164,10 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-11-25 — KJ : LASER — SUIVEUR FIGÉ DANS LES TROUS : TC_DIST_FREEZE(1) juste après chaque TC_LASER_ON des trous
+   (contours intérieurs) -> la tête garde sa hauteur et ne plonge plus dans le trou (doc TRUMPF ControlLine 13.5 ; il se
+   réactive tout seul au TC_LASER_OFF(2)). Case « Figer le suiveur » (cochée) + choix « les trous » / « tous les contours ».
+   Corrigé aussi : un « \n » s'affichait en texte sous « Délimitation » sur la page Découpe.
 -- 2026-11-25 — KI : OUVRIR UN PROGRAMME .LST (découpe) : Importer (ou Blocs ▸ « Ouvrir un programme .LST ») lit le programme
    TRUMPF (G0/G1/G2/G3, cercles complets, amorces ENTREE/SORTIE) et le remet en ESQUISSE modifiable : lignes (H/V), arcs, cercles,
    tangences. Les amorces d'origine sont en pointillés (construction, pas découpées : KERF refait les siennes). On mesure (I),
@@ -2559,7 +2563,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-25-KI ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-25-KJ ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3855,7 +3859,10 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
         <label style="flex:1;min-width:120px">Levée Z fin de forme (mm)
           <input id="laserZlift" type="number" value="5" min="0" max="200" step="1" oninput="wzGenLaser()"></label>
       </div>
-      <label class="p10chk"><input type="checkbox" id="laserFrame" checked onchange="wzGenLaser()"><span><b>Délimitation</b> — tour à vide autour de la forme (laser éteint) puis pause M00 pour vérifier que la pièce passe sur la tôle.</span></label>\n      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt2);margin:4px 0 0 26px">Écart du tour <input id="laserFrameOff" type="number" value="2" min="0.5" max="50" step="0.5" style="width:64px" oninput="_frameOffSave(this)"> mm autour de la forme</label>
+      <label class="p10chk"><input type="checkbox" id="laserFrame" checked onchange="wzGenLaser()"><span><b>Délimitation</b> — tour à vide autour de la forme (laser éteint) puis pause M00 pour vérifier que la pièce passe sur la tôle.</span></label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt2);margin:4px 0 0 26px">Écart du tour <input id="laserFrameOff" type="number" value="2" min="0.5" max="50" step="0.5" style="width:64px" oninput="_frameOffSave(this)"> mm autour de la forme</label>
+      <label class="p10chk"><input type="checkbox" id="laserFreeze" checked onchange="_dfSave()"><span><b>Figer le suiveur de hauteur</b> — ajoute <code>TC_DIST_FREEZE(1)</code> juste après <code>TC_LASER_ON</code> : la tête garde sa hauteur et ne plonge plus dans le trou. Il se réactive tout seul au <code>TC_LASER_OFF</code>.</span></label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt2);margin:4px 0 0 26px">Pour <select id="laserFreezeWhere" onchange="_dfSave()" style="font-size:11px"><option value="in">les trous (contours intérieurs)</option><option value="all">tous les contours (aussi l'extérieur)</option></select></label>
       <label class="p10chk"><input type="checkbox" id="laserSmooth" checked onchange="_lsSmoothSave()"><span><b>Courbes lisses</b> — les courbes (SVG, splines, décalages…) sortent en arcs G2/G3 au lieu de centaines de petits G1 : la machine ne saccade plus.</span></label>
       <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt2);margin:4px 0 0 26px">Précision <input id="laserSmoothTol" type="number" value="0.01" min="0.002" max="0.2" step="0.005" style="width:64px" oninput="_lsSmoothSave()"> mm (écart maxi avec le dessin)</label>
     </div>
@@ -21380,6 +21387,7 @@ function buildLaserBody(){
       _prev.push({pts, closed:!!c._closed, start:S?[S[0],S[1]]:null, key:c.key, orig:c._orig, ob:c._ob, off:c._userOff||0, dir:(c._closed?_effDir(c):'auto'), waste:wasteInside,
         lead:chosen?{A:chosen.A.slice(),O:chosen.O?chosen.O.slice():null,g:chosen.g||null,line:!!chosen.line,man:!!chosen._man,sweep:(chosen.sweep!=null?chosen.sweep:Math.PI),S:[S[0],S[1]]}:null,
         manDirect:!!(_man && _man.type==='direct') }); }catch(e){}
+    if(typeof _dfWant==='function' && _dfWant(wasteInside)) head=_dfIns(head);   // KJ : suiveur figé (la tête ne plonge pas dans le trou)
     return head + c.moves.join('\n')+'\n'
       +'TC_LASER_OFF(2)\n'
       +'G1 Z'+_lc(ZL)+'   ;lever la tete pour degager la piece coupee';
@@ -40060,6 +40068,19 @@ function _lstOptSync(){ const cfg=document.getElementById('laserCfg'); if(!cfg) 
   const t=S.table; d.innerHTML='<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="lstKeep" '+(S.keep?'checked':'')+' style="margin-top:2px"><span><b>Garder l\'en-tête et le tableau techno du fichier ouvert</b><br><span style="opacity:.8">'+String(S.name).replace(/[<>&]/g,'')+' → TM_LTTNAME="'+S.dataset+'"'+(t?' · '+t.mat+' '+t.thk+' mm':'')+'<br>Décoché = en-tête et tableau KERF habituels (champ « Tableau techno »).</span></span></label>';
   d.querySelector('#lstKeep').onchange=e=>{ S.keep=!!e.target.checked; try{ wzGenLaser(); }catch(err){} }; }
 if(typeof wzGenLaser==='function'){ const _wzGL0=wzGenLaser; wzGenLaser=function(){ try{ _lstOptSync(); }catch(e){} return _wzGL0.apply(this,arguments); }; }
+
+// ═══ KJ : SUIVEUR DE HAUTEUR FIGÉ (TC_DIST_FREEZE) — la tête ne plonge plus dans les trous ═══
+// Doc TRUMPF (ControlLine 13.5) : TC_DIST_FREEZE(1) APRÈS TC_LASER_ON ; le suiveur garde la hauteur qu'il a à ce moment-là,
+// sans s'arrêter. Il redevient actif tout seul au TC_LASER_OFF(2) -> on le remet à chaque contour concerné.
+let _df={on:true,where:'in'};
+function _dfLoad(){ try{ const v=JSON.parse(localStorage.getItem('kerf_freeze')||'null'); if(v){ _df.on=v.on!==false; _df.where=(v.where==='all')?'all':'in'; } }catch(e){}
+  const a=document.getElementById('laserFreeze'), b=document.getElementById('laserFreezeWhere'); if(a) a.checked=_df.on; if(b) b.value=_df.where; }
+function _dfRead(){ const a=document.getElementById('laserFreeze'), b=document.getElementById('laserFreezeWhere'); if(a) _df.on=!!a.checked; if(b) _df.where=(b.value==='all')?'all':'in'; }
+function _dfSave(){ _dfRead(); try{ localStorage.setItem('kerf_freeze',JSON.stringify(_df)); }catch(e){} if(typeof wzGenLaser==='function') wzGenLaser(); }
+function _dfWant(waste){ return !!_df.on && (_df.where==='all' || !!waste); }
+function _dfIns(head){ const on=_laserOnStr()+'\n'; if(head.indexOf(on)<0) return head;
+  return head.replace(on, on+'TC_DIST_FREEZE(1)   ;suiveur de hauteur fige : la tete ne plonge pas dans le trou (reactive au TC_LASER_OFF)\n'); }
+try{ _dfLoad(); }catch(e){}
 
 </script>
 <!-- ╚═ FIN ESQUISSE (SK) ═╝ -->
