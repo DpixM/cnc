@@ -164,6 +164,12 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-11-25 — KI : OUVRIR UN PROGRAMME .LST (découpe) : Importer (ou Blocs ▸ « Ouvrir un programme .LST ») lit le programme
+   TRUMPF (G0/G1/G2/G3, cercles complets, amorces ENTREE/SORTIE) et le remet en ESQUISSE modifiable : lignes (H/V), arcs, cercles,
+   tangences. Les amorces d'origine sont en pointillés (construction, pas découpées : KERF refait les siennes). On mesure (I),
+   on cote (D), on modifie, on ajoute, puis on regénère. Sur la page Découpe : case « Garder l'en-tête et le tableau techno du
+   fichier ouvert » (cochée par défaut) -> seul le programme entre START_TEXT et STOP_TEXT change, TM_LTTNAME = le tableau du
+   fichier, titres et nom de fichier SANS ACCENTS (la machine les refuse). Fenêtre d'infos : titre, tableau, matière/épaisseur.
 -- 2026-11-13 — KH : LASER — COURBES LISSES (case « Courbes lisses », précision 0,01 mm) : toutes les courbes fines (SVG, splines,
    ellipses, décalages, saignée…) sortent en arcs G2/G3 au lieu de centaines de petits G1 qui faisaient saccader la machine.
    Seuls les tracés fins sont touchés : un vrai polygone / une étoile / un rectangle garde ses côtés (vérifié identique).
@@ -2553,7 +2559,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-13-KH ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-25-KI ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -4337,7 +4343,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 </div>
 
 <input type="file" id="fontFileInput" accept=".ttf,.otf,.woff" style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px" onchange="importFontFile(this)">
-<input type="file" id="svgFileInput" accept=".svg,.dxf,.png,.jpg,.jpeg,.gif,.bmp,.webp,image/*" style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px" onchange="importSvgOrImage(this)">
+<input type="file" id="svgFileInput" accept=".svg,.dxf,.lst,.LST,.png,.jpg,.jpeg,.gif,.bmp,.webp,image/*" style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px" onchange="importSvgOrImage(this)">
 <input type="file" id="projFileInput" accept=".json,application/json" style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px" onchange="loadProjectFile(this)">
 
 <script>
@@ -28774,6 +28780,7 @@ function importSvgOrImage(input){
   const name=(file.name||'').toLowerCase();
   const isSvg = file.type==='image/svg+xml' || name.endsWith('.svg');
   const isDxf = name.endsWith('.dxf');
+  if(name.endsWith('.lst') && typeof lstImportFile==='function'){ lstImportFile(file); input.value=''; return; }   // KI : programme découpe TRUMPF -> esquisse
   if(isSvg){ importSVG(input); return; }
   if(isDxf){ importDXF(file); input.value=''; return; }
   // Image bitmap : vectorisation automatique en mode contour (comme avant)
@@ -37902,7 +37909,7 @@ function _s3dCubeRender(){ if(!_s3dCube||!_s3d) return; const {r,sc,cam}=_s3dCub
 
 
 <input type="file" id="fontFileInput" accept=".ttf,.otf,.woff" style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px" onchange="importFontFile(this)">
-<input type="file" id="svgFileInput" accept=".svg,.dxf,.png,.jpg,.jpeg,.gif,.bmp,.webp,image/*" style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px" onchange="importSvgOrImage(this)">
+<input type="file" id="svgFileInput" accept=".svg,.dxf,.lst,.LST,.png,.jpg,.jpeg,.gif,.bmp,.webp,image/*" style="position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px" onchange="importSvgOrImage(this)">
 
 <!-- ══ GEAR MODAL ══ -->
 <div class="modal-bg modal-bubble" id="gearModal" onclick="if(event.target===this)document.getElementById('gearModal').classList.remove('open')">
@@ -39501,7 +39508,7 @@ function skBarBuild(){ const host=document.getElementById('skBar'); if(!host||ho
     TOOL_MENUS.skMore=[ {i:'⊡',l:'Rectangle par le centre',fn:"skTool('rectc')"}, {i:'◔',l:'Arc : centre + 2 points',fn:"skTool('arcc')"}, {i:'⤻',l:'Arc tangent (au bout d\'un trait)',fn:"skTool('arct')"}, {i:'⊖',l:'Cercle 2 points (diamètre)',fn:"skTool('circle2')"}, {i:'◌',l:'Cercle 3 points',fn:"skTool('circle3')"}, {i:svgI,l:'Oblong / Rainure',fn:"skTool('slot')"}, {i:'⬠',l:'Polygone (Ø sur les pointes)',fn:"skTool('poly')"}, {i:'⬡',l:'Polygone (sur plats / clé)',fn:"skTool('polyo')"}, {i:'◇',l:'Rectangle 3 points (incliné)',fn:"skTool('rect3')"}, {i:'•',l:'Point',fn:"skTool('point')"},
       {i:'T',l:'Texte (bloc)',fn:"skTool(null);cadPick('text')"}, {i:'⚙️',l:'Engrenage (bloc)',fn:'skTool(null);openGearModal()'}, {i:'∿',l:'Spline (courbe par points)',fn:"skTool('spline')"}, {i:'⬭',l:'Ellipse',fn:"skTool('ellipse')"}, {i:'✎',l:'Tracé à main levée (bloc)',fn:"skTool(null);cadPick('free')"}, {i:'★',l:'Étoile (bloc)',fn:"skTool(null);cadPick('star')"}, {i:'△',l:'Triangle (bloc)',fn:"skTool(null);cadPick('tri')"} ];
     TOOL_MENUS.skMod=[ {i:'⊢',l:'Prolonger',fn:"skTool('extend')"}, {i:'✂',l:'Couper en un point',fn:"skTool('split')"}, {i:'✥',l:'Déplacer [M] (valeurs X/Y)',fn:"skTool('move')"}, {i:'⧉',l:'Copier (valeurs X/Y)',fn:"skTool('copy')"}, {i:'⤢',l:'Échelle',fn:'skScaleSel()'}, {i:'📐',l:'Mesurer [I]',fn:"skTool('measure')"}, {i:'🪞',l:'Miroir',fn:"skTool('mirror')"}, {i:'🔗',l:'Pont (tab)',fn:"skTool('tab')"}, {i:'▦',l:'Réseau rectangulaire',fn:'skPatternRect()'}, {i:'❋',l:'Réseau circulaire',fn:"skTool('patc')"}, {i:'⟳',l:'Tourner',fn:'skRotateSel()'} ];
-    TOOL_MENUS.skBlk=[ {i:'📥',l:'Importer un DXF en esquisse (modifiable)',fn:'skImportDXF()'}, {i:'✎',l:'Convertir en esquisse',fn:'skFromBlocks()'}, {i:'⟳',l:'Rotation',fn:'cadRotate()'}, {i:'⤢',l:'Échelle',fn:'cadScale()'}, {i:'⧉',l:'Dupliquer (+5 mm)',fn:'cadDuplicate()'}, {i:'🪞',l:'Miroir',fn:'cadMirrorTool()'}, {i:'⚓',l:'Accrocher 2 points',fn:'cadAlign2()'}, {i:'🔗',l:'Tab (pont)',fn:'cadTabs()'}, {i:'🧽',l:'Gomme',fn:"setPTool('eraser')"}, {i:'🔓',l:'Déverrouiller',fn:'cadUnlock()'},
+    TOOL_MENUS.skBlk=[ {i:'📥',l:'Importer un DXF en esquisse (modifiable)',fn:'skImportDXF()'}, {i:'📂',l:'Ouvrir un programme .LST (découpe)',fn:'lstOpen()'}, {i:'✎',l:'Convertir en esquisse',fn:'skFromBlocks()'}, {i:'⟳',l:'Rotation',fn:'cadRotate()'}, {i:'⤢',l:'Échelle',fn:'cadScale()'}, {i:'⧉',l:'Dupliquer (+5 mm)',fn:'cadDuplicate()'}, {i:'🪞',l:'Miroir',fn:'cadMirrorTool()'}, {i:'⚓',l:'Accrocher 2 points',fn:'cadAlign2()'}, {i:'🔗',l:'Tab (pont)',fn:'cadTabs()'}, {i:'🧽',l:'Gomme',fn:"setPTool('eraser')"}, {i:'🔓',l:'Déverrouiller',fn:'cadUnlock()'},
       {i:'⌒',l:'Congé (bloc)',fn:'cadFillet()'}, {i:'◣',l:'Chanfrein (bloc)',fn:'cadChamfer()'}, {i:'⧈',l:'Décalage (bloc)',fn:'cadOffset()'}, {i:'✂️',l:'Ajuster (bloc)',fn:'cadTrim()'}, {i:'⊢',l:'Prolonger 2 côtés (bloc)',fn:'cadExtend2()'}, {i:'⊬',l:'Prolonger jusqu\'à l\'obstacle (bloc)',fn:'cadExtend()'}, {i:'◯',l:'Rendre rond (bloc)',fn:'cadToTrueCircle()'}, {i:'📏',l:'Cote (bloc)',fn:'cadStartDim()'}, {i:'❋',l:'Réseaux (bloc)',fn:'cadArraysMenu()'}, {i:'⟂',l:'Contraintes (bloc)',fn:"openToolMenu('cadConstrain',document.getElementById('cat-skBlk'))"} ];
   }catch(e){ console.error('sk menus',e); }
   const cw=document.getElementById('canvasWrap'); if(cw&&!document.getElementById('skHint')){ const hd=document.createElement('div'); hd.id='skHint'; cw.appendChild(hd); }
@@ -39903,6 +39910,156 @@ SKT.ellipse={ n:3, name:'Ellipse', from:T=>T.clicks.length===1?T.clicks[0]:null,
 // décalage : pas encore sur spline / ellipse -> message clair au lieu d'une erreur
 { const _od=SKT.offset.down; SKT.offset.down=(T,x,y)=>{ if(!T.path){ const h=skHitAt(x,y,{geoOnly:true,noPts:true}); if(h&&h.k==='e'){ const ch=skChainOf(h.id); if(ch.some(s=>s.e.t==='S'||s.e.t==='E')){ skSay('Décalage : pas encore possible sur une spline / ellipse'); return; } } } return _od(T,x,y); };
   const _om=SKT.offset.move; SKT.offset.move=(T,x,y)=>{ if(T.path&&T.path.some(s=>s.e.t==='S'||s.e.t==='E')){ T.path=null; return; } if(!T.path){ const h=skHitAt(x,y,{geoOnly:true,noPts:true}); if(h&&h.k==='e'&&skChainOf(h.id).some(s=>s.e.t==='S'||s.e.t==='E')){ SK.hl=null; return; } } return _om(T,x,y); }; }
+
+// ═══ KI : OUVRIR UN PROGRAMME .LST (découpe laser TRUMPF) → esquisse modifiable ═══
+// On lit le programme (G0/G1/G2/G3, amorces ENTREE/SORTIE), on refait les contours en esquisse (lignes, arcs, cercles),
+// les amorces d'origine en pointillés (construction : visibles, jamais découpées — KERF refait les siennes).
+// À la génération, on peut GARDER l'en-tête et le tableau techno du fichier ouvert (seul le programme change).
+function lstClean(s){ s=String(s||''); try{ s=s.normalize('NFD').replace(/[\u0300-\u036f]/g,''); }catch(e){}
+  s=s.toUpperCase().replace(/\s*-\s*/g,'-').replace(/[^A-Z0-9_-]+/g,'_').replace(/_+/g,'_').replace(/^[_-]+|[_-]+$/g,''); return s.slice(0,60)||'PROGRAMME1'; }
+function lstParse(text){
+  const raw=String(text||'').replace(/^\uFEFF/,''); const L=raw.replace(/\r/g,'').split('\n');
+  const R={contours:[],warn:[],title:'',dataset:'',lttVar:'',table:null,header:'',footer:'',nOff:0};
+  const iS=L.findIndex(l=>/^\s*START_TEXT\s*$/i.test(l)), iE=(()=>{ for(let i=L.length-1;i>=0;i--) if(/^\s*STOP_TEXT\s*$/i.test(L[i])) return i; return -1; })();
+  const b0=iS>=0?iS+1:0, b1=(iE>b0)?iE:L.length;
+  if(iS>=0&&iE>iS){ R.header=L.slice(0,iS+1).join('\n')+'\n'; R.footer=L.slice(iE).join('\n'); if(!/\n$/.test(R.footer)) R.footer+='\n'; }
+  for(let i=(iS>=0?iS:L.length)-1;i>=0;i--){ const m=/^DA,'([^']*)'/.exec(L[i]); if(m){ R.title=m[1]; break; } }
+  for(const l of L){ let m=/^DA,'LTT_STAMM','([^']*)'/.exec(l); if(m&&!R.dataset) R.dataset=m[1]; }
+  const iT=L.findIndex(l=>/^BEGIN_LTT_STAMM/.test(l));
+  if(iT>=0) for(let i=iT;i<L.length;i++){ const m=/^DA,'([^']*)','([^']*)',([-\d.]+),'([^']*)',([-\d.]+)/.exec(L[i]); if(m){ R.table={name:m[1],mach:m[2],power:+m[3],mat:m[4],thk:+m[5]}; break; } }
+  // ── programme ──
+  let X=0,Y=0,G=0,abs=true,on=false,cur=null,sec='cut',leadPending=false,nUnk=0;
+  const near=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1])<=0.002;
+  const newC=()=>({lead:[],cut:[],out:[],marked:false});
+  const finish=()=>{ if(!cur) return; if(cur.lead.length+cur.cut.length+cur.out.length){
+      if(!cur.marked&&cur.cut.length>=2){ // pas de repères ENTREE/SORTIE : on devine l'amorce (le 1er mouvement, si le contour revient sur son bout)
+        const mv=cur.cut, p1=mv[0].q; let k=-1; for(let i=mv.length-1;i>=1;i--){ if(near(mv[i].q,p1)){ k=i; break; } }
+        if(k>=1&&!near(mv[0].p,p1)){ cur.lead=[mv[0]]; cur.out=mv.slice(k+1); cur.cut=mv.slice(1,k+1); } }
+      R.contours.push(cur); } cur=null; };
+  for(let li=b0;li<b1;li++){ let s=L[li]; const sc=s.indexOf(';'); const com=sc>=0?s.slice(sc+1):''; if(sc>=0) s=s.slice(0,sc); s=s.trim().toUpperCase();
+    if(/ENTREE\s+LEAD\s*IN/i.test(com)){ if(cur){ sec='lead'; leadPending=true; cur.marked=true; } continue; }
+    if(/SORTIE\s+LEAD\s*OUT/i.test(com)){ if(cur){ sec='out'; cur.marked=true; } continue; }
+    if(!s) continue;
+    if(/^TC_LASER_ON\b/.test(s)){ finish(); cur=newC(); on=true; sec='cut'; leadPending=false; continue; }
+    if(/^TC_LASER_OFF\b/.test(s)){ on=false; finish(); continue; }
+    if(/^(TC_|TM_|SET_POS|M\d|ED\b|BD\b)/.test(s)||/^[A-Z_][A-Z0-9_]*\s*=\s*"/.test(s)||/^[A-Z_][A-Z0-9_]*\(/.test(s)){
+      if(/^(L\d+|CALL|PCALL|MCALL)\b/.test(s)) R.warn.push('sous-programme ignoré : '+s);
+      continue; }
+    if(/^(L\d+|CALL|PCALL|MCALL)\b/.test(s)){ R.warn.push('sous-programme ignoré : '+s); continue; }
+    const tok={}; const gs=[]; const re=/([A-Z])\s*=?\s*(-?\d*\.?\d+(?:E[-+]?\d+)?)/g; let m; while((m=re.exec(s))){ if(m[1]==='G') gs.push(+m[2]); else tok[m[1]]=+m[2]; }
+    if(!gs.length&&!('X' in tok)&&!('Y' in tok)&&!('I' in tok)&&!('J' in tok)){ if(++nUnk<=3) R.warn.push('ligne non lue : '+s.slice(0,40)); continue; }
+    for(const g of gs){ if(g===90) abs=true; else if(g===91){ abs=false; } else if(g>=0&&g<=3&&Number.isInteger(g)) G=g; }
+    if(!abs&&!R.warn.some(w=>/G91/.test(w))) R.warn.push('G91 (relatif) : lu en relatif, vérifie le résultat');
+    if(on&&(('A' in tok)||('B' in tok)||('C' in tok))&&!R.warn.some(w=>/axes A\/B\/C/.test(w))) R.warn.push('axes A/B/C (biseau / 5 axes) ignorés');
+    const has=('X' in tok)||('Y' in tok)||('I' in tok)||('J' in tok); if(!has) continue;
+    const nx=('X' in tok)?(abs?tok.X:X+tok.X):X, ny=('Y' in tok)?(abs?tok.Y:Y+tok.Y):Y;
+    const p=[X,Y], q=[nx,ny];
+    if(on&&cur&&G>=1){ let mv;
+      if(G===1){ if(!near(p,q)) mv={t:'L',p,q}; }
+      else { const c=[X+(tok.I||0),Y+(tok.J||0)], r=Math.hypot(X-c[0],Y-c[1]); if(r>1e-6) mv={t:'A',p,q,c,r,cw:G===2,full:near(p,q)}; }
+      if(mv){ (sec==='lead'?cur.lead:sec==='out'?cur.out:cur.cut).push(mv); if(sec==='lead'&&leadPending){ leadPending=false; sec='cut'; } } }
+    else if(!on&&G>=1) R.nOff++;
+    X=nx; Y=ny; }
+  finish(); return R; }
+
+// encadrement d'un mouvement (arcs : on échantillonne)
+function _lstMvPts(mv){ if(mv.t==='L') return [mv.p,mv.q]; const c=mv.c, a0=Math.atan2(mv.p[1]-c[1],mv.p[0]-c[0]); let a1=Math.atan2(mv.q[1]-c[1],mv.q[0]-c[0]);
+  let sw=mv.cw?a0-a1:a1-a0; while(sw<=1e-9) sw+=2*Math.PI; if(mv.full) sw=2*Math.PI; const n=Math.max(4,Math.ceil(sw/0.1)), out=[];
+  for(let i=0;i<=n;i++){ const a=a0+(mv.cw?-1:1)*sw*i/n; out.push([c[0]+mv.r*Math.cos(a),c[1]+mv.r*Math.sin(a)]); } return out; }
+
+// R (lstParse) -> esquisse. opt.replace : on vide le dessin d'abord.
+function lstToSketch(R,opt){ opt=opt||{};
+  const cs=R.contours.filter(c=>c.cut.length); if(!cs.length) return {n:0};
+  let x0=1e18,y0=1e18,x1=-1e18,y1=-1e18; for(const c of cs) for(const mv of c.cut) for(const q of _lstMvPts(mv)){ if(q[0]<x0)x0=q[0]; if(q[0]>x1)x1=q[0]; if(q[1]<y0)y0=q[1]; if(q[1]>y1)y1=q[1]; }
+  const W=wMm(), H=hMm(), Xc=(x0+x1)/2, Yc=(y0+y1)/2;
+  // repère KERF : X machine = offX - x (miroir), Y machine = y - offY  ->  x = W/2 + (Xc - X), y = H/2 + (Y - Yc)
+  const TX=X=>W/2+(Xc-X), TY=Y=>H/2+(Y-Yc);
+  const before=skSnap(), km=SK.kMode; SK.kMode=false; const made=[], lead=[]; const grid={}; const tol=0.002;
+  const P=(x,y)=>{ const gx=Math.round(x/tol), gy=Math.round(y/tol); for(let a=-1;a<=1;a++) for(let b=-1;b<=1;b++){ const Lg=grid[(gx+a)+','+(gy+b)]; if(Lg) for(const p of Lg){ if(Math.hypot(p.x-x,p.y-y)<=tol) return p; } } const p=skNewP(x,y); (grid[gx+','+gy]||(grid[gx+','+gy]=[])).push(p); return p; };
+  const add=(mv,k)=>{ const pa=[TX(mv.p[0]),TY(mv.p[1])], pb=[TX(mv.q[0]),TY(mv.q[1])];
+    if(mv.t==='L'){ const a=P(pa[0],pa[1]), b=P(pb[0],pb[1]); if(a===b) return null; const l=skLine(a.id,b.id,k); if(!k){ if(Math.abs(a.y-b.y)<1e-6) skAddCon({t:'H',e:l.id}); else if(Math.abs(a.x-b.x)<1e-6) skAddCon({t:'V',e:l.id}); } return l; }
+    const C=[TX(mv.c[0]),TY(mv.c[1])];
+    if(mv.full) return skCircle(skNewP(C[0],C[1]).id,mv.r,k);
+    // G2 (horaire machine) de P vers Q = chez nous arc de P vers Q ; G3 = de Q vers P (le miroir X inverse le sens)
+    const A=P(pa[0],pa[1]), B=P(pb[0],pb[1]); if(A===B) return skCircle(skNewP(C[0],C[1]).id,mv.r,k);
+    const c=skNewP(C[0],C[1]); return mv.cw?skArc(c.id,A.id,B.id,k):skArc(c.id,B.id,A.id,k); };
+  let nc=0;
+  try{
+    if(opt.replace){ try{ paintObjects.length=0; }catch(e){} skLoad(null); }
+    for(const c of cs){ nc++; for(const mv of c.cut){ const e=add(mv,0); if(e) made.push(e.id); }
+      if(opt.leads!==false) for(const mv of c.lead.concat(c.out)){ const e=add(mv,1); if(e) lead.push(e.id); } }
+    // tangences d'origine (congés) : on les garde, comme l'import DXF
+    const byP={}; for(const id of made){ const e=SK.ents[id]; if(!e||e.t==='C') continue; for(const pid of [e.a,e.b]) (byP[pid]||(byP[pid]=[])).push(e); }
+    const tang=(e,pid)=>{ const p=SK.pts[pid]; if(e.t==='L'){ const q=SK.pts[e.a==pid?e.b:e.a]; return [q.x-p.x,q.y-p.y]; } const c=SK.pts[e.c]; return [-(p.y-c.y),p.x-c.x]; };
+    for(const pid in byP){ const L2=byP[pid]; if(L2.length!==2) continue; const [e,f]=L2; if(e.t!=='A'&&f.t!=='A') continue;
+      const t1=tang(e,pid), t2=tang(f,pid); const cr=Math.abs(t1[0]*t2[1]-t1[1]*t2[0])/((Math.hypot(t1[0],t1[1])*Math.hypot(t2[0],t2[1]))||1);
+      if(cr<1e-4){ const ln=e.t==='L'?e:(f.t==='L'?f:null); if(ln) skAddCon({t:'TAN',e:ln.id,f:(ln===e?f:e).id,s:1}); else skAddCon({t:'TAN',e:e.id,f:f.id,s:1}); } }
+  }catch(e){ console.error('import lst',e); skUnsnap(before); SK.kMode=km; return {n:0,err:e.message}; }
+  SK.kMode=km; skClean(); skSolve(); skCommitDone(); SK.sel=new Set(); if(made.length>150&&!SK.hideCons){ SK.hideCons=true; SK._lstHid=true; try{ skBarSync(); }catch(e){} }   // 800 badges H/V = illisible : masqués (bouton Contraintes)
+  skRefresh(); try{ _lstFit(W/2-(x1-x0)/2,H/2-(y1-y0)/2,W/2+(x1-x0)/2,H/2+(y1-y0)/2); }catch(e){ try{ fitView(); }catch(e2){} } try{ if(typeof pushHistory==='function') pushHistory(); }catch(e){}
+  return {n:made.length,nl:lead.length,contours:nc,w:x1-x0,h:y1-y0}; }
+
+// vue cadrée sur le programme entier (fitView cadre la feuille brute, souvent bien plus petite qu'un plan de découpe)
+function _lstFit(x0,y0,x1,y1){ if(!pCanvas) return; computeBasePx(); const cssW=parseFloat(pCanvas.style.width)||pCanvas.width, cssH=parseFloat(pCanvas.style.height)||pCanvas.height;
+  const w=Math.max(1,x1-x0), h=Math.max(1,y1-y0); vZoom=Math.max(0.02,Math.min(cssW*0.86/(w*BASE_PX), cssH*0.86/(h*BASE_PX)));
+  vPanX=cssW/2-(x0+x1)/2*BASE_PX*vZoom; vPanY=cssH/2-(y0+y1)/2*BASE_PX*vZoom; const zd=document.getElementById('zoomDisp'); if(zd) zd.textContent=Math.round(vZoom*100)+'%'; redrawCanvas(); }
+// ── fenêtre d'infos (reste affichée, × pour fermer) ──
+function lstInfoBox(R,S,name){ let d=document.getElementById('lstInfo'); if(d) d.remove(); d=document.createElement('div'); d.id='lstInfo';
+  const t=R.table; const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const rows=[['Fichier',name],['Titre',R.title||'—'],['Contours',S.contours+' ('+S.n+' éléments)'],['Taille',S.w.toFixed(1)+' × '+S.h.toFixed(1)+' mm'],
+    ['Tableau techno',(R.dataset||(t&&t.name)||'—')],['Matière',t?(t.mat+' — '+t.thk+' mm'):'—']];
+  if(R.lttVarBad) rows.push(['⚠ TM_LTTNAME','« '+R.lttVar+' » dans le fichier → KERF mettra « '+R.dataset+' »']);
+  d.innerHTML='<div class="h"><b>📂 Programme .LST ouvert</b><span class="x" title="Fermer">✕</span></div><table>'+rows.map(r=>'<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>').join('')+'</table>'+
+    (SK._lstHid?'<div class="n">Badges de contraintes masqués (trop nombreux) : bouton 👁 Contraintes pour les voir.</div>':'')+'<div class="n">Pointillés = amorces d\'origine (pas découpées : KERF refait les siennes).<br>Mesurer : <b>I</b> · Coter : <b>D</b> · Modifier : clic / glisser.<br>À la génération, l\'en-tête + le tableau du fichier sont gardés (case sur la page Découpe).</div>'+
+    (R.warn.length?'<div class="w">⚠ '+R.warn.slice(0,5).map(esc).join('<br>⚠ ')+'</div>':'');
+  d.style.cssText='position:fixed;left:12px;top:120px;z-index:9000;max-width:330px;background:rgba(20,22,26,.96);color:#dde;border:1px solid #3a3f48;border-radius:8px;padding:8px 10px;font:12px system-ui,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.5)';
+  document.body.appendChild(d);
+  d.querySelector('.h').style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;gap:10px';
+  const x=d.querySelector('.x'); x.style.cssText='cursor:pointer;padding:0 4px;font-size:14px;color:#aab'; x.onclick=()=>d.remove();
+  d.querySelectorAll('td').forEach((td,i)=>{ td.style.cssText='padding:1px 6px 1px 0;vertical-align:top;'+(i%2?'color:#fff;font-family:monospace':'color:#99a'); });
+  const n=d.querySelector('.n'); n.style.cssText='margin-top:6px;color:#aab;line-height:1.45'; const w=d.querySelector('.w'); if(w) w.style.cssText='margin-top:6px;color:#fc6;line-height:1.4';
+  d.addEventListener('pointerdown',e=>e.stopPropagation()); }
+
+function lstOpenText(text,name,mode){
+  const R=lstParse(text); const m=/^\s*TM_LTTNAME\s*=\s*"([^"]*)"/im.exec(String(text)); R.lttVar=m?m[1]:'';
+  R.lttVarBad=!!(R.dataset&&R.lttVar&&R.lttVar!==R.dataset);
+  if(!R.contours.some(c=>c.cut.length)){ skSay('❌ Aucun contour découpé trouvé dans '+name); return null; }
+  const S=lstToSketch(R,{replace:mode==='replace'}); if(!S.n){ skSay('❌ Import impossible'+(S.err?' : '+S.err:'')); return null; }
+  window._lstSrc={name,title:R.title,dataset:R.dataset,table:R.table,header:R.header,footer:R.footer,keep:!!(R.header&&R.footer&&R.dataset),lttVar:R.lttVar};
+  try{ const pn=document.getElementById('laserProgName'); if(pn) pn.value=lstClean(R.title||String(name).replace(/\.[^.]*$/,'')); }catch(e){}
+  lstInfoBox(R,S,name); skSay('✔ .LST ouvert : '+S.contours+' contour(s)'); return {R,S}; }
+
+// choix Remplacer / Ajouter quand le dessin n'est pas vide
+function lstImportFile(file){ const r=new FileReader(); r.onload=()=>{ const text=String(r.result||''); const name=file.name||'programme.LST';
+    const empty=!(paintObjects&&paintObjects.length)&&!skCount();
+    if(empty){ try{ lstOpenText(text,name,'add'); }catch(e){ console.error(e); skSay('❌ .LST illisible'); } return; }
+    const old=document.getElementById('skAsk'); if(old) old.remove(); const d=document.createElement('div'); d.id='skAsk';
+    d.innerHTML='<b>Ouvrir '+name.replace(/[<>&]/g,'')+'</b><div style="margin:6px 0 8px;opacity:.85">Le dessin n\'est pas vide.</div><div class="row"><button class="ok" data-m="replace">Remplacer le dessin</button><button class="ok" data-m="add">Ajouter</button><button class="no">Annuler</button></div>';
+    document.body.appendChild(d); d.addEventListener('pointerdown',e=>e.stopPropagation());
+    d.querySelectorAll('button[data-m]').forEach(b=>b.onclick=()=>{ d.remove(); try{ lstOpenText(text,name,b.dataset.m); }catch(e){ console.error(e); skSay('❌ .LST illisible'); } });
+    d.querySelector('.no').onclick=()=>d.remove(); };
+  r.readAsText(file); }
+function lstOpen(){ let inp=document.getElementById('skLstIn'); if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.id='skLstIn'; inp.accept='.lst,.LST'; inp.style.cssText='position:fixed;left:-9999px;top:-9999px'; document.body.appendChild(inp);
+    inp.addEventListener('change',()=>{ const f=inp.files&&inp.files[0]; if(f) lstImportFile(f); inp.value=''; }); }
+  try{ skTool(null); }catch(e){} inp.value=''; inp.click(); }
+
+// ── génération : garder l'en-tête + le tableau techno du fichier ouvert ──
+if(typeof _buildLST==='function'){ const _buildLST0=_buildLST;
+  _buildLST=function(progName,techno,req,body){ const S=window._lstSrc;
+    if(!S||!S.keep||!S.header||!S.footer||!S.dataset) return _buildLST0(progName,techno,req,body);
+    const full=_buildLST0(progName,S.dataset,req,body); const i=full.indexOf('START_TEXT\n'), j=full.lastIndexOf('STOP_TEXT');
+    if(i<0||j<i) return full; const inner=full.slice(i+11,j);
+    const P=lstClean(progName||S.title); const Lh=S.header.split('\n');
+    // titres (ProgName / ProgTitle) sans accents : la machine les refuse
+    for(let k=0;k<Lh.length;k++){ if(/^DA,'[^']*','(Service|HP)'/.test(Lh[k])) Lh[k]=Lh[k].replace(/^DA,'[^']*'/,"DA,'"+P+"'"); }
+    let h=Lh.join('\n'), f=S.footer; const strip=s=>{ try{ return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x00-\x7E]/g,'_'); }catch(e){ return s; } };
+    return strip(h)+inner+strip(f); }; }
+function _lstOptSync(){ const cfg=document.getElementById('laserCfg'); if(!cfg) return; let d=document.getElementById('lstKeepRow'); const S=window._lstSrc;
+  if(!S||!S.header||!S.dataset){ if(d) d.remove(); return; }
+  if(!d){ d=document.createElement('div'); d.id='lstKeepRow'; d.style.cssText='margin:8px 0;padding:8px 10px;border:1px solid var(--brd2,#444);border-radius:6px;font-size:12px;line-height:1.45'; cfg.insertBefore(d,cfg.firstChild); }
+  const t=S.table; d.innerHTML='<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer"><input type="checkbox" id="lstKeep" '+(S.keep?'checked':'')+' style="margin-top:2px"><span><b>Garder l\'en-tête et le tableau techno du fichier ouvert</b><br><span style="opacity:.8">'+String(S.name).replace(/[<>&]/g,'')+' → TM_LTTNAME="'+S.dataset+'"'+(t?' · '+t.mat+' '+t.thk+' mm':'')+'<br>Décoché = en-tête et tableau KERF habituels (champ « Tableau techno »).</span></span></label>';
+  d.querySelector('#lstKeep').onchange=e=>{ S.keep=!!e.target.checked; try{ wzGenLaser(); }catch(err){} }; }
+if(typeof wzGenLaser==='function'){ const _wzGL0=wzGenLaser; wzGenLaser=function(){ try{ _lstOptSync(); }catch(e){} return _wzGL0.apply(this,arguments); }; }
 
 </script>
 <!-- ╚═ FIN ESQUISSE (SK) ═╝ -->
