@@ -164,6 +164,10 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-11-26 — KM : LASER — LES 18 TABLEAUX DE LA MACHINE dans la bibliothèque (📟, relevés sur l'écran de la TruLaser :
+   inox 1.4301 0,8 → 4 mm, acier St37 0,5 → 8 mm, azote / air / oxygène). Choisir un 📟 = le programme APPELLE ce tableau par son
+   nom (TM_LTTNAME) et n'emporte AUCUN réglage : ce sont ceux de la machine qui servent. « ➕ Ajouter un tableau de la machine »
+   (nom + matière + épaisseur). Les tableaux 📄 importés d'un .LST restent comme avant (réglages dans le fichier).
 -- 2026-11-26 — KL : LASER — Z COMME L'INGÉ : plus de « G1 Z0 » avant chaque perçage (le cycle TC_LASER_ON descend la tête
    avec le capteur de hauteur). Levée de la tête entre deux découpes = case « Lever la tête entre 2 découpes » (décochée par
    défaut = aucun Z entre les contours, comme le programme de l'ingé ; cochée = G1 Z<hauteur> après chaque TC_LASER_OFF).
@@ -2573,7 +2577,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-26-KL ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-26-KM ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -40106,7 +40110,7 @@ try{ _dfLoad(); }catch(e){}
 const LTT_KEY='kerf_lttLib';
 let _ltt={v:1,items:[],mms:{},sel:'kerf'};
 function _lttHash(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h*33)^s.charCodeAt(i))>>>0; return h.toString(36)+'_'+s.length; }
-function _lttLoad(){ try{ const v=JSON.parse(localStorage.getItem(LTT_KEY)||'null'); if(v&&Array.isArray(v.items)){ _ltt={v:1,items:v.items.filter(i=>i&&i.id&&i.da&&i.ds),mms:v.mms||{},sel:v.sel||'kerf'}; } }catch(e){} if(_ltt.sel!=='kerf'&&!_ltt.items.some(i=>i.id===_ltt.sel)) _ltt.sel=_ltt.items.length?_ltt.items[0].id:'kerf'; }
+function _lttLoad(){ try{ const v=JSON.parse(localStorage.getItem(LTT_KEY)||'null'); if(v&&Array.isArray(v.items)){ _ltt={v:1,items:v.items.filter(i=>i&&i.id&&i.ds&&(i.da||i.machine)),mms:v.mms||{},sel:v.sel||'kerf',seedM:v.seedM||0}; } }catch(e){} if(_ltt.sel!=='kerf'&&!_ltt.items.some(i=>i.id===_ltt.sel)) _ltt.sel=_ltt.items.length?_ltt.items[0].id:'kerf'; }
 function _lttSave(){ try{ localStorage.setItem(LTT_KEY,JSON.stringify(_ltt)); return true; }catch(e){ skSay('⚠ Bibliothèque pleine : supprime des tableaux'); return false; } }
 function lttSel(){ return _ltt.sel==='kerf'?null:(_ltt.items.find(i=>i.id===_ltt.sel)||null); }
 // lit les tableaux (BEGIN_LTT_STAMM … ENDE_LTT_STAMM) d'un .LST : en-tête des colonnes (MM) + une ligne DA par tableau
@@ -40163,9 +40167,9 @@ function lttImportFiles(){ let inp=document.getElementById('lttIn'); if(!inp){ i
     inp.addEventListener('change',async()=>{ let add=0,seen=0; for(const f of [...(inp.files||[])]){ const t=await f.text(); if(/\.json$/i.test(f.name)){ add+=lttImportJSON(t); continue; } const r=lttAddText(t,true); add+=r.added; seen+=r.n; }
       inp.value=''; skSay(add?'📚 '+add+' tableau(x) ajouté(s)':(seen?'📚 Déjà dans la bibliothèque':'❌ Aucun tableau techno trouvé')); lttOpen(); try{ wzGenLaser(); }catch(e){} }); }
   inp.value=''; inp.click(); }
-function lttExport(){ const data=JSON.stringify({kerfLttLib:1,items:_ltt.items.map(i=>({name:i.name,ds:i.ds,da:i.da,mm:_ltt.mms[i.mmk]}))});
+function lttExport(){ const data=JSON.stringify({kerfLttLib:1,items:_ltt.items.map(i=>i.machine?({name:i.name,ds:i.ds,machine:1,info:i.info}):({name:i.name,ds:i.ds,da:i.da,mm:_ltt.mms[i.mmk]}))});
   if(typeof _dlBlob==='function') _dlBlob('KERF_tableaux_techno.json',data,'application/json'); }
-function lttImportJSON(t){ let n=0; try{ const o=JSON.parse(t); for(const x of (o.items||[])){ if(!x.da||!x.ds||!x.mm) continue; if(_ltt.items.some(i=>i.ds===x.ds&&i.da===x.da)) continue; const mmk=_lttHash(x.mm); _ltt.mms[mmk]=x.mm;
+function lttImportJSON(t){ let n=0; try{ const o=JSON.parse(t); for(const x of (o.items||[])){ if(x&&x.machine&&x.ds){ if(_ltt.items.some(i=>i.machine&&i.ds===x.ds)) continue; _ltt.items.push({id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),machine:1,ds:x.ds,name:String(x.name||x.ds).slice(0,80),info:x.info||{}}); n++; continue; } if(!x.da||!x.ds||!x.mm) continue; if(_ltt.items.some(i=>i.ds===x.ds&&i.da===x.da)) continue; const mmk=_lttHash(x.mm); _ltt.mms[mmk]=x.mm;
       _ltt.items.push({id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:String(x.name||x.ds).slice(0,80),ds:x.ds,da:x.da,mmk}); n++; } _lttSave(); _lttApply(); }catch(e){} return n; }
 function lttOpen(){ lttClose(); const cur=document.getElementById('lttCur'); if(!cur) return; const d=document.createElement('div'); d.id='lttDrop';
   const rows=_ltt.items.map((it,k)=>{ const S=lttSummary(it); return '<div class="row'+(it.id===_ltt.sel?' on':'')+'" draggable="true" data-id="'+it.id+'" data-k="'+k+'"><span class="hd" title="Glisser pour ranger">⠿</span><div class="tx"><div class="n">'+_lttEsc(it.name)+'</div><div class="s">'+_lttEsc(S.thk)+' mm · '+_lttEsc(S.p)+' W · '+_lttEsc(S.f)+' m/min · '+_lttEsc(it.ds)+'</div></div>'
@@ -40228,6 +40232,59 @@ function _kkZSync(){ const a=document.getElementById('laserZliftOn'), v=document
 function _kkZLoad(){ try{ const v=JSON.parse(localStorage.getItem('kerf_zlift')||'null'); if(v) _kkZ.lift=!!v.lift; }catch(e){} _kkZSync(); }
 function _kkZSave(){ const a=document.getElementById('laserZliftOn'); if(a) _kkZ.lift=!!a.checked; try{ localStorage.setItem('kerf_zlift',JSON.stringify(_kkZ)); }catch(e){} _kkZSync(); try{ wzGenLaser(); }catch(e){} }
 try{ _kkZLoad(); }catch(e){}
+
+// ── KM : TABLEAUX DE LA MACHINE (relevés sur l'écran de la TruLaser, photos de Seb du 26/11/2026) ──
+// Le programme les APPELLE PAR LEUR NOM (TM_LTTNAME) : il n'emporte PAS de réglages -> ce sont ceux de la machine qui servent.
+// [nom, matériau, épaisseur, source, focale, puissance W, vitesse m/min, pression bar, fente mm]
+const LTT_MACHINE=[
+ ['SS005MDN2S-0','1.4301-10',1.00,'TruDisk 3000 W',-1.0,3000,35,12,0.110],
+ ['SS008MDN2S-0','1.4301-08',0.80,'TruFiber 400 W',-1.8,400,7.5,13,0.070],
+ ['SS010MDN2S-0','1.4301-10',1.00,'4000 W, LHT 7',-1.2,4000,42,12,0.210],
+ ['SS015MDN2S-0','1.4301-15',1.50,'TruFiber 500 W',-3.0,500,4.0,11,0.080],
+ ['SS01MDN2S-0','1.4301-20',2.00,'TruDisk 6000 W, LHT 7',-1.7,4000,16.5,13,0.170],
+ ['SS020MDN2S-0','1.4301-20',2.00,'4000 W, LHT 7',-1.7,4000,16.5,13,0.170],
+ ['SS030MDN2S-0','1.4301-30',3.00,'TruDisk 6000 W, LHT',-3.0,2500,6.0,16,0.170],
+ ['SS040MDN2S-0','1.4301-40',4.00,'TruDisk 3000 W',-3.2,3000,5.0,16,0.200],
+ ['ST005MDN2S-0','St37-05',0.50,'TruDisk 2000 W',-0.7,2000,50,10,0.130],
+ ['ST008MDN2S-0','St37-08',0.80,'TruFiber 400 W',-2.1,400,6.0,15,0.060],
+ ['ST010MDAIS-0','St37-10',1.00,'TruDisk 3000 W',-2.2,3000,29,10,0.160],
+ ['ST015MDN2S-0','St37-15',1.50,'TruFiber 500 W',-3.3,500,2.8,13,0.090],
+ ['ST020MDAIS-0','St37-20',2.00,'TruDisk 3000 W',-1.7,3000,15,12,0.160],
+ ['ST030MDN2S-0','St37-30',3.00,'TruDisk 2000 W',-3.5,2000,4.3,21,0.160],
+ ['ST040MDN2S-0','St37-40',4.00,'TruDisk 3000 W',-2.5,3000,4.3,17,0.190],
+ ['ST050MDO2S-0','St37-50',5.00,'TruDisk 3000 W',2.5,3000,3.3,0.8,0.460],
+ ['ST060MDO2S-0','St37-60',6.00,'TruDisk 3000 W',2.5,3000,2.7,0.8,0.500],
+ ['ST080MDO2S-0','St37-80',8.00,'TruDisk 3000 W',3.0,3000,2.2,0.8,0.550]];
+function _lttGas(ds){ ds=String(ds).toUpperCase(); return /O2/.test(ds)?'oxygène':/AI/.test(ds)?'air':/N2/.test(ds)?'azote':''; }
+function _lttMat(m){ m=String(m||''); return /^1\.43/.test(m)?'Inox':/^St/i.test(m)?'Acier':/^(Al|3\.)/i.test(m)?'Alu':m; }
+function _lttMkMachine(ds,mat,thk,info){ const g=_lttGas(ds); const t=+thk; return {id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),machine:1,ds,
+  name:_lttMat(mat)+' '+(isFinite(t)?String(t).replace('.',','):'?')+' mm'+(g?' · '+g:'')+' — '+ds, info:Object.assign({mat,thk:t,gas:g},info||{})}; }
+function _lttSeedMachine(){ if(_ltt.seedM) return; for(const r of LTT_MACHINE){ if(_ltt.items.some(i=>i.machine&&i.ds===r[0])) continue;
+    _ltt.items.push(_lttMkMachine(r[0],r[1],r[2],{src:r[3],foc:r[4],p:r[5],f:r[6],bar:r[7],fente:r[8]})); } _ltt.seedM=1; _lttSave(); }
+// les fonctions de la bibliothèque connaissent maintenant les tableaux « machine »
+{ const _sum0=lttSummary; lttSummary=function(it){ if(!it.machine) return _sum0(it); const I=it.info||{}; return {mat:_lttMat(I.mat)+' '+(I.mat||''),thk:I.thk,p:I.p!=null?I.p:'?',f:I.f!=null?I.f:'?',gas:I.bar!=null?I.bar:'?',buse:'—',foc:I.foc!=null?I.foc:'?',kerf:I.fente}; }; }
+{ const _ld0=_lttLoad; _lttLoad=function(){ _ld0(); try{ _ltt.items=_ltt.items.filter(i=>i.machine||(i.da&&i.ds)); _lttSeedMachine(); }catch(e){} }; }
+{ const _r0=_lttRender; _lttRender=function(){ _r0(); const it=lttSel(); const info=document.getElementById('lttInfo'); if(!it||!it.machine||!info) return; const I=it.info||{};
+    info.innerHTML='📟 <b>Tableau de la machine</b> : <b>'+_lttEsc(_lttMat(I.mat))+' '+_lttEsc(I.mat)+' · '+_lttEsc(I.thk)+' mm</b>'+(I.gas?' · '+_lttEsc(I.gas):'')+(I.p!=null?' · '+_lttEsc(I.p)+' W':'')+(I.f!=null?' · '+_lttEsc(I.f)+' m/min':'')+(I.bar!=null?' · '+_lttEsc(I.bar)+' bar':'')+(I.fente!=null?' · fente '+_lttEsc(I.fente):'')
+      +'<br>TM_LTTNAME = <b>'+_lttEsc(it.ds)+'</b> — le programme appelle ce tableau par son nom : ce sont les réglages <b>de la machine</b> qui servent (aucun tableau dans le fichier).'; }; }
+// génération : tableau « machine » -> TM_LTTNAME = son nom, et PAS de bloc BEGIN_LTT_STAMM (rien qui puisse écraser les réglages machine)
+if(typeof _buildLST==='function'){ const _bm=_buildLST; _buildLST=function(progName,techno,req,body){ const S=window._lstSrc; const it=lttSel();
+    if(!it||!it.machine||(S&&S.keep&&S.header&&S.footer&&S.dataset)) return _bm(progName,techno,req,body);
+    _ltt.sel='kerf'; let full; try{ full=_bm(progName,it.ds,req,body); } finally { _ltt.sel=it.id; }
+    const i=full.lastIndexOf('BEGIN_LTT_STAMM'), j=full.lastIndexOf('ENDE_LTT_STAMM'); if(i<0||j<i) return full;
+    let k=j+'ENDE_LTT_STAMM'.length; if(full.slice(k,k+3)==='\nC\n') k+=3; else if(full[k]==='\n') k+=1; return full.slice(0,i)+full.slice(k); }; }
+// menu : icônes 📟 / 📄 + « ajouter un tableau de la machine »
+{ const _o0=lttOpen; lttOpen=function(){ _o0(); const d=document.getElementById('lttDrop'); if(!d) return;
+    d.querySelectorAll('.row[data-id]').forEach(row=>{ const it=_ltt.items.find(i=>i.id===row.dataset.id); if(!it) return; const n=row.querySelector('.tx .n'); if(n) n.textContent=(it.machine?'📟 ':'📄 ')+it.name;
+      if(it.machine){ const s=row.querySelector('.tx .s'); const I=it.info||{}; if(s) s.textContent=it.ds+' · '+(I.p!=null?I.p+' W · ':'')+(I.f!=null?I.f+' m/min · ':'')+(I.bar!=null?I.bar+' bar':''); } });
+    const ft=d.querySelector('.ft'); if(!ft) return; const add=document.createElement('div'); add.className='row'; add.dataset.x='addm'; add.textContent='➕ Ajouter un tableau de la machine (son nom + matière + épaisseur)'; ft.insertBefore(add,ft.firstChild);
+    add.onclick=()=>{ const f=document.createElement('div'); f.style.cssText='padding:6px;display:flex;flex-direction:column;gap:5px;font-size:12px';
+      f.innerHTML='<input class="ren" data-k="ds" placeholder="Nom du tableau (ex : SS005MDN2S-0)"><div style="display:flex;gap:5px"><input class="ren" data-k="mat" placeholder="Matériau (ex : 1.4301-10)"><input class="ren" data-k="thk" placeholder="Épaisseur mm" inputmode="decimal" style="width:110px"></div><div style="display:flex;gap:5px"><button class="ib" data-a="ok" style="border-color:var(--acc,#f59e0b)">✓ Ajouter</button><button class="ib" data-a="no">Annuler</button></div>';
+      add.replaceWith(f); const q=k=>f.querySelector('[data-k="'+k+'"]'); q('ds').focus(); f.addEventListener('click',e=>e.stopPropagation()); f.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter') go(); if(e.key==='Escape') lttOpen(); });
+      const go=()=>{ const ds=q('ds').value.trim().toUpperCase(); if(!/^[A-Z0-9_.-]{2,40}$/.test(ds)){ q('ds').style.borderColor='#ef4444'; q('ds').focus(); return; } const thk=parseFloat(String(q('thk').value).replace(',','.'));
+        const it=_lttMkMachine(ds,q('mat').value.trim(),thk,{}); _ltt.items.push(it); _ltt.sel=it.id; _lttSave(); _lttApply(); try{ wzGenLaser(); }catch(e){} lttOpen(); };
+      f.querySelector('[data-a="ok"]').onclick=go; f.querySelector('[data-a="no"]').onclick=()=>lttOpen(); }; }; }
+try{ _lttLoad(); _lttApply(); }catch(e){}
 
 </script>
 <!-- ╚═ FIN ESQUISSE (SK) ═╝ -->
