@@ -164,6 +164,16 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-11-26 — KL : LASER — Z COMME L'INGÉ : plus de « G1 Z0 » avant chaque perçage (le cycle TC_LASER_ON descend la tête
+   avec le capteur de hauteur). Levée de la tête entre deux découpes = case « Lever la tête entre 2 découpes » (décochée par
+   défaut = aucun Z entre les contours, comme le programme de l'ingé ; cochée = G1 Z<hauteur> après chaque TC_LASER_OFF).
+-- 2026-11-25 — KK : LASER — BIBLIOTHÈQUE DE TABLEAUX TECHNO : avant, KERF envoyait TOUJOURS son tableau inox 2 mm / 4000 W
+   (même pour couper du 1 mm). Maintenant : menu « 📚 Tableau techno » (page Découpe, carte Programme) : importer depuis les .LST
+   de l'ingé (plusieurs d'un coup), choisir, renommer, ranger (glisser ou ▲▼), supprimer, sauvegarder/recharger (.json).
+   Le tableau choisi part dans le .LST et TM_LTTNAME = son nom. Ouvrir un .LST ajoute son tableau tout seul.
+   AMORCES COMME L'INGÉ : les fentes / petits trous trop étroits ne sont plus percés SUR LE BORD : mini-amorce depuis le milieu
+   de la fente (dans la chute). + SORTIE en arc dans la chute à la fin de chaque contour fermé (le laser ne s'éteint plus sur la
+   pièce). Deux cases dans « Rentrée automatique ». Le perçage (0) n'est PAS touché.
 -- 2026-11-25 — KJ : LASER — SUIVEUR FIGÉ DANS LES TROUS : TC_DIST_FREEZE(1) juste après chaque TC_LASER_ON des trous
    (contours intérieurs) -> la tête garde sa hauteur et ne plonge plus dans le trou (doc TRUMPF ControlLine 13.5 ; il se
    réactive tout seul au TC_LASER_OFF(2)). Case « Figer le suiveur » (cochée) + choix « les trous » / « tous les contours ».
@@ -2563,7 +2573,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-25-KJ ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-26-KL ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -3756,6 +3766,8 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
           <summary style="cursor:pointer;font-weight:700">Rentrée automatique (formes non réglées)</summary>
           <label style="display:flex;align-items:flex-start;gap:6px;margin-top:6px;cursor:pointer"><input type="checkbox" id="laserLeadin" checked onchange="_dcBuild()" style="width:15px;height:15px;flex-shrink:0;margin-top:1px"><span><b>Perçage au centre de la chute</b> puis arc vers le contour</span></label>
           <label style="display:flex;align-items:flex-start;gap:6px;margin-top:5px;cursor:pointer"><input type="checkbox" id="laserArc" checked onchange="_dcBuild()" style="width:15px;height:15px;flex-shrink:0;margin-top:1px"><span><b>Entrée en arc</b> (tangente, si la place le permet)</span></label>
+          <label style="display:flex;align-items:flex-start;gap:6px;margin-top:5px;cursor:pointer"><input type="checkbox" id="laserLeadMini" checked onchange="_kkSave()" style="width:15px;height:15px;flex-shrink:0;margin-top:1px"><span><b>Mini-amorce dans les fentes étroites</b> (perçage au milieu de la fente, jamais sur le bord)</span></label>
+          <label style="display:flex;align-items:flex-start;gap:6px;margin-top:5px;cursor:pointer"><input type="checkbox" id="laserLeadOut" checked onchange="_kkSave()" style="width:15px;height:15px;flex-shrink:0;margin-top:1px"><span><b>Sortie en arc</b> dans la chute à la fin du contour (le laser ne s'éteint pas sur la pièce)</span></label>
           <label style="display:flex;align-items:center;gap:6px;margin-top:5px">Longueur amorce (mm) <input id="laserLead" type="number" value="1" min="0.1" max="10" step="0.1" oninput="_dcBuild()" style="width:60px;padding:4px 6px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:6px;color:var(--txt);font-size:12px"></label>
         </details>
       </div>
@@ -3856,7 +3868,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
       <div class="p10f">
         <label style="flex:1;min-width:120px">Vitesse F (mm/min)
           <input id="laserFeed" type="number" value="5000" min="1" max="20000" step="50" oninput="wzGenLaser()"></label>
-        <label style="flex:1;min-width:120px">Levée Z fin de forme (mm)
+        <label style="flex:1;min-width:120px"><span style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="laserZliftOn" onchange="_kkZSave()" style="width:14px;height:14px;margin:0">Lever la tête entre 2 découpes (mm)</span>
           <input id="laserZlift" type="number" value="5" min="0" max="200" step="1" oninput="wzGenLaser()"></label>
       </div>
       <label class="p10chk"><input type="checkbox" id="laserFrame" checked onchange="wzGenLaser()"><span><b>Délimitation</b> — tour à vide autour de la forme (laser éteint) puis pause M00 pour vérifier que la pièce passe sur la tôle.</span></label>
@@ -20997,6 +21009,7 @@ function _lsMoves(pts,arcs){ const G1=q=>'G1 X'+_lc(q[0])+' Y'+_lc(q[1]);
   flush(); return out; }
 function buildLaserBody(){
   _lsSmoothRead();
+  window._kkOuts=[];   // KK : sorties en arc (pour que le tour de délimitation les englobe)
   const flat=_exportFlatObjs();
   const _zl=parseFloat(document.getElementById('laserZlift')?.value); const ZL=isNaN(_zl)?5:_zl;
   const _fd=parseFloat(document.getElementById('laserFeed')?.value); const FEED=isNaN(_fd)?5000:_fd;
@@ -21322,6 +21335,13 @@ function buildLaserBody(){
             }
           }
         }
+        // KK : MINI-AMORCE (fente / petit trou trop étroit pour l'amorce normale), comme le programme de l'ingé :
+        // perçage AU MILIEU de la fente (dans la chute) puis petit demi-cercle tangent jusqu'au contour. Plus jamais percé sur le bord.
+        if(!chosen && !manual && !forced && ARC && (typeof _kk==='undefined'||_kk.mini) && c._pole && c._pole.pt && c._pole.d>0.05){
+          const P0=c._pole.pt; let bd2=1e18,bk2=0,bt2=0.5,bS2=null,bT2=null;
+          for(let k=0;k<nB;k++){ const a=base[k],b=base[(k+1)%nB]; const dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1e-9; let t=((P0[0]-a[0])*dx+(P0[1]-a[1])*dy)/L2; t=Math.max(0,Math.min(1,t)); const fx=a[0]+t*dx,fy=a[1]+t*dy,d=Math.hypot(P0[0]-fx,P0[1]-fy); if(d<bd2){ bd2=d;bk2=k;bt2=t;bS2=[fx,fy]; const tl=Math.sqrt(L2); bT2=[dx/tl,dy/tl]; } }
+          if(bS2 && bd2>0.05){ const Nd=[(P0[0]-bS2[0])/bd2,(P0[1]-bS2[1])/bd2], eps=Math.min(0.05,bd2*0.3);
+            if(globalWaste([bS2[0]+Nd[0]*eps,bS2[1]+Nd[1]*eps])===true){ for(let d=bd2; d>=0.05; d*=0.8){ const c2=tryLead(bS2,bT2,Nd,d,0); if(c2){ chosen={bk:bk2,tp:bt2,...c2,_mini:1}; break; } } } } }
         const bk=chosen?chosen.bk:nfBk, tp=chosen?chosen.tp:nfTp;
         const a=base[bk],b=base[(bk+1)%nB]; let St=chosen?chosen.S:[a[0]+(b[0]-a[0])*tp,a[1]+(b[1]-a[1])*tp];
         // VRAI CERCLE : le départ doit être SUR le cercle, pas sur une corde du polygone (sinon le G2/G3
@@ -21359,19 +21379,16 @@ function buildLaserBody(){
     const S=c.start;
     if(chosen && chosen.line){
       head='G1 X'+_lc(chosen.A[0])+' Y'+_lc(chosen.A[1])+Fstr+'   ;percage (rentree choisie a la main)\n'
-          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
           +_laserOnStr()+'\n'
           +'G1 X'+_lc(S[0])+' Y'+_lc(S[1])+'   ;LEAD droit (rentree manuelle)\n';
     }
     else if(chosen && chosen._man){
       head='G1 X'+_lc(chosen.A[0])+' Y'+_lc(chosen.A[1])+Fstr+'   ;percage (rentree choisie a la main)\n'
-          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
           +_laserOnStr()+'\n'
           +chosen.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(chosen.O[0]-chosen.A[0])+' J'+_lc(chosen.O[1]-chosen.A[1])+'   ;LEAD arc tangent (rentree manuelle)\n';
     }
     else if(chosen){
       head='G1 X'+_lc(chosen.A[0])+' Y'+_lc(chosen.A[1])+Fstr+'   ;percage au coeur de la zone (loin du bord)\n'
-          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
           +_laserOnStr()+'\n'
           +chosen.g+' X'+_lc(S[0])+' Y'+_lc(S[1])+' I'+_lc(chosen.O[0]-chosen.A[0])+' J'+_lc(chosen.O[1]-chosen.A[1])+'   ;LEAD arc lisse, tangent au contour\n';
     }
@@ -21379,7 +21396,6 @@ function buildLaserBody(){
     // on perce directement sur le depart (head===null ci-dessous). Aucune diagonale moche.
     if(head===null){
       head='G1 X'+_lc(S[0])+' Y'+_lc(S[1])+Fstr+'\n'
-          +'G1 Z0   ;redescendre sur la tole avant de percer\n'
           +_laserOnStr()+'\n';
     }
     // Parcours réel (ordre de passage) pour l'affichage des flèches mauves — n'influence PAS le code.
@@ -21389,8 +21405,9 @@ function buildLaserBody(){
         manDirect:!!(_man && _man.type==='direct') }); }catch(e){}
     if(typeof _dfWant==='function' && _dfWant(wasteInside)) head=_dfIns(head);   // KJ : suiveur figé (la tête ne plonge pas dans le trou)
     return head + c.moves.join('\n')+'\n'
-      +'TC_LASER_OFF(2)\n'
-      +'G1 Z'+_lc(ZL)+'   ;lever la tete pour degager la piece coupee';
+      +(typeof _kkLeadOut==='function'?_kkLeadOut(c,S,chosen,globalWaste):'')   // KK : sortie en arc dans la chute
+      +'TC_LASER_OFF(2)'
+      +((typeof _kkZ!=='undefined'&&_kkZ.lift)?'\nG1 Z'+_lc(ZL)+'   ;lever la tete pour aller a la decoupe suivante':'');   // KL : levée en option, plus de Z0
   });
   // DELIMITATION : avant de couper, tour du rectangle englobant A VIDE (laser off) + M00.
   // Permet de verifier le placement sur la tole avant de valider la decoupe.
@@ -21406,6 +21423,7 @@ function buildLaserBody(){
     const _fpl=contours.map(c=>c.poly).filter(p=>p&&p.length>=2);
     // les PERÇAGES / amorces aussi (ils peuvent être un peu en dehors de la pièce) : le tour doit les englober
     for(const pv of _prev){ const ld=pv&&pv.lead; if(!ld||!ld.A) continue; if(ld.O){ const r=Math.hypot(ld.A[0]-ld.O[0],ld.A[1]-ld.O[1]); const cc=[]; for(let k=0;k<=24;k++){ const t=k/24*2*Math.PI; cc.push([ld.O[0]+r*Math.cos(t),ld.O[1]+r*Math.sin(t)]); } _fpl.push(cc); } else if(ld.S) _fpl.push([ld.A.slice(),ld.S.slice()]); else _fpl.push([ld.A.slice(),ld.A.slice()]); }
+    if(window._kkOuts) for(const q of window._kkOuts) if(q&&q.length>=2) _fpl.push(q);   // KK : sorties en arc
     let loops=null; try{ loops=_frameOutline(_fpl, FD, true); }catch(e){ loops=null; }
     if(!loops||!loops.length){ const allp=[]; for(const c of contours) for(const q of c.poly) allp.push(q); const h=_frameHullOffset(allp, FD); if(h&&h.length>=4) loops=[h]; }
     if(loops && loops.length){
@@ -40081,6 +40099,135 @@ function _dfWant(waste){ return !!_df.on && (_df.where==='all' || !!waste); }
 function _dfIns(head){ const on=_laserOnStr()+'\n'; if(head.indexOf(on)<0) return head;
   return head.replace(on, on+'TC_DIST_FREEZE(1)   ;suiveur de hauteur fige : la tete ne plonge pas dans le trou (reactive au TC_LASER_OFF)\n'); }
 try{ _dfLoad(); }catch(e){}
+
+// ═══ KK : BIBLIOTHÈQUE DE TABLEAUX TECHNO + AMORCES COMME L'INGÉ (mini-amorce, sortie en arc) ═══
+// Avant : KERF mettait TOUJOURS son tableau « inox 2 mm / 4000 W » dans le .LST, même pour couper du 1 mm.
+// Maintenant : on importe les tableaux depuis les .LST de l'ingé, on choisit, renomme, range, supprime (comme les outils).
+const LTT_KEY='kerf_lttLib';
+let _ltt={v:1,items:[],mms:{},sel:'kerf'};
+function _lttHash(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h*33)^s.charCodeAt(i))>>>0; return h.toString(36)+'_'+s.length; }
+function _lttLoad(){ try{ const v=JSON.parse(localStorage.getItem(LTT_KEY)||'null'); if(v&&Array.isArray(v.items)){ _ltt={v:1,items:v.items.filter(i=>i&&i.id&&i.da&&i.ds),mms:v.mms||{},sel:v.sel||'kerf'}; } }catch(e){} if(_ltt.sel!=='kerf'&&!_ltt.items.some(i=>i.id===_ltt.sel)) _ltt.sel=_ltt.items.length?_ltt.items[0].id:'kerf'; }
+function _lttSave(){ try{ localStorage.setItem(LTT_KEY,JSON.stringify(_ltt)); return true; }catch(e){ skSay('⚠ Bibliothèque pleine : supprime des tableaux'); return false; } }
+function lttSel(){ return _ltt.sel==='kerf'?null:(_ltt.items.find(i=>i.id===_ltt.sel)||null); }
+// lit les tableaux (BEGIN_LTT_STAMM … ENDE_LTT_STAMM) d'un .LST : en-tête des colonnes (MM) + une ligne DA par tableau
+function lttParseText(text){ const t=String(text||'').replace(/\r/g,''); const i=t.indexOf('BEGIN_LTT_STAMM'); if(i<0) return [];
+  const j=t.indexOf('ENDE_LTT_STAMM',i); if(j<0) return []; const sec=t.slice(i,j); const k=sec.search(/^ZA,DA,/m); if(k<0) return [];
+  const mm=sec.slice(0,k); const das=sec.slice(k).split('\n').filter(l=>/^DA,'/.test(l)); return das.map(da=>({mm,da,ds:(/^DA,'([^']*)'/.exec(da)||[])[1]||''})).filter(o=>o.ds); }
+// valeurs d'un tableau par nom de colonne
+function lttVals(it){ const mm=_ltt.mms[it.mmk]||it.mm||''; const names=[...mm.matchAll(/^MM,AT,1,\d+,1,1,,'([^']*)'/mg)].map(m=>m[1]);
+  const vals=[]; const s=it.da.slice(3); let cur='',q=false; for(let i=0;i<s.length;i++){ const ch=s[i]; if(ch==="'"){ q=!q; continue; } if(ch===','&&!q){ vals.push(cur); cur=''; continue; } cur+=ch; } vals.push(cur);
+  const o={}; names.forEach((n,i)=>{ o[n]=vals[i]; }); return o; }
+function lttSummary(it){ const v=lttVals(it); const mat=String(v.LT_ALL_MATERIAL||'').replace(/-\d+$/,''); const nice={'1.4301':'Inox 1.4301','1.4404':'Inox 1.4404','1.4571':'Inox 1.4571','1.0038':'Acier S235','3.3535':'Alu 5754','AlMg3':'Alu AlMg3'}[mat]||mat;
+  return {mat:nice||'?', thk:v.LT_ALL_MAT_DICKE, p:v.LT_SCH_GR_NOR_LSTG, f:v.LT_SCH_GR_NOR_GESCHW, gas:v.LT_SCH_GR_NOR_GASDRUCK, buse:v.LT_ALL_DUESENTYP, foc:v.LT_SCH_GR_FOKUSLAGE, kerf:v.LT_SCH_GR_SPALT}; }
+function lttAddText(text,quiet){ const L=lttParseText(text); let added=0,first=null;
+  for(const o of L){ const mmk=_lttHash(o.mm); _ltt.mms[mmk]=o.mm; const dup=_ltt.items.find(i=>i.ds===o.ds&&i.da===o.da); if(dup){ first=first||dup; continue; }
+    const it={id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),ds:o.ds,da:o.da,mmk}; const S=lttSummary(it); it.name=S.mat+' — '+S.thk+' mm ('+o.ds+')'; _ltt.items.push(it); added++; first=first||it; }
+  if(first){ _ltt.sel=first.id; } _lttSave(); _lttApply(); if(!quiet) skSay(L.length?(added?'📚 '+added+' tableau(x) ajouté(s) à la bibliothèque':'📚 Déjà dans la bibliothèque — sélectionné'):'❌ Pas de tableau techno dans ce fichier'); return {added,first,n:L.length}; }
+function lttBlock(it){ const mm=_ltt.mms[it.mmk]||it.mm; return mm+'ZA,DA,1\n'+it.da+'\nC\nENDE_LTT_STAMM'; }
+// le champ TM_LTTNAME suit le tableau choisi (c'est le nom DANS le tableau : on ne le change pas à la main)
+function _lttApply(){ const inp=document.getElementById('laserTechno'); const it=lttSel();
+  if(inp){ if(it){ if(!inp.dataset.kerfOld) inp.dataset.kerfOld=inp.value; inp.value=it.ds; inp.readOnly=true; inp.title='Nom du tableau choisi dans la bibliothèque (TM_LTTNAME). Pour un autre nom : choisis « KERF d\'origine ».'; inp.style.opacity='.75'; }
+    else { if(inp.readOnly&&inp.dataset.kerfOld!=null) inp.value=inp.dataset.kerfOld; delete inp.dataset.kerfOld; inp.readOnly=false; inp.title=''; inp.style.opacity=''; } }
+  _lttRender(); }
+function _lttCss(){ if(document.getElementById('lttCss')) return; const s=document.createElement('style'); s.id='lttCss'; s.textContent=`
+#lttBox{margin-top:8px}#lttBox .lb{font-size:11px;color:var(--txt2);margin-bottom:4px}
+#lttCur{width:100%;display:flex;align-items:center;gap:8px;text-align:left;padding:8px 10px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:8px;color:var(--txt);cursor:pointer;font-size:13px}
+#lttCur:hover{border-color:var(--acc)}#lttCur .nm{flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lttInfo{font:11px var(--mono);color:var(--txt2);margin-top:5px;line-height:1.5}#lttInfo b{color:var(--txt)}#lttInfo .w{color:#f59e0b;font-family:system-ui,sans-serif}
+#lttDrop{position:fixed;z-index:10000;background:var(--surf,#1b1e23);border:1.5px solid var(--brd2,#444);border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.55);max-height:70vh;overflow:auto;min-width:300px;padding:4px}
+#lttDrop .row{display:flex;align-items:center;gap:6px;padding:6px 6px;border-radius:6px;cursor:pointer;font-size:12.5px;color:var(--txt,#ddd)}
+#lttDrop .row:hover{background:rgba(255,255,255,.06)}#lttDrop .row.on{background:rgba(245,158,11,.16);outline:1px solid var(--acc,#f59e0b)}
+#lttDrop .row.drag{opacity:.4}#lttDrop .row.over{box-shadow:0 -2px 0 var(--acc,#f59e0b) inset}
+#lttDrop .hd{cursor:grab;color:var(--txt3,#888);padding:0 2px;font-size:14px;user-select:none}
+#lttDrop .tx{flex:1;min-width:0}#lttDrop .tx .n{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#lttDrop .tx .s{font:10.5px var(--mono,monospace);color:var(--txt2,#aaa)}
+#lttDrop .ib{background:none;border:1px solid transparent;border-radius:5px;color:var(--txt2,#aaa);cursor:pointer;padding:2px 5px;font-size:13px}
+#lttDrop .ib:hover{border-color:var(--brd2,#555);color:var(--txt,#fff)}#lttDrop .ib.del2{background:#b91c1c;color:#fff;font-size:11px;font-weight:700}
+#lttDrop .ft{border-top:1px solid var(--brd,#333);margin-top:4px;padding-top:4px}#lttDrop .ft .row{font-weight:600}
+#lttDrop input.ren{width:100%;padding:3px 6px;background:var(--bg,#111);border:1.5px solid var(--acc,#f59e0b);border-radius:5px;color:var(--txt,#fff);font-size:12.5px}`; document.head.appendChild(s); }
+function _lttEnsureUI(){ const inp=document.getElementById('laserTechno'); if(!inp) return null; let box=document.getElementById('lttBox'); if(box) return box; _lttCss();
+  const card=inp.closest('.p10card'); const f=inp.closest('.p10f'); if(!card||!f) return null;
+  box=document.createElement('div'); box.id='lttBox'; box.innerHTML='<div class="lb">📚 Tableau techno envoyé dans le programme (bibliothèque)</div><button type="button" id="lttCur"><span class="nm"></span><span>▾</span></button><div id="lttInfo"></div>';
+  f.parentNode.insertBefore(box,f.nextSibling); box.querySelector('#lttCur').onclick=e=>{ e.stopPropagation(); lttOpen(); }; return box; }
+function _lttRender(){ const box=_lttEnsureUI(); if(!box) return; const it=lttSel(); const nm=box.querySelector('.nm'), info=box.querySelector('#lttInfo');
+  if(it){ const S=lttSummary(it); nm.textContent=it.name; info.innerHTML='<b>'+_lttEsc(S.mat)+' · '+_lttEsc(S.thk)+' mm</b> · '+_lttEsc(S.p)+' W · '+_lttEsc(S.f)+' m/min · '+_lttEsc(S.gas)+' bar · buse '+_lttEsc(S.buse)+' · focale '+_lttEsc(S.foc)+'<br>TM_LTTNAME = <b>'+_lttEsc(it.ds)+'</b>'; }
+  else { nm.textContent='KERF d\'origine (inox 2 mm)'; info.innerHTML='<span class="w">⚠ Tableau embarqué = inox 2 mm, 4000 W. Pour une autre tôle : importe le tableau depuis un .LST de l\'ingé (▾ puis « Importer »).</span>'; } }
+function _lttEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function lttClose(){ const d=document.getElementById('lttDrop'); if(d&&d.isConnected){ try{ d.remove(); }catch(e){} } document.removeEventListener('pointerdown',_lttOut,true); }
+function _lttOut(e){ const d=document.getElementById('lttDrop'); if(d&&!d.contains(e.target)&&e.target.id!=='lttCur'&&!(e.target.closest&&e.target.closest('#lttCur'))) lttClose(); }
+function lttPick(id){ _ltt.sel=id; _lttSave(); _lttApply(); lttClose(); try{ wzGenLaser(); }catch(e){} }
+function lttMove(id,to){ const a=_ltt.items.findIndex(i=>i.id===id); if(a<0) return; const [it]=_ltt.items.splice(a,1); to=Math.max(0,Math.min(_ltt.items.length,to)); _ltt.items.splice(to,0,it); _lttSave(); lttOpen(); }
+function lttRename(id,name){ const it=_ltt.items.find(i=>i.id===id); if(!it) return; name=String(name||'').trim(); if(name) it.name=name.slice(0,80); _lttSave(); _lttApply(); }
+function lttDelete(id){ const k=_ltt.items.findIndex(i=>i.id===id); if(k<0) return; _ltt.items.splice(k,1); if(_ltt.sel===id) _ltt.sel=_ltt.items.length?_ltt.items[Math.min(k,_ltt.items.length-1)].id:'kerf';
+  const used=new Set(_ltt.items.map(i=>i.mmk)); for(const h in _ltt.mms) if(!used.has(h)) delete _ltt.mms[h]; _lttSave(); _lttApply(); try{ wzGenLaser(); }catch(e){} }
+function lttImportFiles(){ let inp=document.getElementById('lttIn'); if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.id='lttIn'; inp.multiple=true; inp.accept='.lst,.LST,.json'; inp.style.cssText='position:fixed;left:-9999px;top:-9999px'; document.body.appendChild(inp);
+    inp.addEventListener('change',async()=>{ let add=0,seen=0; for(const f of [...(inp.files||[])]){ const t=await f.text(); if(/\.json$/i.test(f.name)){ add+=lttImportJSON(t); continue; } const r=lttAddText(t,true); add+=r.added; seen+=r.n; }
+      inp.value=''; skSay(add?'📚 '+add+' tableau(x) ajouté(s)':(seen?'📚 Déjà dans la bibliothèque':'❌ Aucun tableau techno trouvé')); lttOpen(); try{ wzGenLaser(); }catch(e){} }); }
+  inp.value=''; inp.click(); }
+function lttExport(){ const data=JSON.stringify({kerfLttLib:1,items:_ltt.items.map(i=>({name:i.name,ds:i.ds,da:i.da,mm:_ltt.mms[i.mmk]}))});
+  if(typeof _dlBlob==='function') _dlBlob('KERF_tableaux_techno.json',data,'application/json'); }
+function lttImportJSON(t){ let n=0; try{ const o=JSON.parse(t); for(const x of (o.items||[])){ if(!x.da||!x.ds||!x.mm) continue; if(_ltt.items.some(i=>i.ds===x.ds&&i.da===x.da)) continue; const mmk=_lttHash(x.mm); _ltt.mms[mmk]=x.mm;
+      _ltt.items.push({id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:String(x.name||x.ds).slice(0,80),ds:x.ds,da:x.da,mmk}); n++; } _lttSave(); _lttApply(); }catch(e){} return n; }
+function lttOpen(){ lttClose(); const cur=document.getElementById('lttCur'); if(!cur) return; const d=document.createElement('div'); d.id='lttDrop';
+  const rows=_ltt.items.map((it,k)=>{ const S=lttSummary(it); return '<div class="row'+(it.id===_ltt.sel?' on':'')+'" draggable="true" data-id="'+it.id+'" data-k="'+k+'"><span class="hd" title="Glisser pour ranger">⠿</span><div class="tx"><div class="n">'+_lttEsc(it.name)+'</div><div class="s">'+_lttEsc(S.thk)+' mm · '+_lttEsc(S.p)+' W · '+_lttEsc(S.f)+' m/min · '+_lttEsc(it.ds)+'</div></div>'
+    +'<button class="ib" data-a="up" title="Monter">▲</button><button class="ib" data-a="dn" title="Descendre">▼</button><button class="ib" data-a="ren" title="Renommer">✏️</button><button class="ib" data-a="del" title="Supprimer">🗑</button></div>'; }).join('');
+  d.innerHTML=(rows||'<div style="padding:8px;font-size:12px;color:var(--txt2)">Bibliothèque vide : importe un tableau depuis un .LST de l\'ingé ⬇</div>')
+    +'<div class="row'+(_ltt.sel==='kerf'?' on':'')+'" data-id="kerf"><span class="hd"> </span><div class="tx"><div class="n">KERF d\'origine (inox 2 mm)</div><div class="s">ancien tableau intégré · nom libre</div></div></div>'
+    +'<div class="ft"><div class="row" data-x="imp">➕ Importer depuis un .LST de l\'ingé… (plusieurs fichiers possible)</div><div class="row" data-x="exp">💾 Sauvegarder la bibliothèque (.json)</div><div class="row" data-x="impj">📂 Recharger une sauvegarde (.json)</div></div>';
+  document.body.appendChild(d); const r=cur.getBoundingClientRect(); const W=Math.max(r.width,320); d.style.width=W+'px'; d.style.left=Math.max(8,Math.min(innerWidth-W-8,r.left))+'px';
+  const h=Math.min(d.scrollHeight, innerHeight*0.7); d.style.top=((r.bottom+4+h<innerHeight)?r.bottom+4:Math.max(8,r.top-4-h))+'px';
+  d.addEventListener('pointerdown',e=>e.stopPropagation());
+  d.querySelectorAll('.row[data-id]').forEach(row=>{ const id=row.dataset.id;
+    row.addEventListener('click',e=>{ const b=e.target.closest('button'); if(row.querySelector('input.ren')) return; if(!b){ lttPick(id); return; } e.stopPropagation(); const k=+row.dataset.k;
+      if(b.dataset.a==='up') lttMove(id,k-1); else if(b.dataset.a==='dn') lttMove(id,k+1);
+      else if(b.dataset.a==='ren'){ const n=row.querySelector('.tx .n'); const it=_ltt.items.find(i=>i.id===id); const inp=document.createElement('input'); inp.className='ren'; inp.value=it.name; n.replaceWith(inp); inp.focus(); inp.select(); row.draggable=false;
+        let fin=false; const ok=()=>{ if(fin) return; fin=true; lttRename(id,inp.value); setTimeout(lttOpen,0); }; inp.addEventListener('keydown',ev=>{ ev.stopPropagation(); if(ev.key==='Enter'){ ev.preventDefault(); ok(); } else if(ev.key==='Escape'){ ev.preventDefault(); fin=true; setTimeout(lttOpen,0); } }); inp.addEventListener('blur',ok); inp.addEventListener('click',ev=>ev.stopPropagation()); }
+      else if(b.dataset.a==='del'){ if(b.classList.contains('del2')){ lttDelete(id); lttOpen(); return; } b.classList.add('del2'); b.textContent='Supprimer ?'; setTimeout(()=>{ if(b.isConnected){ b.classList.remove('del2'); b.textContent='🗑'; } },3000); } });
+    if(id!=='kerf'){ row.addEventListener('dragstart',e=>{ row.classList.add('drag'); e.dataTransfer.setData('text/plain',id); e.dataTransfer.effectAllowed='move'; });
+      row.addEventListener('dragend',()=>row.classList.remove('drag'));
+      row.addEventListener('dragover',e=>{ e.preventDefault(); row.classList.add('over'); }); row.addEventListener('dragleave',()=>row.classList.remove('over'));
+      row.addEventListener('drop',e=>{ e.preventDefault(); const src=e.dataTransfer.getData('text/plain'); if(src&&src!==id){ const to=+row.dataset.k; lttMove(src,to); } row.classList.remove('over'); }); } });
+  d.querySelector('[data-x="imp"]').onclick=()=>{ lttImportFiles(); }; d.querySelector('[data-x="exp"]').onclick=()=>{ lttExport(); }; d.querySelector('[data-x="impj"]').onclick=()=>{ lttImportFiles(); };
+  setTimeout(()=>document.addEventListener('pointerdown',_lttOut,true),0); }
+// génération : le tableau choisi remplace celui de KERF (sauf si « garder l'en-tête du fichier ouvert » est actif : c'est alors celui du fichier)
+if(typeof _buildLST==='function'){ const _buildLSTk=_buildLST;
+  _buildLST=function(progName,techno,req,body){ const S=window._lstSrc; if(S&&S.keep&&S.header&&S.footer&&S.dataset) return _buildLSTk(progName,techno,req,body);
+    const it=lttSel(); if(!it) return _buildLSTk(progName,techno,req,body);
+    const full=_buildLSTk(progName,it.ds,req,body); const i=full.lastIndexOf('BEGIN_LTT_STAMM'), j=full.lastIndexOf('ENDE_LTT_STAMM'); if(i<0||j<i) return full;
+    return full.slice(0,i)+lttBlock(it)+full.slice(j+'ENDE_LTT_STAMM'.length); }; }
+if(typeof wzGenLaser==='function'){ const _wzGLk=wzGenLaser; wzGenLaser=function(){ try{ _lttApply(); }catch(e){} try{ const ib=document.getElementById('lstInfo'); if(ib) ib.remove(); }catch(e){} return _wzGLk.apply(this,arguments); }; }
+// ouvrir un .LST de l'ingé : son tableau rejoint la bibliothèque (et devient le tableau choisi)
+if(typeof lstOpenText==='function'){ const _lstOT=lstOpenText; lstOpenText=function(text,name,mode){ const r=_lstOT.apply(this,arguments); if(r){ try{ const a=lttAddText(text,true); if(a.added) setTimeout(()=>skSay('📚 Tableau '+(a.first&&a.first.ds)+' ajouté à la bibliothèque'),1400); }catch(e){} } return r; }; }
+
+// ── AMORCES : réglages (mini-amorce dans les fentes étroites, sortie en arc) ──
+let _kk={mini:true,out:true};
+function _kkLoad(){ try{ const v=JSON.parse(localStorage.getItem('kerf_leads2')||'null'); if(v){ _kk.mini=v.mini!==false; _kk.out=v.out!==false; } }catch(e){} const a=document.getElementById('laserLeadMini'), b=document.getElementById('laserLeadOut'); if(a) a.checked=_kk.mini; if(b) b.checked=_kk.out; }
+function _kkSave(){ const a=document.getElementById('laserLeadMini'), b=document.getElementById('laserLeadOut'); if(a) _kk.mini=!!a.checked; if(b) _kk.out=!!b.checked; try{ localStorage.setItem('kerf_leads2',JSON.stringify(_kk)); }catch(e){} try{ if(typeof _dcBuild==='function') _dcBuild(); }catch(e){} try{ wzGenLaser(); }catch(e){} }
+// SORTIE : petit demi-cercle qui part du point de départ/fin du contour DANS LE SENS de la coupe et s'en va dans la chute
+// (même cercle que l'amorce d'entrée quand il y en a une -> il revient au point de perçage, comme le programme de l'ingé).
+function _kkLeadOut(c,S,chosen,gw){ if(!_kk.out||!c||!c._closed||!S||!c.moves||!c.moves.length||typeof gw!=='function') return '';
+  let T=null; for(const mv of c.moves){ const s=String(mv).split(';')[0]; const X=/X(-?\d*\.?\d+)/.exec(s), Y=/Y(-?\d*\.?\d+)/.exec(s), I=/I(-?\d*\.?\d+)/.exec(s), J=/J(-?\d*\.?\d+)/.exec(s);
+    if(/^G[23]\b/.test(s)&&I&&J){ const O=[S[0]+(+I[1]),S[1]+(+J[1])]; const v=[-(S[1]-O[1]),S[0]-O[0]]; const l=Math.hypot(v[0],v[1]); if(l>1e-9){ const sg=/^G3/.test(s)?1:-1; T=[v[0]/l*sg,v[1]/l*sg]; break; } }
+    if(X&&Y){ const d=Math.hypot(+X[1]-S[0],+Y[1]-S[1]); if(d>1e-4){ T=[(+X[1]-S[0])/d,(+Y[1]-S[1])/d]; break; } } }
+  if(!T) return ''; let N=[T[1],-T[0]];
+  if(chosen&&chosen.A){ const dA=[chosen.A[0]-S[0],chosen.A[1]-S[1]]; if(dA[0]*N[0]+dA[1]*N[1]<0) N=[-N[0],-N[1]]; }
+  else if(gw([S[0]+N[0]*0.05,S[1]+N[1]*0.05])!==true) N=[-N[0],-N[1]];
+  if(gw([S[0]+N[0]*0.05,S[1]+N[1]*0.05])!==true) return '';
+  let r0=(chosen&&chosen.O)?Math.hypot(chosen.O[0]-S[0],chosen.O[1]-S[1]):0.5; if(!(r0>0.02)) r0=0.5; r0=Math.min(r0,5);
+  for(let r=r0; r>=0.03; r*=0.7){ const O=[S[0]+N[0]*r,S[1]+N[1]*r]; const vc=[-(S[1]-O[1]),S[0]-O[0]]; const g=(vc[0]*T[0]+vc[1]*T[1]>=0)?'G3':'G2'; const dir=g==='G3'?1:-1;
+    const a0=Math.atan2(S[1]-O[1],S[0]-O[0]); const NS=Math.max(16,Math.round(Math.PI*r*12)); const mrg=Math.min(0.12,r*0.6); let ok=true;
+    for(let k=1;k<=NS;k++){ const an=a0+dir*Math.PI*k/NS; const p=[O[0]+r*Math.cos(an),O[1]+r*Math.sin(an)]; if(Math.hypot(p[0]-S[0],p[1]-S[1])<mrg) continue; if(gw(p)!==true){ ok=false; break; } }
+    if(!ok) continue; const E=[S[0]+2*N[0]*r,S[1]+2*N[1]*r];
+    try{ if(window._kkOuts){ const pl=[]; for(let k=0;k<=16;k++){ const an=a0+dir*Math.PI*k/16; pl.push([O[0]+r*Math.cos(an),O[1]+r*Math.sin(an)]); } window._kkOuts.push(pl); } }catch(e){}
+    return g+' X'+_lc(E[0])+' Y'+_lc(E[1])+' I'+_lc(O[0]-S[0])+' J'+_lc(O[1]-S[1])+'   ;SORTIE : arc dans la chute (le laser ne s\'eteint pas sur la piece)\n'; }
+  return ''; }
+try{ _lttLoad(); }catch(e){} try{ _kkLoad(); }catch(e){} try{ _lttApply(); }catch(e){}
+
+// ── KL : Z comme l'ingé — plus de G1 Z0 avant le perçage ; levée de la tête entre deux découpes EN OPTION ──
+let _kkZ={lift:false};
+function _kkZSync(){ const a=document.getElementById('laserZliftOn'), v=document.getElementById('laserZlift'); if(a) a.checked=!!_kkZ.lift; if(v){ v.disabled=!_kkZ.lift; v.style.opacity=_kkZ.lift?'':'.45'; } }
+function _kkZLoad(){ try{ const v=JSON.parse(localStorage.getItem('kerf_zlift')||'null'); if(v) _kkZ.lift=!!v.lift; }catch(e){} _kkZSync(); }
+function _kkZSave(){ const a=document.getElementById('laserZliftOn'); if(a) _kkZ.lift=!!a.checked; try{ localStorage.setItem('kerf_zlift',JSON.stringify(_kkZ)); }catch(e){} _kkZSync(); try{ wzGenLaser(); }catch(e){} }
+try{ _kkZLoad(); }catch(e){}
 
 </script>
 <!-- ╚═ FIN ESQUISSE (SK) ═╝ -->
