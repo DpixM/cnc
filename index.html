@@ -164,6 +164,10 @@
    Workflow mise a jour : editer -> cp text-to-cnc.html vers index.html ->
    push sur DpixM/cnc main -> GitHub Pages redeploie tout seul (~1 min). Gratuit, illimite.
 
+-- 2026-11-26 — KN : LASER — LIGNES EN PLUS PAR FORME (page Découpe, carte 5) : clic sur une forme -> son BLOC G-code s'affiche,
+   et on lui ajoute ses lignes : avant le perçage / juste après TC_LASER_ON / après TC_LASER_OFF (boutons + TC_DIST_FREEZE(1),
+   + TC_DIST_FREEZE(0), + M00). « Suiveur figé : Auto / Oui / Non » forme par forme (Auto = la case de la page Découpe).
+   Les lignes tapées sortent telles quelles (jamais recalculées par le changement de repère).
 -- 2026-11-26 — KM : LASER — LES 18 TABLEAUX DE LA MACHINE dans la bibliothèque (📟, relevés sur l'écran de la TruLaser :
    inox 1.4301 0,8 → 4 mm, acier St37 0,5 → 8 mm, azote / air / oxygène). Choisir un 📟 = le programme APPELLE ce tableau par son
    nom (TM_LTTNAME) et n'emporte AUCUN réglage : ce sont ceux de la machine qui servent. « ➕ Ajouter un tableau de la machine »
@@ -2577,7 +2581,7 @@ svg .edbox{fill:rgba(12,14,18,.82);stroke:#f5a623;stroke-width:1;rx:4;cursor:poi
 <!-- ── TOP BAR ── -->
 <div id="topBar">
   <span style="font-family:var(--mono);font-size:13px;font-weight:900;color:var(--acc);letter-spacing:2px" title="KERF = la saignée, la largeur du trait de coupe">✦ KERF</span>
-  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-26-KM ⚡auto</span>
+  <span id="appVer" title="Version — hébergée, auto-déployée" style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono);margin-left:8px;letter-spacing:.5px">v2026-11-26-KN ⚡auto</span>
   <div class="wz-prog" id="wzProg"></div>
   <span style="font-size:10px;color:var(--txt2);font-weight:600" id="wzLbl">—</span>
 </div>
@@ -21407,10 +21411,12 @@ function buildLaserBody(){
       _prev.push({pts, closed:!!c._closed, start:S?[S[0],S[1]]:null, key:c.key, orig:c._orig, ob:c._ob, off:c._userOff||0, dir:(c._closed?_effDir(c):'auto'), waste:wasteInside,
         lead:chosen?{A:chosen.A.slice(),O:chosen.O?chosen.O.slice():null,g:chosen.g||null,line:!!chosen.line,man:!!chosen._man,sweep:(chosen.sweep!=null?chosen.sweep:Math.PI),S:[S[0],S[1]]}:null,
         manDirect:!!(_man && _man.type==='direct') }); }catch(e){}
-    if(typeof _dfWant==='function' && _dfWant(wasteInside)) head=_dfIns(head);   // KJ : suiveur figé (la tête ne plonge pas dans le trou)
+    { const _uc=(typeof _kkUC==='function')?_kkUC(c):null; const _fz=(_uc&&_uc.frz!=null)?_uc.frz:null;   // KN : réglage de CETTE forme (page Découpe)
+      if(typeof _dfWant==='function' && (_fz===1 || (_fz==null && _dfWant(wasteInside)))) head=_dfIns(head);
+      if(_uc) head=_kkUHead(head,_uc); }   // KJ : suiveur figé (la tête ne plonge pas dans le trou)
     return head + c.moves.join('\n')+'\n'
       +(typeof _kkLeadOut==='function'?_kkLeadOut(c,S,chosen,globalWaste):'')   // KK : sortie en arc dans la chute
-      +'TC_LASER_OFF(2)'
+      +'TC_LASER_OFF(2)'+((typeof _kkUPost==='function')?_kkUPost(c):'')   // KN : lignes après TC_LASER_OFF
       +((typeof _kkZ!=='undefined'&&_kkZ.lift)?'\nG1 Z'+_lc(ZL)+'   ;lever la tete pour aller a la decoupe suivante':'');   // KL : levée en option, plus de Z0
   });
   // DELIMITATION : avant de couper, tour du rectangle englobant A VIDE (laser off) + M00.
@@ -21454,10 +21460,13 @@ function buildLaserBody(){
   // Avant : X = x - xmin -> la pièce sortait en MIROIR gauche/droite (Seb : « c'est à l'envers »).
   // Maintenant : X = xmax - x (tout reste positif, même surface, même coin de départ physique), Y inchangé.
   // Un miroir gauche/droite inverse le sens des arcs : G2 <-> G3, et I change de signe (J ne bouge pas).
-  if(haveOff){ text=text.split('\n').map(L=>{ const k=L.indexOf(';'); let c=k>=0?L.slice(0,k):L; const cm=k>=0?L.slice(k):'';
+  // KN : une ligne marquée \u0001 = tapée par l'utilisateur -> recopiée telle quelle (pas de changement de repère)
+  const _xfL=L=>{ if(L.charCodeAt(0)===1) return L.slice(1); if(!haveOff) return L; const k=L.indexOf(';'); let c=k>=0?L.slice(0,k):L; const cm=k>=0?L.slice(k):'';
       c=c.replace(/([XY])(-?\d*\.?\d+)/g,(mm,ax,num)=>ax+_lc(ax==='X'?(offX-parseFloat(num)):(parseFloat(num)-offY)));
       if(/^G[23]\s/.test(c)){ c=c.replace(/I(-?\d*\.?\d+)/,(mm,num)=>'I'+_lc(-parseFloat(num))).replace(/^G([23])/,(mm,g)=>'G'+(g==='2'?'3':'2')); }
-      return c+cm; }).join('\n'); }
+      return c+cm; };
+  text=text.split('\n').map(_xfL).join('\n');
+  try{ const _bk={}; if(_prev.length===blocks.length) blocks.forEach((b,i)=>{ const p=_prev[i]; if(p&&p.key!=null) _bk[p.key]=String(b).split('\n').map(_xfL).join('\n'); }); window._kkBlk=_bk; }catch(e){}   // KN : bloc de chaque forme (page Découpe)
   _laserCutPaths=_prev;
   return {text, count:contours.length};
 }
@@ -40285,6 +40294,49 @@ if(typeof _buildLST==='function'){ const _bm=_buildLST; _buildLST=function(progN
         const it=_lttMkMachine(ds,q('mat').value.trim(),thk,{}); _ltt.items.push(it); _ltt.sel=it.id; _lttSave(); _lttApply(); try{ wzGenLaser(); }catch(e){} lttOpen(); };
       f.querySelector('[data-a="ok"]').onclick=go; f.querySelector('[data-a="no"]').onclick=()=>lttOpen(); }; }; }
 try{ _lttLoad(); _lttApply(); }catch(e){}
+
+// ═══ KN : LIGNES EN PLUS PAR FORME (page Découpe) — clic sur une forme -> son bloc G-code + lignes à ajouter avant / après ═══
+// Par forme (et ses « pareilles » si le lien 🔗 est actif) : suiveur figé Auto / Oui / Non, lignes avant le perçage,
+// juste après TC_LASER_ON, après TC_LASER_OFF. Les lignes tapées sont recopiées TELLES QUELLES (jamais recalculées).
+function _kkUC(c){ const cf=(typeof _dcCfg!=='undefined'&&_dcCfg&&c&&c.key!=null)?_dcCfg[c.key]:null; if(!cf) return null; if(cf.frz==null&&!cf.uPre&&!cf.uOn&&!cf.uPost) return null; return cf; }
+function _kkLines(t){ return String(t||'').replace(/\r/g,'').split('\n').map(s=>s.replace(/\s+$/,'')).filter(s=>s.trim()).map(s=>'\u0001'+s); }
+function _kkUHead(head,cf){ let h=head; const pre=_kkLines(cf.uPre), on=_kkLines(cf.uOn);
+  if(on.length){ const L=h.split('\n'); let i=L.findIndex(l=>/^TC_LASER_ON/.test(l)); if(i>=0){ if(/^TC_DIST_FREEZE/.test(L[i+1]||'')) i++; L.splice(i+1,0,...on); h=L.join('\n'); } }
+  if(pre.length) h=pre.join('\n')+'\n'+h; return h; }
+function _kkUPost(c){ const cf=_kkUC(c); if(!cf) return ''; const p=_kkLines(cf.uPost); return p.length?'\n'+p.join('\n'):''; }
+function _kkEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
+function _kkCard(){ let card=document.getElementById('dcUserCard'); if(card) return card;
+  const ref=[...document.querySelectorAll('.dccard')].find(d=>/Rentrée du laser/.test(d.textContent)); if(!ref) return null;
+  card=document.createElement('div'); card.className='dccard'; card.id='dcUserCard';
+  const ta='width:100%;box-sizing:border-box;font:12px var(--mono,monospace);background:var(--surf);color:var(--txt);border:1.5px solid var(--brd2);border-radius:6px;padding:5px 7px;resize:vertical;margin-top:3px';
+  card.innerHTML='<div class="dct"><span class="dcn" style="background:#8b5cf6">5</span>Lignes en plus (bloc G-code)</div>'
+   +'<div class="dcs" id="dcuInfo"></div>'
+   +'<div class="dcrow" style="align-items:center"><span style="font-size:11px;white-space:nowrap">Suiveur figé :</span><button class="dcb" id="dcuF_a" title="Comme la case de la page Découpe (trous figés)">Auto</button><button class="dcb" id="dcuF_1" title="TC_DIST_FREEZE(1) après TC_LASER_ON pour cette forme">Oui</button><button class="dcb" id="dcuF_0" title="Jamais figé pour cette forme">Non</button></div>'
+   +'<label style="font-size:11px;display:block">Avant le perçage<textarea id="dcuPre" rows="2" spellcheck="false" style="'+ta+'"></textarea></label>'
+   +'<label style="font-size:11px;display:block">Juste après TC_LASER_ON<textarea id="dcuOn" rows="2" spellcheck="false" style="'+ta+'"></textarea></label>'
+   +'<div class="dcrow" style="flex-wrap:wrap;gap:4px"><button class="dcb" data-ins="on" data-t="TC_DIST_FREEZE(1)" style="font-size:11px;padding:4px 7px">+ TC_DIST_FREEZE(1)</button><button class="dcb" data-ins="on" data-t="TC_DIST_FREEZE(0)" style="font-size:11px;padding:4px 7px">+ TC_DIST_FREEZE(0)</button><button class="dcb" data-ins="pre" data-t="M00   ;pause" style="font-size:11px;padding:4px 7px">+ M00 avant</button></div>'
+   +'<label style="font-size:11px;display:block">Après TC_LASER_OFF<textarea id="dcuPost" rows="2" spellcheck="false" style="'+ta+'"></textarea></label>'
+   +'<details id="dcuBlkD" open><summary style="cursor:pointer;font-size:11px;font-weight:700">📄 Bloc G-code de la forme</summary><pre id="dcuBlk" style="max-height:220px;overflow:auto;margin:5px 0 0;padding:6px 8px;background:#0d0f12;border:1px solid var(--brd2);border-radius:6px;font:11px/1.45 var(--mono,monospace);color:#cbd5e1;white-space:pre"></pre></details>';
+  ref.parentNode.insertBefore(card,ref.nextSibling);
+  const T=()=>(typeof _dcSelRecs==='function')?_dcSelRecs():[];
+  const setAll=(k,v)=>{ const S=T(); if(!S.length){ _dcSay&&_dcSay('Clique d\'abord une forme'); return; } S.forEach(r=>{ const cf=_dcCfgFor(r.key); if(v==null||v==='') delete cf[k]; else cf[k]=v; }); _dcBuild(); };
+  card.querySelector('#dcuF_a').onclick=()=>setAll('frz',null); card.querySelector('#dcuF_1').onclick=()=>setAll('frz',1); card.querySelector('#dcuF_0').onclick=()=>setAll('frz',0);
+  for(const [id,k] of [['dcuPre','uPre'],['dcuOn','uOn'],['dcuPost','uPost']]){ const el=card.querySelector('#'+id);
+    el.addEventListener('change',()=>setAll(k,el.value.replace(/\r/g,'').replace(/\s+$/,'')));
+    el.addEventListener('keydown',e=>e.stopPropagation()); el.addEventListener('keyup',e=>e.stopPropagation()); el.addEventListener('pointerdown',e=>e.stopPropagation()); }
+  card.querySelectorAll('[data-ins]').forEach(b=>b.onclick=()=>{ const el=card.querySelector(b.dataset.ins==='pre'?'#dcuPre':'#dcuOn'); el.value=(el.value.replace(/\s+$/,'')+(el.value.trim()?'\n':'')+b.dataset.t); el.dispatchEvent(new Event('change')); });
+  return card; }
+function _kkCardSync(){ const card=_kkCard(); if(!card) return; const S=(typeof _dcSelRecs==='function')?_dcSelRecs():[]; const info=card.querySelector('#dcuInfo');
+  const ins=card.querySelectorAll('textarea,button'); ins.forEach(x=>x.disabled=!S.length); card.style.opacity=S.length?'':'.75';
+  const on=(id,v)=>{ const b=card.querySelector('#'+id); if(b) b.classList.toggle('on',!!v); };
+  if(!S.length){ info.textContent='Clique une forme sur le dessin : tu vois son bloc G-code et tu peux lui ajouter des lignes avant / après (ex : TC_DIST_FREEZE(1)).'; ['dcuPre','dcuOn','dcuPost'].forEach(id=>card.querySelector('#'+id).value=''); on('dcuF_a',0); on('dcuF_1',0); on('dcuF_0',0); card.querySelector('#dcuBlk').textContent=''; return; }
+  const cfs=S.map(r=>_dcCfg[r.key]||{}); const c0=cfs[0]; const same=k=>cfs.every(c=>(c[k]||'')===(c0[k]||''));
+  const act=document.activeElement; for(const [id,k] of [['dcuPre','uPre'],['dcuOn','uOn'],['dcuPost','uPost']]){ const el=card.querySelector('#'+id); if(el!==act) el.value=same(k)?(c0[k]||''):''; el.placeholder=same(k)?'(rien)':'(différent selon les formes — ce que tu tapes remplace pour toutes)'; }
+  const fz=cfs.every(c=>c.frz===c0.frz)?c0.frz:'mix'; on('dcuF_a',fz==null); on('dcuF_1',fz===1); on('dcuF_0',fz===0);
+  info.textContent=S.length+' forme(s) choisie(s) — ce que tu mets ici s\'applique à toutes. Le bloc montré est celui de la 1re.';
+  const blk=(window._kkBlk||{})[S[0].key]||''; const user=new Set([c0.uPre,c0.uOn,c0.uPost].join('\n').split('\n').map(s=>s.trim()).filter(Boolean));
+  card.querySelector('#dcuBlk').innerHTML=blk.split('\n').map(l=>{ const e=_kkEsc(l); if(user.has(l.trim())) return '<span style="color:#f59e0b;font-weight:700">'+e+'</span>'; if(/^TC_DIST_FREEZE|^TC_LASER_(ON|OFF)/.test(l)) return '<span style="color:#a78bfa">'+e+'</span>'; if(/;/.test(l)) return e.replace(/(;.*)$/,'<span style="color:#64748b">$1</span>'); return e; }).join('\n'); }
+if(typeof _dcPanel==='function'){ const _dcP0=_dcPanel; _dcPanel=function(){ const r=_dcP0.apply(this,arguments); try{ _kkCardSync(); }catch(e){ console.error('kn',e); } return r; }; }
 
 </script>
 <!-- ╚═ FIN ESQUISSE (SK) ═╝ -->
